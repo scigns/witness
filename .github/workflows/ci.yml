@@ -35,12 +35,19 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - id: check
+        # The precondition for every code job is an INSTALLABLE workspace, not merely
+        # the presence of a package.json. `actions/setup-node` with `cache: pnpm` and
+        # `pnpm install --frozen-lockfile` both require a committed lockfile, so that
+        # is what we gate on. Keying on package.json meant the placeholder manifests
+        # in packages/* switched these jobs on before there was anything to install.
         run: |
-          if find apps packages services workers sdk -name 'package.json' -not -path '*/node_modules/*' 2>/dev/null | grep -q .; then
+          if [ -f pnpm-lock.yaml ] && \
+             find apps packages services workers sdk -name '*.ts' -not -path '*/node_modules/*' 2>/dev/null | grep -q .; then
             echo "has_code=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Workspace is installable — code gates active."
           else
             echo "has_code=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No workspace source yet — code gates skipped. See STATUS.md."
+            echo "::notice::No installable workspace yet (no lockfile or no TypeScript source) — code gates skipped. See STATUS.md."
           fi
 
   docs:

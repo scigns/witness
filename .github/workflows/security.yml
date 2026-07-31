@@ -40,7 +40,10 @@ jobs:
         with:
           fail-on-severity: moderate
           # Incompatible with GPL-3.0, or unacceptable for public infrastructure.
-          deny-licenses: SSPL-1.0, BUSL-1.1, Elastic-2.0, RSAL-1.0, CC-BY-NC-4.0
+          # Every entry must be a valid SPDX identifier — the action rejects the whole
+          # list otherwise. Redis's RSALv2 has no SPDX id, so it is caught by name in
+          # scripts/security/check-licenses.sh instead. See OSS_EVALUATION.md.
+          deny-licenses: SSPL-1.0, BUSL-1.1, Elastic-2.0, CC-BY-NC-4.0
 
   licenses:
     name: Licence compatibility
