@@ -3,7 +3,10 @@
 **Owner:** Principal Architect
 **Status:** Baseline — Phase 1
 **Last reviewed:** 2026-07-31
-**Companion documents:** [`SYSTEM_CONTEXT.md`](SYSTEM_CONTEXT.md) · [`DATA_MODEL.md`](DATA_MODEL.md) · [`KNOWLEDGE_GRAPH.md`](KNOWLEDGE_GRAPH.md) · [`EVENT_CATALOGUE.md`](EVENT_CATALOGUE.md) · [`SECURITY_ARCHITECTURE.md`](SECURITY_ARCHITECTURE.md) · [`DEPLOYMENT_ARCHITECTURE.md`](DEPLOYMENT_ARCHITECTURE.md) · [`decisions/`](decisions/)
+**Companion documents:** [`SYSTEM_CONTEXT.md`](SYSTEM_CONTEXT.md) · [`DATA_MODEL.md`](DATA_MODEL.md)
+· [`KNOWLEDGE_GRAPH.md`](KNOWLEDGE_GRAPH.md) · [`EVENT_CATALOGUE.md`](EVENT_CATALOGUE.md) ·
+[`SECURITY_ARCHITECTURE.md`](SECURITY_ARCHITECTURE.md) ·
+[`DEPLOYMENT_ARCHITECTURE.md`](DEPLOYMENT_ARCHITECTURE.md) · [`decisions/`](decisions/)
 
 ---
 
@@ -249,6 +252,7 @@ Postgres holds the append-only event log and the normalised write model; Neo4j, 
 pgvector are **rebuildable projections**.
 
 This one decision is what makes tractable:
+
 - **Consent revocation** — delete from the log's tombstone set, rebuild projections, done
 - **Model re-runs** — re-extract, re-review, re-project without corrupting history
 - **Ontology evolution** — change the projection logic, replay

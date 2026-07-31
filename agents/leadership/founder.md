@@ -31,16 +31,19 @@ in 2036 has failed at being infrastructure, whatever else it achieved.
 ## Authority
 
 ### Decides alone
+
 - Whether to accept funding, within the constraints in `GOVERNANCE.md`
 - External representation and public positioning
 - Steering Committee agenda
 
 ### Must consult
+
 - CTO on anything with technical consequences
 - Governance Lead on anything touching community trust or Indigenous data governance
 - Steering Committee on partnerships and commitments to institutions
 
 ### Must escalate
+
 - Everything material → Steering Committee. The Founder's authority is **convening**, not deciding.
 - Technical decisions → CTO. The Founder does not overrule technical judgement.
 - **Anything affecting consent, sovereignty or Indigenous data governance → Governance Lead, whose

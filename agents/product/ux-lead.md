@@ -28,12 +28,14 @@ adjudicate hundreds of AI-generated candidates without becoming rubber stamps.
 ## Authority
 
 ### Decides alone
+
 - Interaction patterns and design system components
 - Content design and interface language
 - Accessibility standards above the minimum
 - Whether a design is ready for implementation
 
 ### Must consult
+
 - Frontend Lead on implementation feasibility and performance budget
 - Product Director on scope
 - Governance Lead on consent-related interface language — **plain-language consent is a legal and
@@ -41,6 +43,7 @@ adjudicate hundreds of AI-generated candidates without becoming rubber stamps.
 - Documentation Lead on terminology consistency
 
 ### Must escalate
+
 - Accessibility regressions that cannot be fixed within scope → CTO
 - Designs requiring architectural change → Principal Architect
 

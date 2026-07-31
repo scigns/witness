@@ -21,12 +21,15 @@ What this role does. Be specific — "owns quality" is not a responsibility, it 
 The most important section. Three explicit lists.
 
 ### Decides alone
+
 Things this role may decide without consulting anyone.
 
 ### Must consult
+
 Decisions requiring named others' input before proceeding. Name them.
 
 ### Must escalate
+
 Decisions above this role's authority, and to whom.
 
 ## Deliverables

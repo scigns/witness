@@ -44,6 +44,7 @@ Events (AsyncAPI 3.0) are the third interface, documented in [`EVENT_CATALOGUE.m
 ## Options considered
 
 ### Option A — GraphQL only
+
 **Pros:** one API to build and maintain; flexible for every consumer.
 **Cons:** excludes integrators who cannot or will not adopt GraphQL — a large fraction of government
 IT. A public GraphQL schema also becomes frozen by unknown consumers, losing the flexibility that
@@ -51,16 +52,19 @@ justified it. And an expressive query language exposed publicly is a denial-of-s
 exfiltration surface requiring query cost analysis and depth limiting to control.
 
 ### Option B — REST only
+
 **Pros:** universally understood; trivially cacheable; simple to secure and document.
 **Cons:** the waterfall problem above. We would end up building composite endpoints shaped exactly
 like our UI screens — a worse GraphQL, invented accidentally, and then frozen as a public contract.
 
 ### Option C — Both, with GraphQL as a BFF *(chosen)*
+
 **Pros:** each consumer gets what it needs; the public contract stays stable while the UI evolves
 freely; the BFF is not public API, so schema changes are cheap.
 **Cons:** two API surfaces to build, document, test and secure. Real, ongoing cost.
 
 ### Option D — gRPC for internal, REST for external
+
 **Pros:** efficient internal communication.
 **Cons:** our internal communication is predominantly asynchronous via events (ADR-0005), so the
 synchronous internal API surface is small. gRPC would add tooling for little benefit. Revisit if
@@ -69,12 +73,14 @@ synchronous service-to-service traffic grows.
 ## Consequences
 
 ### Positive
+
 - The web app fetches a full meeting view in one round trip — decisive for low-bandwidth use.
 - Integrators get a stable, documented, boring REST contract with a real deprecation policy.
 - Contract-first means the SDKs are generated, not hand-written, so they cannot drift.
 - Breaking-change detection in CI is possible because both surfaces have machine-readable specs.
 
 ### Negative
+
 - Two surfaces means duplicated authorisation, validation and audit concerns. Mitigated by both
   delegating to the same application layer — neither contains business logic.
 - More documentation to maintain.
@@ -82,6 +88,7 @@ synchronous service-to-service traffic grows.
   unstable public contract or an over-constrained BFF.
 
 ### Risks accepted
+
 That an integrator starts depending on the GraphQL BFF despite it not being a public contract. It is
 served on a distinct path, documented as unstable, and not included in the SDKs — but someone will
 do it anyway. If it becomes widespread we will have to decide whether to stabilise it, which would
@@ -105,4 +112,5 @@ permanent from v1.0, which is exactly why it is versioned and specified before w
 
 ## References
 
-- [`docs/guides/API_GUIDE.md`](../../docs/guides/API_GUIDE.md) · [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0.html) · [AsyncAPI 3.0](https://www.asyncapi.com/)
+- [`docs/guides/API_GUIDE.md`](../../docs/guides/API_GUIDE.md) · [OpenAPI
+  3.1](https://spec.openapis.org/oas/v3.1.0.html) · [AsyncAPI 3.0](https://www.asyncapi.com/)

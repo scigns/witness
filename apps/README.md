@@ -13,7 +13,8 @@ Deployable, user-facing applications.
 
 ## Rules
 
-- **Performance budget: ≤ 200 KB gzipped initial JavaScript.** Enforced in CI. It protects users on the
+- **Performance budget: ≤ 200 KB gzipped initial JavaScript.** Enforced in CI. It protects users on
+  the
   worst connections, and trading it away helps precisely the people who need help least ([ADR-0020](../architecture/decisions/ADR-0020-offline-first-and-low-connectivity.md)).
 - **WCAG 2.2 AA is a merge gate**, per component, not a milestone.
 - **No hard-coded user-facing strings.** ICU message format throughout.

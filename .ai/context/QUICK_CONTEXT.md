@@ -33,7 +33,7 @@ under what consent — and can I prove it five years later when everyone involve
 
 ## The flow
 
-```
+```text
 Recording → Transcription (Whisper, local) → Extraction (LLM → candidates)
   → HUMAN REVIEW ← the gap here is the entire ethical position of the product
   → Assertion (Postgres, system of record)
@@ -44,7 +44,7 @@ Everything before human review is a **proposal**. Everything after is **institut
 
 ## Layering
 
-```
+```text
 adapters (infra) → application (use cases) → domain (pure)
 ```
 

@@ -66,29 +66,34 @@ These are architectural constraints, not aspirations. A pull request that violat
 is rejected regardless of how good the code is.
 
 ### P1 — Digital sovereignty
+
 Every operator owns their knowledge, their models, their storage and their compute. The default
 deployment (`deployments/sovereign-onprem`) sends **zero bytes** outside the operator's network
 boundary. Any egress is opt-in, per-tenant, explicitly configured, logged, and visible to end
 users. See [ADR-0009](architecture/decisions/ADR-0009-ai-abstraction-and-model-sovereignty.md).
 
 ### P2 — Consent is a domain primitive
+
 Consent is not a checkbox and not a feature flag. It is a first-class aggregate with its own
 lifecycle, its own service, and enforcement at the policy decision point. **No consent record →
 no processing.** Consent is revocable, and revocation propagates through every projection.
 See [ADR-0008](architecture/decisions/ADR-0008-consent-as-a-domain-primitive.md).
 
 ### P3 — Provenance or it did not happen
+
 Every node and every edge in the knowledge graph carries an unbroken chain back to a source
 utterance, at a timestamp, in a recording, under a consent grant, extracted by a named model
 version, confirmed or corrected by a named human. Unattributable assertions are not permitted to
 exist in the graph. See [ADR-0012](architecture/decisions/ADR-0012-provenance-and-human-in-the-loop.md).
 
 ### P4 — The machine proposes, the human disposes
+
 AI extraction produces **candidate** assertions. Candidates require human confirmation before
 they become institutional record. We will never present a model's inference as fact. Confidence
 scores are shown to users, never hidden.
 
 ### P5 — Indigenous Data Sovereignty is designed in, not bolted on
+
 Witness will be used to record the knowledge of Indigenous and traditional-owner communities.
 CARE principles and OCAP® are architectural requirements: community-level (not just
 individual-level) consent, community-controlled access rules, cultural sensitivity flags, and
@@ -96,15 +101,18 @@ the right to withdraw knowledge entirely. See
 [ADR-0019](architecture/decisions/ADR-0019-indigenous-data-sovereignty.md).
 
 ### P6 — Decades, not quarters
+
 Design lifetime is **ten years minimum**. Optimise for maintainability, legibility and
 replaceability over delivery speed. Every component must be independently replaceable behind a
 port. A staff turnover event must not be an extinction event — for our users *or* for us.
 
 ### P7 — Boring, proven technology
+
 We prefer a widely deployed, well-understood tool over a better one nobody in a ministry of
 health can operate at 2am. New technology requires an ADR that names what it replaces.
 
 ### P8 — Accessible and multilingual by default
+
 WCAG 2.2 AA is a merge gate, not a milestone. Witness will run in low-bandwidth, intermittently
 connected environments in languages with limited model support. See
 [ADR-0020](architecture/decisions/ADR-0020-offline-first-and-low-connectivity.md).

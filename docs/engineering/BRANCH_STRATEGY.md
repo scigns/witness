@@ -11,7 +11,7 @@
 Trunk-based development with **long-lived domain integration branches**. Domain branches are owned
 integration lanes, **not parallel forks** — they sync from `develop` daily and never diverge.
 
-```
+```text
 main                         always releasable · protected · tagged for release
  └── develop                 continuous integration of all domains
       └── <domain>           long-lived · one named owner · synced daily
@@ -24,13 +24,13 @@ months, and GitFlow is what we are avoiding.
 
 ## Naming
 
-```
+```text
 <type>/<domain>/<issue-number>-<short-slug>
 ```
 
 `type` ∈ `feat` `fix` `docs` `refactor` `test` `perf` `chore` `spike`
 
-```
+```text
 feat/knowledge-graph/142-entity-resolution-adjudication
 fix/backend/318-outbox-duplicate-delivery
 docs/governance/205-indigenous-consent-protocols

@@ -125,6 +125,7 @@ in different places, because the failure modes differ.
 | Miss a security implication | State a confident and incorrect security rationale |
 
 **Reviewer checklist for AI-assisted changes:**
+
 - Does every API called actually exist, with those parameters?
 - Do the tests test the *requirement*, or do they restate the implementation?
 - Are error paths real, or ceremonial `try/catch` blocks that swallow?

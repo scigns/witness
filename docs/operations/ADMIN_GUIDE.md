@@ -16,6 +16,7 @@ policy · configure model and egress policy · view audit logs · run exports ·
 administration.
 
 **Cannot:**
+
 - **Read community-restricted knowledge.** There is no role that bypasses this and no break-glass
   mechanism ([ADR-0019](../../architecture/decisions/ADR-0019-indigenous-data-sovereignty.md)).
 - **Process data without a recorded consent grant.** The system refuses.
@@ -48,7 +49,8 @@ The highest-consequence area of the console.
   matters is how long it takes *you* to record it.
 - **Watch the propagation dashboard** after a withdrawal. Verification runs automatically and fails
   loudly, but a failure needs a human.
-- **Community delegations** must have their basis recorded — a council resolution, a customary role, a
+- **Community delegations** must have their basis recorded — a council resolution, a customary role,
+  a
   written protocol. Do not record a delegation you cannot evidence.
 
 ## Monitoring — the metrics that matter here

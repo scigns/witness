@@ -88,7 +88,8 @@ Written before work starts. Testable, not aspirational.
 **Bad:** "Search should be fast and return good results."
 
 **Good:**
-```
+
+```text
 - [ ] Hybrid search returns results in < 800 ms p95 over the 10k-meeting fixture set
 - [ ] No result is returned that the caller lacks permission to see (adversarial test)
 - [ ] No result is returned from a session whose consent has been revoked

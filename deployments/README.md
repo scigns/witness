@@ -3,7 +3,8 @@
 **Owner:** Infrastructure Lead
 **Status:** Phase 2 deliverable
 
-Composed, opinionated deployment topologies. Where [`infrastructure/`](../infrastructure/) provides the
+Composed, opinionated deployment topologies. Where [`infrastructure/`](../infrastructure/) provides
+the
 building blocks, this provides the assembled configurations an operator actually runs.
 
 | Topology | For | Profile |
@@ -17,7 +18,8 @@ building blocks, this provides the assembled configurations an operator actually
 It sends **zero bytes** outside the operator's network boundary. No telemetry, no licence check, no
 update check, no external model calls. Verified by `make egress-test`, which runs in CI.
 
-Note that `cloud-managed` still defaults to the `sovereign` profile. Running on cloud infrastructure is
+Note that `cloud-managed` still defaults to the `sovereign` profile. Running on cloud infrastructure
+is
 a hosting decision; permitting egress is a separate, deliberate one.
 
 See [`docs/operations/DEPLOYMENT_GUIDE.md`](../docs/operations/DEPLOYMENT_GUIDE.md).

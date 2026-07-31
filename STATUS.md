@@ -82,6 +82,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ## What changed recently
 
 ### 2026-07-31 — Foundation established
+
 - Repository scaffolded to the full enterprise structure.
 - Complete documentation baseline: context, vision, mission, roadmap, governance, engineering
   operating model, product operating model, all process documents.
@@ -97,6 +98,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   divergence, licence boundary, and static zero-egress verification. All pass on this commit.
 
 **Known gaps, stated plainly:**
+
 - The *runtime* half of zero-egress verification activates with the Phase 2 stack. Only the static
   half runs today.
 - Deployment, admin, user and API guides describe the **target** experience, not a shipped one. They

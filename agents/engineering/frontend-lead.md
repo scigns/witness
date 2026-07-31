@@ -27,17 +27,20 @@ review queue fast enough to use without becoming fast enough to rubber-stamp.
 ## Authority
 
 ### Decides alone
+
 - Component implementation and internal structure
 - State management approach
 - Frontend build and bundling configuration
 - Data fetching and caching strategy
 
 ### Must consult
+
 - UX Lead on interaction, accessibility and content design
 - Backend Lead on API shape — GraphQL BFF changes are collaborative
 - Product Director on scope
 
 ### Must escalate
+
 - Anything that would breach the performance budget → CTO
 - Accessibility regressions that cannot be fixed in scope → UX Lead and CTO
 - Adding a heavy dependency → CTO with an OSS evaluation

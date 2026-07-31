@@ -2,7 +2,8 @@
 
 **Owner:** Principal Architect & Backend Lead
 **Status:** Draft v0.1 — Phase 1 deliverable 1.2
-**Companion:** [`KNOWLEDGE_GRAPH.md`](KNOWLEDGE_GRAPH.md) (the projection) · [`EVENT_CATALOGUE.md`](EVENT_CATALOGUE.md) (the events)
+**Companion:** [`KNOWLEDGE_GRAPH.md`](KNOWLEDGE_GRAPH.md) (the projection) ·
+[`EVENT_CATALOGUE.md`](EVENT_CATALOGUE.md) (the events)
 
 > This describes the **write model** — the system of record in PostgreSQL. The knowledge graph is
 > a projection derived from it, described separately. If the two ever disagree, the write model is
@@ -71,7 +72,7 @@ without contention — and review throughput is a known bottleneck risk (A-6).
 
 ### Tenancy and identity
 
-```
+```text
 tenant                (id, slug, name, data_residency, deployment_profile, created_at)
 workspace             (id, tenant_id, name, description, retention_policy_id, archived_at)
 user_account          (id, tenant_id, external_subject_id, display_name, email, status, ...)
@@ -89,7 +90,7 @@ A **Subject** is a person whose data may be processed. Critically, a subject **n
 user** — most people recorded in a community consultation will never hold an account, and their
 rights must work anyway.
 
-```
+```text
 subject               (id, tenant_id, display_name, subject_type, linked_user_id?, created_at)
                       -- subject_type: individual | community | organisation
 consent_grant         (id, tenant_id, subject_id, granted_by_subject_id, legal_basis,
@@ -113,7 +114,7 @@ erasure_request       (id, tenant_id, subject_id, requested_at, scope, status,
 
 ### Sessions and media
 
-```
+```text
 session               (id, tenant_id, workspace_id, title, session_type, occurred_at,
                        location_id?, convening_org_id?, status, sensitivity_class,
                        consent_state, created_by, ...)
@@ -135,7 +136,7 @@ important safety check in the system.
 
 ### Transcription
 
-```
+```text
 transcript            (id, tenant_id, media_object_id, engine, engine_version, model,
                        language_detected, wer_estimate?, status, produced_at)
 utterance             (id, transcript_id, sequence, speaker_label, subject_id?,
@@ -155,7 +156,7 @@ it can be corrected without touching the transcript.
 
 ### Extraction and assertion
 
-```
+```text
 extraction_run        (id, tenant_id, transcript_id, pipeline_version, model_id, model_version,
                        prompt_id, prompt_hash, parameters_json, started_at, completed_at, status)
 candidate_assertion   (id, run_id, tenant_id, assertion_type, payload_json, confidence,
@@ -177,7 +178,7 @@ parameters are recoverable, forever.
 
 ### Knowledge entities
 
-```
+```text
 entity                (id, tenant_id, entity_type, canonical_label, sensitivity_class,
                        community_restriction_id?, created_at, merged_into_id?)
 entity_identity       (id, entity_id, identifier_scheme, identifier_value, confidence, source)
@@ -198,7 +199,7 @@ a `NOT NULL` foreign key. Provenance is not a convention here; it is a constrain
 
 ### Audit
 
-```
+```text
 audit_entry           (id, tenant_id, sequence, actor_type, actor_id, action, resource_type,
                        resource_id, outcome, context_json, occurred_at,
                        previous_hash, entry_hash)
@@ -212,7 +213,7 @@ externally-anchored checkpoint.
 
 ### Event log
 
-```
+```text
 event_log             (id, tenant_id, aggregate_type, aggregate_id, sequence, event_type,
                        event_version, payload_json, metadata_json, occurred_at, recorded_at)
 outbox                (id, event_id, destination, status, attempts, last_attempt_at, published_at)
@@ -232,7 +233,7 @@ Two axes, always distinguished:
 | **Valid time** | `valid_from` / `valid_to` | When was this true in the world? |
 | **Transaction time** | `recorded_at` / `retracted_at` | When did we believe it? |
 
-```
+```text
 Alice became Director of Housing on 2026-01-01.        ← valid time
 We learned this in a meeting on 2027-03-04.            ← transaction time
 We discovered on 2027-09-12 that the date was wrong.   ← retraction + new assertion
@@ -243,6 +244,7 @@ here is when we were wrong, and here is what we believed while we were wrong." A
 reviewing a 2027 decision needs to know what the decision-maker knew *then*, not what we know now.
 
 Queries:
+
 - *Current belief about now:* `valid_to IS NULL AND retracted_at IS NULL`
 - *What we believed on date D:* `recorded_at <= D AND (retracted_at IS NULL OR retracted_at > D)`
 - *What was true on date D:* `valid_from <= D AND (valid_to IS NULL OR valid_to > D)`

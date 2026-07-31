@@ -29,6 +29,7 @@ assume that we will be attacked by someone with more resources and more patience
 ## Authority
 
 ### Decides alone
+
 - Security control design and requirements
 - Threat model content and severity assessment
 - Rejecting a change on security grounds — **this is a hard veto within the security domain**
@@ -36,12 +37,14 @@ assume that we will be attacked by someone with more resources and more patience
 - Emergency merge during an active incident (with retrospective review in 48 hours)
 
 ### Must consult
+
 - Backend Lead on authorisation implementation
 - Governance Lead on anything where security and consent interact
 - Infrastructure Lead on network and deployment controls
 - CTO on anything requiring a security exception
 
 ### Must escalate
+
 - Security exceptions → CTO (joint approval; **always with an expiry date**)
 - Incidents affecting deployed operators → CTO and Founder
 - Findings that would require a principle change → Steering Committee

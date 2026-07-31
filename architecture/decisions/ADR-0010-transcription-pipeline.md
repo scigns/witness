@@ -42,27 +42,32 @@ why we can accept this ADR now without waiting for the benchmark.
 ## Options considered
 
 ### Option A — OpenAI Whisper reference implementation
+
 **Pros:** the canonical implementation; MIT; broad language coverage.
 **Cons:** slow; high memory; segment-level timestamps only, which fails the provenance requirement.
 
 ### Option B — faster-whisper (CTranslate2) *(chosen for transcription)*
+
 **Pros:** roughly 4× faster, substantially lower memory, supports int8 quantisation so it runs
 acceptably on CPU-only hardware — which matters enormously for the single-node profile. Same model
 weights, so quality is equivalent.
 **Cons:** still segment-level timestamps alone; another layer between us and upstream Whisper.
 
 ### Option C — WhisperX *(chosen for alignment and diarisation)*
+
 **Pros:** forced alignment gives word-level timestamps; integrates pyannote diarisation; solves
 exactly our provenance-precision problem.
 **Cons:** heavier pipeline; pyannote models have gated licences requiring acceptance of terms, which
 complicates the air-gapped offline bundle and must be handled explicitly in the install process.
 
 ### Option D — whisper.cpp
+
 **Pros:** minimal dependencies, excellent CPU performance, trivially embeddable, no Python runtime.
 **Cons:** weaker diarisation and alignment ecosystem.
 **Retained** as the recommended binding for the most constrained and embedded deployments.
 
 ### Option E — Commercial ASR (Deepgram, AssemblyAI, Azure Speech)
+
 **Pros:** often better accuracy, especially on hard audio; no infrastructure.
 **Cons:** violates P1 as a default. Supported as opt-in adapters under the same egress policy as
 ADR-0009, never as the default.
@@ -70,6 +75,7 @@ ADR-0009, never as the default.
 ## Consequences
 
 ### Positive
+
 - Word-level timestamps make provenance precise enough to play the exact sentence.
 - Runs fully locally, including air-gapped.
 - Quantisation makes CPU-only deployment viable, if slow.
@@ -77,6 +83,7 @@ ADR-0009, never as the default.
   language can use them.
 
 ### Negative
+
 - A multi-stage pipeline is more failure modes than a single call. Each stage needs independent retry
   and observability.
 - **pyannote's gated model licence** is a genuine friction point for offline bundles and must be
@@ -88,6 +95,7 @@ ADR-0009, never as the default.
   what real meetings contain.
 
 ### Risks accepted
+
 - **Quality in low-resource languages may be inadequate**, and this falls hardest on the institutions
   we most want to serve. Mitigations: publish WER and DER per language honestly; support
   community-contributed fine-tuned models; treat this as a named equity commitment with an owner
@@ -113,4 +121,7 @@ fastest-moving part of our stack and we expect to change it more than once.
 
 ## References
 
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) · [WhisperX](https://github.com/m-bain/whisperX) · [whisper.cpp](https://github.com/ggerganov/whisper.cpp) · [pyannote.audio](https://github.com/pyannote/pyannote-audio)
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) ·
+  [WhisperX](https://github.com/m-bain/whisperX) ·
+  [whisper.cpp](https://github.com/ggerganov/whisper.cpp) ·
+  [pyannote.audio](https://github.com/pyannote/pyannote-audio)

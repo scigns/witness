@@ -31,6 +31,7 @@ together is how systems become unmaintainable, and nobody notices until it is ex
 ## Authority
 
 ### Decides alone
+
 - Bounded context boundaries and service decomposition
 - Layering rules and dependency direction
 - Whether a change requires an ADR
@@ -38,12 +39,14 @@ together is how systems become unmaintainable, and nobody notices until it is ex
 - Rejecting a change on structural grounds
 
 ### Must consult
+
 - CTO on any decision affecting the technology stack
 - Domain leads on changes within their domains
 - Security Lead on trust boundary changes
 - Knowledge Graph Lead on ontology structure
 
 ### Must escalate
+
 - Technology stack additions → CTO
 - Changes to principles P1–P8 → CTO → Steering Committee
 - Consent, provenance or Indigenous data governance → Governance Lead

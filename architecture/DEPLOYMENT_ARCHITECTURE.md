@@ -2,7 +2,8 @@
 
 **Owner:** Infrastructure Lead
 **Status:** Baseline — Phase 1
-**Companion:** [`docs/operations/DEPLOYMENT_GUIDE.md`](../docs/operations/DEPLOYMENT_GUIDE.md) (how) · [ADR-0013](decisions/ADR-0013-tenancy-and-deployment-topology.md) (why)
+**Companion:** [`docs/operations/DEPLOYMENT_GUIDE.md`](../docs/operations/DEPLOYMENT_GUIDE.md) (how)
+· [ADR-0013](decisions/ADR-0013-tenancy-and-deployment-topology.md) (why)
 
 ---
 
@@ -116,6 +117,7 @@ thing that quietly ruins disaster recovery in polyglot systems — are simply no
 **Recovery is drilled quarterly.** An untested backup is a hypothesis.
 
 Degradation ladder, in order:
+
 1. Neo4j down → graph views unavailable; search, transcripts and review continue
 2. OpenSearch down → lexical search degrades to Postgres full-text; everything else continues
 3. Workers down → ingestion queues; nothing is lost; users see honest queue status

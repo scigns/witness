@@ -33,34 +33,41 @@ guess as though it were a fact, and if it ever appears to, that is a serious bug
 ## Common tasks
 
 ### Finding out what was decided
+
 Search in your own words. Witness looks for both exact matches and related discussion, so *"water
 access"* will also find *"the bore ran dry"*.
 
 ### Checking why something was decided
+
 Open a decision and select **Show provenance**. You will see the exact words spoken, who said them,
 when, and you can play the audio from that moment. This is the point of Witness — you never have to
 take its word for anything.
 
 ### Tracking a commitment
+
 Commitments are promises made to someone. Each has who promised, who it was promised to, what, by when,
 and its current status. Filter by status to see what is outstanding.
 
 ### Reviewing suggestions
+
 If you are a reviewer, you will have a queue. For each suggestion: read it, listen to the source,
 then **confirm**, **correct** or **reject**.
 
 **Rejecting is as valuable as confirming.** It tells us where the system is getting things wrong, and
-that is how it improves. There is no target for how many you should confirm, and nobody is measured on
+that is how it improves. There is no target for how many you should confirm, and nobody is measured
+on
 speed.
 
 **Take the time to check.** A confirmed assertion becomes the institution's memory, and someone may
 rely on it in five years.
 
 ### Recording a meeting
+
 Create a session, add participants, record consent from everyone, then upload or record. **Witness will
 not process a recording without consent.** That is not a setting; it is how it works.
 
 ### Working offline
+
 In the field with no signal, Witness still records. Your work is saved on your device and uploads when
 you have a connection. Look for the sync indicator, and **do not clear your browser data before it has
 synced**.

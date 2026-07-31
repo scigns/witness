@@ -36,6 +36,7 @@ organisation.
 ## Roles
 
 ### Leadership
+
 | Role | Owns |
 |---|---|
 | [Founder](leadership/founder.md) | Mission integrity, funding, external relationships, succession |
@@ -44,6 +45,7 @@ organisation.
 | [Engineering Manager](leadership/engineering-manager.md) | Flow of work, contributor health, process |
 
 ### Product
+
 | Role | Owns |
 |---|---|
 | [Product Director](product/product-director.md) | What we build, why, and what we decline |
@@ -51,6 +53,7 @@ organisation.
 | [Research Lead](product/research-lead.md) | Evidence — user research, OSS evaluation, benchmarks |
 
 ### Engineering
+
 | Role | Owns |
 |---|---|
 | [Backend Lead](engineering/backend-lead.md) | Services, domain layer, data, events, APIs |
@@ -59,6 +62,7 @@ organisation.
 | [Knowledge Graph Lead](engineering/knowledge-graph-lead.md) | Ontology, projection, entity resolution, provenance |
 
 ### Platform
+
 | Role | Owns |
 |---|---|
 | [Infrastructure Lead](platform/infrastructure-lead.md) | Deployment, operability, observability, CI/CD |
@@ -66,12 +70,14 @@ organisation.
 | [Developer Experience Lead](platform/developer-experience-lead.md) | Toolchain, templates, onboarding, build |
 
 ### Quality
+
 | Role | Owns |
 |---|---|
 | [QA Lead](quality/qa-lead.md) | Test strategy, invariants, adversarial and evaluation testing |
 | [Release Manager](quality/release-manager.md) | Releases, versioning, LTS, upgrade and rollback |
 
 ### Community & governance
+
 | Role | Owns |
 |---|---|
 | [Governance Lead](community/governance-lead.md) | Consent, sovereignty, Indigenous data governance — **holds an absolute veto** |

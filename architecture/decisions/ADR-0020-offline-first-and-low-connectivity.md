@@ -41,10 +41,12 @@ functional on five-year-old Android hardware.
 ## Options considered
 
 ### Option A — Online-only web application
+
 **Pros:** far simpler; no sync, no offline state, no conflict handling.
 **Cons:** unusable where it is most needed. Rejected on principle P8.
 
 ### Option B — Native mobile applications
+
 **Pros:** best offline experience; best audio capture; background recording.
 **Cons:** two additional codebases, two app store relationships, two release processes — a
 substantial permanent maintenance burden for a small team. App store distribution is also a
@@ -53,6 +55,7 @@ the strongest alternative and it is deferred rather than dismissed: if field evi
 is inadequate for audio capture, we revisit with data.
 
 ### Option C — Offline-capable PWA *(chosen)*
+
 **Pros:** one codebase; installable; no app store dependency, so air-gapped distribution works;
 service worker gives real offline capability; adequate audio capture via MediaRecorder.
 **Cons:** browser audio capture is less reliable than native — background recording, screen lock and
@@ -60,6 +63,7 @@ long-session behaviour vary by platform and will produce real field failures. St
 browser-controlled. iOS Safari has historically been the weakest PWA target.
 
 ### Option D — Separate lightweight field-capture tool
+
 **Pros:** purpose-built and minimal.
 **Cons:** another artefact to build and maintain, and a fragmented experience. Reconsider only if the
 PWA proves inadequate.
@@ -67,6 +71,7 @@ PWA proves inadequate.
 ## Consequences
 
 ### Positive
+
 - Field workers can capture sessions with no connectivity, which is the core equity requirement.
 - One codebase; no app store dependency; air-gapped distribution works.
 - The performance budget benefits every user, not only those on poor connections.
@@ -74,6 +79,7 @@ PWA proves inadequate.
   constraint.
 
 ### Negative
+
 - **Browser audio capture is genuinely less reliable than native.** Long recordings, screen lock and
   backgrounding behave inconsistently across platforms. We will have field failures, and we should
   set expectations honestly rather than discover them with users.
@@ -85,6 +91,7 @@ PWA proves inadequate.
   simply unavailable to us.
 
 ### Risks accepted
+
 - **Data loss during field capture** — the most serious risk in this ADR. A recording lost before sync
   is often irreplaceable; the meeting will not reconvene. Mitigations: durable IndexedDB writes with
   chunked flushing during recording rather than at the end; explicit unsync'd-data warnings;
@@ -110,4 +117,5 @@ reversing this — the PWA would remain for desktop and air-gapped use.
 
 ## References
 
-- [`architecture/DEPLOYMENT_ARCHITECTURE.md`](../DEPLOYMENT_ARCHITECTURE.md) · [WCAG 2.2](https://www.w3.org/TR/WCAG22/) · [Web Almanac: PWA](https://almanac.httparchive.org/)
+- [`architecture/DEPLOYMENT_ARCHITECTURE.md`](../DEPLOYMENT_ARCHITECTURE.md) · [WCAG
+  2.2](https://www.w3.org/TR/WCAG22/) · [Web Almanac: PWA](https://almanac.httparchive.org/)

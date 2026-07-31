@@ -28,6 +28,7 @@ personal one.
 ## Authority
 
 ### Decides alone
+
 - Issue triage process, labels, priority definitions
 - Cadence and meeting structure
 - Reassigning a stalled review
@@ -35,11 +36,13 @@ personal one.
 - Reducing a contributor's load
 
 ### Must consult
+
 - Domain leads on prioritisation within their domains
 - CTO on process changes affecting quality gates
 - Product Director on sequencing
 
 ### Must escalate
+
 - Sustained capacity shortfall in a domain → CTO
 - Conduct concerns → Code of Conduct committee
 - Chronic process failure → CTO and retrospective

@@ -61,6 +61,7 @@ nobody in a ministry of health can debug.
 ## Frontend
 
 ### Next.js 15 + React 19 + TypeScript
+
 **Why:** server components meaningfully reduce client bundle size, which matters for the
 low-bandwidth field deployments in principle P8. Mature, enormous talent pool, self-hostable with
 no vendor dependency.
@@ -70,6 +71,7 @@ in CI by building and running the standalone container. Exit would be expensive 
 this is a deliberate, documented acceptance rather than an oversight.
 
 ### Tailwind CSS 4 + shadcn/ui
+
 **Why:** shadcn/ui is *copied into the repository*, not installed as a dependency. We own the
 component source, which is exactly right for a ten-year accessibility commitment — we can fix a
 WCAG defect without waiting for an upstream release. Built on Radix primitives, which have
@@ -82,6 +84,7 @@ genuinely good accessibility foundations.
 ## Backend
 
 ### NestJS
+
 **Why:** opinionated structure with first-class dependency injection, which is what makes
 hexagonal architecture practical rather than aspirational. Modules map cleanly to bounded
 contexts. Its conventions mean a new contributor reads any service and knows where things are —
@@ -92,6 +95,7 @@ layer. A framework migration would be a large but bounded adapter rewrite, not a
 system.
 
 ### GraphQL + REST, both, spec-first
+
 **Why:** they serve different consumers and we need both. GraphQL is the backend-for-frontend: the
 web app fetches a meeting with its decisions, participants and provenance in one round trip
 instead of a waterfall. REST is for integrators — government systems, scripts, EDRMS connectors,
@@ -101,6 +105,7 @@ changes only under the versioning policy in [`docs/guides/API_GUIDE.md`](../docs
 [ADR-0006](decisions/ADR-0006-api-strategy.md)
 
 ### Prisma
+
 **Why:** excellent TypeScript type inference, first-class migrations, good developer ergonomics.
 **Risk:** limited support for advanced Postgres features we will need — recursive CTEs, complex
 window functions, `pgvector` operators, row-level security.
@@ -113,6 +118,7 @@ is fine.
 ## Data
 
 ### PostgreSQL 16 + pgvector — the system of record
+
 **Why:** the most operationally trusted open-source database in existence, understood by every
 public-sector DBA, with a 25-year track record and no ownership risk. `pgvector` means semantic
 search does not require a fourth data store, a fourth backup and a fourth on-call runbook.
@@ -121,6 +127,7 @@ because the alternative is a lowest-common-denominator abstraction that wastes t
 chose Postgres for. [ADR-0004](decisions/ADR-0004-polyglot-persistence.md)
 
 ### Neo4j 5 Community — graph projection
+
 **Why:** best-in-class traversal ergonomics; Cypher is genuinely readable by non-specialists, which
 matters when a policy analyst wants to understand a query.
 **Risk:** Community edition lacks clustering and some security features; the licence and product
@@ -130,11 +137,13 @@ behind `GraphPort`. **Apache AGE** (Postgres graph extension) is under active ev
 alternative binding for constrained deployments, tracked as open decision D-4.
 
 ### OpenSearch — lexical projection
+
 **Why:** Apache-2.0, community-governed under the Linux Foundation, no rug-pull risk of the kind
 that motivated its fork from Elasticsearch. Mature BM25 and aggregation capability.
 **Mitigation:** behind `SearchPort`; a Postgres full-text fallback exists for minimal deployments.
 
 ### Redis — cache, locks, rate limiting
+
 **Why:** ubiquitous, well understood, operationally simple.
 **⚠️ Licensing risk:** Redis moved to RSALv2/SSPL in 2024. Those licences are **not** acceptable for
 this project.
@@ -144,6 +153,7 @@ cache, nothing more. This is a genuine licensing hazard on a dependency people a
 it is exactly why every dependency needs an exit strategy.
 
 ### MinIO — object storage
+
 **Why:** S3-compatible API, self-hostable, straightforward to operate.
 **Risk:** AGPL-3.0 (compatible with our GPL-3.0 platform, but operators should understand it) and
 recent upstream feature-gating of the console.
@@ -155,6 +165,7 @@ Garage, Ceph, or a cloud provider's S3 — is a configuration change. Exit is ge
 ## Events
 
 ### NATS JetStream
+
 **Why it is here at all** (it was not in the original stack list, so it requires justification):
 services need reliable asynchronous communication with durable delivery. Kafka is the obvious
 answer and the wrong one for us — ZooKeeper/KRaft, partition management and rebalancing are a
@@ -170,6 +181,7 @@ viable at small scale and available as a profile for minimal deployments.
 ## AI platform
 
 ### Whisper (faster-whisper / WhisperX)
+
 **Why:** the best openly licensed ASR available, with credible multilingual coverage. MIT licensed
 weights. `faster-whisper` (CTranslate2) gives roughly 4× the throughput at lower memory;
 `WhisperX` adds forced alignment and speaker diarisation, and word-level timestamps are what make
@@ -178,17 +190,20 @@ our provenance spans precise rather than approximate.
 boundary means this is a configuration decision, not an architectural one.
 
 ### LiteLLM — model gateway
+
 **Why:** one OpenAI-compatible interface across Ollama, vLLM, and any external provider, with
 per-key budgets, rate limits and request logging. It is the natural place to enforce the egress
 policy — a single chokepoint where "did this tenant permit an external call?" is answered.
 
 ### Ollama — local inference default
+
 **Why:** trivial to operate, good model library, sensible defaults. The default binding, so the
 out-of-the-box experience is sovereign.
 **Note:** for larger deployments **vLLM** is the recommended alternative for throughput. Both sit
 behind `LanguageModelPort`.
 
 ### LangGraph — extraction orchestration
+
 **Why:** extraction is a stateful multi-step graph with retries, branching and human-in-the-loop
 interrupts. LangGraph models exactly that, and its checkpointing supports resumable pipelines —
 which we need, because a 4-hour parliamentary session cannot restart from zero on a transient failure.
@@ -197,6 +212,7 @@ which we need, because a 4-hour parliamentary session cannot restart from zero o
 permitted in the domain or in prompt management. Prompts are versioned assets we own.
 
 ### LlamaIndex — document processing
+
 **Why:** mature document parsing, chunking and ingestion across formats we must handle (PDF
 submissions, scanned minutes, Word documents).
 **Scope limit:** used for parsing and chunking only. Retrieval and ranking are ours, because they
@@ -208,6 +224,7 @@ for us.
 ## Identity & authorisation
 
 ### Keycloak
+
 **Why:** the reference open-source IdP for government. Supports OIDC, SAML, LDAP/AD federation,
 step-up authentication and identity brokering — which is how we federate to whatever national SSO
 an operator already runs. Red Hat backed, CNCF incubating.
@@ -216,6 +233,7 @@ an operator already runs. Red Hat backed, CNCF incubating.
 `IdentityProviderPort` so a lighter IdP (Zitadel, Authentik) can be substituted for small deployments.
 
 ### Casbin
+
 **Why:** policy as data rather than code, supporting RBAC, ABAC and ReBAC in one model. Our
 authorisation is genuinely complex — role, tenant, consent scope, data classification, community
 restriction and graph relationship all participate — and expressing that in scattered `if`
@@ -233,6 +251,7 @@ deployment for most institutions and is treated as a first-class production targ
 provided; nothing depends on them.
 
 ### GitHub Actions
+
 **Why:** where the code is; excellent ecosystem; zero setup cost.
 **Risk:** vendor lock-in on a critical path, and a supply-chain surface.
 **Mitigation:** all real logic lives in `scripts/` and `Makefile` targets, invoked identically
@@ -241,6 +260,7 @@ SHAs. A mirror to a self-hosted GitLab CI is a Phase 7 deliverable, because a pu
 project that can only be built on one commercial platform is not credibly sovereign.
 
 ### OpenTelemetry + Prometheus + Grafana + Tempo + Loki
+
 **Why:** vendor-neutral instrumentation is the whole point of OTel — operators can forward to
 whatever they already run. Self-hosted by default, telemetry never leaves the operator's boundary,
 and there is no upstream collector. We will not add one.

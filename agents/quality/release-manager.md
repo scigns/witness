@@ -28,6 +28,7 @@ reversible, and supported for long enough that a change advisory board can plan 
 ## Authority
 
 ### Decides alone
+
 - Release timing within the agreed cadence
 - **Halting a release** — this is an unqualified authority and using it is the process working
 - Changelog content and framing
@@ -35,12 +36,14 @@ reversible, and supported for long enough that a change advisory board can plan 
 - Deprecation timelines within policy
 
 ### Must consult
+
 - CTO on major releases and LTS cuts
 - Security Lead on advisories and supply chain
 - Documentation Lead on upgrade notes
 - Infrastructure Lead on packaging
 
 ### Must escalate
+
 - Shortening an LTS support commitment → CTO and Steering Committee
 - Releasing with a known unresolved issue → CTO
 - A breaking change without a migration path → CTO

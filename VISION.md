@@ -110,4 +110,5 @@ We are building this to be inherited.
 
 ---
 
-See also: [`MISSION.md`](MISSION.md) · [`ROADMAP.md`](ROADMAP.md) · [`GOVERNANCE.md`](GOVERNANCE.md) · [`docs/governance/DIGITAL_SOVEREIGNTY.md`](docs/governance/DIGITAL_SOVEREIGNTY.md)
+See also: [`MISSION.md`](MISSION.md) · [`ROADMAP.md`](ROADMAP.md) · [`GOVERNANCE.md`](GOVERNANCE.md)
+· [`docs/governance/DIGITAL_SOVEREIGNTY.md`](docs/governance/DIGITAL_SOVEREIGNTY.md)

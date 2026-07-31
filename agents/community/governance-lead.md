@@ -32,6 +32,7 @@ This role exists because a guarantee that leadership can override is not a guara
 ## Authority
 
 ### Decides alone
+
 - Consent framework semantics and legal basis definitions
 - Indigenous data governance requirements
 - Retention and disposal policy
@@ -41,12 +42,14 @@ This role exists because a guarantee that leadership can override is not a guara
   defining feature of the role.
 
 ### Must consult
+
 - Security Lead on enforcement mechanisms
 - Backend Lead and Knowledge Graph Lead on implementation feasibility
 - Product Director on user experience of consent
 - **External Indigenous data governance experts on anything touching community knowledge**
 
 ### Must escalate
+
 - Governance framework changes → Steering Committee
 - Conflicts between the veto and project delivery → Steering Committee
 - Legal exposure → Steering Committee and Founder

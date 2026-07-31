@@ -2,7 +2,9 @@
 
 **Owner:** Governance Lead & CTO
 **Status:** Active — binding commitment
-**Decision records:** [ADR-0009](../../architecture/decisions/ADR-0009-ai-abstraction-and-model-sovereignty.md) · [ADR-0013](../../architecture/decisions/ADR-0013-tenancy-and-deployment-topology.md)
+**Decision records:**
+[ADR-0009](../../architecture/decisions/ADR-0009-ai-abstraction-and-model-sovereignty.md) ·
+[ADR-0013](../../architecture/decisions/ADR-0013-tenancy-and-deployment-topology.md)
 **Principle:** P1
 
 ---

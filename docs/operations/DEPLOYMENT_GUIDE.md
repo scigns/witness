@@ -85,6 +85,7 @@ Security advisories reach air-gapped operators through the out-of-band process i
 ## Before production — the checklist
 
 **Security**
+
 - [ ] Every default password changed
 - [ ] TLS configured with a real certificate
 - [ ] Network policy restricting inbound access
@@ -92,23 +93,27 @@ Security advisories reach air-gapped operators through the out-of-band process i
 - [ ] [`SECURITY_HARDENING.md`](SECURITY_HARDENING.md) worked through
 
 **Data**
+
 - [ ] `WITNESS_DATA_RESIDENCY` set accurately — **it is shown to the people you record**
 - [ ] Retention policy configured to your statutory obligations
 - [ ] Backup target configured and reachable
 - [ ] **A restore actually performed and verified.** An untested backup is a hypothesis
 
 **Identity**
+
 - [ ] Keycloak federated to your directory
 - [ ] MFA enforced for administrative roles
 - [ ] Roles assigned; least privilege verified
 
 **Consent** — the part that is not technical
+
 - [ ] Lawful basis determined **for your jurisdiction** (we do not give legal advice)
 - [ ] Consent text reviewed, translated, and comprehension-tested
 - [ ] Staff who obtain consent are trained — the interface cannot fix a bad conversation
 - [ ] Withdrawal process tested end to end, including requests arriving outside the system
 
 **Operations**
+
 - [ ] Monitoring and alerting configured
 - [ ] Runbooks accessible to on-call staff
 - [ ] Recovery drill scheduled (quarterly)

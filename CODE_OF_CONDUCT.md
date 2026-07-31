@@ -99,6 +99,7 @@ Community leaders will follow these Community Impact Guidelines in determining t
 for any action they deem in violation of this Code of Conduct:
 
 ### 1. Correction
+
 **Community impact:** Use of inappropriate language or other behaviour deemed unprofessional or
 unwelcome.
 **Consequence:** A private, written warning from community leaders, providing clarity around the
@@ -106,6 +107,7 @@ nature of the violation and an explanation of why the behaviour was inappropriat
 apology may be requested.
 
 ### 2. Warning
+
 **Community impact:** A violation through a single incident or series of actions.
 **Consequence:** A warning with consequences for continued behaviour. No interaction with the
 people involved, including unsolicited interaction with those enforcing the Code of Conduct, for a
@@ -113,6 +115,7 @@ specified period. This includes avoiding interactions in community spaces as wel
 channels. Violating these terms may lead to a temporary or permanent ban.
 
 ### 3. Temporary ban
+
 **Community impact:** A serious violation of community standards, including sustained
 inappropriate behaviour.
 **Consequence:** A temporary ban from any sort of interaction or public communication with the
@@ -121,6 +124,7 @@ including unsolicited interaction with those enforcing the Code of Conduct, is a
 period. Violating these terms may lead to a permanent ban.
 
 ### 4. Permanent ban
+
 **Community impact:** Demonstrating a pattern of violation of community standards, including
 sustained inappropriate behaviour, harassment of an individual, or aggression toward or
 disparagement of classes of individuals.
@@ -136,7 +140,7 @@ involved in the original decision. The Steering Committee's decision on appeal i
 
 This Code of Conduct is adapted from the [Contributor Covenant](https://www.contributor-covenant.org),
 version 2.1, available at
-https://www.contributor-covenant.org/version/2/1/code_of_conduct.html, with additions specific to
+<https://www.contributor-covenant.org/version/2/1/code_of_conduct.html>, with additions specific to
 the responsibilities of a project handling community and Indigenous knowledge.
 
 Community Impact Guidelines were inspired by

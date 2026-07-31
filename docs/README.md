@@ -41,15 +41,22 @@ Start with [`PROJECT_CONTEXT.md`](../PROJECT_CONTEXT.md). It is short and it is 
 
 ### [`product/`](product/) — what we build and why
 
-[`PRODUCT_OPERATING_MODEL.md`](product/PRODUCT_OPERATING_MODEL.md) · [`PERSONAS.md`](product/PERSONAS.md) · `prd/` · `design/`
+[`PRODUCT_OPERATING_MODEL.md`](product/PRODUCT_OPERATING_MODEL.md) ·
+[`PERSONAS.md`](product/PERSONAS.md) · `prd/` · `design/`
 
 ### [`governance/`](governance/) — the commitments we are held to
 
-[`CONSENT_FRAMEWORK.md`](governance/CONSENT_FRAMEWORK.md) · [`DIGITAL_SOVEREIGNTY.md`](governance/DIGITAL_SOVEREIGNTY.md) · [`INDIGENOUS_DATA_SOVEREIGNTY.md`](governance/INDIGENOUS_DATA_SOVEREIGNTY.md) · [`RISK_REGISTER.md`](governance/RISK_REGISTER.md) · [`DECISIONS.md`](governance/DECISIONS.md)
+[`CONSENT_FRAMEWORK.md`](governance/CONSENT_FRAMEWORK.md) ·
+[`DIGITAL_SOVEREIGNTY.md`](governance/DIGITAL_SOVEREIGNTY.md) ·
+[`INDIGENOUS_DATA_SOVEREIGNTY.md`](governance/INDIGENOUS_DATA_SOVEREIGNTY.md) ·
+[`RISK_REGISTER.md`](governance/RISK_REGISTER.md) · [`DECISIONS.md`](governance/DECISIONS.md)
 
 ### [`operations/`](operations/) — running Witness
 
-[`DEPLOYMENT_GUIDE.md`](operations/DEPLOYMENT_GUIDE.md) · [`ADMIN_GUIDE.md`](operations/ADMIN_GUIDE.md) · [`SECURITY_HARDENING.md`](operations/SECURITY_HARDENING.md) · [`INCIDENT_RESPONSE.md`](operations/INCIDENT_RESPONSE.md) · `runbooks/`
+[`DEPLOYMENT_GUIDE.md`](operations/DEPLOYMENT_GUIDE.md) ·
+[`ADMIN_GUIDE.md`](operations/ADMIN_GUIDE.md) ·
+[`SECURITY_HARDENING.md`](operations/SECURITY_HARDENING.md) ·
+[`INCIDENT_RESPONSE.md`](operations/INCIDENT_RESPONSE.md) · `runbooks/`
 
 ### [`guides/`](guides/) — using and building on Witness
 

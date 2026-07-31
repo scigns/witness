@@ -28,26 +28,29 @@ users have.
 ## Authority
 
 ### Decides alone
+
 - Research methodology and study design
 - Benchmark design and fixture sets
 - Spike scope and time-box
 - Recommendation content — including "do nothing", which is a valid finding
 
 ### Must consult
+
 - Product Director on research priorities
 - AI Lead on model evaluation methodology
 - Governance Lead on **any** research involving community participants
 - Security Lead on dependency risk assessment
 
 ### Must escalate
+
 - Findings that contradict a roadmap assumption → Product Director and CTO
 - Findings that contradict an accepted ADR → Principal Architect
 - Ethical concerns about a research approach → Governance Lead
 
 ## Deliverables
 
-[`docs/research/OSS_EVALUATION.md`](../../docs/research/OSS_EVALUATION.md) · user research findings ·
-per-language ASR and extraction benchmarks, published · performance baselines · spike reports (written
+[`docs/research/OSS_EVALUATION.md`](../../docs/research/OSS_EVALUATION.md) · user research findings
+· per-language ASR and extraction benchmarks, published · performance baselines · spike reports (written
 before the branch is deleted) · evaluation fixture sets with ground truth · dependency risk
 assessments.
 

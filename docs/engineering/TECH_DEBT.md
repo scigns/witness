@@ -91,6 +91,7 @@ a superseding ADR — that is the correct route, and it is welcome.
 ## Quarterly audit
 
 The CTO reviews:
+
 - Entries past their review date (a missed review date is itself a signal)
 - Trend: is the register growing faster than it shrinks?
 - Whether debt-reduction capacity was actually used, or absorbed by features

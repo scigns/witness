@@ -29,13 +29,15 @@ retaining leverage after the code has been released.
 - Implying **official endorsement**, certification or partnership
 - Distributing a **modified version under the Witness name** — call it something else, or make the
   distinction clear
-- Using the marks in **your** product name, company name or domain in a way that suggests we produced it
+- Using the marks in **your** product name, company name or domain in a way that suggests we
+  produced it
 - Using our logo as your logo
 
 ## The distinction
 
 The line is **accuracy about who made what**. An institution should always be able to tell whether it
-is running the project's software or someone's derivative, and whether a vendor's endorsement claim is
+is running the project's software or someone's derivative, and whether a vendor's endorsement claim
+is
 real. That is the whole of the policy.
 
 We will not use trademark to suppress forks, criticism, competition or unfavourable comparison. A

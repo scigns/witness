@@ -59,7 +59,7 @@ translation between our vocabulary and our stakeholders' is a place misunderstan
 
 ## File structure
 
-```
+```text
 services/consent/
   src/
     domain/           # pure — no framework imports
@@ -143,7 +143,7 @@ edges.
 [Conventional Commits](https://www.conventionalcommits.org/), enforced. Scopes are the domain list in
 `commitlint.config.js`.
 
-```
+```text
 feat(knowledge-graph): add bitemporal validity to entity assertions
 
 Entities need both when a fact was true in the world and when we came to

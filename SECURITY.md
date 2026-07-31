@@ -96,6 +96,7 @@ and Helm charts we publish; the SDKs; CI/CD supply chain (workflows, signing, re
 documentation that would cause an insecure deployment if followed.
 
 **In scope and especially wanted:**
+
 - **Consent bypass** — any path that processes data without a valid consent grant
 - **Provenance forgery** — creating a graph assertion without a valid traceable chain
 - **Tenant or workspace isolation escape**

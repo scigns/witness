@@ -31,6 +31,7 @@ and only a person can assess whether a test is worth having.
 ## Authority
 
 ### Decides alone
+
 - Test strategy, structure and tooling
 - Coverage requirements above the minimum
 - Quarantining or deleting a flaky test
@@ -38,12 +39,14 @@ and only a person can assess whether a test is worth having.
 - Blocking a merge on inadequate test quality
 
 ### Must consult
+
 - Security Lead on adversarial test design
 - AI Lead on evaluation methodology
 - Domain leads on domain-specific test requirements
 - Infrastructure Lead on CI test execution
 
 ### Must escalate
+
 - Coverage or quality standards being routinely bypassed → CTO
 - An invariant that cannot be tested → Principal Architect
 - Performance regressions breaching an SLO → CTO

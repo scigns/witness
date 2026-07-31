@@ -30,6 +30,7 @@ an ADR naming what it replaces and why the existing stack is insufficient. That 
 > **NATS JetStream** as the transport for event distribution between services and workers.
 
 Two profiles:
+
 - **Standard** — Postgres outbox → relay → NATS JetStream → consumers
 - **Minimal** — Postgres outbox → in-process polling dispatcher, no broker, for the smallest
   single-node deployments
@@ -39,6 +40,7 @@ Both use identical application code behind `EventBusPort`. The profile is a depl
 ## Options considered
 
 ### Option A — Apache Kafka
+
 The default answer for event-driven systems.
 **Pros:** the most battle-tested event log in existence; enormous ecosystem; excellent for replay and
 stream processing; every consultant knows it.
@@ -49,6 +51,7 @@ paying Kafka's operational cost for none of its benefit. **Rejected on operabili
 architectural goal 4 and above performance.
 
 ### Option B — Redis Streams
+
 **Pros:** Redis is already in the stack — no new technology at all, which is the strongest argument
 available under principle P7.
 **Cons:** persistence guarantees are weaker than we need for consent revocation; consumer group
@@ -57,12 +60,14 @@ ADR-0004's placement of Redis as strictly ephemeral. That contradiction is what 
 Redis licensing situation (see `TECH_STACK.md`) makes expanding our dependence on it unwise.
 
 ### Option C — RabbitMQ
+
 **Pros:** mature, well understood, good routing.
 **Cons:** a message queue rather than an event log — replay and multiple independent consumers with
 independent cursors are awkward, and both are central to our projection model. Erlang operational
 knowledge is a scarcer skill in our operator population than it looks.
 
 ### Option D — PostgreSQL only, using `LISTEN/NOTIFY` plus an outbox table
+
 **Pros:** zero new technology; one fewer thing to operate; genuinely sufficient at small scale.
 **Cons:** `LISTEN/NOTIFY` payloads are size-limited and notifications are lost if no listener is
 connected, so it needs polling as a backstop; no consumer-group semantics; connection-count pressure
@@ -71,6 +76,7 @@ with many consumers; poor fan-out at scale.
 a few hundred meetings a year, this is the right answer and we should not force a broker on them.
 
 ### Option E — NATS JetStream *(chosen for the standard profile)*
+
 **Pros:** single ~15 MB Go binary, no JVM, no ZooKeeper; embeddable for single-node; durable streams
 with configurable retention; consumer groups with independent cursors; at-least-once delivery; simple
 enough that an operator can actually understand it from the runbook; Apache-2.0 under CNCF
@@ -81,6 +87,7 @@ processing patterns are less developed.
 ## Consequences
 
 ### Positive
+
 - Services are decoupled in availability — transcription being down queues work rather than failing
   ingestion.
 - Durable retry with dead-lettering for poison messages.
@@ -89,6 +96,7 @@ processing patterns are less developed.
 - The minimal profile means small institutions run one fewer service.
 
 ### Negative
+
 - One more component to run, monitor and back up in the standard profile.
 - Eventual consistency is now user-visible; the UI must show honest processing status.
 - Contributors need to understand at-least-once semantics, and every consumer must be idempotent —
@@ -96,6 +104,7 @@ processing patterns are less developed.
 - Two profiles means two paths to test. Mitigated by identical application code behind the port.
 
 ### Risks accepted
+
 - NATS is less widely known than Kafka; hiring and community support are thinner. Mitigated by the
   port abstraction — a Kafka adapter is a bounded piece of work if we ever need it.
 - Duplicate delivery causing duplicate side effects if a consumer's idempotency is wrong. Mitigated

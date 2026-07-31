@@ -48,6 +48,7 @@ validity periods; historical belief is answered by replaying the log.
 ## Options considered
 
 ### Option A — Neo4j as system of record
+
 **Pros:** one store for graph data; no projection lag; simpler mental model; natural fit for the
 domain.
 **Cons:** all four failures above. Additionally: Neo4j Community lacks clustering, making it a
@@ -55,11 +56,13 @@ single point of failure holding authoritative data; and it puts a single-vendor 
 critical path for data we cannot lose. **Rejected.**
 
 ### Option B — Dual write to Postgres and Neo4j
+
 **Pros:** both stores current; no lag.
 **Cons:** dual write without distributed transactions guarantees eventual divergence — this is
 well-established and there is no version of it that works. Rejected without further consideration.
 
 ### Option C — Postgres as system of record, graph as projection *(chosen)*
+
 **Pros:** one backup, one recovery procedure, one consistency boundary; consent revocation is a
 delete plus a rebuild, verifiable; ontology changes are a projector change plus a replay, with no
 data migration; model re-runs are re-derivation without corrupting history; bitemporality is natural
@@ -69,6 +72,7 @@ free to be optimised purely for reads.
 component with real complexity; conceptually less obvious to newcomers.
 
 ### Option D — Full event sourcing with aggregates rebuilt from events on load
+
 **Pros:** maximal auditability; no separate write model to keep consistent.
 **Cons:** snapshotting, event versioning and replay performance are substantial ongoing complexity.
 We take the event log — which is where the value is — without paying for rebuild-on-every-load. A
@@ -77,6 +81,7 @@ pragmatic middle path.
 ## Consequences
 
 ### Positive
+
 - **Consent revocation is tractable and verifiable**, which alone justifies the decision.
 - Ontology evolution costs a projector change and a replay — we can afford to be wrong, which we
   will be.
@@ -88,7 +93,9 @@ pragmatic middle path.
   D-4). Nothing irreplaceable sits on the critical path.
 
 ### Negative
-- **Projection lag is real and user-visible.** After confirming an assertion, a user may not see it in
+
+- **Projection lag is real and user-visible.** After confirming an assertion, a user may not see it
+  in
   the graph for seconds. We must show honest processing status rather than pretending it is instant.
 - **Rebuild time grows with data volume** — architectural risk A-2. At national scale a full rebuild
   could take hours. Mitigations designed in from the start: incremental and partitioned rebuild,
@@ -100,6 +107,7 @@ pragmatic middle path.
   eventually try to write to Neo4j directly.
 
 ### Risks accepted
+
 - Rebuild exceeding the maintenance window at scale. Signal: measured rebuild duration approaching 6
   hours for 100k meetings. Response: invest in incremental rebuild before it becomes urgent.
 - A projector bug producing a silently wrong graph. Mitigation: the CI test that drops and rebuilds
@@ -126,5 +134,7 @@ which is why it is documented at this length.
 
 ## References
 
-- [`ARCHITECTURE.md` §5.1](../ARCHITECTURE.md) · [`KNOWLEDGE_GRAPH.md` §8](../KNOWLEDGE_GRAPH.md) · [`DATA_MODEL.md` §4](../DATA_MODEL.md)
-- Martin Fowler, [CQRS](https://martinfowler.com/bliki/CQRS.html) · Snodgrass, *Developing Time-Oriented Database Applications* (1999)
+- [`ARCHITECTURE.md` §5.1](../ARCHITECTURE.md) · [`KNOWLEDGE_GRAPH.md` §8](../KNOWLEDGE_GRAPH.md) ·
+  [`DATA_MODEL.md` §4](../DATA_MODEL.md)
+- Martin Fowler, [CQRS](https://martinfowler.com/bliki/CQRS.html) · Snodgrass, *Developing
+  Time-Oriented Database Applications* (1999)

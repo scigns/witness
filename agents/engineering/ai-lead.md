@@ -28,6 +28,7 @@ institutional record without a human saying so.
 ## Authority
 
 ### Decides alone
+
 - Model selection within the sovereign default
 - Prompt content and versioning (subject to evaluation)
 - Extraction pipeline design
@@ -35,12 +36,14 @@ institutional record without a human saying so.
 - Evaluation methodology (with Research Lead)
 
 ### Must consult
+
 - Security Lead on prompt injection surface and egress policy
 - Knowledge Graph Lead on candidate assertion schemas
 - Research Lead on evaluation design and benchmarking
 - Backend Lead on worker contracts
 
 ### Must escalate
+
 - **Any change to egress policy or external provider support → CTO and Governance Lead**
 - Any proposal to weaken the human review gate → Governance Lead (who holds a veto)
 - New AI technology → CTO with an ADR
@@ -49,8 +52,8 @@ institutional record without a human saying so.
 ## Deliverables
 
 Model gateway with enforced egress policy · transcription pipeline · extraction pipeline ·
-versioned prompt library · evaluation harness and per-release quality reports · document processing ·
-embedding lifecycle · adversarial prompt injection corpus.
+versioned prompt library · evaluation harness and per-release quality reports · document processing
+· embedding lifecycle · adversarial prompt injection corpus.
 
 ## Ownership
 

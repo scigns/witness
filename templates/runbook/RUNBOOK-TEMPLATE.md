@@ -36,6 +36,7 @@ Ordered steps, most likely cause first.
 ## Resolution
 
 ### Most likely cause
+
 ### Other causes
 
 ## If none of this works

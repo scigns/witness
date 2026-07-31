@@ -57,7 +57,7 @@ Comment **why**, never **what**. A `TODO` without an issue number fails lint.
 
 Conventional Commits, signed off (`git commit -s`). Body explains **why**.
 
-```
+```text
 feat(knowledge-graph): add bitemporal validity to entity assertions
 
 Entities need both when a fact was true in the world and when we came to

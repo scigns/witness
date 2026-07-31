@@ -41,6 +41,7 @@ The tension is real and this ADR resolves it by constraining *what each store is
 ## Options considered
 
 ### Option A — Postgres-only
+
 Postgres has JSONB, full-text search, `pgvector`, recursive CTEs, and Apache AGE for graph queries.
 **Pros:** one store to operate, back up and recover. Dramatically simpler for the small-deployment
 operator. Genuinely tempting.
@@ -52,6 +53,7 @@ analysis that OpenSearch provides. We would be choosing operability over the cor
 limitations. This is not a rejected option so much as a deferred second profile.
 
 ### Option B — Polyglot with each store authoritative for its own domain
+
 The conventional polyglot approach: Neo4j owns entities, Postgres owns transactions, OpenSearch owns
 its documents.
 **Pros:** each store used to its full strength; no projection lag.
@@ -61,6 +63,7 @@ recovery requires four consistent snapshots. **Rejected decisively**; this is th
 quietly ruin us in year three.
 
 ### Option C — Polyglot with Postgres as system of record and everything else as projection *(chosen)*
+
 **Pros:** one backup, one recovery procedure, one consistency boundary; projections rebuild after
 corruption, schema change or ontology evolution; consent revocation is deleting from one place and
 rebuilding; each store is still used to its strength for reads.
@@ -68,14 +71,17 @@ rebuilding; each store is still used to its strength for reads.
 still four things to run, even if only one to back up.
 
 ### Option D — Add a dedicated vector database (Qdrant, Weaviate, Milvus)
+
 **Pros:** better vector performance at very large scale; more index types.
 **Cons:** a fifth store for a capability `pgvector` provides adequately at our scale (tens of
-millions of vectors, not billions). Rejected on operability. Revisit only with measured evidence of a
+millions of vectors, not billions). Rejected on operability. Revisit only with measured evidence of
+a
 `pgvector` bottleneck.
 
 ## Consequences
 
 ### Positive
+
 - **One backup, one restore procedure.** The single largest operability win available to us.
 - Ontology changes require a projector change and a replay, not a data migration.
 - Consent revocation and erasure have a tractable, verifiable implementation.
@@ -83,6 +89,7 @@ millions of vectors, not billions). Rejected on operability. Revisit only with m
 - Each read pattern is served by a store that is good at it.
 
 ### Negative
+
 - **Projection lag is real** and must be surfaced honestly in the UI, not hidden.
 - Rebuild time grows with data volume — architectural risk A-2, tracked and measured.
 - Four services to run even in the single-node profile, which is a meaningful operational load.
@@ -91,6 +98,7 @@ millions of vectors, not billions). Rejected on operability. Revisit only with m
 - Some duplication of data across stores, and therefore storage cost.
 
 ### Risks accepted
+
 That rebuild time eventually exceeds the maintenance window at national scale. Mitigations designed
 in from the start: incremental and partitioned rebuilds, shadow-store rebuild with atomic swap,
 continuously measured rebuild duration with an alert threshold. If a full rebuild ever exceeds 6

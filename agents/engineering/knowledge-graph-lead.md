@@ -28,6 +28,7 @@ about something a person said.
 ## Authority
 
 ### Decides alone
+
 - Ontology relationship types and their semantics
 - Projector implementation and rebuild strategy
 - Entity resolution scoring, blocking and thresholds
@@ -35,6 +36,7 @@ about something a person said.
 - Export format details
 
 ### Must consult
+
 - Principal Architect on core node type changes — these are architectural
 - AI Lead on candidate assertion schemas
 - Backend Lead on projection event contracts
@@ -42,6 +44,7 @@ about something a person said.
 - Research Lead on standards alignment
 
 ### Must escalate
+
 - Adding or removing a **core node type** → Principal Architect and CTO, with an ADR
 - Ontology major version → CTO
 - Any change to entity merge authority thresholds → Governance Lead

@@ -126,7 +126,7 @@ enough context to actually start.
 
 Branch from the relevant **domain integration branch**, not from `main`:
 
-```
+```text
 <type>/<domain>/<issue-number>-<short-slug>
 
 feat/knowledge-graph/142-entity-resolution-adjudication
@@ -140,7 +140,7 @@ Long-lived integration branches, their owners and merge rules are in
 **Commits follow [Conventional Commits](https://www.conventionalcommits.org/)** — this drives
 versioning and the changelog, so it is enforced in CI:
 
-```
+```text
 feat(knowledge-graph): add bitemporal validity to entity assertions
 
 Entities need to record both when a fact was true in the world and when we
@@ -180,6 +180,7 @@ Reviewers commit to first response within **one working day**. If you cannot rev
 so immediately and reassign — silence is the expensive failure mode.
 
 Reviewers are asked to distinguish clearly between:
+
 - **Blocking** — "this must change before merge" (with the reason, and ideally a suggestion)
 - **Non-blocking** — "consider this" (prefix `nit:` or `suggestion:`)
 - **Question** — "help me understand this"
@@ -205,7 +206,8 @@ A change is done when **all** of these hold. This list is the merge checklist.
 - [ ] Internationalisation: no hard-coded user-facing strings
 - [ ] Performance: no unbounded query, traversal or allocation on a request path
 - [ ] Migration path and rollback documented for schema or projection changes
-- [ ] No new technical debt, or debt logged in [`docs/engineering/TECH_DEBT.md`](docs/engineering/TECH_DEBT.md) with owner and date
+- [ ] No new technical debt, or debt logged in
+  [`docs/engineering/TECH_DEBT.md`](docs/engineering/TECH_DEBT.md) with owner and date
 - [ ] CODEOWNER approval obtained for every path touched
 
 ## 10. Architectural changes and ADRs

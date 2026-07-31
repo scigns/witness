@@ -21,7 +21,7 @@ worse than no suite, because it manufactures false confidence.
 
 Not a rigid pyramid — a distribution matched to where our risk actually lives.
 
-```
+```text
         ╱╲          E2E (few)             critical user journeys
        ╱──╲         Contract (many)       every API and event boundary
       ╱────╲        Integration (many)    every adapter against real infrastructure
@@ -55,7 +55,7 @@ where review attention should concentrate.
 
 Non-negotiable properties, asserted continuously:
 
-```
+```text
 INV-1  No path reaches personal data without a valid ConsentedContext
 INV-2  No Assertion exists without a complete ProvenanceChain
 INV-3  Every projected graph node/edge resolves to ≥ 1 confirmed assertion

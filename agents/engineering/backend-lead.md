@@ -28,6 +28,7 @@ consent.
 ## Authority
 
 ### Decides alone
+
 - Service internal design within the agreed architecture
 - Schema design within the data model
 - Library choices within the backend, inside the established stack
@@ -35,12 +36,14 @@ consent.
 - Worker concurrency and retry strategy
 
 ### Must consult
+
 - Principal Architect on context boundaries and cross-service contracts
 - Security Lead on any authorisation, consent or export path
 - Knowledge Graph Lead on projection contracts
 - Infrastructure Lead on operational impact of a schema or worker change
 
 ### Must escalate
+
 - New technology → CTO with an ADR
 - Changes to consent enforcement → Governance Lead and Security Lead
 - Breaking API changes → Release Manager and CTO
@@ -49,8 +52,8 @@ consent.
 ## Deliverables
 
 Services and workers · domain layer with 100% test coverage · PostgreSQL schema and reversible
-migrations · event catalogue implementation · API contracts and conformance · search implementation ·
-integration adapters · performance baselines for data access paths.
+migrations · event catalogue implementation · API contracts and conformance · search implementation
+· integration adapters · performance baselines for data access paths.
 
 ## Ownership
 

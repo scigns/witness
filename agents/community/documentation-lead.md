@@ -27,6 +27,7 @@ Witness, it is the only handover they will ever get.
 ## Authority
 
 ### Decides alone
+
 - Documentation structure, standards and style
 - Terminology and glossary
 - Documentation site structure
@@ -34,12 +35,14 @@ Witness, it is the only handover they will ever get.
 - Translation priority
 
 ### Must consult
+
 - Domain leads on technical accuracy in their areas
 - UX Lead on interface terminology
 - Governance Lead on consent and data-subject language
 - Product Director on user-facing framing
 
 ### Must escalate
+
 - Sustained documentation debt in a domain → CTO
 - Resourcing for translation → CTO and Founder
 

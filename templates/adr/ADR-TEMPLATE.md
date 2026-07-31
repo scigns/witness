@@ -29,12 +29,14 @@ State the decision in the active voice, unambiguously.
 ## Options considered
 
 ### Option A — <name>
+
 **Description.**
 **Pros:**
 **Cons:**
 **Why we did or did not choose it:**
 
 ### Option B — <name>
+
 …
 
 Include the option you rejected that a reasonable person would have chosen. If every alternative
@@ -43,16 +45,20 @@ looks obviously bad, you have not represented them fairly, and this ADR will not
 ## Consequences
 
 ### Positive
+
 What gets better.
 
 ### Negative
+
 What gets worse. **This section must not be empty.** Every real decision has a cost; an ADR
 without costs is advocacy, not a decision record.
 
 ### Neutral
+
 What changes without being better or worse.
 
 ### Risks accepted
+
 What we are knowingly exposing ourselves to, and what would tell us it has gone wrong.
 
 ## Compliance and enforcement

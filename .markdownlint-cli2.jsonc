@@ -1,12 +1,51 @@
+// Markdown linting.
+//
+// Calibration note: this gate exists to catch documentation that is broken,
+// unreadable or drifting — not to enforce cosmetic preferences. Two rules are
+// disabled below, each with a stated reason, rather than quietly relaxed to make
+// a build pass. Per docs/engineering/CI_CD.md: "If a gate is wrong, we change the
+// gate deliberately, in its own pull request, with reasoning."
 {
   "config": {
     "default": true,
+
+    // Tables and code blocks are exempt from line length — wrapping them makes
+    // them less readable, which is the opposite of the point.
     "MD013": { "line_length": 100, "tables": false, "code_blocks": false },
+
+    // Duplicate headings are correct under different parents: every role charter
+    // has an "Authority" section, and every ADR has "Consequences".
     "MD024": { "siblings_only": true },
+
+    // Inline HTML is permitted — the README uses it for the centred header.
     "MD033": false,
+
+    // Several documents open with a metadata table rather than a heading.
     "MD041": false,
-    "MD046": { "style": "fenced" }
+
+    "MD046": { "style": "fenced" },
+
+    // DISABLED — MD060 (table-column-style) requires padded pipes (`| --- |`)
+    // rather than compact (`|---|`). Compact pipes are standard GitHub-flavoured
+    // Markdown, render identically, and are more readable in source for the wide
+    // reference tables this project uses heavily. Enforcing the padded style
+    // would mean reformatting ~1,600 table rows for no reader benefit.
+    "MD060": false,
+
+    // DISABLED — MD036 (no-emphasis-as-heading) flags the `**Pros:**`,
+    // `**Cons:**` and `**Decision.**` labels used throughout the ADRs and the
+    // decision log. These are inline labels inside a section, not headings.
+    // Promoting them to real headings would fragment the ADR structure and break
+    // the template.
+    "MD036": false
   },
   "globs": ["**/*.md"],
-  "ignores": ["node_modules", "**/node_modules", "CHANGELOG.md", "LICENSE"]
+  "ignores": [
+    "node_modules",
+    "**/node_modules",
+    "CHANGELOG.md",
+    "LICENSE",
+    "sdk/LICENSE",
+    "packages/contracts/LICENSE"
+  ]
 }

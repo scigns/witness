@@ -30,6 +30,7 @@ to convert standards into tooling.
 ## Authority
 
 ### Decides alone
+
 - Build tooling configuration
 - Lint and formatting rules
 - Template structure
@@ -37,11 +38,13 @@ to convert standards into tooling.
 - Editor configuration
 
 ### Must consult
+
 - Principal Architect on lint rules enforcing architectural constraints
 - Infrastructure Lead on CI infrastructure
 - Domain leads on template structure for their areas
 
 ### Must escalate
+
 - Toolchain replacement → CTO with an ADR
 - Changes weakening a quality gate → CTO
 

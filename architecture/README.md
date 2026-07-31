@@ -22,10 +22,12 @@ If you read only three things:
 
 1. **[ADR-0011](decisions/ADR-0011-knowledge-graph-as-projection.md)** — PostgreSQL is the system of
    record; Neo4j, OpenSearch and pgvector are disposable projections. This decision makes consent
-   revocation, ontology evolution and disaster recovery tractable, and everything else follows from it.
+   revocation, ontology evolution and disaster recovery tractable, and everything else follows from
+it.
 2. **[ADR-0008](decisions/ADR-0008-consent-as-a-domain-primitive.md)** — consent is enforced by the
    type system and the topology, so a processing path that bypasses it cannot be written.
-3. **[ADR-0012](decisions/ADR-0012-provenance-and-human-in-the-loop.md)** — every assertion carries an
+3. **[ADR-0012](decisions/ADR-0012-provenance-and-human-in-the-loop.md)** — every assertion carries
+   an
    unbroken chain to a source utterance and a named human who confirmed it. Model output is never
    institutional fact.
 

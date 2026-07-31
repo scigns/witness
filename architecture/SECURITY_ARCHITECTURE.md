@@ -2,7 +2,8 @@
 
 **Owner:** Security Lead
 **Status:** Baseline — Phase 1 deliverable 1.7 (threat model in progress)
-**Companion:** [`SECURITY.md`](../SECURITY.md) (disclosure) · [`docs/engineering/SECURITY_REVIEW.md`](../docs/engineering/SECURITY_REVIEW.md) (process)
+**Companion:** [`SECURITY.md`](../SECURITY.md) (disclosure) ·
+[`docs/engineering/SECURITY_REVIEW.md`](../docs/engineering/SECURITY_REVIEW.md) (process)
 
 ---
 
@@ -78,7 +79,7 @@ Casbin, one policy decision point, three composed models:
 | **ABAC** | Do the attributes — tenant, sensitivity class, deployment profile, consent scope — permit it in this case? |
 | **ReBAC** | Does this user's relationship to this graph entity permit it? (community membership, project team, session participation) |
 
-```
+```text
 request:  (subject, tenant, resource, action, context)
 decision: ALLOW | DENY   # default DENY
 ```

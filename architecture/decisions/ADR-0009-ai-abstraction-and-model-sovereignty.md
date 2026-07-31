@@ -44,23 +44,27 @@ parameters, and the pipeline version. Permanently.
 ## Options considered
 
 ### Option A — Local models only
+
 **Pros:** absolute sovereignty; the simplest possible story.
 **Cons:** an institution with an approved cloud arrangement and genuinely better model access is
 forbidden from using it, which is paternalistic and costs us adoption. Some languages are materially
 better served by frontier models today.
 
 ### Option B — External models by default, local as an option
+
 **Pros:** best out-of-the-box quality.
 **Cons:** violates P1. The default configuration would exfiltrate institutional deliberation to a
 third party, and defaults are what almost everyone runs. Rejected.
 
 ### Option C — Local by default, external opt-in behind a gateway *(chosen)*
+
 **Pros:** sovereign by default; institutions retain the choice; the gateway is a single chokepoint for
 policy, logging and budget; models are swappable without application changes.
 **Cons:** two paths to test and support; the temptation to enable egress for quality will be real,
 and it is our job to make that decision visible rather than easy.
 
 ### Option D — Bring-your-own-model with no gateway
+
 **Pros:** minimal infrastructure.
 **Cons:** no single enforcement point for egress policy, no consistent logging, no per-tenant budgets.
 Rejected — the chokepoint is the control.
@@ -68,6 +72,7 @@ Rejected — the chokepoint is the control.
 ## Consequences
 
 ### Positive
+
 - Air-gapped deployment works with no special build and no disabled features beyond external models.
 - Model choice is a configuration decision, not an architectural one.
 - Every assertion is attributable to a specific model and prompt version, forever.
@@ -75,6 +80,7 @@ Rejected — the chokepoint is the control.
 - A single place to enforce budget, rate limits and per-tenant policy.
 
 ### Negative
+
 - **Local model quality will be lower than frontier models for some tasks and some languages**, and
   we must publish that honestly rather than obscure it. This is the real cost of P1 and it is paid by
   users, so they deserve to know the size of it.
@@ -84,6 +90,7 @@ Rejected — the chokepoint is the control.
 - Two inference paths means more testing surface.
 
 ### Risks accepted
+
 - **Quality gap** between sovereign and hybrid deployments creating a two-tier product. Mitigation:
   publish per-language evaluation results for both paths; invest in prompt engineering for local
   models specifically; treat low-resource language quality as an equity issue with named ownership.

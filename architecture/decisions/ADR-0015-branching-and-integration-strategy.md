@@ -29,7 +29,7 @@ domains, where an agent's work needs a clear integration point and an accountabl
 > **long-lived domain integration branches** that serve as owned, reviewed staging areas — not as
 > parallel forks.
 
-```
+```text
 main                    ← always releasable, protected, tagged for release
  └── develop            ← continuous integration of all domains
       └── <domain>      ← long-lived integration branch, one named owner
@@ -47,6 +47,7 @@ Full branch inventory, owners and rules: [`docs/engineering/BRANCH_STRATEGY.md`]
 ## Options considered
 
 ### Option A — Pure trunk-based, everything to `main`
+
 **Pros:** simplest; smallest integration risk; the industry's best-evidenced practice for delivery
 performance.
 **Cons:** no natural integration point for a domain lead to validate a coherent body of work; no
@@ -55,23 +56,27 @@ change needs a different reviewer); with many parallel AI-assisted contributions
 a stream of loosely-related commits with no owner assembling them.
 
 ### Option B — GitFlow with release and hotfix branches
+
 **Pros:** familiar; explicit release preparation.
 **Cons:** long-lived divergent branches, painful merges, slow feedback. Poor fit for continuous
 delivery. Rejected.
 
 ### Option C — Trunk-based with long-lived domain integration branches *(chosen)*
+
 **Pros:** each domain has an owner and a validation point; specialised review is structural; `main`
 stays releasable; work is visible early; maps cleanly to CODEOWNERS and to role charters.
 **Cons:** more branches to keep current; divergence risk if discipline lapses; contributors must
 know which domain branch to target.
 
 ### Option D — Branch per release train
+
 Considered and rejected — our release cadence is time-based with LTS lines (ADR-0017), and release
 branches are cut from `main` at release time rather than maintained continuously.
 
 ## Consequences
 
 ### Positive
+
 - Every domain has a named owner with merge authority over their area.
 - Specialised review is enforced by branch protection plus CODEOWNERS rather than by remembering.
 - `main` is always releasable, so a release is a tag rather than a project.
@@ -79,6 +84,7 @@ branches are cut from `main` at release time rather than maintained continuously
 - Work in progress is visible on a domain branch before it reaches `develop`.
 
 ### Negative
+
 - **Thirty branches is a lot of branches.** Real cognitive overhead, and a new contributor needs
   guidance to pick the right one.
 - Automated syncing is required; without it this degrades into GitFlow's problems within months.
@@ -88,6 +94,7 @@ branches are cut from `main` at release time rather than maintained continuously
   of the primary owner and request review from the others.
 
 ### Risks accepted
+
 That domain branches become stale forks despite the automation — the exact failure this design is
 meant to prevent. Signals: divergence alerts firing regularly; merge conflicts at domain → develop.
 Response: if a domain branch is chronically stale, retire it and work directly on `develop`. Not
@@ -112,4 +119,5 @@ the six-month review rather than defending the structure out of sunk cost.
 
 ## References
 
-- [`docs/engineering/BRANCH_STRATEGY.md`](../../docs/engineering/BRANCH_STRATEGY.md) · [Trunk Based Development](https://trunkbaseddevelopment.com/) · Forsgren, Humble & Kim, *Accelerate* (2018)
+- [`docs/engineering/BRANCH_STRATEGY.md`](../../docs/engineering/BRANCH_STRATEGY.md) · [Trunk Based
+  Development](https://trunkbaseddevelopment.com/) · Forsgren, Humble & Kim, *Accelerate* (2018)

@@ -22,7 +22,7 @@ about the code itself.
 
 ## Layering
 
-```
+```text
 adapters  →  application  →  domain
 (infra)      (use cases)     (pure)
 ```
@@ -86,6 +86,7 @@ type ConsentDecision =
 **Infrastructure failures are exceptions**, handled at the adapter with retry and backoff.
 
 Rules:
+
 - Never swallow an error. A `catch` that logs and continues must say why in a comment.
 - Never lose the cause. Wrap with `{ cause }`.
 - Error messages must help the person debugging at 3am. `Error: failed` does not.

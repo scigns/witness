@@ -42,7 +42,7 @@ with off-the-shelf tooling.
 
 ## 2. Naming and versioning
 
-```
+```text
 org.witness.<context>.<aggregate>.<past-tense-verb>.v<major>
 ```
 

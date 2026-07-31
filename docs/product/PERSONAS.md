@@ -11,6 +11,7 @@ exists to prevent. Each will be revised or discarded against real evidence.
 ## Primary
 
 ### Amara — Ministerial policy officer
+
 *The persona whose success or failure determines the product's.*
 
 Mid-career, 200+ meetings a year, writes briefings under time pressure. Not technical, highly literate,
@@ -20,10 +21,12 @@ works in Word and email. Inherits policy areas from people who have left.
 **Today:** searches shared drives, emails colleagues who might remember, sometimes recreates analysis
 that already exists.
 **Success:** finds a three-year-old decision with its rationale and the evidence behind it, in minutes.
-**Fails us if:** search returns transcripts instead of answers, or she cannot tell whether something is
+**Fails us if:** search returns transcripts instead of answers, or she cannot tell whether something
+is
 confirmed or an AI guess.
 
 ### Tomas — Committee clerk
+
 Formal legal obligations for the accuracy of the record. Detail-oriented, low tolerance for error,
 accountable if the record is wrong.
 
@@ -33,6 +36,7 @@ accountable if the record is wrong.
 came from.
 
 ### Grace — Community engagement lead
+
 Works in the field. Poor connectivity. Records consultations in halls, on country, in people's homes.
 Cares deeply about whether community input actually changes anything.
 
@@ -44,6 +48,7 @@ status.
 meeting will not reconvene.
 
 ### Joseph — Indigenous knowledge custodian
+
 *The highest trust bar in the system.*
 
 Holds authority under customary law for what community knowledge may be recorded, by whom, and who may
@@ -56,37 +61,45 @@ it rather than being asked to trust.
 individual choice when it is not.
 
 ### Priya — Platform operator
+
 *A first-class persona, not an afterthought.*
 
 Two-person IT team in an under-resourced agency. Runs twelve other systems. Was not consulted about
 adopting Witness.
 
-**Core need:** install it, back it up, upgrade it, restore it — from documentation, without calling us.
+**Core need:** install it, back it up, upgrade it, restore it — from documentation, without calling
+us.
 **Success:** working instance in a day; a restore drill that works; alerts that come with runbooks.
-**Fails us if:** the stack is too complex to operate, a backup cannot be restored, or an alert fires at
+**Fails us if:** the stack is too complex to operate, a backup cannot be restored, or an alert fires
+at
 2am with no runbook.
 
 ## Secondary
 
 ### David — Programme manager
+
 Five-year development programme, three staff cohorts. Needs commitments tracked across years and
 handovers. **Success:** commitments made in 2027 are still visible and closable in 2032.
 
 ### Fatima — Auditor / Ombudsman
+
 Infrequent user, high stakes, read-only. Reconstructs decision chains years later.
 **Success:** follows a decision to the exact words spoken, with tamper-evident provenance.
 **Fails us if:** the chain has gaps, or she cannot distinguish confirmed record from AI inference.
 
 ### Rita — Data subject
+
 *May never log in. Her rights must work anyway.*
 
 Attended one consultation. Wants to know what was recorded about her and to be able to withdraw it.
 **Success:** understands the consent she gave, in her own language; can see her data; can withdraw
 easily.
-**Fails us if:** withdrawal is harder than consenting, or the consent explanation was in a language she
+**Fails us if:** withdrawal is harder than consenting, or the consent explanation was in a language
+she
 does not read.
 
 ### Sam — Integrator
+
 Contractor building a connector to the department's records system. Will have left before it needs
 maintenance. **Success:** stable REST API, generated SDK, documentation that works.
 

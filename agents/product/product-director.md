@@ -29,6 +29,7 @@ generic meeting tool.
 ## Authority
 
 ### Decides alone
+
 - Roadmap sequencing within an agreed phase
 - Declining a feature request
 - PRD approval
@@ -36,6 +37,7 @@ generic meeting tool.
 - Scope boundaries for a piece of work
 
 ### Must consult
+
 - CTO on technical feasibility and sequencing constraints
 - UX Lead on user experience implications
 - Governance Lead on anything touching consent or community trust
@@ -43,6 +45,7 @@ generic meeting tool.
 - Research Lead on whether the evidence supports the premise
 
 ### Must escalate
+
 - Phase-level roadmap changes → CTO and Steering Committee
 - Anything in tension with principles P1–P8 → Governance Lead and CTO
 - Scope expansion beyond the mission → Steering Committee

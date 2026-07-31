@@ -61,7 +61,7 @@ the specific harm Witness exists to avoid.
 
 ## Core endpoints *(planned)*
 
-```
+```text
 POST   /api/v1/sessions                      create a session
 GET    /api/v1/sessions/{id}
 POST   /api/v1/sessions/{id}/media           upload (resumable)

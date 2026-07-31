@@ -52,43 +52,51 @@ shared with any model.
 <!-- Strike through with ~~text~~ and explain anything genuinely not applicable. -->
 
 **Correctness**
+
 - [ ] Acceptance criteria in the linked issue are met
 - [ ] Errors handled explicitly; no silent failure; no swallowed exception
 - [ ] Edge cases, failure paths and concurrent execution considered
 
 **Tests**
+
 - [ ] Unit tests for logic; integration tests for boundaries; contract tests for APIs
 - [ ] Tests assert the *requirement*, not the implementation
 - [ ] Coverage has not decreased; new domain logic is fully covered
 
 **Invariants** <!-- The properties that define this product -->
+
 - [ ] No new path reaches personal data without a `ConsentedContext`
 - [ ] No assertion can be created without a complete provenance chain
 - [ ] Tenant isolation and community restrictions upheld
 - [ ] Domain layer imports nothing from adapters or frameworks
 
 **Documentation**
+
 - [ ] Updated **in this PR** — including `docs/` and `architecture/` where relevant
 - [ ] `STATUS.md` / `ROADMAP.md` updated if a workstream's state changed
 - [ ] ADR written or updated if an architectural decision was made
 
 **Security**
+
 - [ ] Input validated at the boundary; authorisation enforced
 - [ ] No secret in code, config, fixture or commit history
 - [ ] No sensitive data in logs, traces or error messages
 - [ ] Fails closed, not open
 
 **Operability**
+
 - [ ] Meaningful traces, metrics and structured logs for new paths
 - [ ] No unbounded query, traversal or allocation on a request path
 - [ ] Migration path **and rollback** documented for schema or projection changes
 
 **Experience** <!-- UI changes only -->
+
 - [ ] WCAG 2.2 AA verified: keyboard, contrast, screen reader, 200% zoom
 - [ ] No hard-coded user-facing strings
 - [ ] Bundle size budget met; works on a slow connection
 
 **Housekeeping**
+
 - [ ] Conventional Commits, signed off (`git commit -s`)
 - [ ] No new technical debt, or logged in `docs/engineering/TECH_DEBT.md` with an owner and a date
 - [ ] `make verify` passes locally

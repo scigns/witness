@@ -44,6 +44,7 @@ Confidence scores are always shown to users. We never present an inference as a 
 ## Options considered
 
 ### Option A — Auto-accept above a confidence threshold
+
 **Pros:** dramatically higher throughput; human review is the known bottleneck (risk A-6).
 **Cons:** confidence scores from LLMs are poorly calibrated, and the errors that matter most — a
 misattributed commitment, an inverted conditional — are frequently high-confidence. Threshold-based
@@ -51,6 +52,7 @@ auto-acceptance would systematically admit the most dangerous errors. **Rejected
 single most consequential rejection in the project.
 
 ### Option B — Human confirmation for everything *(chosen)*
+
 **Pros:** no unverified model output ever becomes institutional record; neutralises most prompt-injection
 risk structurally; every assertion has a named accountable human; corrections become a high-quality
 evaluation signal.
@@ -58,6 +60,7 @@ evaluation signal.
 candidates. This is a real product constraint, not a rounding error.
 
 ### Option C — Auto-accept low-stakes types, review high-stakes
+
 **Pros:** better throughput; keeps the gate where it matters most.
 **Cons:** the boundary is not stable — an apparently low-stakes attendance record becomes high-stakes
 in a dispute about who was in the room. Every attempt to draw the line produced a case that crossed
@@ -65,18 +68,23 @@ it. **Deferred, not rejected**: revisit with real data from Phase 5 evaluation, 
 requires its own ADR and Governance Lead approval.
 
 ### Option D — Provenance as optional metadata
+
 Rejected. Optional provenance is absent provenance within two years.
 
 ## Consequences
 
 ### Positive
+
 - **No unverified model output enters the institutional record.** The central trust property.
-- Prompt injection is structurally neutralised — a forged assertion still requires a human to confirm it.
+- Prompt injection is structurally neutralised — a forged assertion still requires a human to
+  confirm it.
 - Every assertion answers "why do you believe this?" with playable audio and a named human.
-- Rejections and corrections form a continuously growing, expert-labelled evaluation set at no extra cost.
+- Rejections and corrections form a continuously growing, expert-labelled evaluation set at no extra
+  cost.
 - The system is defensible to an auditor, a regulator and a community council.
 
 ### Negative
+
 - **Human review is the throughput bottleneck of the entire product** (risk A-6). This constrains how
   much material an institution can process, which is a genuine product limitation we should state
   plainly to prospective adopters rather than discover with them.
@@ -86,6 +94,7 @@ Rejected. Optional provenance is absent provenance within two years.
 - Contributor friction: every code path creating knowledge must thread provenance through.
 
 ### Risks accepted
+
 - **Rubber-stamping.** A reviewer under time pressure clicking "confirm" on everything defeats the
   control entirely. This is the most serious residual risk and it is behavioural, not technical.
   Mitigations: measure review duration per decision and flag implausibly fast sessions; sample-audit

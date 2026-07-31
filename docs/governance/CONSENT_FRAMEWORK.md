@@ -38,7 +38,7 @@ recording a different basis.
 
 ## 3. The consent record
 
-```
+```text
 consent_grant
   subject              who the data is about
   granted_by_subject   who gave it (may differ — delegation, guardianship, custodial authority)

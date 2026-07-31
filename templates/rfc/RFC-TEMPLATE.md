@@ -24,8 +24,11 @@ non-technical constraints such as operator capacity or procurement.
 Explore genuinely. An RFC that presents one option with three strawmen has not done its job.
 
 ### Option A
+
 ### Option B
+
 ### Do nothing
+
 **Always include this.** It is often the right answer, and forcing yourself to argue against it
 surfaces whether the problem is real.
 

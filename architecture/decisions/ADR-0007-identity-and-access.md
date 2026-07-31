@@ -69,6 +69,7 @@ relationships, so it is a complement, not a replacement.
 ## Consequences
 
 ### Positive
+
 - Institutions keep their existing identity infrastructure; no second credential store.
 - One place to reason about, review and test authorisation, rather than hundreds of call sites.
 - Policy changes do not require code changes or a deployment.
@@ -77,6 +78,7 @@ relationships, so it is a complement, not a replacement.
 - Deny-by-default is structural.
 
 ### Negative
+
 - Keycloak is a substantial operational burden for a small operator. Mitigated by realm-as-code,
   shipped configuration and detailed runbooks — but the burden is real and we should say so.
 - Casbin's syntax is unfriendly; policy authoring will concentrate in a few people, which is a bus
@@ -85,6 +87,7 @@ relationships, so it is a complement, not a replacement.
   in-process with a cached policy set, and we accept the resulting cache-invalidation complexity.
 
 ### Risks accepted
+
 - **Fail-closed availability cost:** if policy evaluation fails, we deny. A PDP bug becomes an
   outage rather than a breach. That is the correct trade for this product, and it is a deliberate
   acceptance of reduced availability in favour of correctness.

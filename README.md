@@ -102,7 +102,8 @@ Sequencing: [`ROADMAP.md`](ROADMAP.md)
 **Backend** NestJS · GraphQL · REST · Prisma
 **Data** PostgreSQL + pgvector · Neo4j · OpenSearch · Redis · MinIO
 **AI** Whisper · LiteLLM · LangGraph · LlamaIndex · Ollama · OpenAI-compatible APIs
-**Infrastructure** Docker · Kubernetes · Helm · Terraform · GitHub Actions · OpenTelemetry · Prometheus · Grafana
+**Infrastructure** Docker · Kubernetes · Helm · Terraform · GitHub Actions · OpenTelemetry ·
+Prometheus · Grafana
 **Identity** Keycloak · OIDC · OAuth2 · JWT · Casbin
 
 Every choice justified in [`architecture/TECH_STACK.md`](architecture/TECH_STACK.md); every

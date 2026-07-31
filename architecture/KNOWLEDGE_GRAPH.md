@@ -120,7 +120,7 @@ failure we exist to fix.
 
 Every edge carries:
 
-```
+```text
 assertion_ids: [uuid]      # required, non-empty — the provenance hook
 valid_from: datetime       # when the relationship became true
 valid_to: datetime?        # null = still valid
@@ -184,6 +184,7 @@ flowchart TD
 ```
 
 **Rules:**
+
 - Auto-merge only above 0.95 **and** with no competing candidate above 0.60. Ambiguity always goes
   to a human.
 - **Every merge is reversible** for a defined window (`entity_merge_log.reversible_until`), and
@@ -226,6 +227,7 @@ sequenceDiagram
 ```
 
 **Properties:**
+
 - **Idempotent** — replaying any event produces an identical graph. `MERGE`, never `CREATE`.
 - **Ordered per aggregate** — global ordering is not required and not assumed.
 - **Resumable** — checkpointed; a crash costs re-processing since the last checkpoint, nothing more.

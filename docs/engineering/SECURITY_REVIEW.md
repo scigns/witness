@@ -2,7 +2,8 @@
 
 **Owner:** Security Lead
 **Status:** Active
-**See also:** [`SECURITY.md`](../../SECURITY.md) (disclosure) · [`architecture/SECURITY_ARCHITECTURE.md`](../../architecture/SECURITY_ARCHITECTURE.md) (the model)
+**See also:** [`SECURITY.md`](../../SECURITY.md) (disclosure) ·
+[`architecture/SECURITY_ARCHITECTURE.md`](../../architecture/SECURITY_ARCHITECTURE.md) (the model)
 
 ---
 
@@ -57,40 +58,47 @@ the residual risk.
 Applied by every reviewer on every pull request, not only by the Security Lead:
 
 **Input and output**
+
 - [ ] All external input validated at the boundary, against a schema
 - [ ] Output encoded for its context; no template injection
 - [ ] No user input concatenated into SQL, Cypher, or a shell command
 - [ ] File uploads: type, size and content verified, not just extension
 
 **Authentication and authorisation**
+
 - [ ] Every new endpoint declares its authorisation requirement
 - [ ] Authorisation checked at the boundary, not deep in a call chain
 - [ ] Deny by default — absence of a policy denies
 - [ ] No authorisation logic bypassable by a direct service call
 
 **Consent and provenance**
+
 - [ ] Personal data access requires a `ConsentedContext`
 - [ ] Assertions carry a complete provenance chain
 - [ ] Revocation propagates to anything this change adds
 - [ ] Community restrictions honoured, including above administrator roles
 
 **Data**
+
 - [ ] Tenant isolation enforced (RLS **and** repository filter)
 - [ ] Sensitivity classification propagated, never silently downgraded
 - [ ] Data minimisation — is every field stored actually needed?
 - [ ] Encryption at rest for anything `confidential` or above
 
 **Secrets and logging**
+
 - [ ] No secret in code, config, test fixture or commit history
 - [ ] No sensitive data in logs, traces, metrics or error messages
 - [ ] Structured logging uses the field allowlist
 
 **Failure**
+
 - [ ] Fails closed, not open
 - [ ] Error messages do not leak internal detail to the caller
 - [ ] No unbounded resource consumption reachable from a request
 
 **AI paths**
+
 - [ ] Model output parsed against a strict schema, never executed as instruction
 - [ ] No tool-calling with side effects in an extraction path
 - [ ] Egress policy respected; external calls logged and attributable

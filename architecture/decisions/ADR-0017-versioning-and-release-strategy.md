@@ -42,28 +42,33 @@ seem stable.
 ## Options considered
 
 ### Option A — Continuous delivery, no versioned releases
+
 **Pros:** simplest; always current.
 **Cons:** impossible for institutional operators to consume. They need a named, tested, documented
 artefact they can put through change control. Rejected.
 
 ### Option B — SemVer with feature-based releases ("ship when ready")
+
 **Pros:** releases are meaningful.
 **Cons:** unpredictable timing makes operator planning impossible, and it creates pressure to cram
 features in before a cut. Time-based releases with whatever is ready avoids both.
 
 ### Option C — Time-based releases with an LTS line *(chosen)*
+
 **Pros:** operators can plan; the LTS line matches real institutional upgrade cycles; no incentive to
 rush features; a six-week cadence keeps releases small and low-risk.
 **Cons:** maintaining an LTS branch means backporting, which is genuine ongoing cost — for 24 months
 per LTS, with two LTS lines overlapping at times.
 
 ### Option D — LTS only, annual releases
+
 **Pros:** minimal release overhead.
 **Cons:** twelve months is too slow for contributors and for institutions that do want to move.
 
 ## Consequences
 
 ### Positive
+
 - Institutions can plan upgrades against a published schedule.
 - LTS gives a genuine two-year runway, which is what a change advisory board needs.
 - Small six-week releases are lower risk than large annual ones.
@@ -71,6 +76,7 @@ per LTS, with two LTS lines overlapping at times.
 - SDK consumers get independent versioning and are not forced to move with the platform.
 
 ### Negative
+
 - **LTS maintenance is a real, recurring cost.** Backporting security fixes to a branch up to two
   years old, with different dependency versions, is unglamorous work that must be resourced. If it is
   not, the LTS promise becomes a lie — and this is the most likely way this ADR fails in practice.
@@ -78,6 +84,7 @@ per LTS, with two LTS lines overlapping at times.
 - Release process overhead every six weeks.
 
 ### Risks accepted
+
 That LTS backporting is under-resourced and the support promise quietly degrades. Signal: security
 fixes landing on `main` but not on LTS within the stated window. Mitigation: LTS backport is part of
 the security fix definition of done, not a follow-up task; the Release Manager owns it explicitly;
@@ -103,5 +110,6 @@ always safe.
 
 ## References
 
-- [Semantic Versioning 2.0.0](https://semver.org/) · [Keep a Changelog](https://keepachangelog.com/) · [Changesets](https://github.com/changesets/changesets)
+- [Semantic Versioning 2.0.0](https://semver.org/) · [Keep a Changelog](https://keepachangelog.com/)
+  · [Changesets](https://github.com/changesets/changesets)
 - [`docs/engineering/RELEASE_STRATEGY.md`](../../docs/engineering/RELEASE_STRATEGY.md)

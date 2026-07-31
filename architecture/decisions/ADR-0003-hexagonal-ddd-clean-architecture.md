@@ -30,7 +30,7 @@ data custodians who have precise existing vocabulary. If our code says `Record` 
 > domain-driven core and Clean Architecture dependency rules. Dependencies point inward. The domain
 > layer imports nothing but the standard library and other domain code.
 
-```
+```text
 adapters (infrastructure) → application (use cases) → domain (pure)
 ```
 
@@ -41,6 +41,7 @@ random source. Time and identity generation are injected as ports.
 ## Options considered
 
 ### Option A — Hexagonal + DDD + Clean layering *(chosen)*
+
 **Pros:** infrastructure becomes replaceable without touching business rules — the single most
 important property for a ten-year system; domain logic is testable in milliseconds with no
 containers; ubiquitous language is enforced by the code itself; the structure teaches new
@@ -49,17 +50,20 @@ contributors where things belong.
 real work; over-application to trivial contexts is a genuine and common failure mode.
 
 ### Option B — Conventional layered architecture (controller → service → repository)
+
 **Pros:** familiar; less ceremony; fast for CRUD.
 **Cons:** the "service" layer becomes a dumping ground; domain logic ends up in controllers and
 entity classes; ORM entities become the domain model, which couples business rules to the database
 schema forever. This is how most systems rot, and we would notice around year four.
 
 ### Option C — Transaction script / anaemic domain
+
 **Pros:** simplest for genuinely simple domains.
 **Cons:** ours is not simple. Consent, bitemporality and provenance invariants would be scattered
 across procedures with no enforcement. Rejected.
 
 ### Option D — Event sourcing all the way down, with aggregates rebuilt from events
+
 Partially adopted. We keep an authoritative event log (ADR-0011) but also maintain normalised
 current-state tables, rather than rebuilding every aggregate from events on every load. Full event
 sourcing adds meaningful operational complexity — snapshotting, versioning, replay performance —
@@ -68,6 +72,7 @@ for benefits we get more cheaply from the log plus projections.
 ## Consequences
 
 ### Positive
+
 - Neo4j, Whisper, Ollama, OpenSearch and any LLM provider are swappable behind ports. This is what
   makes the exit strategies in `docs/research/OSS_EVALUATION.md` credible rather than aspirational.
 - The domain test suite runs in seconds with no infrastructure, so contributors actually run it.
@@ -76,6 +81,7 @@ for benefits we get more cheaply from the log plus projections.
   requirements defects.
 
 ### Negative
+
 - More code. A simple create-and-read feature touches four or five files instead of two.
 - Mapping layers between domain and persistence must be written and maintained.
 - Contributors unfamiliar with the pattern need onboarding — mitigated by `templates/service/`.
@@ -84,6 +90,7 @@ for benefits we get more cheaply from the log plus projections.
   the engineering guide, so nobody has to fight about it in review.
 
 ### Risks accepted
+
 That the abstraction becomes ritual rather than useful — ports with exactly one implementation that
 will never have another. Mitigation: a port is justified when it crosses a technology boundary we
 might replace, not for every collaborator. Reviewed at each architecture review.

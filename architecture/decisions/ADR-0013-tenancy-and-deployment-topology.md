@@ -37,12 +37,14 @@ misunderstands.
 ## Options considered
 
 ### Option A — Single-tenant only, no tenancy model
+
 **Pros:** simplest; strongest isolation; no risk of a cross-tenant bug.
 **Cons:** a ministry with twelve departments runs twelve installations, each needing patching, backup
 and monitoring. Operationally worse for the operator we care most about. And retrofitting tenancy
 later is a schema migration across every table — one of the most expensive changes available.
 
 ### Option B — Multi-tenant software, single-tenant deployment default *(chosen)*
+
 **Pros:** one installation serves an institution's internal structure; tenancy is available where
 needed without imposing shared hosting; the isolation model is built and tested from day one rather
 than retrofitted.
@@ -50,6 +52,7 @@ than retrofitted.
 requiring permanent adversarial testing.
 
 ### Option C — Multi-tenant SaaS as the primary model
+
 **Pros:** operationally efficient; lower barrier to adoption.
 **Cons:** contradicts P1 directly, and would divert effort from making self-hosting excellent —
 which is the entire proposition. Rejected. (If a *public-sector* operator wanted to offer shared
@@ -57,6 +60,7 @@ hosting to smaller agencies in its jurisdiction, the software supports it; that 
 decision to make, not ours.)
 
 ### Option D — Namespace-per-tenant at the infrastructure layer
+
 **Pros:** very strong isolation.
 **Cons:** operational cost scales linearly with tenant count; overkill for departments within one
 institution. Available to operators who want it; not our default.
@@ -64,19 +68,23 @@ institution. Available to operators who want it; not our default.
 ## Consequences
 
 ### Positive
+
 - One installation serves an institution's internal structure — the common real-world case.
 - Isolation is built in and adversarially tested from the beginning, not bolted on.
 - Deployment posture is enforced by the software, so an operator cannot be wrong about it silently.
 - Air-gapped operation is a supported, CI-tested configuration rather than an aspiration.
 
 ### Negative
+
 - Every query and every index carries a tenancy dimension — permanent cognitive and performance cost.
 - Cross-tenant leakage remains a live risk class forever, requiring ongoing adversarial testing.
 - Three profiles means three configurations to test.
 - Row-level security adds query planning overhead; measurable, accepted.
 
 ### Risks accepted
-- A cross-tenant leak through a code path bypassing both RLS and the repository filter — for example a
+
+- A cross-tenant leak through a code path bypassing both RLS and the repository filter — for example
+  a
   raw query or an analytics job. Mitigation: adversarial CI suite covering every entry point; raw SQL
   requires explicit review; RLS is enabled by default on new tables via a migration lint check.
 - Operators running `development` profile in production because it is easier. Mitigation: refused when

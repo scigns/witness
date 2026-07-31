@@ -45,6 +45,7 @@ would require every contributor's agreement.
 ## Recorded decisions
 
 ### D-000 — Record non-architectural decisions
+
 **Date:** 2026-07-31 · **Decided by:** CTO, Governance Lead · **Status:** Active
 
 **Question.** ADRs cover architecture. Where do governance, process and product decisions go?

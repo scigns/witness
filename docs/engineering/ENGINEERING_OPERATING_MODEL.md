@@ -37,6 +37,7 @@ holds merge authority, is accountable for its health, and whose authority is wri
 charter in [`agents/`](../../agents/).
 
 Ownership means:
+
 - **Authority** to decide within the domain, without asking permission
 - **Accountability** for quality, security, documentation and operability of that domain
 - **Obligation** to review promptly, to be reachable, and to name a deputy

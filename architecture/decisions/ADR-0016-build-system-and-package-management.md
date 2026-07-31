@@ -58,8 +58,8 @@ contributor may need to debug the build, Turborepo's simplicity outweighs Nx's c
 close call and a defensible one to revisit.
 
 **Option C — Make plus scripts only.** Simplest, zero dependencies. *Cons:* no caching, no affected
-detection; full builds every time; CI times become unacceptable in a monorepo. **Partially adopted** —
-`Makefile` remains the entry point, delegating to Turborepo.
+detection; full builds every time; CI times become unacceptable in a monorepo. **Partially adopted**
+— `Makefile` remains the entry point, delegating to Turborepo.
 
 **Option D — Bazel.** Correct, hermetic, superb caching. *Cons:* the learning curve and maintenance
 burden would consume a large share of a small team's capacity. Wrong tool at our scale.
@@ -67,6 +67,7 @@ burden would consume a large share of a small team's capacity. Wrong tool at our
 ## Consequences
 
 ### Positive
+
 - Installs are fast and disk-efficient; CI cache restores are quick.
 - Phantom dependencies are impossible, catching a real bug class before deployment.
 - Affected-project detection keeps CI proportional to the change, which ADR-0001 depends on.
@@ -74,6 +75,7 @@ burden would consume a large share of a small team's capacity. Wrong tool at our
 - Configuration is small enough that a contributor can read and understand the entire build.
 
 ### Negative
+
 - pnpm's strict layout occasionally requires workarounds for tools assuming hoisting.
 - Turborepo caching can mask a stale build if task inputs are declared incorrectly — a confusing
   failure mode. Mitigated by explicit input declarations and `--force` in release builds.
@@ -82,6 +84,7 @@ burden would consume a large share of a small team's capacity. Wrong tool at our
   forgo it.
 
 ### Risks accepted
+
 That Turborepo becomes under-maintained or pivots commercially. Mitigation: our `turbo.json` is
 small, and migrating to Nx or plain scripts would be days, not weeks, because the real logic lives in
 `Makefile` and `scripts/`. That separation is deliberate insurance.

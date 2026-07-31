@@ -86,7 +86,7 @@ within 48 hours and a public record of what was merged and why.
 
 For work that is genuinely sequential, stack rather than batch:
 
-```
+```text
 feat/backend/220-consent-aggregate          → domain branch
   feat/backend/221-consent-policy-point     → 220
     feat/backend/222-consent-revocation     → 221

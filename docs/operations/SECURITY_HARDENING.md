@@ -13,12 +13,14 @@ operator's responsibility, and what to verify rather than assume.
 ## Verify before production
 
 **Egress** — the sovereignty claim
+
 - [ ] `WITNESS_DEPLOYMENT_PROFILE=sovereign`
 - [ ] `make egress-test` passes
 - [ ] Network policy denies outbound by default — **do not rely on the application layer alone**
 - [ ] Monitor `egress_denied_total`; any non-zero value means something tried
 
 **Identity**
+
 - [ ] Every default credential changed — Keycloak, Postgres, Neo4j, OpenSearch, MinIO
 - [ ] MFA enforced for administrative roles
 - [ ] Token lifetimes reviewed (15 min access default)
@@ -26,23 +28,27 @@ operator's responsibility, and what to verify rather than assume.
 - [ ] Break-glass accounts monitored and their use alerted
 
 **Authorisation**
+
 - [ ] Roles assigned on least privilege; review quarterly
 - [ ] Sensitivity classifications correct for your data
 - [ ] Community restrictions configured with the custodians, not on their behalf
 
 **Data**
+
 - [ ] Encryption at rest on every volume
 - [ ] Backups encrypted; **keys stored separately from backups**
 - [ ] TLS 1.3 with a real certificate
 - [ ] Retention configured to your statutory obligations
 
 **Audit**
+
 - [ ] Audit log forwarding to your SIEM configured
 - [ ] Chain verification scheduled; failure raises a page
 - [ ] External anchoring configured — so an attacker with database access still cannot rewrite history
       undetectably
 
 **Supply chain**
+
 - [ ] Release signatures verified before install. Every time
 - [ ] SBOM reviewed against your policy
 - [ ] Image provenance attestation checked

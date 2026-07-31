@@ -55,16 +55,20 @@ the system still cannot read data whose grant has been revoked.
 ## Options considered
 
 ### Option A — Boolean flag on session or subject
+
 **Pros:** trivial.
-**Cons:** cannot express scope, purpose, expiry, delegation or partial revocation; nothing prevents a
+**Cons:** cannot express scope, purpose, expiry, delegation or partial revocation; nothing prevents
+a
 code path from skipping it. Rejected.
 
 ### Option B — Consent service with checks called by each service
+
 **Pros:** centralised policy; scoped and revocable.
 **Cons:** relies on every service remembering to call it. Better, but it is still discipline, and
 discipline fails at 2am in year six under deadline pressure. Rejected as insufficient.
 
 ### Option C — Consent as a domain primitive with type-enforced access *(chosen)*
+
 **Pros:** forgetting the check is a compile error; the gate is topological; revocation has a defined,
 measured, verified SLO; the model expresses scope, purpose, expiry, delegation and collective
 authority.
@@ -72,6 +76,7 @@ authority.
 code; a genuine learning curve for contributors.
 
 ### Option D — Encrypt per subject, delete the key on revocation (crypto-shredding)
+
 **Pros:** elegant; revocation is instant and provable; solves the backup problem cleanly.
 **Cons:** per-subject encryption of overlapping data is intractable when one utterance involves five
 speakers with different consent states; key management complexity is severe; and a single lost key is
@@ -82,6 +87,7 @@ complement rather than a replacement.
 ## Consequences
 
 ### Positive
+
 - **A processing path that bypasses consent cannot be written**, which is a stronger guarantee than
   any amount of review.
 - Scope, purpose limitation, expiry and delegation are expressible, so the model fits real
@@ -91,6 +97,7 @@ complement rather than a replacement.
   that will actually ask.
 
 ### Negative
+
 - **Significant invasiveness.** Every repository method returning personal data changes signature.
   More parameters, more ceremony, more verbose call sites.
 - Performance cost: a policy decision on every data access. Mitigated by caching decisions per
@@ -101,6 +108,7 @@ complement rather than a replacement.
   sessions, which is confusing UX that we must design carefully rather than hide.
 
 ### Risks accepted
+
 - **Revocation from backups** cannot be instant. Erasure lists are replayed on restore, documented as
   a mandatory step. A restore performed without replaying the erasure list would resurrect erased
   data — this is the residual risk, it is documented in the operator runbook, and it is verified in

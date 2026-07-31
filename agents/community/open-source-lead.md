@@ -30,18 +30,21 @@ needs more than that.
 ## Authority
 
 ### Decides alone
+
 - Contributor experience process and community documentation
 - Community communication and channels
 - Curation standards for `good first issue` and `help wanted`
 - Nominating a contributor for maintainer status
 
 ### Must consult
+
 - CTO on maintainer appointments and merge authority
 - Steering Committee on external partnerships and foundation relationships
 - Code of Conduct committee on conduct matters
 - Legal counsel, where available, on licensing questions
 
 ### Must escalate
+
 - **Licensing changes → Steering Committee and all copyright holders**
 - Foundation relationship decisions → Founder and Steering Committee
 - Governance changes affecting contributors → Steering Committee

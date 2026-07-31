@@ -19,7 +19,8 @@ sovereign, including when that platform is the one we currently use.
 ## Rules
 
 - Every script runs identically locally and in CI.
-- Fail with a **clear message**, not a stack trace. A contributor blocked on their first morning by an
+- Fail with a **clear message**, not a stack trace. A contributor blocked on their first morning by
+  an
   unhelpful error may not come back.
 - Bash only where trivial. Anything with real logic goes to Node or Python.
 - Exit non-zero on failure, and say what would fix it.

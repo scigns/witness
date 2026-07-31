@@ -10,10 +10,12 @@
 ## Why this exists
 
 **We do not build what already exists.** Witness is not a database, a search engine, an identity
-provider or a speech recognition system, and every line we write that duplicates mature open source is
+provider or a speech recognition system, and every line we write that duplicates mature open source
+is
 a line we must maintain for a decade for no benefit.
 
-But every dependency is a liability accepted deliberately. This dossier records, for each one: what it
+But every dependency is a liability accepted deliberately. This dossier records, for each one: what
+it
 does for us, what it costs us, how we would live without it, and what would tell us it is time to
 leave.
 
@@ -33,7 +35,8 @@ describe how we would remove a dependency, we are not adding it.
 | **Integration** | How is it bounded so it does not spread through the codebase? |
 | **Replacement** | What is the exit, how long does it take, and what triggers it? |
 
-**Automatic rejection:** licence incompatible with the consuming package · unmaintained (no release or
+**Automatic rejection:** licence incompatible with the consuming package · unmaintained (no release
+or
 meaningful commit in 12 months) without a fork plan · single maintainer on a critical path without
 mitigation · requires a phone-home or external service in the default configuration · known unpatched
 critical vulnerability.
@@ -91,7 +94,10 @@ property for a system operated by under-resourced teams. Transactional guarantee
 Row-level security for tenant isolation. `pgvector` avoids a fourth data store and a fourth backup.
 
 **Risks.**
-- `pgvector` is younger and less proven at very large scale than dedicated vector databases. **Assessment:** adequate for tens of millions of vectors, which exceeds our largest projected deployment.
+
+- `pgvector` is younger and less proven at very large scale than dedicated vector databases.
+  **Assessment:** adequate for tens of millions of vectors, which exceeds our largest projected
+  deployment.
 - Deep coupling: we deliberately use advanced features (RLS, recursive CTEs, JSONB, window functions).
 
 **Integration.** Behind `RepositoryPort` and `VectorPort`. Prisma for the common path; hand-written
@@ -119,6 +125,7 @@ between Community and Enterprise. Historically they have moved capability into E
 which matters when a policy analyst wants to understand what a query does. Mature tooling.
 
 **Risks.**
+
 - Community edition lacks clustering — a single point of failure if it held authoritative data.
 - Single-vendor licence risk: capability could move to Enterprise.
 - Java runtime adds to the operational footprint.
@@ -150,11 +157,13 @@ participation.
 **Maintenance.** Frequent releases, responsive security process, long track record.
 
 **Advantages.** The reference open-source IdP for government. Federating to whatever directory an
-institution already runs is essential — asking a ministry to manage a second credential store is both a
+institution already runs is essential — asking a ministry to manage a second credential store is
+both a
 security regression and an adoption blocker. Step-up authentication supports our elevated-authority
 operations.
 
 **Risks.**
+
 - ⚠️ **Heavy.** A meaningful share of the platform's total operational complexity is Keycloak's. JVM
   tuning, memory footprint, occasional upgrade friction.
 - Major upgrades have historically required attention.
@@ -187,6 +196,7 @@ WhisperX gives word-level timestamps — which is what makes our provenance clai
 play the exact sentence rather than a vague region.
 
 **Risks.**
+
 - ⚠️ **The gated pyannote licence complicates the air-gapped offline bundle.** Must be handled in the
   install path and documented, not discovered by an operator at 2am.
 - Quality in low-resource languages may be inadequate — **risk R-03**, and it falls hardest on
@@ -237,13 +247,15 @@ Days.
 
 **Licence.** MIT.
 
-**Community.** ⚠️ **Vercel-controlled.** Enormous user community, but roadmap and governance sit with a
+**Community.** ⚠️ **Vercel-controlled.** Enormous user community, but roadmap and governance sit
+with a
 company whose business is hosting.
 
 **Advantages.** Server components meaningfully reduce client bundle size, which is decisive for the
 low-bandwidth field deployments in principle P8. Enormous talent pool. Self-hostable in standalone mode.
 
 **Risks.**
+
 - ⚠️ **Vendor incentive misalignment.** Vercel's interests are hosting-shaped; features are sometimes
   optimised for their platform.
 - Fast-moving with frequent breaking changes across majors.
@@ -269,7 +281,8 @@ unavoidable for core functionality.*
 but the bus factor upstream is a genuine consideration.
 
 **Advantages.** First-class dependency injection, which is what makes hexagonal architecture practical
-rather than aspirational. Module structure maps cleanly to bounded contexts. Strong conventions mean a
+rather than aspirational. Module structure maps cleanly to bounded contexts. Strong conventions mean
+a
 contributor can read any service and know where things are — worth a great deal over a decade.
 
 **Risks.** Upstream bus factor. Framework coupling. Heavier than Fastify alone.

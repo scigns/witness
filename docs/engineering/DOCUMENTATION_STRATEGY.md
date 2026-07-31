@@ -108,7 +108,8 @@ English is the source. Community translations are welcome and credited.
 
 Priority order when resources are limited: consent and data-subject material first, then user guide,
 then admin guide. **Consent material is the highest priority for translation** — someone who cannot
-read the consent explanation in their own language has not meaningfully consented, which makes this a
+read the consent explanation in their own language has not meaningfully consented, which makes this
+a
 correctness requirement rather than a reach goal.
 
 ## Documentation site

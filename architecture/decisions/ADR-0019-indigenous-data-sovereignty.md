@@ -53,16 +53,19 @@ Five concrete mechanisms:
 ## Options considered
 
 ### Option A — Rely on general consent and access control
+
 **Pros:** no additional complexity.
 **Cons:** cannot express collective authority, custodianship, cultural protocol or non-exportability.
 Would reproduce the extractive pattern with better technology. Rejected.
 
 ### Option B — Policy and training only, no technical enforcement
+
 **Pros:** flexible; no engineering cost.
 **Cons:** a policy an administrator can override is not a control. Communities have every reason,
 based on experience, not to accept a promise where a mechanism is possible. Rejected.
 
 ### Option C — Architectural enforcement *(chosen)*
+
 **Pros:** the guarantee is structural; a community can verify it in open source rather than trust us;
 supports genuine community-controlled deployment.
 **Cons:** substantial complexity; an access control model where administrators are not the top of the
@@ -70,6 +73,7 @@ hierarchy is unusual and will surprise operators; risk of us — mostly non-Indi
 encoding our own misunderstanding of customary governance into software.
 
 ### Option D — Separate deployment for Indigenous organisations
+
 **Pros:** maximum control for those communities.
 **Cons:** does not help the far more common case where a *government* records a consultation with a
 community. That is exactly where the risk concentrates, and it needs to work in the government's
@@ -79,12 +83,14 @@ not sufficient on its own.
 ## Consequences
 
 ### Positive
+
 - Communities retain genuine, verifiable control over their knowledge.
 - Custodial authority is representable rather than flattened into individual consent.
 - Administrator override is impossible by construction — the strongest assurance we can offer.
 - The architecture supports community-controlled deployment as a first-class topology.
 
 ### Negative
+
 - Meaningful complexity in the authorisation model, and an unusual hierarchy that operators must be
   taught rather than assume.
 - Operational awkwardness: a platform administrator debugging an issue involving restricted knowledge
@@ -93,6 +99,7 @@ not sufficient on its own.
 - Export and backup paths become more complex, with permanently excluded classes.
 
 ### Risks accepted
+
 - **That we have modelled customary governance incorrectly.** This is the primary risk and it is not
   resolvable by engineering effort. Mitigation: the external review below is a hard gate, and the
   model must be revised on its findings even at significant cost.
@@ -127,8 +134,12 @@ Governance Lead's veto.
 
 ## References
 
-- [CARE Principles for Indigenous Data Governance](https://www.gida-global.org/care) — Global Indigenous Data Alliance
-- [OCAP® — Ownership, Control, Access, Possession](https://fnigc.ca/ocap-training/) — First Nations Information Governance Centre
-- [UN Declaration on the Rights of Indigenous Peoples](https://www.un.org/development/desa/indigenouspeoples/declaration-on-the-rights-of-indigenous-peoples.html), Art. 31
+- [CARE Principles for Indigenous Data Governance](https://www.gida-global.org/care) — Global
+  Indigenous Data Alliance
+- [OCAP® — Ownership, Control, Access, Possession](https://fnigc.ca/ocap-training/) — First Nations
+  Information Governance Centre
+- [UN Declaration on the Rights of Indigenous
+  Peoples](https://www.un.org/development/desa/indigenouspeoples/declaration-on-the-rights-of-indigenous-peoples.html),
+  Art. 31
 - [Maiam nayri Wingara Indigenous Data Sovereignty Principles](https://www.maiamnayriwingara.org/)
 - [`docs/governance/INDIGENOUS_DATA_SOVEREIGNTY.md`](../../docs/governance/INDIGENOUS_DATA_SOVEREIGNTY.md)

@@ -100,8 +100,8 @@ index, aggregate and backup restore path. Enforced at the serialisation layer an
 A community may withdraw knowledge entirely. Hard erasure across every store and every derived work,
 verified, leaving only a non-reversible tombstone.
 
-Unlike individual erasure, community withdrawal may be **retrospective across an entire engagement** —
-every session, every assertion, every graph node derived from a whole consultation.
+Unlike individual erasure, community withdrawal may be **retrospective across an entire engagement**
+— every session, every assertion, every graph node derived from a whole consultation.
 
 ## Additional protections
 

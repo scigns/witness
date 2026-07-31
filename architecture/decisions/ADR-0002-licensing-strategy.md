@@ -40,11 +40,13 @@ The `sdk/`, `packages/contracts/` and published ontology artefacts carry Apache-
 ## Options considered
 
 ### Option A — GPL-3.0 throughout
+
 **Pros:** simple; strong protection against proprietary capture.
 **Cons:** integrators writing against our SDK face copyleft questions about their own systems, which
 in practice means legal review and often abandonment. Suppresses exactly the ecosystem we need.
 
 ### Option B — GPL-3.0 platform + Apache-2.0 contracts and SDKs *(chosen)*
+
 **Pros:** the platform stays protected; integration is frictionless; matches well-understood practice
 (Linux with its syscall exception, GCC with its runtime exception). A government system calling our
 REST API through our SDK has no copyleft exposure.
@@ -53,6 +55,7 @@ build a proprietary product *around* Witness using the SDK, which we consider ac
 desirable; what they cannot do is take the platform itself proprietary.
 
 ### Option C — AGPL-3.0 platform
+
 **Pros:** closes the network-service gap; a hosted modified Witness would have to publish changes.
 **Cons:** significantly more procurement resistance in government contexts; some organisations have
 blanket AGPL prohibitions. Given that our *primary* deployment model is self-hosting by the
@@ -62,6 +65,7 @@ typical SaaS-shaped project.
 commercial hosted-Witness market emerges, the calculation changes materially.
 
 ### Option D — Permissive throughout (Apache-2.0 / MIT)
+
 **Pros:** maximum adoption; no procurement friction anywhere.
 **Cons:** permits exactly the proprietary capture that principle P1 exists to prevent. A vendor could
 build "Witness Enterprise", capture the government market, and leave the open version to rot. This is
@@ -70,6 +74,7 @@ a well-documented pattern. Rejected.
 ## Consequences
 
 ### Positive
+
 - The platform cannot be taken proprietary.
 - Integrators face no copyleft exposure — the ecosystem can grow.
 - Commercial support, hosting and integration businesses remain viable, which is how the project
@@ -77,6 +82,7 @@ a well-documented pattern. Rejected.
 - Compatible with Digital Public Goods Alliance requirements.
 
 ### Negative
+
 - Two licences means a boundary contributors can get wrong. Requires tooling and vigilance.
 - GPL-3.0 excludes some dependency licences from the platform (Apache-2.0 is fine; SSPL, BUSL and
   RSAL are not) — which constrains our technology choices, though we consider that constraint
@@ -86,6 +92,7 @@ a well-documented pattern. Rejected.
   for evaluators.
 
 ### Risks accepted
+
 That a hosted-service market emerges and someone runs a modified Witness commercially without
 contributing back. Signal: any commercial Witness hosting offering. Response: evaluate relicensing
 to AGPL for future versions, which requires the consent of all copyright holders — which is precisely

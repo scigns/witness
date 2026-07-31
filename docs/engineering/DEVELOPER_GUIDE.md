@@ -60,14 +60,14 @@ around it silently, because the next person will hit the same thing.
 
 | Service | URL | Credentials |
 |---|---|---|
-| Web app | http://localhost:3000 | via Keycloak |
-| API gateway | http://localhost:4000 | |
-| GraphQL playground | http://localhost:4000/graphql | dev only |
-| Keycloak | http://localhost:8080 | `admin` / see `.env` |
-| Neo4j browser | http://localhost:7474 | see `.env` |
-| OpenSearch Dashboards | http://localhost:5601 | |
-| MinIO console | http://localhost:9001 | see `.env` |
-| Grafana | http://localhost:3001 | `admin` / `admin` |
+| Web app | <http://localhost:3000> | via Keycloak |
+| API gateway | <http://localhost:4000> | |
+| GraphQL playground | <http://localhost:4000/graphql> | dev only |
+| Keycloak | <http://localhost:8080> | `admin` / see `.env` |
+| Neo4j browser | <http://localhost:7474> | see `.env` |
+| OpenSearch Dashboards | <http://localhost:5601> | |
+| MinIO console | <http://localhost:9001> | see `.env` |
+| Grafana | <http://localhost:3001> | `admin` / `admin` |
 
 ## Synthetic data
 

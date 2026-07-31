@@ -29,6 +29,7 @@ Operability is architectural goal 4, above performance. This role is why.
 ## Authority
 
 ### Decides alone
+
 - Deployment topology and container structure
 - Observability stack and instrumentation approach
 - CI/CD pipeline structure
@@ -36,12 +37,14 @@ Operability is architectural goal 4, above performance. This role is why.
 - Alert thresholds and runbook content
 
 ### Must consult
+
 - Security Lead on network policy, secrets and supply chain
 - Backend Lead on resource requirements and migration timing
 - CTO on anything increasing operator burden
 - Release Manager on release packaging
 
 ### Must escalate
+
 - Anything adding a component operators must run → CTO
 - Anything that would break air-gapped operation → CTO (this is close to a hard no)
 - Recovery objectives that cannot be met → CTO

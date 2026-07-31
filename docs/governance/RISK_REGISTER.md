@@ -73,8 +73,8 @@ correct-first-time · [ADR-0011](../../architecture/decisions/ADR-0011-knowledge
 makes ontology change a projector change plus a replay, so **being wrong is affordable** · ship and
 iterate.
 
-**Signal.** Ontology work extending past its time-box · ADR-0019-style external reviews multiplying ·
-no working pipeline by end of Phase 4.
+**Signal.** Ontology work extending past its time-box · ADR-0019-style external reviews multiplying
+· no working pipeline by end of Phase 4.
 
 ### R-02 — Human review bottleneck 🟠
 
@@ -96,7 +96,8 @@ a complete answer. Recorded plainly rather than glossed.
 **Mitigation.** Minimise · treat mentions of absent third parties as `confidential` by default ·
 support redaction on request · **external legal review before Phase 3**.
 
-**Signal.** Legal review finding our approach insufficient · a complaint from a mentioned third party ·
+**Signal.** Legal review finding our approach insufficient · a complaint from a mentioned third
+party ·
 a jurisdiction where our approach is unlawful.
 
 ### R-06 — Legitimising extractive consultation 🟠
@@ -122,8 +123,8 @@ structure is designed to reduce.
 knowledge · maintainer pathway with real merge authority · governance Stage 2 target of ≥ 3
 organisations with merge authority · continuity plan tested six-monthly.
 
-**Signal.** Any domain where one person's absence would stop a release · a lead unable to take leave ·
-review latency spiking when one person is away.
+**Signal.** Any domain where one person's absence would stop a release · a lead unable to take leave
+· review latency spiking when one person is away.
 
 ### R-12 — Operational complexity 🟠
 
@@ -132,7 +133,8 @@ for a two-person government IT team, and operability is architectural goal 4 —
 
 **Mitigation.** Single-node Compose profile as a first-class production target · minimal
 (Postgres-only) profile under evaluation · one backup target, not four
-([ADR-0004](../../architecture/decisions/ADR-0004-polyglot-persistence.md)) · runbook for every alert ·
+([ADR-0004](../../architecture/decisions/ADR-0004-polyglot-persistence.md)) · runbook for every
+alert ·
 **every new component requires justification to the CTO**.
 
 **Signal.** Operators abandoning deployment · support questions concentrating on operations rather than

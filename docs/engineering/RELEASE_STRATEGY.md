@@ -35,6 +35,7 @@ stable before we are is how trust is lost early.
 Run by `scripts/release/preflight.sh`; the Release Manager owns the go/no-go.
 
 **Code**
+
 - [ ] All required CI checks green on `main`
 - [ ] No P0 or P1 issues open against this release
 - [ ] Full test suite including E2E, performance and evaluation
@@ -43,6 +44,7 @@ Run by `scripts/release/preflight.sh`; the Release Manager owns the go/no-go.
 - [ ] Zero-egress verification passes in the sovereign profile
 
 **Migration and recovery**
+
 - [ ] Migrations tested forward **and** backward on a realistic data volume
 - [ ] Migration duration measured and documented
 - [ ] Upgrade tested from the previous stable **and** from the current LTS
@@ -50,6 +52,7 @@ Run by `scripts/release/preflight.sh`; the Release Manager owns the go/no-go.
 - [ ] Backup and restore drill passed
 
 **Supply chain**
+
 - [ ] SBOM generated (CycloneDX)
 - [ ] Artefacts and images signed (cosign)
 - [ ] Provenance attestation generated
@@ -57,6 +60,7 @@ Run by `scripts/release/preflight.sh`; the Release Manager owns the go/no-go.
 - [ ] Offline install bundle built and verified air-gapped
 
 **Documentation**
+
 - [ ] Changelog curated — not just generated
 - [ ] Upgrade notes written, including **operator actions required**
 - [ ] Breaking changes documented with a migration path
@@ -64,6 +68,7 @@ Run by `scripts/release/preflight.sh`; the Release Manager owns the go/no-go.
 - [ ] Known issues and limitations published honestly
 
 **Security and support**
+
 - [ ] Security fixes backported to **all supported LTS lines** — this is part of the fix's
       definition of done, never a follow-up task
 - [ ] Advisories drafted for any disclosed vulnerability

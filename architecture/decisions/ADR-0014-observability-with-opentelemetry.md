@@ -30,21 +30,25 @@ recording's full journey from upload to graph is a single trace.
 ## Options considered
 
 ### Option A — OpenTelemetry with a self-hosted stack *(chosen)*
+
 **Pros:** vendor-neutral by design — operators forward to whatever they run; CNCF governed; no lock-in;
 one instrumentation API for all three signal types; broad ecosystem.
 **Cons:** the OTel Node SDK has historically churned; the collector is another component to run; more
 initial setup than a single-vendor agent.
 
 ### Option B — Vendor SDK (Datadog, New Relic, Honeycomb)
+
 **Pros:** excellent developer experience; less setup.
 **Cons:** violates P1 outright — data egress by default. Rejected without hesitation.
 
 ### Option C — Logs only, no tracing
+
 **Pros:** simplest; every operator understands logs.
 **Cons:** correlating a request across six services and several hours from logs alone is
 impractical, and this is precisely our hardest debugging scenario.
 
 ### Option D — Prometheus metrics plus structured logs, no distributed tracing
+
 **Pros:** lighter; covers most operational questions.
 **Cons:** loses causal chains in the async pipeline. Tracing is where the value is for our topology.
 **However**: tracing is made optional at deployment. A small operator who does not want to run Tempo
@@ -53,6 +57,7 @@ gets metrics and logs, and the system works. This is a partial adoption, not a r
 ## Consequences
 
 ### Positive
+
 - One trace spans upload through to graph projection, across services and hours.
 - Operators integrate with existing tooling rather than adopting ours.
 - Telemetry stays inside the boundary; nothing to disable for air-gapped deployment.
@@ -60,6 +65,7 @@ gets metrics and logs, and the system works. This is a partial adoption, not a r
   first-class, and these are the metrics that actually matter for this product.
 
 ### Negative
+
 - The OTel Node SDK adds startup time and some runtime overhead. Sampling is configurable; the
   default is 10%.
 - The full stack (Prometheus, Grafana, Tempo, Loki) is four more services in the observability
@@ -67,6 +73,7 @@ gets metrics and logs, and the system works. This is a partial adoption, not a r
 - Contributors must instrument deliberately; poorly chosen spans are noise.
 
 ### Risks accepted
+
 - **Sensitive data leaking into telemetry.** Utterance text in a span attribute or an error message
   would be a privacy incident via the observability path — an easy mistake to make. Mitigation:
   structured logging with a **field allowlist, not a denylist**; a CI check for known-sensitive field

@@ -34,6 +34,7 @@ architecture after the CTO has gone.
 ## Authority
 
 ### Decides alone
+
 - Technology stack additions and removals (with an ADR)
 - Engineering process, standards and quality gates
 - Lead appointments and domain boundaries
@@ -42,6 +43,7 @@ architecture after the CTO has gone.
 - Halting a release
 
 ### Must consult
+
 - Principal Architect on any architectural change
 - Security Lead on anything touching the threat model
 - Governance Lead on anything touching consent, provenance or Indigenous data governance
@@ -49,6 +51,7 @@ architecture after the CTO has gone.
 - Infrastructure Lead on operability impact
 
 ### Must escalate
+
 - Changes to principles P1–P8 → Steering Committee
 - Licensing changes → Steering Committee and copyright holders
 - Governance structure → Steering Committee

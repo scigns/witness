@@ -37,6 +37,7 @@ Witness. Any such split requires its own ADR.
 ## Options considered
 
 ### Option A — Monorepo *(chosen)*
+
 **Pros:** atomic cross-cutting changes (a domain model change, its consumers and its tests in one
 reviewable commit); one version of truth for shared types; single CI configuration; trivially
 consistent tooling, linting and standards; a new contributor clones once and has everything;
@@ -46,18 +47,21 @@ everything; access control is all-or-nothing at the repository level; unfamiliar
 contributors.
 
 ### Option B — Polyrepo, one per service
+
 **Pros:** clear ownership; independent release cadence; smaller clones; granular access control.
 **Cons:** the shared domain model problem above, which is decisive. Also: cross-repo changes need
 coordinated pull requests; dependency version skew becomes a standing tax; contributors must
 discover and clone many repositories; CI configuration duplicated and divergent. Rejected.
 
 ### Option C — Hybrid — core monorepo plus separate SDK and infrastructure repositories
+
 **Pros:** SDKs get an independent release cadence, which their consumers want.
 **Cons:** SDKs are *generated from* the contracts; separating them means generation crosses a
 repository boundary and can silently drift. We get the same benefit by publishing SDK packages from
 the monorepo. Rejected, but this is the closest alternative and the most likely future revision.
 
 ### Option D — Monorepo with Nx instead of Turborepo
+
 Considered as a variant. Nx is more capable — generators, dependency graph analysis, richer plugin
 ecosystem. Turborepo chosen for lower conceptual overhead and a smaller configuration surface, which
 matters more than power for a small team. See ADR-0016.
@@ -65,6 +69,7 @@ matters more than power for a small team. See ADR-0016.
 ## Consequences
 
 ### Positive
+
 - Ontology, consent and provenance definitions have exactly one authoritative version.
 - Cross-cutting changes are one pull request, reviewed as one coherent unit.
 - Consistent tooling by construction: one ESLint config, one Prettier config, one TypeScript base.
@@ -72,6 +77,7 @@ matters more than power for a small team. See ADR-0016.
 - Onboarding is one clone and one `make bootstrap`.
 
 ### Negative
+
 - CI must use affected-project detection or build times become unacceptable. This is real work.
 - Clone size grows over a decade; shallow clone guidance will eventually be needed.
 - Cannot grant a contributor write access to only one service — access is repository-wide, mediated
@@ -80,6 +86,7 @@ matters more than power for a small team. See ADR-0016.
 - Release tooling must handle independently versioned packages within one repository.
 
 ### Risks accepted
+
 That the repository becomes unwieldy at a scale we have not yet reached. Signals to watch: CI time
 above 15 minutes p95 after affected-detection; clone above 2 GB; contributors avoiding areas because
 the repository is intimidating. Revisit if any of those trigger.
