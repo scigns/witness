@@ -1,0 +1,106 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+.yarn/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Build output
+dist/
+build/
+out/
+.next/
+.turbo/
+.nest/
+*.tsbuildinfo
+target/
+
+# Test & coverage
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+.pytest_cache/
+
+# Environment & secrets — never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!**/testdata/**/*.key
+*.p12
+*.pfx
+secrets/
+.secrets/
+kubeconfig
+*.kubeconfig
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+crash.log
+
+# Local data & media — institutional recordings must never enter git
+data/
+media/
+uploads/
+recordings/
+*.wav
+*.mp3
+*.m4a
+*.mp4
+*.mkv
+!examples/**/*.synthetic.*
+
+# Models — large binaries live in object storage, not git
+models/
+*.gguf
+*.bin
+*.safetensors
+*.onnx
+*.pt
+
+# Databases
+*.sqlite
+*.sqlite3
+*.db
+pgdata/
+neo4j-data/
+opensearch-data/
+minio-data/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+pnpm-debug.log*
+
+# Editors & OS
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+*~
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+
+# Tooling artefacts
+.eslintcache
+.cache/
+tmp/
+temp/
+sbom.json
+*.sarif

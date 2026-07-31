@@ -1,0 +1,9 @@
+pnpm-lock.yaml
+dist/
+build/
+.next/
+.turbo/
+coverage/
+**/generated/**
+*.generated.*
+LICENSE
