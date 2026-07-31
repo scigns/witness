@@ -1,0 +1,23 @@
+# Air-gap overlay — used by `make egress-test` and by the CI sovereignty job.
+#
+# Removes all external network access from every service. If the stack still
+# functions with this applied, the sovereignty claim in DIGITAL_SOVEREIGNTY.md is
+# true rather than aspirational. If it does not, we have a defect and a broken
+# promise, in that order.
+
+services:
+  postgres:   { networks: [isolated] }
+  neo4j:      { networks: [isolated] }
+  opensearch: { networks: [isolated] }
+  valkey:     { networks: [isolated] }
+  minio:      { networks: [isolated] }
+  nats:       { networks: [isolated] }
+  keycloak:   { networks: [isolated] }
+  ollama:     { networks: [isolated] }
+
+networks:
+  isolated:
+    # internal: true removes the default gateway. Nothing on this network can
+    # reach anything outside it — not a model API, not a CDN, not a font host.
+    internal: true
+    name: witness-isolated

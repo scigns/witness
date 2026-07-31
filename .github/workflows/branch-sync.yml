@@ -1,0 +1,26 @@
+# Keeps the long-lived domain integration branches from becoming forks.
+#
+# This automation is what makes ADR-0015 work. Without it, the branch model
+# degrades into GitFlow within months — which is the thing we are avoiding.
+
+name: Branch sync
+
+on:
+  schedule:
+    - cron: "0 5 * * 1-5"   # weekday mornings
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  divergence:
+    name: Check domain branch divergence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Report divergence from develop
+        # Warn beyond 50 commits behind; fail beyond 200.
+        run: bash scripts/ci/check-branch-divergence.sh

@@ -86,10 +86,24 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 - Complete documentation baseline: context, vision, mission, roadmap, governance, engineering
   operating model, product operating model, all process documents.
 - ADRs 0000–0020 drafted; core architectural stance recorded and open to challenge.
-- 19 role charters defined in [`agents/`](agents/).
+- 19 role charters defined in [`agents/`](agents/), with explicit authority boundaries.
 - Branch strategy defined for 30 long-lived branches with owners and merge rules.
 - CI/CD, security review and AI development workflow established.
-- OSS evaluation dossier produced for the full core stack.
+- OSS evaluation dossier produced for the full core stack, with an exit strategy per dependency.
+- Governance framework: consent, digital sovereignty, Indigenous data sovereignty, risk register.
+- CODEOWNERS mapping every path to an owning role; no path is unowned.
+- **Executable governance gates** in `scripts/ci` and `scripts/security`, wired into CI: link
+  integrity, document ownership, ADR completeness, CODEOWNERS coverage, action pinning, branch
+  divergence, licence boundary, and static zero-egress verification. All pass on this commit.
+
+**Known gaps, stated plainly:**
+- The *runtime* half of zero-egress verification activates with the Phase 2 stack. Only the static
+  half runs today.
+- Deployment, admin, user and API guides describe the **target** experience, not a shipped one. They
+  are published early so operators can tell us they are wrong before we build them.
+- Personas are hypotheses from desk research, not findings from interviews (Phase 1 research).
+- ADR-0019 (Indigenous data sovereignty) carries a **hard external review gate** before Phase 4.
+  Nothing in that area should be implemented until it is met.
 
 ---
 
@@ -97,7 +111,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 
 | # | Decision | Owner | Needed by | Notes |
 |---|---|---|---|---|
-| D-1 | Confirm SDK/contracts permissive licensing with copyright holders | Open Source Lead | Phase 2 | ADR-0002 records intent; requires holder consent |
+| D-1 | Confirm SDK/contracts permissive licensing with copyright holders | Open Source Lead | Phase 2 | ⚠️ **Partially actioned.** Apache-2.0 `LICENSE` and `NOTICE` files placed in `sdk/` and `packages/contracts/` per ADR-0002, while the repository has a single copyright holder and no third-party contributions — the cheapest possible moment to do it. **Formal confirmation by the copyright holder is still outstanding and must happen before those directories accept outside contributions.** Reversing this is trivial today and effectively impossible later |
 | D-2 | Event transport: NATS JetStream vs Postgres-only for small deployments | Backend Lead | Phase 3 | ADR-0005 proposes profile-based; needs load evidence |
 | D-3 | ASR engine: faster-whisper vs whisper.cpp vs WhisperX composition | AI Lead | Phase 5 | Blocked on benchmark against target languages |
 | D-4 | Graph store: confirm Neo4j Community vs Apache AGE for constrained deployments | Knowledge Graph Lead | Phase 4 | Licensing/footprint trade-off, ADR-0004 |

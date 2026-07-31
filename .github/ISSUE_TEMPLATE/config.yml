@@ -1,0 +1,15 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔐 Report a security vulnerability
+    url: https://github.com/scigns/witness/security/advisories/new
+    about: >
+      Never open a public issue for a vulnerability. Private disclosure only.
+      We acknowledge within 2 working days. See SECURITY.md.
+  - name: 💬 Ask a question or discuss an idea
+    url: https://github.com/scigns/witness/discussions
+    about: >
+      For questions and open-ended discussion. If the documentation failed to
+      answer you, please file a documentation issue instead — that is a real bug.
+  - name: 📖 Read PROJECT_CONTEXT.md first
+    url: https://github.com/scigns/witness/blob/main/PROJECT_CONTEXT.md
+    about: Short, binding, and answers most "why is it like this?" questions.

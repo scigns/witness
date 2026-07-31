@@ -1,0 +1,80 @@
+name: 🐛 Bug report
+description: Something does not work as documented
+labels: ["type:bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting this.
+
+        **Do not include real recordings, transcripts or personal data** in this
+        issue — not even redacted. Use synthetic examples.
+
+        If this is a security vulnerability, close this and follow SECURITY.md instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did you observe?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: And where the documentation led you to expect it, if applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Deployment profile
+      options: [sovereign, hybrid, development, not applicable, unsure]
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      value: |
+        - Witness version:
+        - Deployment topology (single node / Kubernetes / air-gapped):
+        - OS and Docker version:
+        - Browser (if relevant):
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or trace ID
+      description: Redact anything sensitive. A trace ID is usually more useful than a log dump.
+      render: shell
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Does this involve any of the following?
+      description: These change the priority immediately. Be honest — we would rather over-triage.
+      options:
+        - label: Consent was not honoured, or data was processed without a valid grant
+        - label: Data appeared across a tenant or community restriction boundary
+        - label: An assertion exists without valid provenance
+        - label: Unexpected outbound network traffic in the sovereign profile
+        - label: Data survived a revocation or erasure request
+  - type: checkboxes
+    id: confirm
+    attributes:
+      options:
+        - label: I have searched existing issues
+          required: true
+        - label: This contains no real personal data, recordings or institutional content
+          required: true

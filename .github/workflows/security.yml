@@ -1,0 +1,70 @@
+# Security and supply chain scanning.
+# Owner: Security Lead (docs/engineering/SECURITY_REVIEW.md)
+
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: "17 3 * * *"   # daily
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Secret scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0   # full history — a secret removed from HEAD is still a secret
+      - name: Scan working tree and history
+        uses: gitleaks/gitleaks-action@83373cf2f8c4db6e24b41c1a9b086bb9619e9cd3 # v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependencies:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Review new dependencies
+        uses: actions/dependency-review-action@3b139cfc5fae8b618d3eae3675e383bb1769c019 # v4.5.0
+        with:
+          fail-on-severity: moderate
+          # Incompatible with GPL-3.0, or unacceptable for public infrastructure.
+          deny-licenses: SSPL-1.0, BUSL-1.1, Elastic-2.0, RSAL-1.0, CC-BY-NC-4.0
+
+  licenses:
+    name: Licence compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check licence boundary
+        # Platform is GPL-3.0; sdk/ and packages/contracts/ are Apache-2.0 (ADR-0002).
+        run: bash scripts/security/check-licenses.sh
+
+  sovereignty:
+    name: Zero-egress verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # Principle P1: the sovereign profile must make zero external calls.
+      # This gate is what makes that claim checkable rather than aspirational.
+      - name: Verify no egress in the sovereign profile
+        run: bash scripts/security/verify-no-egress.sh
+
+  workflows:
+    name: Workflow hardening
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Actions must be pinned to a commit SHA
+        run: bash scripts/security/check-action-pinning.sh

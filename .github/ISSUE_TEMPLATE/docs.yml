@@ -1,0 +1,35 @@
+name: 📖 Documentation problem
+description: Documentation is missing, wrong, unclear or out of date
+labels: ["type:docs", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **If the documentation failed you, that is our defect — not your shortcoming.**
+        Thank you for telling us.
+  - type: input
+    id: where
+    attributes:
+      label: Which document
+      placeholder: docs/operations/DEPLOYMENT_GUIDE.md, or a URL
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of problem
+      options:
+        - Missing — the answer is not there at all
+        - Wrong — it says something untrue
+        - Out of date — it describes older behaviour
+        - Unclear — I could not follow it
+        - Broken example — the command or code did not work
+        - Inaccessible — hard to use with assistive technology
+    validations:
+      required: true
+  - type: textarea
+    id: detail
+    attributes:
+      label: What you were trying to do, and what happened
+    validations:
+      required: true

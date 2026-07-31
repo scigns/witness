@@ -1,0 +1,59 @@
+# Canonical label set. Applied by scripts/ci/sync-labels.sh.
+# See docs/engineering/ISSUE_WORKFLOW.md.
+
+# ─── Type ─────────────────────────────────────────────────────────────────────
+- name: "type:bug"            color: "d73a4a"  description: "Does not work as documented"
+- name: "type:feature"        color: "0e8a16"  description: "New capability"
+- name: "type:chore"          color: "cfd3d7"  description: "Maintenance"
+- name: "type:docs"           color: "0075ca"  description: "Documentation — a docs failure is our defect"
+- name: "type:research"       color: "5319e7"  description: "Time-boxed investigation"
+- name: "type:security"       color: "b60205"  description: "Security (never for undisclosed vulnerabilities)"
+- name: "type:adr"            color: "1d76db"  description: "Architecture decision"
+- name: "type:epic"           color: "3e4b9e"  description: "Large work with child issues"
+- name: "type:accessibility"  color: "fbca04"  description: "WCAG 2.2 AA and assistive technology"
+- name: "type:sovereignty"    color: "006b75"  description: "Data sovereignty, egress, self-hosting"
+
+# ─── Priority ─────────────────────────────────────────────────────────────────
+- name: "P0"  color: "b60205"  description: "Drop everything — outage, data at risk, or any consent violation"
+- name: "P1"  color: "d93f0b"  description: "Next sprint"
+- name: "P2"  color: "fbca04"  description: "Planned"
+- name: "P3"  color: "c2e0c6"  description: "Backlog"
+
+# ─── State ────────────────────────────────────────────────────────────────────
+- name: "triage"        color: "ededed"  description: "Awaiting triage — within 2 working days"
+- name: "needs-info"    color: "d4c5f9"  description: "Blocked on the reporter"
+- name: "accepted"      color: "c2e0c6"  description: "Real, in scope, will be done"
+- name: "ready"         color: "0e8a16"  description: "Acceptance criteria written — pick this up"
+- name: "in-progress"   color: "1d76db"  description: "Being worked"
+- name: "in-review"     color: "5319e7"  description: "Pull request open"
+- name: "blocked"       color: "e99695"  description: "Blocked — the blocker must be named"
+
+# ─── Domain ───────────────────────────────────────────────────────────────────
+- name: "domain:architecture"     color: "bfd4f2"
+- name: "domain:product"          color: "bfd4f2"
+- name: "domain:research"         color: "bfd4f2"
+- name: "domain:ux"               color: "bfd4f2"
+- name: "domain:frontend"         color: "bfd4f2"
+- name: "domain:backend"          color: "bfd4f2"
+- name: "domain:workers"          color: "bfd4f2"
+- name: "domain:auth"             color: "bfd4f2"
+- name: "domain:knowledge-graph"  color: "bfd4f2"
+- name: "domain:ai-platform"      color: "bfd4f2"
+- name: "domain:capture"          color: "bfd4f2"
+- name: "domain:search"           color: "bfd4f2"
+- name: "domain:security"         color: "bfd4f2"
+- name: "domain:governance"       color: "bfd4f2"
+- name: "domain:infra"            color: "bfd4f2"
+- name: "domain:deps"             color: "bfd4f2"
+- name: "domain:docs"             color: "bfd4f2"
+
+# ─── Community ────────────────────────────────────────────────────────────────
+- name: "good first issue"  color: "7057ff"  description: "Curated — has context, criteria and a named person to ask"
+- name: "help wanted"       color: "008672"  description: "We would welcome help here"
+- name: "needs-expertise"   color: "d876e3"  description: "Needs expertise we do not have in-project"
+
+# ─── Flags ────────────────────────────────────────────────────────────────────
+- name: "breaking-change"       color: "b60205"  description: "Requires a major version"
+- name: "needs-adr"             color: "1d76db"  description: "Requires an architecture decision record"
+- name: "needs-external-review" color: "d876e3"  description: "Requires review from outside the project"
+- name: "ai-generated"          color: "ededed"  description: "Substantially AI-generated, with a human sponsor"

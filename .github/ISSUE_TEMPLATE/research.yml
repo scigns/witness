@@ -1,0 +1,40 @@
+name: 🔬 Research spike
+description: Propose a time-boxed investigation
+labels: ["type:research", "triage"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: The question
+      description: One question, answerable with evidence.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: What decision does this unblock?
+      description: Research that unblocks nothing is a hobby. Which ADR, roadmap item or design waits on this?
+    validations:
+      required: true
+  - type: input
+    id: timebox
+    attributes:
+      label: Time box
+      placeholder: e.g. 3 days
+    validations:
+      required: true
+  - type: textarea
+    id: method
+    attributes:
+      label: Method
+      description: How will you answer it, reproducibly?
+    validations:
+      required: true
+  - type: checkboxes
+    id: ethics
+    attributes:
+      label: If this involves community participants
+      options:
+        - label: Participants are compensated
+        - label: Governance Lead has reviewed the approach
+        - label: Not applicable — no human participants

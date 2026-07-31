@@ -1,0 +1,53 @@
+# Dependency updates.
+#
+# Every dependency is a liability we accept deliberately. Updates are batched
+# weekly so review is a single considered activity rather than constant noise,
+# and security updates are separated so they are never lost in that batch.
+# See docs/engineering/SECURITY_REVIEW.md.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: ["type:chore", "domain:deps"]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Batch routine updates; majors are reviewed individually because they
+      # are behaviour changes, not maintenance.
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: pip
+    directory: "/workers"
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ["type:chore", "domain:deps"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: docker
+    directory: "/infrastructure/docker"
+    schedule:
+      interval: weekly
+    labels: ["type:chore", "domain:infra"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels: ["type:chore", "domain:infra"]
+    commit-message:
+      prefix: "ci(deps)"
+    # Actions are pinned to commit SHAs; Dependabot updates the SHA and the
+    # comment together. scripts/security/check-action-pinning.sh enforces this.
