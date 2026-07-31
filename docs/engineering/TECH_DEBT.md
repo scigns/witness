@@ -41,12 +41,38 @@ quietly not doing.
 
 ## Register
 
-*No entries yet — Witness is pre-implementation ([`STATUS.md`](../../STATUS.md)). The format below
-is illustrative and will be replaced by real entries as they are incurred.*
-
 | ID | Title | Severity | Incurred | Owner | Review by | Rationale | Exit |
 |---|---|---|---|---|---|---|---|
-| *TD-001* | *(example) Prisma cannot express the bitemporal window query; hand-written SQL in the assertion repository* | *S3* | *—* | *Backend Lead* | *—* | *ORM limitation; raw SQL is correct and tested* | *Revisit if Prisma adds support* |
+| **TD-001** | Dependency review gate is not running — GitHub Dependency graph unavailable on this repository | **S2** | 2026-07-31 (#1) | Security Lead | **2026-10-31** | Platform feature is off; the action hard-failed on every run, turning the whole security workflow permanently red | Enable Dependency graph in repository settings, or make the repository public |
+
+### TD-001 — Dependency review gate is not running
+
+**Severity:** S2 · **Incurred:** 2026-07-31 in #1 · **Owner:** Security Lead
+**Review by:** 2026-10-31 · **Area:** `.github/workflows/security.yml`
+
+**What was done and why.**
+`actions/dependency-review-action` requires GitHub's Dependency graph, which is unavailable on a
+private repository without Advanced Security. It therefore hard-failed on every run. Rather than
+leave the entire security workflow permanently red — which trains contributors to ignore CI, and is
+worse for security than the missing check itself — the job now probes availability first, runs the
+gate for real when the feature is present, and emits a loud `::warning::` when it is not.
+
+**Cost of carrying it.**
+Supply-chain review of new dependencies is **not happening**. Today that costs nothing because there
+are no dependencies and no lockfile. From Phase 2 it is a real gap: a dependency with a known
+vulnerability or a denied licence could merge without this gate noticing.
+
+Partial compensating controls remain: `scripts/security/check-licenses.sh` (licence compatibility,
+including Redis/RSALv2 by name), Dependabot, secret scanning, GitGuardian and CodeQL all run.
+
+**What it would take to fix.**
+A repository setting: *Settings → Code security → Dependency graph → Enable*. On a public repository
+it is on by default. Roughly five minutes, and it needs someone with admin rights — which is why this
+is tracked rather than fixed in a commit.
+
+**Trigger to fix.**
+**Before Phase 2 introduces the first real dependency.** A supply-chain gate that is switched off at
+the moment dependencies arrive is worse than one that was never claimed.
 
 ### Entry format
 
