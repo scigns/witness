@@ -6,7 +6,7 @@ on:
   push:
     branches: [main, develop]
   schedule:
-    - cron: "42 4 * * 1"   # weekly deep scan
+    - cron: "42 4 * * 1" # weekly deep scan
 
 permissions:
   contents: read

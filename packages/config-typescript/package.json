@@ -4,5 +4,7 @@
   "private": true,
   "license": "GPL-3.0-or-later",
   "description": "Shared TypeScript configuration",
-  "files": ["*.json"]
+  "files": [
+    "*.json"
+  ]
 }

@@ -102,6 +102,12 @@ jobs:
       - run: make format-check
       - run: make lint
       - run: make typecheck
+      # ADR-0003: the domain layer imports nothing but the standard library.
+      # Checked here as well as by an ESLint rule, because the ESLint rule is a
+      # denylist and this is the inverse — it catches a dependency nobody thought
+      # to add to the list.
+      - name: Domain purity (ADR-0003)
+        run: bash scripts/ci/check-domain-purity.sh
 
   test:
     name: Test

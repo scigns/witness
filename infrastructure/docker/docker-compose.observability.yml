@@ -52,7 +52,7 @@ services:
       - ../observability/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
       - tempo-data:/var/tempo
     ports:
-      - "${OTLP_HTTP_PORT:-4318}:4318"   # OTEL_EXPORTER_OTLP_ENDPOINT
+      - "${OTLP_HTTP_PORT:-4318}:4318" # OTEL_EXPORTER_OTLP_ENDPOINT
       - "${OTLP_GRPC_PORT:-4317}:4317"
       - "${TEMPO_PORT:-3200}:3200"
     healthcheck:
@@ -102,7 +102,7 @@ services:
       retries: 10
 
 volumes:
-  prometheus-data:    # not backed up — metrics are observational, not a record
-  tempo-data:         # not backed up
-  loki-data:          # not backed up
-  grafana-data:       # dashboards are provisioned from source; this is cache only
+  prometheus-data: # not backed up — metrics are observational, not a record
+  tempo-data: # not backed up
+  loki-data: # not backed up
+  grafana-data: # dashboards are provisioned from source; this is cache only

@@ -8,14 +8,38 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
-    "dev": { "cache": false, "persistent": true },
-    "lint": { "dependsOn": ["^build"] },
-    "typecheck": { "dependsOn": ["^build"], "outputs": ["*.tsbuildinfo"] },
-    "test": { "dependsOn": ["^build"], "outputs": ["coverage/**"] },
-    "test:unit": { "dependsOn": ["^build"], "outputs": ["coverage/**"] },
-    "test:integration": { "dependsOn": ["^build"], "cache": false },
-    "test:contract": { "dependsOn": ["^build"], "cache": false },
-    "test:e2e": { "dependsOn": ["^build"], "cache": false },
-    "clean": { "cache": false }
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    },
+    "test:unit": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    },
+    "test:integration": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "test:contract": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "clean": {
+      "cache": false
+    }
   }
 }

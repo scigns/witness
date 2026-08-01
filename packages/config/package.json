@@ -1,9 +1,9 @@
 {
-  "name": "@witness/domain",
+  "name": "@witness/config",
   "version": "0.1.0",
   "private": true,
   "license": "GPL-3.0-or-later",
-  "description": "Pure domain model. Imports nothing but the standard library — enforced by CI, see ADR-0003.",
+  "description": "Environment validation and deployment-profile enforcement (ADR-0013).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,5 +24,7 @@
     "lint": "eslint src",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
-  "dependencies": {}
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
 }
