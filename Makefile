@@ -33,8 +33,13 @@ help: ## Show this help
 bootstrap: .env ## First-time setup: check prerequisites, install deps, create .env
 	@bash scripts/dev/check-prerequisites.sh
 	pnpm install
+	@# The Prisma client is generated, not installed. `pnpm install` cannot do it —
+	@# the postinstall hook runs before the schema is resolvable and skips with a
+	@# warning. Without this, `make seed` fails on a clean clone even though every
+	@# documented step before it succeeded.
+	pnpm --filter @witness/api exec prisma generate
 	@echo
-	@echo "Bootstrap complete. Next:  make dev  &&  make migrate  &&  make app"
+	@echo "Bootstrap complete. Next:  make dev  &&  make migrate  &&  make seed  &&  make app"
 
 .PHONY: dev
 dev: .env ## Start the dependencies the Developer Preview needs (Postgres, Valkey)

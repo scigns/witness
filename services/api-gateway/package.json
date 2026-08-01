@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "license": "GPL-3.0-or-later",
-  "description": "Witness API gateway — HTTP adapter over the domain (ADR-0003, ADR-0006).",
+  "description": "Witness API gateway \u2014 HTTP adapter over the domain (ADR-0003, ADR-0006).",
   "type": "module",
   "main": "./dist/main.js",
   "scripts": {
@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:unit": "vitest run",
     "lint": "eslint src",
-    "seed": "tsx prisma/seed.ts",
+    "seed": "prisma generate && tsx prisma/seed.ts",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
