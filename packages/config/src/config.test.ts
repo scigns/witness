@@ -147,3 +147,23 @@ describe('publicConfig', () => {
     expect(serialised).not.toMatch(/pw/);
   });
 });
+
+describe('web origin (CORS)', () => {
+  it('derives from the web port when not set explicitly', () => {
+    const config = loadConfig({ ...base, WITNESS_WEB_PORT: '3020' });
+    expect(config.webOrigin).toBe('http://localhost:3020');
+  });
+
+  it('defaults to port 3000', () => {
+    expect(loadConfig({ ...base }).webOrigin).toBe('http://localhost:3000');
+  });
+
+  it('honours an explicit origin, for reverse-proxied deployments', () => {
+    const config = loadConfig({
+      ...base,
+      WITNESS_WEB_PORT: '3020',
+      WITNESS_WEB_ORIGIN: 'https://witness.gov.example',
+    });
+    expect(config.webOrigin).toBe('https://witness.gov.example');
+  });
+});

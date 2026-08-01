@@ -49,6 +49,10 @@ const schema = z.object({
   WITNESS_INSTANCE_NAME: z.string().min(1).default('Witness'),
   WITNESS_DATA_RESIDENCY: z.string().min(1).default('not declared'),
   WITNESS_API_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
+  WITNESS_WEB_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  // Explicit override for deployments where the browser reaches the web app at
+  // something other than localhost. Left empty, it is derived from the web port.
+  WITNESS_WEB_ORIGIN: z.string().optional().default(''),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
@@ -68,6 +72,13 @@ export interface WitnessConfig {
   readonly instanceName: string;
   readonly dataResidency: string;
   readonly apiPort: number;
+  /**
+   * The exact origin the browser will send. Used for CORS, so a mismatch means
+   * every request from the web application is refused by the browser before it
+   * reaches Witness at all — with an error that names CORS rather than the port
+   * that was actually changed.
+   */
+  readonly webOrigin: string;
   readonly logLevel: 'debug' | 'info' | 'warn' | 'error';
   readonly databaseUrl: string;
   /** True only when the profile permits egress AND a provider is configured. */
@@ -161,6 +172,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
     instanceName: value.WITNESS_INSTANCE_NAME,
     dataResidency: value.WITNESS_DATA_RESIDENCY,
     apiPort: value.WITNESS_API_PORT,
+    webOrigin:
+      value.WITNESS_WEB_ORIGIN.trim() !== ''
+        ? value.WITNESS_WEB_ORIGIN.trim()
+        : `http://localhost:${value.WITNESS_WEB_PORT}`,
     logLevel: value.LOG_LEVEL,
     databaseUrl: value.DATABASE_URL,
     externalInferenceEnabled:

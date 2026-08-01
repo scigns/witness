@@ -41,7 +41,7 @@ async function bootstrap(): Promise<void> {
   // Narrow, explicit, and never `*` — a permissive CORS policy left in place is
   // one of the most common ways an internal API becomes a public one.
   app.enableCors({
-    origin: process.env['WITNESS_WEB_ORIGIN'] ?? 'http://localhost:3000',
+    origin: config.webOrigin,
     credentials: false,
     allowedHeaders: ['Content-Type', 'X-Witness-Dev-User'],
   });
@@ -55,6 +55,7 @@ async function bootstrap(): Promise<void> {
   );
   logger.log(`Profile: ${config.profile} · Data residency: ${config.dataResidency}`);
   logger.log(`Listening on http://localhost:${config.apiPort}`);
+  logger.log(`Accepting browser requests from ${config.webOrigin}`);
 
   if (config.profile === 'development') {
     logger.warn(
