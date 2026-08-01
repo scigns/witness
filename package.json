@@ -43,8 +43,8 @@
     "docs:headers": "bash scripts/ci/check-doc-headers.sh",
     "seed": "pnpm --filter @witness/api run seed",
     "migrate": "pnpm --filter @witness/api exec prisma migrate deploy",
-    "test:invariants": "vitest run test/invariants",
-    "test:adversarial": "vitest run test/adversarial"
+    "test:invariants": "turbo run build && vitest run test/invariants",
+    "test:adversarial": "turbo run build && vitest run test/adversarial"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.9",

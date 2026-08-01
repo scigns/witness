@@ -149,10 +149,15 @@ jobs:
       # INV-1..INV-8: consent, provenance, tenant isolation, layering, projection rebuild.
       # These encode what Witness promises. A weakened assertion here is the loudest
       # possible signal in code review.
+      #
+      # The suites import the workspace packages by name, which resolve to dist/.
+      # `pnpm test:invariants` builds first so the command is correct standalone;
+      # this job would otherwise fail on a fresh checkout while passing on any
+      # machine that had built at some point.
       - name: Invariant suite
-        run: pnpm vitest run test/invariants
+        run: pnpm test:invariants
       - name: Adversarial suite
-        run: pnpm vitest run test/adversarial
+        run: pnpm test:adversarial
 
   build:
     name: Build
