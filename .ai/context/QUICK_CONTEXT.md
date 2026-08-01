@@ -15,8 +15,8 @@ Meetings, Policies, Evidence, Risks, Decisions, Actions, Commitments, Locations 
 
 Not a transcription tool. A transcript is an intermediate artefact.
 
-**The test every feature must pass:** *"Who committed to what, on whose behalf, on what evidence,
-under what consent — and can I prove it five years later when everyone involved has left?"*
+**The test every feature must pass:** _"Who committed to what, on whose behalf, on what evidence,
+under what consent — and can I prove it five years later when everyone involved has left?"_
 
 ## The architecture in five facts
 
@@ -53,21 +53,43 @@ by lint, not by discipline.
 
 ## Where things live
 
-| Need | Path |
-|---|---|
-| Domain model | `packages/domain/` |
+| Need                    | Path                  |
+| ----------------------- | --------------------- |
+| Domain model            | `packages/domain/`    |
 | API and event contracts | `packages/contracts/` |
-| Backend services | `services/` |
-| Async processors | `workers/` |
-| Web and admin apps | `apps/` |
-| Architecture and ADRs | `architecture/` |
-| Process documentation | `docs/engineering/` |
-| Role charters | `agents/` |
+| Backend services        | `services/`           |
+| Async processors        | `workers/`            |
+| Web and admin apps      | `apps/`               |
+| Architecture and ADRs   | `architecture/`       |
+| Process documentation   | `docs/engineering/`   |
+| Role charters           | `agents/`             |
 
 ## Current state
 
-**Phase 1 — Architecture & research.** No application code exists yet, deliberately: consent and
-provenance are cross-cutting invariants, and any assertion written before they are enforceable is
-permanently untrustworthy.
+**Phase 1 — Architecture & research**, with a **Developer Preview (0.1.0)** that proves the
+foundation end to end: capture a record, store it, display it, show its provenance, and let a human
+accept or reject it. Domain, configuration, API and web all exist and are tested.
+
+What is deliberately **not** built: AI extraction, transcription, the knowledge graph projection, the
+consent service, and Keycloak/Casbin authentication. The running instance lists every one of these at
+`/ready` and renders the list on its dashboard, so nothing has to be guessed at.
+
+The reason the pipeline is not built yet is unchanged: consent and provenance are cross-cutting
+invariants, and any assertion written before they are enforceable is permanently untrustworthy.
 
 Live picture: [`STATUS.md`](../../STATUS.md).
+
+## Before you write code
+
+Read [`docs/engineering/AGENT_HANDOFF_PROTOCOL.md`](../../docs/engineering/AGENT_HANDOFF_PROTOCOL.md).
+
+It exists because of one specific failure: a capable contributor, given a narrow task, reasons from
+first principles and redesigns something already decided. The redesign is often locally sensible and
+still wrong, because the decision it overturns carried context — funding, procurement, a legal
+constraint — that is invisible from inside the task.
+
+The short version: work your assigned row in
+[`DEPARTMENT_ASSIGNMENTS.md`](../../docs/engineering/DEPARTMENT_ASSIGNMENTS.md), change only what your
+department owns ([`DEPARTMENTS.md`](../../docs/engineering/DEPARTMENTS.md)), and when you find a
+decision that is not yours to make, **write it down and hand it back rather than picking the
+sensible-looking default.**
