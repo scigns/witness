@@ -5,7 +5,14 @@
 
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
-COMPOSE := docker compose -f infrastructure/docker/docker-compose.yml
+# --env-file is not optional here. Compose resolves `.env` relative to the compose
+# FILE's directory, not the working directory, so without this the root .env is
+# silently ignored and every `${VAR:?}` in the stack fails with a message naming a
+# variable the contributor has already set. Relative volume paths inside the
+# compose file still resolve against infrastructure/docker/, which is why this is
+# --env-file rather than --project-directory.
+COMPOSE := docker compose --env-file .env -f infrastructure/docker/docker-compose.yml
+COMPOSE_FULL := $(COMPOSE) --profile full
 COMPOSE_OBS := $(COMPOSE) -f infrastructure/docker/docker-compose.observability.yml
 
 .PHONY: help
@@ -16,37 +23,64 @@ help: ## Show this help
 
 # ─── Environment ──────────────────────────────────────────────────────────────
 
+# Created on first use rather than documented as a manual step, because a setup
+# step a contributor can forget is a setup step a contributor will forget.
+.env:
+	@cp .env.example .env
+	@echo "Created .env from .env.example. Review it before using a real deployment."
+
 .PHONY: bootstrap
-bootstrap: ## First-time setup: check prerequisites, install deps, create .env
+bootstrap: .env ## First-time setup: check prerequisites, install deps, create .env
 	@bash scripts/dev/check-prerequisites.sh
-	@test -f .env || cp .env.example .env
 	pnpm install
-	@echo "Bootstrap complete. Run 'make dev' to start the local stack."
+	@echo
+	@echo "Bootstrap complete. Next:  make dev  &&  make migrate  &&  make app"
 
 .PHONY: dev
-dev: ## Start the local development stack (Postgres, Neo4j, OpenSearch, Redis, MinIO, Keycloak, NATS)
+dev: .env ## Start the dependencies the Developer Preview needs (Postgres, Valkey)
 	$(COMPOSE) up -d
 	@bash scripts/dev/wait-for-healthy.sh
 
+.PHONY: dev-full
+dev-full: .env ## Start the complete stack (adds Neo4j, OpenSearch, MinIO, NATS, Keycloak, Ollama)
+	$(COMPOSE_FULL) up -d
+	@COMPOSE_FILE=infrastructure/docker/docker-compose.yml bash scripts/dev/wait-for-healthy.sh
+
 .PHONY: dev-obs
-dev-obs: ## Start the local stack plus observability (Prometheus, Grafana, Tempo, Loki)
+dev-obs: .env ## Start the local stack plus observability (Prometheus, Grafana, Tempo, Loki)
 	$(COMPOSE_OBS) up -d
 	@bash scripts/dev/wait-for-healthy.sh
 
+.PHONY: app
+app: ## Run the Witness API and web application (requires `make dev`)
+	pnpm dev
+
+.PHONY: migrate
+migrate: ## Apply database migrations
+	pnpm --filter @witness/api exec prisma migrate deploy
+
+.PHONY: migrate-dev
+migrate-dev: ## Create and apply a migration from schema changes
+	pnpm --filter @witness/api exec prisma migrate dev
+
+.PHONY: seed
+seed: ## Seed the database with synthetic fixtures
+	pnpm --filter @witness/api run seed
+
 .PHONY: down
-down: ## Stop the local stack, preserving volumes
-	$(COMPOSE_OBS) down
+down: .env ## Stop the local stack, preserving volumes
+	$(COMPOSE_OBS) --profile full down
 
 .PHONY: clean
-clean: ## Stop the local stack and DESTROY all local data volumes
+clean: .env ## Stop the local stack and DESTROY all local data volumes
 	@echo "This destroys all local data volumes. Ctrl-C within 5s to abort."
 	@sleep 5
-	$(COMPOSE_OBS) down -v
+	$(COMPOSE_OBS) --profile full down -v
 	rm -rf node_modules/.cache .turbo
 
 .PHONY: logs
-logs: ## Tail logs from the local stack
-	$(COMPOSE_OBS) logs -f --tail=100
+logs: .env ## Tail logs from the local stack
+	$(COMPOSE_OBS) --profile full logs -f --tail=100
 
 .PHONY: reset-data
 reset-data: ## Wipe and re-seed local databases with synthetic fixtures
@@ -88,9 +122,10 @@ build: ## Build all workspaces
 # ─── Documentation & architecture ─────────────────────────────────────────────
 
 .PHONY: docs-lint
-docs-lint: ## Lint markdown and check links
+docs-lint: ## Lint markdown and check internal links
 	pnpm docs:lint
-	pnpm docs:links
+	@bash scripts/ci/check-links.sh
+	@bash scripts/ci/check-doc-headers.sh
 
 .PHONY: adr
 adr: ## Create a new ADR from the template (usage: make adr TITLE="short title")
@@ -106,7 +141,7 @@ check-context: ## Verify STATUS.md and ROADMAP.md are not stale relative to rece
 security: ## Run the full local security suite (secrets, deps, licences, containers)
 	@bash scripts/security/scan-secrets.sh
 	pnpm deps:audit
-	pnpm deps:licenses
+	@bash scripts/security/check-licenses.sh
 	@bash scripts/security/scan-containers.sh
 
 .PHONY: sbom

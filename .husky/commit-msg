@@ -1,0 +1,4 @@
+# Conventional Commits are enforced because the changelog and the release version
+# are derived from them (ADR-0017). A malformed message is a release defect, so it
+# is caught here rather than at release time.
+pnpm exec commitlint --edit "$1"

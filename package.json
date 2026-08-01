@@ -17,13 +17,6 @@
     "pnpm": ">=9.0.0"
   },
   "packageManager": "pnpm@9.12.0",
-  "workspaces": [
-    "apps/*",
-    "packages/*",
-    "services/*",
-    "workers/*",
-    "sdk/typescript"
-  ],
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
@@ -39,14 +32,15 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "docs:lint": "markdownlint-cli2 \"**/*.md\" \"#node_modules\"",
-    "docs:links": "lychee --no-progress --exclude-mail .",
+    "docs:links": "bash scripts/ci/check-links.sh",
     "adr:new": "node scripts/dev/new-adr.mjs",
     "deps:audit": "pnpm audit --audit-level=moderate",
-    "deps:licenses": "node scripts/security/check-licenses.mjs",
+    "deps:licenses": "bash scripts/security/check-licenses.sh",
     "sbom": "node scripts/security/generate-sbom.mjs",
     "changeset": "changeset",
     "version": "changeset version",
-    "prepare": "husky"
+    "prepare": "husky",
+    "docs:headers": "bash scripts/ci/check-doc-headers.sh"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.9",

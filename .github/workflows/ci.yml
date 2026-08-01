@@ -76,6 +76,8 @@ jobs:
         run: bash scripts/ci/check-codeowners-coverage.sh
       - name: Configuration syntax (all YAML and JSON)
         run: bash scripts/ci/check-config-syntax.sh
+      - name: Mandatory compose variables are documented in .env.example
+        run: bash scripts/ci/check-env-example.sh
       - name: ADR governance
         run: bash scripts/ci/check-adrs.sh
       - name: Context freshness (STATUS.md / ROADMAP.md)

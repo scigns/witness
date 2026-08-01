@@ -1,0 +1,108 @@
+# Observability overlay — Prometheus, Grafana, Tempo, Loki.
+#
+# Layered on top of docker-compose.yml rather than merged into it, because
+# observability is optional for a small single-institution deployment and
+# mandatory for a large one. An operator with 4 GB of RAM should not be forced to
+# run a tracing backend to record meeting minutes (ADR-0014, principle P7).
+#
+# Usage:
+#   make dev-obs      start the stack with observability
+#   make dev          start without it
+#
+# Sovereignty (P1): nothing here reports upstream. Grafana's analytics and update
+# checks are disabled explicitly below — they are on by default in the image, and
+# a default that phones home is exactly the class of thing ADR-0014 exists to
+# prevent. `make egress-test` verifies the claim rather than trusting it.
+
+name: witness
+
+x-common: &common
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  # ── Metrics ────────────────────────────────────────────────────────────────
+  prometheus:
+    <<: *common
+    image: prom/prometheus:v3.1.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      - --web.enable-lifecycle
+    volumes:
+      - ../observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports: ["${PROMETHEUS_PORT:-9090}:9090"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── Traces — also the OTLP receiver the application exports to ─────────────
+  tempo:
+    <<: *common
+    image: grafana/tempo:2.7.0
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    user: root
+    volumes:
+      - ../observability/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "${OTLP_HTTP_PORT:-4318}:4318"   # OTEL_EXPORTER_OTLP_ENDPOINT
+      - "${OTLP_GRPC_PORT:-4317}:4317"
+      - "${TEMPO_PORT:-3200}:3200"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3200/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  # ── Logs ───────────────────────────────────────────────────────────────────
+  loki:
+    <<: *common
+    image: grafana/loki:3.3.2
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - loki-data:/loki
+    ports: ["${LOKI_PORT:-3100}:3100"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  # ── Dashboards ─────────────────────────────────────────────────────────────
+  grafana:
+    <<: *common
+    image: grafana/grafana:11.5.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # P1: no telemetry, no update checks, no external font or image fetching.
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+    volumes:
+      - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports: ["${GRAFANA_PORT:-3300}:3000"]
+    depends_on:
+      prometheus: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  prometheus-data:    # not backed up — metrics are observational, not a record
+  tempo-data:         # not backed up
+  loki-data:          # not backed up
+  grafana-data:       # dashboards are provisioned from source; this is cache only
