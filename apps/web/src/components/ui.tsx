@@ -1,0 +1,117 @@
+'use client';
+
+/**
+ * Small shared presentation pieces.
+ *
+ * `packages/ui` is where the real design system lives (Phase 6, roadmap 6.3).
+ * These are deliberately minimal and local so that the preview does not create
+ * a second component library that the design system would later have to
+ * reconcile with.
+ */
+
+import type { ReactNode } from 'react';
+
+import type { ReviewState } from '@witness/contracts';
+
+const STATE_LABELS: Record<ReviewState, string> = {
+  draft: 'Draft',
+  in_review: 'In review',
+  confirmed: 'Confirmed',
+  corrected: 'Corrected',
+  rejected: 'Rejected',
+};
+
+/**
+ * Colour is never the only signal — WCAG 2.2 AA (1.4.1) requires that meaning
+ * survives for a user who cannot distinguish the hues, so each state carries a
+ * distinct label and an explicit accepted/candidate note.
+ */
+const STATE_CLASSES: Record<ReviewState, string> = {
+  draft: 'border-current text-[var(--color-ink-muted)]',
+  in_review: 'border-amber-600 text-amber-700 dark:text-amber-400',
+  confirmed: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  corrected: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  rejected: 'border-red-700 text-red-700 dark:text-red-400',
+};
+
+export function StateBadge({ state }: { state: ReviewState }) {
+  const accepted = state === 'confirmed' || state === 'corrected';
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${STATE_CLASSES[state]}`}
+    >
+      {STATE_LABELS[state]}
+      <span className="sr-only">
+        {accepted ? ' — accepted as institutional record' : ' — candidate, not yet accepted'}
+      </span>
+    </span>
+  );
+}
+
+export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={`rounded-lg border border-[var(--color-line)] bg-[var(--color-paper-raised)] p-5 ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function Button({
+  children,
+  onClick,
+  type = 'button',
+  variant = 'secondary',
+  disabled = false,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  type?: 'button' | 'submit';
+  variant?: 'primary' | 'secondary' | 'danger';
+  disabled?: boolean;
+}) {
+  const styles = {
+    primary: 'bg-[var(--color-accent)] text-white hover:opacity-90',
+    secondary:
+      'border border-[var(--color-line)] bg-[var(--color-paper)] hover:bg-[var(--color-accent-soft)]',
+    danger: 'border border-red-700 text-red-700 hover:bg-red-50 dark:hover:bg-red-950',
+  }[variant];
+
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={`rounded px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${styles}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function ErrorNotice({ message }: { message: string }) {
+  return (
+    <div
+      role="alert"
+      className="rounded border border-red-700 bg-red-50 p-4 text-sm text-red-900 dark:bg-red-950 dark:text-red-200"
+    >
+      {message}
+    </div>
+  );
+}
+
+export function NotImplemented({ capability, phase }: { capability: string; phase: string }) {
+  return (
+    <div className="rounded border border-dashed border-[var(--color-line)] p-4 text-sm text-[var(--color-ink-muted)]">
+      <p className="font-medium text-[var(--color-ink)]">
+        Developer Preview — capability not yet implemented
+      </p>
+      <p className="mt-1">
+        {capability} arrives in {phase}. Nothing is being simulated here; when this is built, this
+        panel is replaced by the real thing.
+      </p>
+    </div>
+  );
+}
