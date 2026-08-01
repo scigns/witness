@@ -113,11 +113,12 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 
 | # | Decision | Owner | Needed by | Notes |
 |---|---|---|---|---|
-| D-1 | Confirm SDK/contracts permissive licensing with copyright holders | Open Source Lead | Phase 2 | ⚠️ **Partially actioned.** Apache-2.0 `LICENSE` and `NOTICE` files placed in `sdk/` and `packages/contracts/` per ADR-0002, while the repository has a single copyright holder and no third-party contributions — the cheapest possible moment to do it. **Formal confirmation by the copyright holder is still outstanding and must happen before those directories accept outside contributions.** Reversing this is trivial today and effectively impossible later |
+| D-1 | Confirm SDK/contracts permissive licensing with copyright holders | Open Source Lead | Phase 2 | 🟡 **Structurally resolved; one human action outstanding.** The full Apache-2.0 boundary is implemented, documented in [`docs/governance/LICENSING.md`](docs/governance/LICENSING.md) and mechanically enforced by `check-licenses.sh`. Attribution uses the collective placeholder "The Witness Contributors" rather than an invented legal entity. **Remaining:** the copyright holder must affirm the boundary in writing — see LICENSING.md §D-1 for the exact three-step action. No software change can complete this |
 | D-2 | Event transport: NATS JetStream vs Postgres-only for small deployments | Backend Lead | Phase 3 | ADR-0005 proposes profile-based; needs load evidence |
 | D-3 | ASR engine: faster-whisper vs whisper.cpp vs WhisperX composition | AI Lead | Phase 5 | Blocked on benchmark against target languages |
 | D-4 | Graph store: confirm Neo4j Community vs Apache AGE for constrained deployments | Knowledge Graph Lead | Phase 4 | Licensing/footprint trade-off, ADR-0004 |
 | D-5 | Foundation host for long-term stewardship | Founder | Phase 8 | Candidates under consideration |
+| D-6 | Product and architecture reconciliation | CTO & Founder | **Phase 1 — resolved 2026-08-01** | ✅ **Resolved** by [ADR-0021](architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md). `VISION.md` is canonical product scope; ADR-0000–0020 are the canonical architecture. `docs/vision.md`, `docs/architecture.md`, `docs/coding-standards.md` and `memory/decisions.md` are superseded; `memory/changelog.md` (fictional implementation history) removed. Sector material preserved as explicitly non-canonical in [`docs/product/SECTOR_APPLICATIONS.md`](docs/product/SECTOR_APPLICATIONS.md). **Reversible via a superseding ADR if the multi-sector framing reflects a stakeholder commitment the engineering organisation is not party to** |
 
 ---
 
