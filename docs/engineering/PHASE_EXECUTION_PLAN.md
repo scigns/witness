@@ -204,8 +204,8 @@ unauthenticated path to data exists. **Verified by:** Security Lead and Infrastr
 7. `feat(api): GraphQL BFF conforming to the Phase 1 contract` (3.6)
 8. `docs(ops): backup and restore runbook` (3.8)
 
-**Acceptance.** Consent and provenance invariants enforced by the type system and the database, not by
-developer discipline.
+**Acceptance.** Consent and provenance invariants enforced by the type system and the database,
+not by developer discipline.
 **Test requirements.** INV-7 (no processing without consent), INV-8 (tenant isolation) and INV-10
 (revocation propagation) become executable and join `test/invariants`.
 **Security review.** Mandatory on 2, 3, 4, 5, 6. Governance Lead signs off on 2, 3 and 4 — consent is
@@ -319,8 +319,9 @@ proceed — we fix."_
 
 The failure mode this prevents is specific. Consent and provenance are cross-cutting invariants that
 must exist before the first assertion is written. Every assertion written before them is permanently
-untrustworthy — it cannot be retrofitted, only discarded. A phase gate slipped "just this once" for a
-demo date is how a memory system ends up unable to prove anything about its own early records.
+untrustworthy — it cannot be retrofitted, only discarded. A phase gate slipped "just this once"
+for a demo date is how a memory system ends up unable to prove anything about its own early
+records.
 
 If a gate cannot be met, the options are: fix it, or take it to the Steering Committee and record the
 decision. Proceeding quietly is not among them.

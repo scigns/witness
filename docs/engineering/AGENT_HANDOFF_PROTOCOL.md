@@ -179,8 +179,8 @@ When implementing your task would require contradicting an accepted ADR:
    record of having been wrong is part of the value.
 5. Wait for acceptance. Seven days minimum discussion.
 
-Note what step 4 is not: editing the existing ADR, or adding a code comment explaining why you went a
-different way.
+Note what step 4 is not: editing the existing ADR, or adding a code comment explaining why you
+went a different way.
 
 ## 13. What you must never decide alone
 

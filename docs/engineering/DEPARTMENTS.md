@@ -235,9 +235,9 @@ calls · no model or prompt change merges without an evaluation delta report.
 
 **Roles.** Security Lead (lead) · Governance Lead · CTO
 
-**Responsibilities.** Threat modelling · privacy impact assessment · consent enforcement · Indigenous
-data sovereignty protocols · identity and access control · authorisation policy · secret management ·
-supply-chain security · security review · incident response.
+**Responsibilities.** Threat modelling · privacy impact assessment · consent enforcement ·
+Indigenous data sovereignty protocols · identity and access control · authorisation policy ·
+secret management · supply-chain security · security review · incident response.
 
 **Authority.** May **block any merge** on security grounds. Governance Lead holds an absolute veto
 where consent, provenance or Indigenous data sovereignty is weakened. Security exceptions require an

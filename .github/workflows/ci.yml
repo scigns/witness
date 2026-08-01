@@ -55,11 +55,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
       - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The pinned version, not whatever npx resolves today. `npx --yes` pulled a
+      # newer markdownlint than the lockfile, so a document could pass locally and
+      # fail here — the exact discrepancy CI_CD.md calls a bug.
       - name: Lint markdown
-        run: npx --yes markdownlint-cli2 "**/*.md"
+        run: pnpm docs:lint
       - name: Check internal links
         run: bash scripts/ci/check-links.sh
       - name: Check document headers

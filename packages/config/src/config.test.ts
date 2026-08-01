@@ -63,12 +63,16 @@ describe('sovereign profile (ADR-0009, principle P1)', () => {
     ).toThrow(/zero external calls/i);
   });
 
+  // `.invalid` is reserved by RFC 2606 and can never resolve. Using a real
+  // provider hostname here would put a hard-coded external endpoint in the tree,
+  // which scripts/security/verify-no-egress.sh refuses outright — correctly, and
+  // the gate should not be loosened to accommodate a test.
   it('refuses a provider smuggled in via base URL alone', () => {
     expect(() =>
       loadConfig({
         ...base,
         WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
-        EXTERNAL_MODEL_BASE_URL: 'https://api.openai.com/v1',
+        EXTERNAL_MODEL_BASE_URL: 'https://external-provider.invalid/v1',
       }),
     ).toThrow(/zero external calls/i);
   });

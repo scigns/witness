@@ -86,7 +86,7 @@ describe('INV-1 — P1: the sovereign profile cannot start with egress configure
 
   it.each([
     ['EXTERNAL_MODEL_PROVIDER', 'openai'],
-    ['EXTERNAL_MODEL_BASE_URL', 'https://api.openai.com/v1'],
+    ['EXTERNAL_MODEL_BASE_URL', 'https://external-provider.invalid/v1'],
     ['EXTERNAL_MODEL_API_KEY', 'sk-x'],
   ])('refuses to start when %s is set', (key, value) => {
     expect(() =>

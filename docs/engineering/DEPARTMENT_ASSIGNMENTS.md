@@ -75,10 +75,10 @@ all.
 | D3         | Backend Lead        | 3.6 GraphQL BFF                      | `UNASSIGNED` | 1.5, 3.3     | ⛔ gated | `feat/graphql-bff`        | Contract tests pass; breaking-change detection in CI                                       |
 | D7         | Infrastructure Lead | 3.8 Backup & restore runbook         | `UNASSIGNED` | 3.3          | ⛔ gated | `docs/backup-restore`     | Full restore performed and timed, not described                                            |
 
-**Row 4 is not a database task.** Making `consent_grant_id` NOT NULL requires deciding what happens to
-records captured before the consent service existed. That is a governance decision belonging to D1 and
-the Governance Lead. A migration author who picks a default here has made a policy decision they had
-no authority to make.
+**Row 4 is not a database task.** Making `consent_grant_id` NOT NULL requires deciding what happens
+to records captured before the consent service existed. That is a governance decision belonging to
+D1 and the Governance Lead. A migration author who picks a default here has made a policy decision
+they had no authority to make.
 
 ---
 

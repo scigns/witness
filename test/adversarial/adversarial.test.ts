@@ -84,7 +84,7 @@ describe('ATTACK — smuggle an external model provider past the sovereign profi
       loadConfig({
         ...base,
         WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
-        EXTERNAL_MODEL_BASE_URL: 'https://api.openai.com/v1',
+        EXTERNAL_MODEL_BASE_URL: 'https://external-provider.invalid/v1',
       }),
     ).toThrow();
   });
