@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-07-31
+**Last updated:** 2026-08-01
 **Updated by:** CTO
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -9,12 +9,18 @@ Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Executive summary
 
-Witness is in **Phase 1 (Architecture & Research)**. Phase 0 is complete: the engineering
-organisation, governance, decision record and documentation baseline all exist.
+Witness is in **Phase 1 (Architecture & Research)**, and now ships a **Developer Preview (0.1.0)**
+that runs.
 
-**There is no application code, and that is deliberate.** Consent, provenance and tenancy are
-cross-cutting invariants; any assertion written before they are enforceable is permanently
-untrustworthy. We are not starting the pipeline until the foundations can hold it.
+Phase 0 is complete. The preview proves the architecture end to end on one narrow workflow —
+capture a record, store it, display it, show its provenance, let a human accept or reject it — with
+a hash-chained audit trail and a real authorisation boundary.
+
+**The pipeline is still deliberately unbuilt.** No AI extraction, no transcription, no knowledge
+graph, no consent service, no Keycloak. Consent, provenance and tenancy are cross-cutting
+invariants; any assertion written before they are enforceable is permanently untrustworthy. The
+running instance lists every missing capability at `/ready` and renders it on the dashboard, so the
+gap is visible rather than inferred.
 
 **Overall health:** 🟢 On track
 **Biggest current risk:** R-01 — ontology design becoming an unbounded research project. Mitigation
@@ -29,6 +35,7 @@ correct-first-time one. See [`docs/governance/RISK_REGISTER.md`](docs/governance
 |---|---|---|---|
 | 0 | Engineering organisation | 🟢 Complete | ✅ |
 | 1 | Architecture & research | 🟡 In progress | — |
+| — | *Developer Preview 0.1.0* | 🟢 *Shipped 2026-08-01* | *n/a — not a phase gate* |
 | 2 | Infrastructure & identity | ⚪ Not started | — |
 | 3 | Core backend & data | ⚪ Not started | — |
 | 4 | Knowledge graph | ⚪ Not started | — |
@@ -47,17 +54,17 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 |---|---|---|---|---|
 | Architecture | `architecture` | Principal Architect | 🟡 | C4 context/container done; component views pending |
 | Research | `research` | Research Lead | 🟡 | OSS evaluation complete for core stack; ASR benchmark pending |
-| Documentation | `documentation` | Documentation Lead | 🟢 | Baseline complete; docs site not yet built |
+| Documentation | `documentation` | Documentation Lead | 🟢 | Baseline complete; onboarding verified end-to-end; docs site not yet built |
 | Product | `product` | Product Director | 🟡 | Personas and core journeys defined; PRDs pending |
 | UX design | `ux-design` | UX Lead | ⚪ | Blocked on Phase 1 journeys |
 | Governance | `governance` | Governance Lead | 🟡 | Consent framework drafted; Indigenous protocols need external review |
-| Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun |
-| Infrastructure | `infrastructure` | Infrastructure Lead | ⚪ | Compose stack specified, not built |
-| Backend | `backend` | Backend Lead | ⚪ | Awaiting Phase 2 |
+| Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun; authorisation boundary shipped, real identity is Phase 2 |
+| Infrastructure | `infrastructure` | Infrastructure Lead | 🟡 | Compose stack running; observability overlay added, wiring pending |
+| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0 |
 | Knowledge graph | `knowledge-graph` | Knowledge Graph Lead | 🟡 | Ontology v0.1 in design |
 | AI platform | `ai-platform` | AI Lead | ⚪ | Awaiting Phase 5; model policy drafted |
-| Frontend | `frontend` | Frontend Lead | ⚪ | Awaiting Phase 6 |
-| Testing | `testing` | QA Lead | ⚪ | Strategy written; harness not built |
+| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; design system awaits Phase 6 |
+| Testing | `testing` | QA Lead | 🟡 | 110 tests; invariant and adversarial suites live |
 | Release | `release` | Release Manager | 🟢 | Strategy and versioning defined |
 
 ---
@@ -80,6 +87,30 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-01 — Developer Preview 0.1.0
+
+- **D-6 resolved** ([ADR-0021](architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md)).
+  `VISION.md` is the canonical product definition; ADR-0000–0020 are the canonical architecture. Four
+  overlapping documents from `main` superseded, their content preserved in the ADR appendix.
+  `memory/changelog.md` removed — it recorded five modules as built, none of which existed.
+- **Repository foundation repaired.** Seven referenced-but-missing scripts and compose files created
+  and verified. Two defects fixed that would have hit every new contributor's first `make dev`:
+  `.env.example` was missing a mandatory variable, and Compose never loaded the root `.env` at all.
+- **Toolchain activated.** Lockfile committed; the dormant CI code gates (build, test, lint,
+  invariants) now run for real.
+- **Developer Preview shipped.** `packages/domain` (pure), `packages/config` (profile enforcement),
+  `packages/contracts` (Apache-2.0), `services/api-gateway` (NestJS + Prisma), `apps/web` (Next.js).
+  110 tests across six suites.
+- **Department model established.** Ten departments with ownership and prohibited actions; phase
+  execution plan; assignment board; agent handoff protocol; verified developer onboarding.
+- **D-1 structurally resolved.** Apache-2.0 boundary documented and enforced; one written
+  affirmation from the copyright holder remains outstanding.
+
+**Verified, not assumed:** migrations applied against PostgreSQL 16, fixtures seeded, records created
+through the browser, review transitions performed, provenance and audit trail rendered, zero console
+errors. Tamper detection confirmed by altering an audit row directly in the database and watching the
+chain fail — then restoring it and watching it pass.
 
 ### 2026-07-31 — Foundation established
 
@@ -124,7 +155,11 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 
 ## What we are deliberately not doing right now
 
-- Writing application code (Phase 2+ gate not met)
+- AI extraction, transcription, or anything that produces a candidate assertion (Phase 5)
+- The knowledge graph projection (Phase 4)
+- The consent service (Phase 3) — and therefore not enforcing P2 yet
+- Real authentication (Phase 2) — the preview's authorisation boundary is real; its authentication
+  is deliberately absent rather than faked
 - Building a docs website (content first, presentation later)
 - Any live-transcription work (deferred, see roadmap)
 - Any cloud-hosted multi-tenant offering (contradicts sovereignty default)
