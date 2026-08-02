@@ -18,7 +18,7 @@ jobs:
     name: Secret scanning
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0   # full history — a secret removed from HEAD is still a secret
       - name: Scan working tree and history
@@ -34,7 +34,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Dependency review requires GitHub's Dependency graph, which is unavailable on
       # a private repository without Advanced Security. When the platform feature is
@@ -78,7 +78,7 @@ jobs:
     name: Licence compatibility
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check licence boundary
         # Platform is GPL-3.0; sdk/ and packages/contracts/ are Apache-2.0 (ADR-0002).
         run: bash scripts/security/check-licenses.sh
@@ -87,7 +87,7 @@ jobs:
     name: Zero-egress verification
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Principle P1: the sovereign profile must make zero external calls.
       # This gate is what makes that claim checkable rather than aspirational.
       - name: Verify no egress in the sovereign profile
@@ -97,6 +97,6 @@ jobs:
     name: Workflow hardening
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Actions must be pinned to a commit SHA
         run: bash scripts/security/check-action-pinning.sh
