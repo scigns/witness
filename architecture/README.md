@@ -14,7 +14,8 @@ Everything about how Witness is built, and why.
 | 6 | [`EVENT_CATALOGUE.md`](EVENT_CATALOGUE.md) | The event contracts between bounded contexts |
 | 7 | [`SECURITY_ARCHITECTURE.md`](SECURITY_ARCHITECTURE.md) | Threat model, controls, and AI-specific attack surface |
 | 8 | [`DEPLOYMENT_ARCHITECTURE.md`](DEPLOYMENT_ARCHITECTURE.md) | Profiles, topologies, sizing, recovery, upgrades |
-| 9 | [`decisions/`](decisions/) | Twenty-one ADRs — the reasoning behind all of the above |
+| 9 | [`NFR_SLO.md`](NFR_SLO.md) | Latency, throughput, availability and recovery objectives — quantified where decided, gated where not |
+| 10 | [`decisions/`](decisions/) | Twenty-one ADRs — the reasoning behind all of the above |
 
 ## The short version
 
