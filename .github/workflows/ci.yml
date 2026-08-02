@@ -1,0 +1,175 @@
+# Continuous integration — the main quality gate.
+#
+# Design rule (docs/engineering/CI_CD.md): no logic lives in this file. Every step
+# calls a `make` target or a script that a contributor runs identically on their
+# own machine. That keeps the pipeline portable off GitHub Actions, which matters
+# for a project claiming sovereignty.
+#
+# Witness is pre-implementation, so the code gates are guarded on the presence of
+# workspace source. They activate automatically in Phase 2 without editing this file.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  detect:
+    name: Detect scope
+    runs-on: ubuntu-latest
+    outputs:
+      has_code: ${{ steps.check.outputs.has_code }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - id: check
+        # The precondition for every code job is an INSTALLABLE workspace, not merely
+        # the presence of a package.json. `actions/setup-node` with `cache: pnpm` and
+        # `pnpm install --frozen-lockfile` both require a committed lockfile, so that
+        # is what we gate on. Keying on package.json meant the placeholder manifests
+        # in packages/* switched these jobs on before there was anything to install.
+        run: |
+          if [ -f pnpm-lock.yaml ] && \
+             find apps packages services workers sdk -name '*.ts' -not -path '*/node_modules/*' 2>/dev/null | grep -q .; then
+            echo "has_code=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Workspace is installable — code gates active."
+          else
+            echo "has_code=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No installable workspace yet (no lockfile or no TypeScript source) — code gates skipped. See STATUS.md."
+          fi
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Lint markdown
+        run: npx --yes markdownlint-cli2 "**/*.md"
+      - name: Check internal links
+        run: bash scripts/ci/check-links.sh
+      - name: Check document headers
+        run: bash scripts/ci/check-doc-headers.sh
+
+  governance:
+    name: Repository governance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Every path has an owner
+        run: bash scripts/ci/check-codeowners-coverage.sh
+      - name: Configuration syntax (all YAML and JSON)
+        run: bash scripts/ci/check-config-syntax.sh
+      - name: ADR governance
+        run: bash scripts/ci/check-adrs.sh
+      - name: Context freshness (STATUS.md / ROADMAP.md)
+        run: bash scripts/ci/check-context-freshness.sh
+      - name: Branch naming
+        if: github.event_name == 'pull_request'
+        run: bash scripts/ci/check-branch-name.sh "${{ github.head_ref }}"
+
+  static:
+    name: Lint, format, typecheck
+    needs: detect
+    if: needs.detect.outputs.has_code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: make format-check
+      - run: make lint
+      - run: make typecheck
+
+  test:
+    name: Test
+    needs: detect
+    if: needs.detect.outputs.has_code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Unit and integration tests
+        run: make test
+      - name: Contract tests
+        run: pnpm test:contract
+
+  invariants:
+    name: Invariants and adversarial
+    needs: detect
+    if: needs.detect.outputs.has_code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # INV-1..INV-8: consent, provenance, tenant isolation, layering, projection rebuild.
+      # These encode what Witness promises. A weakened assertion here is the loudest
+      # possible signal in code review.
+      - name: Invariant suite
+        run: pnpm vitest run test/invariants
+      - name: Adversarial suite
+        run: pnpm vitest run test/adversarial
+
+  build:
+    name: Build
+    needs: [detect, static]
+    if: needs.detect.outputs.has_code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: make build
+      - name: Bundle size budget
+        run: bash scripts/ci/check-bundle-size.sh
+
+  gate:
+    name: CI gate
+    if: always()
+    needs: [docs, governance, static, test, invariants, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert no required job failed
+        run: |
+          results='${{ join(needs.*.result, ' ') }}'
+          echo "Results: $results"
+          for r in $results; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "::error::A required job did not pass. We do not disable gates to go green."
+              exit 1
+            fi
+          done

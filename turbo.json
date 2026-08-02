@@ -1,0 +1,21 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
+  "globalDependencies": ["tsconfig.base.json", ".env.example"],
+  "globalEnv": ["NODE_ENV", "WITNESS_DEPLOYMENT_PROFILE"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": { "cache": false, "persistent": true },
+    "lint": { "dependsOn": ["^build"] },
+    "typecheck": { "dependsOn": ["^build"], "outputs": ["*.tsbuildinfo"] },
+    "test": { "dependsOn": ["^build"], "outputs": ["coverage/**"] },
+    "test:unit": { "dependsOn": ["^build"], "outputs": ["coverage/**"] },
+    "test:integration": { "dependsOn": ["^build"], "cache": false },
+    "test:contract": { "dependsOn": ["^build"], "cache": false },
+    "test:e2e": { "dependsOn": ["^build"], "cache": false },
+    "clean": { "cache": false }
+  }
+}

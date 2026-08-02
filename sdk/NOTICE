@@ -1,0 +1,12 @@
+Witness SDKs
+Copyright 2026 The Witness Contributors
+
+This directory is licensed under the Apache License, Version 2.0, while the
+Witness platform as a whole is licensed under GPL-3.0-or-later.
+
+This is deliberate. The SDKs and API contracts are the surface integrators build
+against, and requiring a government records system to adopt copyleft in order to
+call our API would suppress exactly the ecosystem Witness needs in order to
+become infrastructure rather than an island.
+
+See architecture/decisions/ADR-0002-licensing-strategy.md.

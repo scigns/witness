@@ -1,0 +1,126 @@
+# CODEOWNERS — merge authority, mechanically enforced
+#
+# This file is the machine-readable form of the role charters in agents/.
+# If a charter and this file disagree, one of them is a defect — fix both.
+#
+# Rules:
+#   - No path is unowned. A CI check fails if a file matches no rule here.
+#   - Later rules override earlier ones, so specific paths come last.
+#   - Nobody merges their own pull request, including the CTO and Founder.
+#
+# Teams are placeholders until the contributor base exists; they map to the
+# roles in agents/README.md. See docs/engineering/BRANCH_STRATEGY.md.
+
+# ─── Default ──────────────────────────────────────────────────────────────────
+*                                       @scigns/maintainers
+
+# ─── Canonical context and governance ─────────────────────────────────────────
+/PROJECT_CONTEXT.md                     @scigns/cto @scigns/principal-architect
+/VISION.md                              @scigns/founder @scigns/steering-committee
+/MISSION.md                             @scigns/founder @scigns/steering-committee
+/GOVERNANCE.md                          @scigns/founder @scigns/steering-committee
+/ROADMAP.md                             @scigns/product-director @scigns/cto
+/STATUS.md                              @scigns/cto
+/CHANGELOG.md                           @scigns/release-manager
+/CONTRIBUTING.md                        @scigns/open-source-lead
+/CODE_OF_CONDUCT.md                     @scigns/open-source-lead @scigns/steering-committee
+/SECURITY.md                            @scigns/security-lead
+/LICENSE                                @scigns/open-source-lead @scigns/steering-committee
+
+# ─── Architecture ─────────────────────────────────────────────────────────────
+/architecture/                          @scigns/principal-architect @scigns/cto
+/architecture/decisions/                @scigns/principal-architect @scigns/cto
+/architecture/KNOWLEDGE_GRAPH.md        @scigns/knowledge-graph-lead @scigns/principal-architect
+/architecture/EVENT_CATALOGUE.md        @scigns/backend-lead @scigns/principal-architect
+/architecture/SECURITY_ARCHITECTURE.md  @scigns/security-lead @scigns/cto
+/architecture/DEPLOYMENT_ARCHITECTURE.md @scigns/infrastructure-lead @scigns/cto
+
+# ─── Roles and AI context ─────────────────────────────────────────────────────
+/agents/                                @scigns/cto
+/.ai/                                   @scigns/cto @scigns/principal-architect
+/.ai/policies/                          @scigns/cto @scigns/security-lead @scigns/governance-lead
+
+# ─── Documentation ────────────────────────────────────────────────────────────
+/docs/                                  @scigns/documentation-lead
+/docs/engineering/                      @scigns/cto
+/docs/engineering/ISSUE_WORKFLOW.md     @scigns/engineering-manager
+/docs/engineering/PULL_REQUEST_WORKFLOW.md @scigns/engineering-manager
+/docs/engineering/TESTING_STRATEGY.md   @scigns/qa-lead
+/docs/engineering/SECURITY_REVIEW.md    @scigns/security-lead
+/docs/engineering/RELEASE_STRATEGY.md   @scigns/release-manager
+/docs/engineering/AI_GUIDELINES.md      @scigns/cto @scigns/ai-lead
+/docs/product/                          @scigns/product-director
+/docs/product/design/                   @scigns/ux-lead
+/docs/research/                         @scigns/research-lead
+/docs/operations/                       @scigns/infrastructure-lead @scigns/documentation-lead
+/docs/guides/                           @scigns/documentation-lead
+
+# ─── Governance — consent, sovereignty, Indigenous data ───────────────────────
+# The Governance Lead holds an absolute veto here. See agents/community/governance-lead.md
+/docs/governance/                       @scigns/governance-lead
+/docs/governance/INDIGENOUS_DATA_SOVEREIGNTY.md @scigns/governance-lead @scigns/steering-committee
+/docs/governance/CONSENT_FRAMEWORK.md   @scigns/governance-lead @scigns/security-lead
+/docs/governance/RISK_REGISTER.md       @scigns/governance-lead @scigns/cto
+
+# ─── Shared packages ──────────────────────────────────────────────────────────
+/packages/                              @scigns/backend-lead
+/packages/domain/                       @scigns/principal-architect @scigns/backend-lead
+/packages/contracts/                    @scigns/principal-architect @scigns/backend-lead
+/packages/policy/                       @scigns/security-lead
+/packages/ui/                           @scigns/frontend-lead @scigns/ux-lead
+/packages/observability/                @scigns/infrastructure-lead
+/packages/config-eslint/                @scigns/developer-experience-lead
+/packages/config-typescript/            @scigns/developer-experience-lead
+
+# ─── Applications ─────────────────────────────────────────────────────────────
+/apps/                                  @scigns/frontend-lead
+/apps/docs-site/                        @scigns/documentation-lead
+
+# ─── Services ─────────────────────────────────────────────────────────────────
+/services/                              @scigns/backend-lead
+/services/consent/                      @scigns/governance-lead @scigns/security-lead
+/services/identity/                     @scigns/security-lead @scigns/backend-lead
+/services/knowledge-graph/              @scigns/knowledge-graph-lead
+/services/ai-orchestrator/              @scigns/ai-lead @scigns/security-lead
+/services/ingestion/                    @scigns/backend-lead @scigns/governance-lead
+/services/search/                       @scigns/backend-lead @scigns/ai-lead
+
+# ─── Workers ──────────────────────────────────────────────────────────────────
+/workers/                               @scigns/backend-lead
+/workers/transcription/                 @scigns/ai-lead
+/workers/extraction/                    @scigns/ai-lead
+/workers/graph-projector/               @scigns/knowledge-graph-lead
+
+# ─── SDKs and examples ────────────────────────────────────────────────────────
+/sdk/                                   @scigns/backend-lead @scigns/documentation-lead
+/examples/                              @scigns/documentation-lead @scigns/research-lead
+
+# ─── Infrastructure and deployment ────────────────────────────────────────────
+/infrastructure/                        @scigns/infrastructure-lead
+/infrastructure/observability/          @scigns/infrastructure-lead
+/deployments/                           @scigns/infrastructure-lead @scigns/cto
+
+# ─── Build, tooling, templates ────────────────────────────────────────────────
+/Makefile                               @scigns/developer-experience-lead
+/turbo.json                             @scigns/developer-experience-lead
+/pnpm-workspace.yaml                    @scigns/developer-experience-lead
+/tsconfig.base.json                     @scigns/developer-experience-lead
+/package.json                           @scigns/developer-experience-lead
+/templates/                             @scigns/developer-experience-lead
+/scripts/                               @scigns/developer-experience-lead
+/scripts/release/                       @scigns/release-manager
+/scripts/security/                      @scigns/security-lead
+
+# ─── CI/CD and repository configuration ───────────────────────────────────────
+/.github/                               @scigns/engineering-manager
+/.github/workflows/                     @scigns/infrastructure-lead @scigns/security-lead
+/.github/workflows/release.yml          @scigns/release-manager @scigns/security-lead
+/.github/CODEOWNERS                     @scigns/cto
+/.github/ISSUE_TEMPLATE/                @scigns/engineering-manager
+/.github/PULL_REQUEST_TEMPLATE.md       @scigns/engineering-manager
+
+# ─── Tests ────────────────────────────────────────────────────────────────────
+/test/                                  @scigns/qa-lead
+/test/invariants/                       @scigns/qa-lead @scigns/principal-architect
+/test/adversarial/                      @scigns/qa-lead @scigns/security-lead
+/test/evaluation/                       @scigns/ai-lead @scigns/research-lead

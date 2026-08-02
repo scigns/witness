@@ -1,0 +1,172 @@
+# Witness local development and single-node production stack.
+#
+# This file is a first-class production target for single-institution deployments,
+# not a development convenience (ADR-0013). Most institutions should run this
+# rather than Kubernetes.
+#
+# Sovereignty note: every image here is self-hosted. Nothing in this stack makes an
+# outbound connection. `make egress-test` verifies that claim.
+
+name: witness
+
+x-common: &common
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  # ── System of record (ADR-0004, ADR-0011) ──────────────────────────────────
+  postgres:
+    <<: *common
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-witness}
+      POSTGRES_USER: ${POSTGRES_USER:-witness}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      # Row-level security is the second layer of tenant isolation. The first is
+      # the repository filter. Both exist because one will eventually be wrong.
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d:ro
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-witness} -d ${POSTGRES_DB:-witness}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── Projections — rebuildable, NOT backed up (ADR-0011) ────────────────────
+  neo4j:
+    <<: *common
+    image: neo4j:5-community
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?NEO4J_PASSWORD must be set}
+      NEO4J_server_memory_heap_max__size: ${NEO4J_HEAP:-2G}
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4j-data:/data
+    ports: ["${NEO4J_HTTP_PORT:-7474}:7474", "${NEO4J_BOLT_PORT:-7687}:7687"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  opensearch:
+    <<: *common
+    image: opensearchproject/opensearch:2
+    environment:
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms${OPENSEARCH_HEAP:-1g} -Xmx${OPENSEARCH_HEAP:-1g}"
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_PASSWORD:?OPENSEARCH_PASSWORD must be set}
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile: { soft: 65536, hard: 65536 }
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports: ["${OPENSEARCH_PORT:-9200}:9200"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sk -u admin:${OPENSEARCH_PASSWORD} https://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+
+  # ── Ephemeral state only. Valkey, not Redis — see OSS_EVALUATION.md ────────
+  valkey:
+    <<: *common
+    image: valkey/valkey:8-alpine
+    command: valkey-server --save "" --appendonly no
+    ports: ["${REDIS_PORT:-6379}:6379"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Object storage — media and documents ───────────────────────────────────
+  minio:
+    <<: *common
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-witness}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?S3_SECRET_ACCESS_KEY must be set}
+      # No telemetry. Ever. See DIGITAL_SOVEREIGNTY.md.
+      MINIO_UPDATE: "off"
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+    volumes:
+      - minio-data:/data
+    ports: ["${S3_PORT:-9000}:9000", "${S3_CONSOLE_PORT:-9001}:9001"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  # ── Event transport (ADR-0005) ─────────────────────────────────────────────
+  nats:
+    <<: *common
+    image: nats:2-alpine
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    volumes:
+      - nats-data:/data
+    ports: ["${NATS_PORT:-4222}:4222", "8222:8222"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8222/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Identity (ADR-0007) ────────────────────────────────────────────────────
+  keycloak:
+    <<: *common
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD must be set}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER:-witness}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      # Realm-as-code: configuration is reproducible and reviewable, not clicked.
+      - ./init/keycloak:/opt/keycloak/data/import:ro
+    ports: ["${KEYCLOAK_PORT:-8080}:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q 'UP'"]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+
+  # ── Local inference — the sovereign default (ADR-0009) ─────────────────────
+  ollama:
+    <<: *common
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-models:/root/.ollama
+    ports: ["${OLLAMA_PORT:-11434}:11434"]
+    # Uncomment for GPU. Without one, transcription runs 6-10x slower than
+    # realtime — acceptable for overnight batch, and documented rather than hidden.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+
+volumes:
+  postgres-data:      # BACKED UP — system of record
+  minio-data:         # BACKED UP — original media and documents
+  neo4j-data:         # not backed up — rebuildable from the event log
+  opensearch-data:    # not backed up — rebuildable from the event log
+  nats-data:
+  ollama-models:
+
+networks:
+  default:
+    name: witness

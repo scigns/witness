@@ -1,0 +1,9 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "services/*"
+  - "workers/*"
+  - "sdk/typescript"
+  - "templates/service"
+  - "templates/package"
+  - "!**/node_modules/**"

@@ -1,0 +1,71 @@
+name: ✨ Feature request
+description: Propose a capability
+labels: ["type:feature", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before writing: please read
+        [what Witness is not](https://github.com/scigns/witness/blob/main/PROJECT_CONTEXT.md#2-what-witness-is-not).
+
+        We decline requests openly and with reasoning. A clear "no" respects your
+        time more than an issue that stays open forever.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: Whose problem, how often it occurs, and what it costs them today. Not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: How do you know this is real? Deployment experience, user research, a specific incident.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should someone be able to do that they cannot do now?
+    validations:
+      required: true
+  - type: dropdown
+    id: persona
+    attributes:
+      label: Who is affected
+      multiple: true
+      options:
+        - Policy officer
+        - Committee clerk / Hansard officer
+        - Community engagement lead
+        - Indigenous knowledge custodian
+        - Programme manager
+        - Auditor / Ombudsman
+        - Platform operator
+        - Data subject (person recorded)
+        - Integrator / developer
+    validations:
+      required: true
+  - type: textarea
+    id: misuse
+    attributes:
+      label: How could this be misused?
+      description: >
+        Every feature touching identity, attribution or search can be turned toward
+        surveillance. Thinking about this now is genuinely useful, and it is not a
+        trick question.
+    validations:
+      required: true
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Principle check
+      description: Confirm this does not conflict with the non-negotiable principles.
+      options:
+        - label: Does not require sending data outside the operator's boundary by default (P1)
+        - label: Does not weaken or bypass consent (P2)
+        - label: Does not create assertions without provenance (P3)
+        - label: Does not let a machine decide something a human should (P4)
+        - label: Does not weaken community or Indigenous data control (P5)

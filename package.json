@@ -1,0 +1,76 @@
+{
+  "name": "witness",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Open-source Digital Public Infrastructure for institutional memory",
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://github.com/scigns/witness",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/scigns/witness.git"
+  },
+  "bugs": {
+    "url": "https://github.com/scigns/witness/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0 <23",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*",
+    "workers/*",
+    "sdk/typescript"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint -- --fix",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration",
+    "test:e2e": "turbo run test:e2e",
+    "test:contract": "turbo run test:contract",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "docs:lint": "markdownlint-cli2 \"**/*.md\" \"#node_modules\"",
+    "docs:links": "lychee --no-progress --exclude-mail .",
+    "adr:new": "node scripts/dev/new-adr.mjs",
+    "deps:audit": "pnpm audit --audit-level=moderate",
+    "deps:licenses": "node scripts/security/check-licenses.mjs",
+    "sbom": "node scripts/security/generate-sbom.mjs",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.9",
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.10",
+    "markdownlint-cli2": "^0.14.0",
+    "prettier": "^3.3.3",
+    "turbo": "^2.2.3",
+    "typescript": "^5.6.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yaml,yml}": [
+      "prettier --write"
+    ]
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowedVersions": {}
+    }
+  }
+}

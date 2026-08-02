@@ -1,0 +1,49 @@
+name: 🏛 Architecture decision
+description: Propose a decision that is expensive to reverse
+labels: ["type:adr", "triage", "needs-adr"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when a decision would be expensive to reverse: new technology, a
+        service boundary, a data model change, or anything touching consent,
+        provenance, security or sovereignty.
+
+        **If in doubt, propose one.** A rejected ADR costs an hour. An undocumented
+        decision costs a year.
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What forces are at play? Why does this need deciding now? Include non-technical constraints.
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options being considered
+      description: >
+        Include the option a reasonable person would choose that you are inclined to
+        reject. If every alternative looks obviously bad, the analysis is not finished.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed decision
+    validations:
+      required: true
+  - type: textarea
+    id: costs
+    attributes:
+      label: What gets worse
+      description: Every real decision has a cost. This must not be empty.
+    validations:
+      required: true
+  - type: textarea
+    id: reversal
+    attributes:
+      label: Reversal
+      description: What would it cost to undo? What signal would tell us we should?
+    validations:
+      required: true

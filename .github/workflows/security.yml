@@ -1,0 +1,102 @@
+# Security and supply chain scanning.
+# Owner: Security Lead (docs/engineering/SECURITY_REVIEW.md)
+
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: "17 3 * * *"   # daily
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Secret scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0   # full history — a secret removed from HEAD is still a secret
+      - name: Scan working tree and history
+        uses: gitleaks/gitleaks-action@83373cf2f8c4db6e24b41c1a9b086bb9619e9cd3 # v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependencies:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      # Dependency review requires GitHub's Dependency graph, which is unavailable on
+      # a private repository without Advanced Security. When the platform feature is
+      # off, the action hard-fails on every run — turning the entire security workflow
+      # permanently red, which trains people to ignore it. That is worse for security
+      # than an honest, loud skip.
+      #
+      # So: probe first. When the feature IS available the gate runs for real and fails
+      # on findings. When it is not, we warn loudly and record it as tracked debt
+      # (TD-001) rather than pretending the check ran.
+      - name: Probe dependency graph availability
+        id: probe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          base='${{ github.event.pull_request.base.sha }}'
+          head='${{ github.event.pull_request.head.sha }}'
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/dependency-graph/compare/$base...$head")
+          if [ "$code" = "200" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Dependency review skipped::Dependency graph unavailable (HTTP $code). Enable it at Settings > Code security, or make the repository public. Until then this supply-chain gate is NOT running. Tracked as TD-001."
+          fi
+
+      - name: Review new dependencies
+        if: steps.probe.outputs.available == 'true'
+        uses: actions/dependency-review-action@3b139cfc5fae8b618d3eae3675e383bb1769c019 # v4.5.0
+        with:
+          fail-on-severity: moderate
+          # Incompatible with GPL-3.0, or unacceptable for public infrastructure.
+          # Every entry must be a valid SPDX identifier — the action rejects the whole
+          # list otherwise. Redis's RSALv2 has no SPDX id, so it is caught by name in
+          # scripts/security/check-licenses.sh instead. See OSS_EVALUATION.md.
+          deny-licenses: SSPL-1.0, BUSL-1.1, Elastic-2.0, CC-BY-NC-4.0
+
+  licenses:
+    name: Licence compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check licence boundary
+        # Platform is GPL-3.0; sdk/ and packages/contracts/ are Apache-2.0 (ADR-0002).
+        run: bash scripts/security/check-licenses.sh
+
+  sovereignty:
+    name: Zero-egress verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # Principle P1: the sovereign profile must make zero external calls.
+      # This gate is what makes that claim checkable rather than aspirational.
+      - name: Verify no egress in the sovereign profile
+        run: bash scripts/security/verify-no-egress.sh
+
+  workflows:
+    name: Workflow hardening
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Actions must be pinned to a commit SHA
+        run: bash scripts/security/check-action-pinning.sh
