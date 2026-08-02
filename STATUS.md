@@ -82,11 +82,24 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 | 1.7 | Threat model & PIA | Security Lead | 🟡 STRIDE started |
 | 1.8 | Consent framework spec | Governance Lead | 🟡 Draft; needs external Indigenous governance review |
 | 1.9 | Accessibility & i18n strategy | UX Lead | ⚪ Not started |
-| 1.10 | NFRs & SLOs | CTO | ⚪ Not started |
+| 1.10 | NFRs & SLOs | CTO | 🟡 Drafted, PR open — [`architecture/NFR_SLO.md`](architecture/NFR_SLO.md) |
 
 ---
 
 ## What changed recently
+
+### 2026-08-02 — Phase 1 deliverable 1.10 (NFRs & SLOs) drafted
+
+- **[`architecture/NFR_SLO.md`](architecture/NFR_SLO.md)** consolidates the latency, throughput,
+  availability and recovery objectives already decided piecemeal in `DEPLOYMENT_ARCHITECTURE.md`,
+  `CI_CD.md` and the risk register, and explicitly gates six not-yet-decided objectives (API latency,
+  write throughput, review queue throughput, projection rebuild time, extraction latency, concurrent
+  capacity at scale) with an owning department and the phase gate that must produce each number.
+- Chosen from the Phase 1 backlog because it was the only deliverable that was simultaneously
+  unblocked (no dependencies), assignable to a single department (D2), and directly named on the
+  critical path to the Phase 2 exit gate in `docs/engineering/PHASE_EXECUTION_PLAN.md`.
+- **Not self-certified.** Marked 🟡 drafted, pending Principal Architect and CTO review — the exit
+  gate for 1.10 is verified by the named department, not the implementer.
 
 ### 2026-08-02 — Developer Preview reconciled into main
 
