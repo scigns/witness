@@ -1,0 +1,118 @@
+// Witness — PostgreSQL schema for the Developer Preview.
+//
+// PostgreSQL is the sole system of record (ADR-0004). Neo4j, OpenSearch and
+// pgvector are rebuildable projections and hold no authoritative data; none of
+// them appear here because none of them exist yet, and modelling a projection
+// before its projector exists would be pretending.
+//
+// Scope discipline: only the entities the Developer Preview actually uses are
+// modelled. Assertion, Evidence, Commitment, Consent and Tenant are all real
+// parts of the architecture (architecture/DATA_MODEL.md) and are deliberately
+// absent — adding a table nothing writes to is how a schema becomes fiction.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Who did something. The human/model distinction is load-bearing: principle P4
+/// forbids a model from confirming a record into institutional memory, and that
+/// rule is only enforceable if the system can tell them apart.
+model Actor {
+  id          String   @id @db.Uuid
+  kind        String   @db.VarChar(16)
+  displayName String   @map("display_name") @db.VarChar(200)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  capturedRecords Record[]     @relation("CapturedBy")
+  auditEvents     AuditEvent[]
+
+  @@index([kind])
+  @@map("actor")
+}
+
+/// Where a record came from. Provenance starts here (principle P3).
+model Source {
+  id         String   @id @db.Uuid
+  kind       String   @db.VarChar(32)
+  label      String   @db.VarChar(300)
+  /// When the source material was created — NOT when Witness ingested it.
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  records Record[]
+
+  @@index([occurredAt])
+  @@map("source")
+}
+
+/// A piece of institutional memory.
+///
+/// `sourceId` and `capturedById` are NOT NULL by design. A record without
+/// provenance is exactly what principle P3 forbids, and the database is the last
+/// line of defence for an invariant the application already enforces — because
+/// applications get rewritten and this constraint should outlive them.
+model Record {
+  id           String   @id @db.Uuid
+  title        String   @db.VarChar(200)
+  body         String   @db.Text
+  reviewState  String   @map("review_state") @db.VarChar(24)
+
+  sourceId     String   @map("source_id") @db.Uuid
+  source       Source   @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+
+  capturedById String   @map("captured_by_id") @db.Uuid
+  capturedBy   Actor    @relation("CapturedBy", fields: [capturedById], references: [id], onDelete: Restrict)
+
+  capturedAt   DateTime @map("captured_at") @db.Timestamptz(6)
+
+  /// Consent grant authorising processing (P2). Nullable ONLY because the consent
+  /// service does not exist yet — Phase 3, roadmap 3.4. It becomes NOT NULL then,
+  /// and that migration is expected to be the hard one.
+  consentGrantId String? @map("consent_grant_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  auditEvents AuditEvent[]
+
+  @@index([reviewState])
+  @@index([capturedAt])
+  @@map("record")
+}
+
+/// Append-only, hash-chained audit trail (roadmap 3.7).
+///
+/// There is deliberately no update or delete path in the application. Postgres
+/// cannot express "append-only" as a constraint, so this is enforced in the
+/// repository layer today and moves to a database trigger plus a restricted role
+/// in Phase 3 — tracked, not forgotten.
+model AuditEvent {
+  id           String   @id @db.Uuid
+  recordId     String   @map("record_id") @db.Uuid
+  record       Record   @relation(fields: [recordId], references: [id], onDelete: Restrict)
+
+  action       String   @db.VarChar(64)
+
+  actorId      String   @map("actor_id") @db.Uuid
+  actor        Actor    @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  occurredAt   DateTime @map("occurred_at") @db.Timestamptz(6)
+
+  /// Null only for the first event in a record's chain.
+  previousHash String?  @map("previous_hash") @db.VarChar(64)
+  hash         String   @unique @db.VarChar(64)
+
+  /// Context only — never record content. The audit log answers "who did what,
+  /// when", and is retained under a different policy from the content itself.
+  metadata     Json     @default("{}")
+
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([recordId, occurredAt])
+  @@map("audit_event")
+}

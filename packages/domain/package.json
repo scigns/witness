@@ -1,17 +1,28 @@
 {
   "name": "@witness/domain",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "license": "GPL-3.0-or-later",
-  "description": "Pure domain model. Imports nothing but the standard library — enforced by lint, see ADR-0003.",
+  "description": "Pure domain model. Imports nothing but the standard library — enforced by CI, see ADR-0003.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "eslint ."
+    "test:unit": "vitest run",
+    "lint": "eslint src",
+    "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {}
 }

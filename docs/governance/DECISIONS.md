@@ -35,6 +35,9 @@ Tracked in [`STATUS.md`](../../STATUS.md) until resolved, then recorded here.
 | D-3 | ASR engine composition: faster-whisper / whisper.cpp / WhisperX | AI Lead | Phase 5 |
 | D-4 | Graph store: Neo4j Community vs Apache AGE for constrained deployments | KG Lead | Phase 4 |
 | D-5 | Foundation host for long-term stewardship | Founder | Phase 8 |
+| ~~D-6~~ | ~~Product and architecture reconciliation~~ | CTO & Founder | ✅ **Resolved 2026-08-01** — see below |
+| D-7 | Agent persona layer: adopt subordinate, fold in, or replace the charters | CTO & Product Director | Before Phase 2 |
+| D-8 | `engineering/README.md`: build, rewrite, or deprecate | CTO | Before Phase 2 |
 
 D-1 is the most time-sensitive. It is trivial to resolve now and becomes practically impossible once
 the SDK and contract directories carry substantive third-party contributions, because relicensing
@@ -60,3 +63,35 @@ quo everywhere and is precisely how organisational knowledge evaporates.
 
 **Revisit when.** If this log is not being used, that is a signal the ceremony is still too high — or
 that decisions are being made without being recorded, which is worse and needs a different response.
+
+### D-6 — Product and architecture reconciliation
+
+**Date:** 2026-08-01 · **Decided by:** CTO, Founder, Principal Architect · **Status:** Resolved
+**Recorded as:** [ADR-0021](../../architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md)
+
+**Question.** The repository contained two foundational document sets describing two different
+products on two different architectures — one scoping Witness to institutional memory from
+conversations, the other to a Pacific multi-sector DPI platform including geospatial intelligence.
+Both were presented as current. Which is authoritative?
+
+**Decision.** `VISION.md` is the canonical product definition. ADR-0000 to ADR-0020 are the canonical
+architecture. The four overlapping documents from `main` are superseded and `memory/changelog.md` —
+which recorded implementation work that had never happened — is removed.
+
+**Reasoning.** Two considerations decided it. First, the ADR set records *why* each choice was made,
+with alternatives and costs; the other set records only *what*. A record with reasoning survives a
+change of team. Second, the alternative specified OpenAI as the inference provider and Cloudflare and
+Azure as infrastructure, which contradicts principle P1 and the `VISION.md` anti-goal against
+third-party model defaults. Scope was tradeable; the sovereignty guarantee was not.
+
+We considered keeping both with declared roles — a public-facing summary layer over a normative
+architecture — and rejected it. A summary saying "OpenAI" over an architecture saying "local
+inference only" is worse than either alone, because the summary is what gets read.
+
+**Cost accepted.** A broader and arguably more fundable product framing was foreclosed without
+stakeholder input, because none was available. This is recorded as a risk in ADR-0021 rather than
+presented as a clean win.
+
+**Revisit when.** A named institutional stakeholder requires multi-sector scope for a funded
+deployment. The route is a superseding ADR through the Steering Committee — not incremental scope
+creep in implementation.

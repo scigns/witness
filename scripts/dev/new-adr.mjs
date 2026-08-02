@@ -17,7 +17,10 @@ const existing = readdirSync(DIR)
   .map((f) => Number.parseInt(f.slice(4, 8), 10));
 const next = String(Math.max(-1, ...existing) + 1).padStart(4, '0');
 
-const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const slug = title
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-|-$/g, '');
 const file = join(DIR, `ADR-${next}-${slug}.md`);
 
 const body = readFileSync(TEMPLATE, 'utf8')

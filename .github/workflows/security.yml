@@ -8,7 +8,7 @@ on:
   push:
     branches: [main, develop]
   schedule:
-    - cron: "17 3 * * *"   # daily
+    - cron: "17 3 * * *" # daily
 
 permissions:
   contents: read
@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0   # full history — a secret removed from HEAD is still a secret
+          fetch-depth: 0 # full history — a secret removed from HEAD is still a secret
       - name: Scan working tree and history
         uses: gitleaks/gitleaks-action@83373cf2f8c4db6e24b41c1a9b086bb9619e9cd3 # v2.3.7
         env:

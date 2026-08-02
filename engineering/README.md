@@ -1,5 +1,23 @@
 # Witness Engineering Operating System
 
+> **⚠️ This document describes a repository layout that does not exist.**
+>
+> It instructs agents to read `engineering/vision/`, `engineering/architecture/`,
+> `engineering/standards/`, `engineering/memory/` and `engineering/tasks/`, and to update
+> `memory/completed-features.md` and `memory/architecture-log.md`. **None of those paths exist**,
+> in this repository or any branch of it. An agent following this literally fails at step one.
+>
+> The canonical engineering operating model is
+> [`docs/engineering/`](../docs/engineering/) — start with
+> [`AGENT_HANDOFF_PROTOCOL.md`](../docs/engineering/AGENT_HANDOFF_PROTOCOL.md), whose precedence
+> order in section 2 expresses the same intent as the priority list below, against paths that are
+> real.
+>
+> This file has been **retained, not deleted**. Whether to build the layout it proposes, rewrite it
+> to point at the actual paths, or deprecate it is decision **D-8** in
+> [`docs/engineering/AGENT_STRUCTURE_RECONCILIATION.md`](../docs/engineering/AGENT_STRUCTURE_RECONCILIATION.md),
+> and it belongs to the CTO.
+
 This repository is the single source of truth.
 
 No AI agent may make assumptions.

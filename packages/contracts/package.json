@@ -1,15 +1,31 @@
 {
   "name": "@witness/contracts",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "Apache-2.0",
-  "description": "API and event contracts — OpenAPI, GraphQL SDL, AsyncAPI. Apache-2.0 so integrators face no copyleft obligation (ADR-0002).",
+  "description": "API and event contracts. Apache-2.0 so integrators face no copyleft obligation (ADR-0002).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint src",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "test:contract": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
   }
 }
