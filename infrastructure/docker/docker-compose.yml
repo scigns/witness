@@ -6,6 +6,16 @@
 #
 # Sovereignty note: every image here is self-hosted. Nothing in this stack makes an
 # outbound connection. `make egress-test` verifies that claim.
+#
+# Profiles. Services required by the current Developer Preview start by default;
+# everything the preview does not yet use carries `profiles: ["full"]`.
+#
+#   make dev        postgres + valkey        — what 0.1.0 actually needs
+#   make dev-full   the complete stack       — the Phase 2 target
+#
+# The reason is honesty, not convenience: starting Neo4j, OpenSearch, Keycloak and
+# Ollama for an application that does not yet call any of them would suggest they
+# are integrated. They are not. They activate as the phases that own them land.
 
 name: witness
 
@@ -40,6 +50,7 @@ services:
   # ── Projections — rebuildable, NOT backed up (ADR-0011) ────────────────────
   neo4j:
     <<: *common
+    profiles: ["full"]
     image: neo4j:5-community
     environment:
       NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?NEO4J_PASSWORD must be set}
@@ -56,6 +67,7 @@ services:
 
   opensearch:
     <<: *common
+    profiles: ["full"]
     image: opensearchproject/opensearch:2
     environment:
       discovery.type: single-node
@@ -69,7 +81,11 @@ services:
       - opensearch-data:/usr/share/opensearch/data
     ports: ["${OPENSEARCH_PORT:-9200}:9200"]
     healthcheck:
-      test: ["CMD-SHELL", "curl -sk -u admin:${OPENSEARCH_PASSWORD} https://localhost:9200/_cluster/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sk -u admin:${OPENSEARCH_PASSWORD} https://localhost:9200/_cluster/health || exit 1",
+        ]
       interval: 15s
       timeout: 10s
       retries: 15
@@ -89,6 +105,7 @@ services:
   # ── Object storage — media and documents ───────────────────────────────────
   minio:
     <<: *common
+    profiles: ["full"]
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
@@ -109,6 +126,7 @@ services:
   # ── Event transport (ADR-0005) ─────────────────────────────────────────────
   nats:
     <<: *common
+    profiles: ["full"]
     image: nats:2-alpine
     command: ["-js", "-sd", "/data", "-m", "8222"]
     volumes:
@@ -123,6 +141,7 @@ services:
   # ── Identity (ADR-0007) ────────────────────────────────────────────────────
   keycloak:
     <<: *common
+    profiles: ["full"]
     image: quay.io/keycloak/keycloak:26.0
     command: ["start-dev", "--import-realm"]
     environment:
@@ -140,7 +159,11 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q 'UP'"]
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q 'UP'",
+        ]
       interval: 20s
       timeout: 10s
       retries: 15
@@ -148,6 +171,7 @@ services:
   # ── Local inference — the sovereign default (ADR-0009) ─────────────────────
   ollama:
     <<: *common
+    profiles: ["full"]
     image: ollama/ollama:latest
     volumes:
       - ollama-models:/root/.ollama
@@ -160,10 +184,10 @@ services:
     #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
 
 volumes:
-  postgres-data:      # BACKED UP — system of record
-  minio-data:         # BACKED UP — original media and documents
-  neo4j-data:         # not backed up — rebuildable from the event log
-  opensearch-data:    # not backed up — rebuildable from the event log
+  postgres-data: # BACKED UP — system of record
+  minio-data: # BACKED UP — original media and documents
+  neo4j-data: # not backed up — rebuildable from the event log
+  opensearch-data: # not backed up — rebuildable from the event log
   nats-data:
   ollama-models:
 

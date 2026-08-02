@@ -1,0 +1,44 @@
+# Prometheus scrape configuration for the Witness local and single-node stack.
+#
+# Every target here is inside the operator's network boundary. There is no remote
+# write, no federation to a hosted backend and no exporter that reports upstream.
+# Adding one would violate P1 and would be caught by scripts/security/verify-no-egress.sh.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    deployment: witness
+    profile: "${WITNESS_DEPLOYMENT_PROFILE:-development}"
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # The Witness API exposes Prometheus metrics on /metrics (ADR-0014).
+  # Marked honestly: this target does not resolve until the API runs in the
+  # compose network. Prometheus reports it as down rather than pretending.
+  - job_name: witness-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:3001"]
+        labels:
+          service: api-gateway
+          component: application
+
+  - job_name: tempo
+    static_configs:
+      - targets: ["tempo:3200"]
+
+  - job_name: loki
+    static_configs:
+      - targets: ["loki:3100"]
+
+  # Infrastructure targets. Postgres and Valkey need their respective exporters,
+  # which arrive with the Phase 2 observability baseline (roadmap 2.4). Listing
+  # them commented rather than absent so the gap is visible to an operator.
+  # - job_name: postgres
+  #   static_configs: [{ targets: ["postgres-exporter:9187"] }]
+  # - job_name: valkey
+  #   static_configs: [{ targets: ["valkey-exporter:9121"] }]

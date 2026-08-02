@@ -7,7 +7,7 @@ name: Branch sync
 
 on:
   schedule:
-    - cron: "0 5 * * 1-5"   # weekday mornings
+    - cron: "0 5 * * 1-5" # weekday mornings
   workflow_dispatch:
 
 permissions:

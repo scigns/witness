@@ -6,14 +6,14 @@
 # promise, in that order.
 
 services:
-  postgres:   { networks: [isolated] }
-  neo4j:      { networks: [isolated] }
+  postgres: { networks: [isolated] }
+  neo4j: { networks: [isolated] }
   opensearch: { networks: [isolated] }
-  valkey:     { networks: [isolated] }
-  minio:      { networks: [isolated] }
-  nats:       { networks: [isolated] }
-  keycloak:   { networks: [isolated] }
-  ollama:     { networks: [isolated] }
+  valkey: { networks: [isolated] }
+  minio: { networks: [isolated] }
+  nats: { networks: [isolated] }
+  keycloak: { networks: [isolated] }
+  ollama: { networks: [isolated] }
 
 networks:
   isolated:

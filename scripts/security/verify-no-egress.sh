@@ -49,10 +49,15 @@ if [ ! -f infrastructure/docker/docker-compose.yml ] \
 fi
 
 # Phase 2+: run the sovereign profile with no route and assert it still works.
+#
+# --env-file is required: compose resolves `.env` relative to the compose FILE's
+# directory, not the working directory. Without it every mandatory variable fails
+# to interpolate even when the contributor has set them all correctly.
 echo "Running sovereign profile under network isolation..."
 WITNESS_DEPLOYMENT_PROFILE=sovereign \
-  docker compose -f infrastructure/docker/docker-compose.yml \
+  docker compose --env-file .env \
+                 -f infrastructure/docker/docker-compose.yml \
                  -f infrastructure/docker/docker-compose.airgap.yml \
-  up -d --wait
-trap 'docker compose -f infrastructure/docker/docker-compose.yml down -v' EXIT
+  --profile full up -d --wait
+trap 'docker compose --env-file .env -f infrastructure/docker/docker-compose.yml --profile full down -v' EXIT
 bash scripts/security/assert-no-outbound.sh

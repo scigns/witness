@@ -1,9 +1,13 @@
+# pnpm workspace definition — the single source of truth for workspace membership.
+#
+# `templates/` is deliberately excluded. Those are scaffolds copied by generators,
+# not packages: including them would install a template's placeholder dependencies
+# into every developer's node_modules and typecheck code that is meant to contain
+# substitution markers.
 packages:
   - "apps/*"
   - "packages/*"
   - "services/*"
   - "workers/*"
   - "sdk/typescript"
-  - "templates/service"
-  - "templates/package"
   - "!**/node_modules/**"
