@@ -84,16 +84,32 @@ within 48 hours and a public record of what was merged and why.
 
 ## Stacked pull requests
 
-For work that is genuinely sequential, stack rather than batch:
+**Prohibited by default.** Branch from `main`, target `main` — see
+[`docs/engineering/organisation/01-ORGANISATION_CHART.md`](organisation/01-ORGANISATION_CHART.md).
 
-```text
-feat/backend/220-consent-aggregate          → domain branch
-  feat/backend/221-consent-policy-point     → 220
-    feat/backend/222-consent-revocation     → 221
-```
+A stacked PR requires all of the following, recorded in the PR description, not assumed:
 
-Each is independently reviewable. Merge in order. This is strongly preferred over one large PR, and
-reviewers should encourage it.
+- **Explicit approval** — a human has agreed the stack is warranted, not just that the author found
+  it convenient.
+- **Dependency record** — which PR this one cannot exist without.
+- **Merge order** — which merges first, and why nothing else can.
+- **Retarget plan** — the exact base-branch change required if the PR the stack sits on merges
+  before this one is ready, stated before either PR is opened, not improvised afterward.
+- **Recovery plan** — what happens if the base merges and this PR is *not* retargeted in time. "It
+  gets stranded and someone notices later" is not a recovery plan.
+- **Named owner** — one person or agent responsible for the retarget actually happening.
+
+This is not theoretical caution. This exact repository lost 84 files for most of a day because PR #2
+was stacked on PR #1's branch and PR #1 merged first, closing the only path PR #2 had to `main` — the
+incident [ADR-0021](../../architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md)
+exists to repair. It then happened *again*, in miniature: PR #11 was deliberately stacked on PR #10
+with an explicit retarget plan written into its description, and was still merged into PR #10's
+branch directly rather than retargeted — the retarget plan existed but nothing enforced it being
+followed. **The retarget plan is not sufficient on its own; the default of not stacking is the
+actual mitigation.**
+
+For work that is genuinely sequential and cannot avoid stacking, the pattern above (three branches,
+one below another) still applies — but only with all six conditions met and recorded.
 
 ## Draft, stale and abandoned
 

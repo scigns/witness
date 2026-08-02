@@ -73,7 +73,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 
 | # | Deliverable | Owner | State |
 |---|---|---|---|
-| 1.1 | C4 architecture views | Principal Architect | 🟡 Context + container done |
+| 1.1 | C4 architecture views | Principal Architect | 🟡 Context + container done; component views merged to main — [`architecture/views/COMPONENT_VIEWS.md`](architecture/views/COMPONENT_VIEWS.md); pending Principal Architect + CTO sign-off |
 | 1.2 | Domain model & bounded contexts | Principal Architect | 🟡 Draft in `architecture/DATA_MODEL.md` |
 | 1.3 | Knowledge graph ontology v0.1 | Knowledge Graph Lead | 🟡 Draft in `architecture/KNOWLEDGE_GRAPH.md` |
 | 1.4 | Event catalogue v0.1 | Backend Lead | 🟡 Draft in `architecture/EVENT_CATALOGUE.md` |
@@ -87,6 +87,20 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-02 — Persistent multi-agent organisation established; Delivery Wave 1 launched
+
+- **Organisational control plane** established in `docs/engineering/organisation/` — agent
+  registry, work-package register, delivery-wave model, review and escalation matrices, agent
+  communication and memory policies. Extends existing canonical documents (`DEPARTMENTS.md`,
+  `DEPARTMENT_ASSIGNMENTS.md`, `AGENT_HANDOFF_PROTOCOL.md`) rather than duplicating them.
+- **D-9 recorded**: `BRANCH_STRATEGY.md` (ADR-0015) describes a `develop`/domain-branch model that
+  has never actually been used — every merged PR to date branched from and targeted `main` directly.
+- **Stacked PRs now prohibited by default** in `PULL_REQUEST_WORKFLOW.md`, after this session found
+  that PR #11's own documented retarget plan was not followed when PR #10 remained open.
+- **Delivery Wave 1** launched: two independently-owned Phase 1 work packages, each on its own
+  branch from `main`, neither stacked on the other — `architecture/views/COMPONENT_VIEWS.md`
+  (deliverable 1.1, D2) and the threat model/PIA completion (deliverable 1.7, D6).
 
 ### 2026-08-02 — Phase 1 deliverable 1.7 (threat model & PIA) drafted
 
@@ -220,6 +234,7 @@ chain fail — then restoring it and watching it pass.
 | D-5 | Foundation host for long-term stewardship | Founder | Phase 8 | Candidates under consideration |
 | D-7 | Agent persona layer: adopt subordinate, fold into charters, or replace charters | CTO & Product Director | Before Phase 2 | `main` gained five execution personas (`agents/architect.md` etc.) alongside the 19 role charters. They are different artefacts — personas describe behaviour, charters describe authority — and both are retained with the personas explicitly subordinate. Whether that is the end state is a governance call. See [`AGENT_STRUCTURE_RECONCILIATION.md`](docs/engineering/AGENT_STRUCTURE_RECONCILIATION.md) §8 |
 | D-8 | `engineering/README.md`: build the layout it describes, rewrite it, or deprecate it | CTO | Before Phase 2 | It directs agents to `engineering/vision/`, `engineering/standards/` and four other paths that do not exist. Retained with a banner; an agent following it literally fails at step one |
+| D-9 | `docs/engineering/BRANCH_STRATEGY.md` (ADR-0015) describes `main → develop → domain → working`; no `develop` branch has ever existed and every merged PR (#10, #11, #12) branched from and targeted `main` directly | CTO & Release Manager | Before the next delivery wave scales past two parallel agents | Recorded in [`docs/governance/DECISIONS.md`](docs/governance/DECISIONS.md) and [`docs/engineering/organisation/00-INDEX.md`](docs/engineering/organisation/00-INDEX.md). Until resolved, the organisational control plane follows the actually-practiced direct-to-`main` model, not ADR-0015 |
 | D-6 | Product and architecture reconciliation | CTO & Founder | **Phase 1 — resolved 2026-08-01** | ✅ **Resolved** by [ADR-0021](architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md). `VISION.md` is canonical product scope; ADR-0000–0020 are the canonical architecture. `docs/vision.md`, `docs/architecture.md`, `docs/coding-standards.md` and `memory/decisions.md` are superseded; `memory/changelog.md` (fictional implementation history) removed. Sector material preserved as explicitly non-canonical in [`docs/product/SECTOR_APPLICATIONS.md`](docs/product/SECTOR_APPLICATIONS.md). **Reversible via a superseding ADR if the multi-sector framing reflects a stakeholder commitment the engineering organisation is not party to** |
 
 ---
