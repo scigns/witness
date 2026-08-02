@@ -39,6 +39,7 @@ Tracked in [`STATUS.md`](../../STATUS.md) until resolved, then recorded here.
 | D-7 | Agent persona layer: adopt subordinate, fold in, or replace the charters | CTO & Product Director | Before Phase 2 |
 | D-8 | `engineering/README.md`: build, rewrite, or deprecate | CTO | Before Phase 2 |
 | D-9 | `BRANCH_STRATEGY.md` (ADR-0015: `main → develop → domain → working`) contradicts actual practice — no `develop` branch has ever existed; every merged PR (#10, #11, #12) branched from and targeted `main` directly. Adopt the actually-practiced model, or actually implement ADR-0015 | CTO & Release Manager | Before the next delivery wave scales past two parallel agents |
+| D-10 | Whether a Phase 1 deliverable's formal department sign-off (not merge) is a hard prerequisite for starting a *dependent* deliverable, or only for closing the phase gate | CTO & Principal Architect | Confirm before Phase 1 exit — interim reading below already in effect |
 
 D-1 is the most time-sensitive. It is trivial to resolve now and becomes practically impossible once
 the SDK and contract directories carry substantive third-party contributions, because relicensing

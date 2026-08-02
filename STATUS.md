@@ -73,20 +73,39 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 
 | # | Deliverable | Owner | State |
 |---|---|---|---|
-| 1.1 | C4 architecture views | Principal Architect | 🟡 Context + container done; component views merged to main — [`architecture/views/COMPONENT_VIEWS.md`](architecture/views/COMPONENT_VIEWS.md); pending Principal Architect + CTO sign-off |
-| 1.2 | Domain model & bounded contexts | Principal Architect | 🟡 Draft in `architecture/DATA_MODEL.md` |
+| 1.1 | C4 architecture views | Principal Architect | 🟡 MERGED — SIGN-OFF REQUIRED (Principal Architect + CTO) — [`architecture/views/COMPONENT_VIEWS.md`](architecture/views/COMPONENT_VIEWS.md) |
+| 1.2 | Domain model & bounded contexts | Principal Architect | 🟡 Drafted, PR open — [`architecture/domains/DOMAIN_MODEL.md`](architecture/domains/DOMAIN_MODEL.md) |
 | 1.3 | Knowledge graph ontology v0.1 | Knowledge Graph Lead | 🟡 Draft in `architecture/KNOWLEDGE_GRAPH.md` |
 | 1.4 | Event catalogue v0.1 | Backend Lead | 🟡 Draft in `architecture/EVENT_CATALOGUE.md` |
 | 1.5 | API contract v0.1 | Backend Lead | ⚪ Not started |
 | 1.6 | OSS evaluation | Research Lead | 🟢 Complete for core stack |
-| 1.7 | Threat model & PIA | Security Lead | 🟡 Drafted, PR open — [`docs/research/THREAT_MODEL.md`](docs/research/THREAT_MODEL.md) |
-| 1.8 | Consent framework spec | Governance Lead | 🟡 Draft; needs external Indigenous governance review |
-| 1.9 | Accessibility & i18n strategy | UX Lead | 🟡 Drafted, PR open — [`docs/product/ACCESSIBILITY_I18N_STRATEGY.md`](docs/product/ACCESSIBILITY_I18N_STRATEGY.md) |
-| 1.10 | NFRs & SLOs | CTO | 🟡 Merged to main — [`architecture/NFR_SLO.md`](architecture/NFR_SLO.md); pending Principal Architect + CTO sign-off |
+| 1.7 | Threat model & PIA | Security Lead | 🟡 MERGED — SIGN-OFF REQUIRED (2nd Security Lead + QA Lead) — [`docs/research/THREAT_MODEL.md`](docs/research/THREAT_MODEL.md); 7 CodeRabbit findings landed after merge, unaddressed |
+| 1.8 | Consent framework spec | Governance Lead | 🔴 BLOCKED — needs external Indigenous governance review |
+| 1.9 | Accessibility & i18n strategy | UX Lead | 🟡 MERGED — SIGN-OFF REQUIRED (UX Lead + D10) — [`docs/product/ACCESSIBILITY_I18N_STRATEGY.md`](docs/product/ACCESSIBILITY_I18N_STRATEGY.md); 2 CodeRabbit nitpicks outstanding |
+| 1.10 | NFRs & SLOs | CTO | 🟡 MERGED — SIGN-OFF REQUIRED (Principal Architect + CTO) — [`architecture/NFR_SLO.md`](architecture/NFR_SLO.md) |
 
 ---
 
 ## What changed recently
+
+### 2026-08-02 — Sign-off status reconciled; Phase 1 deliverable 1.2 (domain model) drafted
+
+- **Sign-off reconciled for 1.1, 1.7, 1.9, 1.10.** All four are merged to `main`; none has a
+  recorded human department review. Trackers corrected from stale "PR open" / unqualified "merged"
+  text to `MERGED — SIGN-OFF REQUIRED`, naming the exact reviewers each needs. CodeRabbit posted
+  automated findings on PR #12 (1.9, 2 nitpicks) and PR #15 (1.7, 7 findings — landed after merge,
+  a race between the human merge and the review finishing); neither is human sign-off, both are
+  recorded as outstanding rather than silently dropped.
+- **D-10 recorded**: whether a deliverable's formal sign-off (not merge) is required before a
+  *dependent* deliverable may start. Interim reading — no, only phase-gate closure requires it —
+  already acted on to start 1.2, since `DEPARTMENT_ASSIGNMENTS.md`'s own dependency column and
+  status (`⚪ available`, not `⛔ gated`) already reflected that reading before this decision made it
+  explicit.
+- **`architecture/domains/DOMAIN_MODEL.md`** (deliverable 1.2) elaborates all twelve bounded
+  contexts from `ARCHITECTURE.md` §3 and `DATA_MODEL.md` §2 to the depth
+  `DEPARTMENT_ASSIGNMENTS.md`'s acceptance gate requires, and maps every context against actual
+  0.1.0 code. Finding: no undocumented drift — every gap between the model and shipped code already
+  traces to a dated decision (a schema comment, a roadmap sequence item, a threat-model entry).
 
 ### 2026-08-02 — Persistent multi-agent organisation established; Delivery Wave 1 launched
 
@@ -235,6 +254,7 @@ chain fail — then restoring it and watching it pass.
 | D-7 | Agent persona layer: adopt subordinate, fold into charters, or replace charters | CTO & Product Director | Before Phase 2 | `main` gained five execution personas (`agents/architect.md` etc.) alongside the 19 role charters. They are different artefacts — personas describe behaviour, charters describe authority — and both are retained with the personas explicitly subordinate. Whether that is the end state is a governance call. See [`AGENT_STRUCTURE_RECONCILIATION.md`](docs/engineering/AGENT_STRUCTURE_RECONCILIATION.md) §8 |
 | D-8 | `engineering/README.md`: build the layout it describes, rewrite it, or deprecate it | CTO | Before Phase 2 | It directs agents to `engineering/vision/`, `engineering/standards/` and four other paths that do not exist. Retained with a banner; an agent following it literally fails at step one |
 | D-9 | `docs/engineering/BRANCH_STRATEGY.md` (ADR-0015) describes `main → develop → domain → working`; no `develop` branch has ever existed and every merged PR (#10, #11, #12) branched from and targeted `main` directly | CTO & Release Manager | Before the next delivery wave scales past two parallel agents | Recorded in [`docs/governance/DECISIONS.md`](docs/governance/DECISIONS.md) and [`docs/engineering/organisation/00-INDEX.md`](docs/engineering/organisation/00-INDEX.md). Until resolved, the organisational control plane follows the actually-practiced direct-to-`main` model, not ADR-0015 |
+| D-10 | Does a Phase 1 deliverable need its formal department sign-off (not just a merge) before a *dependent* deliverable can start — e.g. must 1.1 be signed off before 1.2 begins? | CTO & Principal Architect | Confirm before Phase 1 exit | **Interim reading, already acted on:** no. `DEPARTMENT_ASSIGNMENTS.md`'s Dependencies column names the prior deliverable (`1.1`), not its sign-off state, and 1.2's own row already read `⚪ available` rather than `⛔ gated` once 1.1 merged. The phase-level exit gate (`PHASE_EXECUTION_PLAN.md`: "verified by the named department, not self-certified") still requires every deliverable's sign-off before *Phase 1* closes — this decision is narrower, about starting dependent *work*, not about closing the *phase* |
 | D-6 | Product and architecture reconciliation | CTO & Founder | **Phase 1 — resolved 2026-08-01** | ✅ **Resolved** by [ADR-0021](architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md). `VISION.md` is canonical product scope; ADR-0000–0020 are the canonical architecture. `docs/vision.md`, `docs/architecture.md`, `docs/coding-standards.md` and `memory/decisions.md` are superseded; `memory/changelog.md` (fictional implementation history) removed. Sector material preserved as explicitly non-canonical in [`docs/product/SECTOR_APPLICATIONS.md`](docs/product/SECTOR_APPLICATIONS.md). **Reversible via a superseding ADR if the multi-sector framing reflects a stakeholder commitment the engineering organisation is not party to** |
 
 ---
