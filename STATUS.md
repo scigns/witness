@@ -79,7 +79,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 | 1.4 | Event catalogue v0.1 | Backend Lead | 🟡 Draft in `architecture/EVENT_CATALOGUE.md` |
 | 1.5 | API contract v0.1 | Backend Lead | ⚪ Not started |
 | 1.6 | OSS evaluation | Research Lead | 🟢 Complete for core stack |
-| 1.7 | Threat model & PIA | Security Lead | 🟡 STRIDE started |
+| 1.7 | Threat model & PIA | Security Lead | 🟡 Drafted, PR open — [`docs/research/THREAT_MODEL.md`](docs/research/THREAT_MODEL.md) |
 | 1.8 | Consent framework spec | Governance Lead | 🟡 Draft; needs external Indigenous governance review |
 | 1.9 | Accessibility & i18n strategy | UX Lead | 🟡 Drafted, PR open — [`docs/product/ACCESSIBILITY_I18N_STRATEGY.md`](docs/product/ACCESSIBILITY_I18N_STRATEGY.md) |
 | 1.10 | NFRs & SLOs | CTO | 🟡 Merged to main — [`architecture/NFR_SLO.md`](architecture/NFR_SLO.md); pending Principal Architect + CTO sign-off |
@@ -87,6 +87,19 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-02 — Phase 1 deliverable 1.7 (threat model & PIA) drafted
+
+- **`docs/research/THREAT_MODEL.md`** created — `SECURITY_ARCHITECTURE.md` §10 has referenced this
+  file as "in progress" since Phase 0; it did not exist. Expands the existing ten-threat STRIDE
+  summary to full detail (asset, attack vector, mitigation — built or planned — verification,
+  residual risk) and adds the Privacy Impact Assessment `DEPARTMENT_ASSIGNMENTS.md` bundles into the
+  same deliverable.
+- Two new risks found during the pass, added to `docs/governance/RISK_REGISTER.md`'s Top risks
+  table: **R-17** (erasure incomplete in backup after a right-to-erasure request) and **R-18**
+  (re-identification via entity resolution merging a pseudonymous subject with a named entity).
+- **Not self-certified.** Marked 🟡 drafted, pending Security Lead (second reviewer) and QA Lead
+  (PIA) sign-off.
 
 ### 2026-08-02 — PR #10 and PR #11 merged; Phase 1 deliverable 1.9 (Accessibility & i18n) drafted
 

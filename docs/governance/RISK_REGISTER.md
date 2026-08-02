@@ -38,6 +38,8 @@ tells us the risk is materialising, so we act on evidence rather than on anxiety
 | **R-14** | Dependency licence change (e.g. Redis) | 3 | 3 | 🟡 9 | Research Lead |
 | **R-15** | No reference deployment materialises | 3 | 5 | 🟠 15 | Founder |
 | **R-16** | Reviewer rubber-stamping defeats the human gate | 4 | 5 | 🔴 20 | UX Lead |
+| **R-17** | Erasure incomplete — subject data survives in a backup after a right-to-erasure request | 3 | 3 | 🟡 9 | Security Lead |
+| **R-18** | Entity resolution re-identifies a pseudonymous subject by merging them with a named entity | 2 | 4 | 🟡 8 | Security Lead |
 
 ---
 
