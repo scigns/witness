@@ -81,12 +81,33 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 | 1.6 | OSS evaluation | Research Lead | 🟢 Complete for core stack |
 | 1.7 | Threat model & PIA | Security Lead | 🟡 STRIDE started |
 | 1.8 | Consent framework spec | Governance Lead | 🟡 Draft; needs external Indigenous governance review |
-| 1.9 | Accessibility & i18n strategy | UX Lead | ⚪ Not started |
-| 1.10 | NFRs & SLOs | CTO | 🟡 Drafted, PR open — [`architecture/NFR_SLO.md`](architecture/NFR_SLO.md) |
+| 1.9 | Accessibility & i18n strategy | UX Lead | 🟡 Drafted, PR open — [`docs/product/ACCESSIBILITY_I18N_STRATEGY.md`](docs/product/ACCESSIBILITY_I18N_STRATEGY.md) |
+| 1.10 | NFRs & SLOs | CTO | 🟡 Merged to main — [`architecture/NFR_SLO.md`](architecture/NFR_SLO.md); pending Principal Architect + CTO sign-off |
 
 ---
 
 ## What changed recently
+
+### 2026-08-02 — PR #10 and PR #11 merged; Phase 1 deliverable 1.9 (Accessibility & i18n) drafted
+
+- **PR #10** (Developer Preview reconciliation) and **PR #11** (deliverable 1.10, merged into PR #10's
+  branch before PR #10 merged) both landed on `main`. Verified by ancestor check, not assumed: both
+  commits are ancestors of `main`, and every Developer Preview path
+  (`packages/domain`, `packages/config`, `packages/contracts`, `services/api-gateway`, `apps/web`,
+  `pnpm-lock.yaml`, the Prisma schema/migration/seed, ADR-0021, the department docs) is present.
+- **Canonical `main` re-verified from a clean checkout**: `make verify` (format, lint, typecheck,
+  test, build), `pnpm test:invariants` (20/20), `pnpm test:adversarial` (21/21), all governance and
+  security gates, `make migrate` and `make seed` against PostgreSQL 16, and the application run
+  end-to-end — capture, submit, confirm, hash-chained audit trail, 401/403 authorisation boundary —
+  all through the running API, not just static checks.
+- **`docs/product/ACCESSIBILITY_I18N_STRATEGY.md`** (deliverable 1.9) consolidates the WCAG 2.2 AA
+  merge-gate, RTL and low-bandwidth requirements already decided in `PROJECT_CONTEXT.md` P8 and
+  ADR-0020, and explicitly gates five not-yet-decided objectives (audit tooling, first-supported
+  languages, i18n infrastructure, external audit timing, per-language extraction quality) with an
+  owner and phase gate.
+- **1.10's tracker rows corrected** — they still read "PR open" after PR #11 merged; now read
+  "merged to main, pending Principal Architect + CTO sign-off," since a human merging a PR is not the
+  same as the named department completing its review.
 
 ### 2026-08-02 — Phase 1 deliverable 1.10 (NFRs & SLOs) drafted
 

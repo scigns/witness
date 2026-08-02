@@ -42,7 +42,8 @@ Start with [`PROJECT_CONTEXT.md`](../PROJECT_CONTEXT.md). It is short and it is 
 ### [`product/`](product/) — what we build and why
 
 [`PRODUCT_OPERATING_MODEL.md`](product/PRODUCT_OPERATING_MODEL.md) ·
-[`PERSONAS.md`](product/PERSONAS.md) · `prd/` · `design/`
+[`PERSONAS.md`](product/PERSONAS.md) ·
+[`ACCESSIBILITY_I18N_STRATEGY.md`](product/ACCESSIBILITY_I18N_STRATEGY.md) · `prd/` · `design/`
 
 ### [`governance/`](governance/) — the commitments we are held to
 
