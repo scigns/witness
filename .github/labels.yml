@@ -2,7 +2,7 @@
 # See docs/engineering/ISSUE_WORKFLOW.md.
 
 labels:
-# ─── Type ─────────────────────────────────────────────────────────────────────
+  # ─── Type ─────────────────────────────────────────────────────────────────────
   - name: "type:bug"
     color: "d73a4a"
     description: "Does not work as documented"
@@ -34,7 +34,7 @@ labels:
     color: "006b75"
     description: "Data sovereignty, egress, self-hosting"
 
-# ─── Priority ─────────────────────────────────────────────────────────────────
+  # ─── Priority ─────────────────────────────────────────────────────────────────
   - name: "P0"
     color: "b60205"
     description: "Drop everything — outage, data at risk, or any consent violation"
@@ -48,7 +48,7 @@ labels:
     color: "c2e0c6"
     description: "Backlog"
 
-# ─── State ────────────────────────────────────────────────────────────────────
+  # ─── State ────────────────────────────────────────────────────────────────────
   - name: "triage"
     color: "ededed"
     description: "Awaiting triage — within 2 working days"
@@ -71,7 +71,7 @@ labels:
     color: "e99695"
     description: "Blocked — the blocker must be named"
 
-# ─── Domain ───────────────────────────────────────────────────────────────────
+  # ─── Domain ───────────────────────────────────────────────────────────────────
   - name: "domain:architecture"
     color: "bfd4f2"
   - name: "domain:product"
@@ -107,7 +107,7 @@ labels:
   - name: "domain:docs"
     color: "bfd4f2"
 
-# ─── Community ────────────────────────────────────────────────────────────────
+  # ─── Community ────────────────────────────────────────────────────────────────
   - name: "good first issue"
     color: "7057ff"
     description: "Curated — has context, criteria and a named person to ask"
@@ -118,7 +118,7 @@ labels:
     color: "d876e3"
     description: "Needs expertise we do not have in-project"
 
-# ─── Flags ────────────────────────────────────────────────────────────────────
+  # ─── Flags ────────────────────────────────────────────────────────────────────
   - name: "breaking-change"
     color: "b60205"
     description: "Requires a major version"

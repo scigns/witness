@@ -124,3 +124,32 @@
 /test/invariants/                       @scigns/qa-lead @scigns/principal-architect
 /test/adversarial/                      @scigns/qa-lead @scigns/security-lead
 /test/evaluation/                       @scigns/ai-lead @scigns/research-lead
+
+# ─── Departments (docs/engineering/DEPARTMENTS.md) ────────────────────────────
+# Extends the role-based rules above with the department model. Later rules win,
+# so these deliberately sit last for the paths they name.
+
+/docs/engineering/DEPARTMENTS.md          @scigns/cto
+/docs/engineering/PHASE_EXECUTION_PLAN.md @scigns/cto @scigns/engineering-manager
+/docs/engineering/DEPARTMENT_ASSIGNMENTS.md @scigns/engineering-manager
+/docs/engineering/AGENT_HANDOFF_PROTOCOL.md @scigns/cto
+/docs/engineering/DEVELOPER_ONBOARDING.md @scigns/developer-experience-lead @scigns/documentation-lead
+/docs/governance/LICENSING.md             @scigns/open-source-lead @scigns/cto
+/docs/product/SECTOR_APPLICATIONS.md      @scigns/product-director
+
+# ─── D3 Application Engineering ───────────────────────────────────────────────
+/apps/                                    @scigns/frontend-lead
+/apps/web/src/components/                 @scigns/ux-lead @scigns/frontend-lead
+/apps/web/src/app/globals.css             @scigns/ux-lead
+/services/                                @scigns/backend-lead
+/packages/domain/                         @scigns/backend-lead @scigns/principal-architect
+/packages/contracts/                      @scigns/backend-lead @scigns/principal-architect
+
+# ─── D4 Data Engineering ──────────────────────────────────────────────────────
+# A migration can make existing provenance unverifiable, which is why the
+# architect signs every one rather than only the interesting ones.
+/services/api-gateway/prisma/             @scigns/backend-lead @scigns/principal-architect
+
+# ─── D6 Security, Privacy & Sovereignty ───────────────────────────────────────
+/services/api-gateway/src/authz/          @scigns/security-lead
+/packages/config/                         @scigns/security-lead @scigns/principal-architect

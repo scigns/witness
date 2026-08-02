@@ -1,0 +1,4 @@
+# Cheap gates only. Anything slower than a few seconds belongs in CI, not in the
+# path between an engineer and pushing their work.
+bash scripts/ci/check-branch-name.sh "$(git rev-parse --abbrev-ref HEAD)" || exit 1
+bash scripts/security/scan-secrets.sh || exit 1

@@ -1,0 +1,42 @@
+# Grafana datasources, provisioned from source rather than configured by clicking.
+#
+# Reproducibility is the point: an operator restoring from backup gets the same
+# dashboards without a runbook step that says "now add three datasources".
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: witness-prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      timeInterval: 15s
+
+  - name: Tempo
+    type: tempo
+    uid: witness-tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: witness-loki
+        spanStartTimeShift: -1h
+        spanEndTimeShift: 1h
+        filterByTraceID: true
+      serviceMap:
+        datasourceUid: witness-prometheus
+
+  - name: Loki
+    type: loki
+    uid: witness-loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      derivedFields:
+        - name: TraceID
+          matcherRegex: '"trace_id":"(\w+)"'
+          url: "$${__value.raw}"
+          datasourceUid: witness-tempo

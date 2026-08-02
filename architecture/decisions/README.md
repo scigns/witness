@@ -36,6 +36,7 @@ record of having been wrong is part of the value.
 | [0018](ADR-0018-hybrid-search-architecture.md) | Hybrid search architecture | Accepted | P6 |
 | [0019](ADR-0019-indigenous-data-sovereignty.md) | Indigenous data sovereignty | Accepted | **P5** |
 | [0020](ADR-0020-offline-first-and-low-connectivity.md) | Offline-first and low connectivity | Accepted | **P8** |
+| [0021](ADR-0021-canonical-scope-and-architecture-reconciliation.md) | Canonical scope and architecture reconciliation | Accepted | P1, P6, P7 |
 
 Bold principles indicate an ADR that is a primary expression of that principle. Changing one of
 those requires Steering Committee approval, and where consent, provenance or Indigenous data
