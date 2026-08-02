@@ -11,6 +11,7 @@ Everything about how Witness is built, and why.
 | 2a | [`views/COMPONENT_VIEWS.md`](views/COMPONENT_VIEWS.md) | The internal structure of selected containers (C4 L3) |
 | 3 | [`TECH_STACK.md`](TECH_STACK.md) | Every technology, why it was chosen, and what would replace it |
 | 4 | [`DATA_MODEL.md`](DATA_MODEL.md) | The write model — aggregates, bitemporality, tenancy, erasure |
+| 4a | [`domains/DOMAIN_MODEL.md`](domains/DOMAIN_MODEL.md) | Every bounded context elaborated — invariants, commands, events, ownership, current vs. future implementation |
 | 5 | [`KNOWLEDGE_GRAPH.md`](KNOWLEDGE_GRAPH.md) | The ontology and the projection that produces it |
 | 6 | [`EVENT_CATALOGUE.md`](EVENT_CATALOGUE.md) | The event contracts between bounded contexts |
 | 7 | [`SECURITY_ARCHITECTURE.md`](SECURITY_ARCHITECTURE.md) | Threat model, controls, and AI-specific attack surface |
