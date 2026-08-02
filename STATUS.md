@@ -73,7 +73,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 
 | # | Deliverable | Owner | State |
 |---|---|---|---|
-| 1.1 | C4 architecture views | Principal Architect | 🟡 Context + container done |
+| 1.1 | C4 architecture views | Principal Architect | 🟡 Context + container done; component views drafted, PR open — [`architecture/views/COMPONENT_VIEWS.md`](architecture/views/COMPONENT_VIEWS.md) |
 | 1.2 | Domain model & bounded contexts | Principal Architect | 🟡 Draft in `architecture/DATA_MODEL.md` |
 | 1.3 | Knowledge graph ontology v0.1 | Knowledge Graph Lead | 🟡 Draft in `architecture/KNOWLEDGE_GRAPH.md` |
 | 1.4 | Event catalogue v0.1 | Backend Lead | 🟡 Draft in `architecture/EVENT_CATALOGUE.md` |
@@ -87,6 +87,20 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-02 — Persistent multi-agent organisation established; Delivery Wave 1 launched
+
+- **Organisational control plane** established in `docs/engineering/organisation/` — agent
+  registry, work-package register, delivery-wave model, review and escalation matrices, agent
+  communication and memory policies. Extends existing canonical documents (`DEPARTMENTS.md`,
+  `DEPARTMENT_ASSIGNMENTS.md`, `AGENT_HANDOFF_PROTOCOL.md`) rather than duplicating them.
+- **D-9 recorded**: `BRANCH_STRATEGY.md` (ADR-0015) describes a `develop`/domain-branch model that
+  has never actually been used — every merged PR to date branched from and targeted `main` directly.
+- **Stacked PRs now prohibited by default** in `PULL_REQUEST_WORKFLOW.md`, after this session found
+  that PR #11's own documented retarget plan was not followed when PR #10 remained open.
+- **Delivery Wave 1** launched: two independently-owned Phase 1 work packages, each on its own
+  branch from `main`, neither stacked on the other — `architecture/views/COMPONENT_VIEWS.md`
+  (deliverable 1.1, D2) and the threat model/PIA completion (deliverable 1.7, D6).
 
 ### 2026-08-02 — PR #10 and PR #11 merged; Phase 1 deliverable 1.9 (Accessibility & i18n) drafted
 

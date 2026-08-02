@@ -7,7 +7,8 @@ Everything about how Witness is built, and why.
 | # | Document | What it answers |
 |---|---|---|
 | 1 | [`SYSTEM_CONTEXT.md`](SYSTEM_CONTEXT.md) | Who uses Witness, what it connects to, where the trust boundaries are (C4 L1) |
-| 2 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | How the system is structured and which decisions carry the weight (C4 L2–L3) |
+| 2 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | How the system is structured and which decisions carry the weight (C4 L1–L2) |
+| 2a | [`views/COMPONENT_VIEWS.md`](views/COMPONENT_VIEWS.md) | The internal structure of selected containers (C4 L3) |
 | 3 | [`TECH_STACK.md`](TECH_STACK.md) | Every technology, why it was chosen, and what would replace it |
 | 4 | [`DATA_MODEL.md`](DATA_MODEL.md) | The write model — aggregates, bitemporality, tenancy, erasure |
 | 5 | [`KNOWLEDGE_GRAPH.md`](KNOWLEDGE_GRAPH.md) | The ontology and the projection that produces it |
