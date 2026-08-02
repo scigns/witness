@@ -2,7 +2,8 @@
 
 **Owner:** Engineering Manager
 **Status:** Active
-**Related:** [`00-INDEX.md`](00-INDEX.md) · [`04-WORK_PACKAGE_REGISTER.md`](04-WORK_PACKAGE_REGISTER.md) ·
+**Related:** [`00-INDEX.md`](00-INDEX.md) ·
+[`04-WORK_PACKAGE_REGISTER.md`](04-WORK_PACKAGE_REGISTER.md) ·
 [`09-PHASE_CONTROL.md`](09-PHASE_CONTROL.md)
 
 ---
@@ -60,6 +61,7 @@ unblocked deliverables.
 **PHASE:** 1 — Architecture & research
 
 **WORK PACKAGES:**
+
 - `WP-1.1-01` — 1.1 C4 component views (D2)
 - `WP-1.7-01` — 1.7 Threat model (STRIDE) & PIA (D6)
 
