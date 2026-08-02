@@ -156,8 +156,9 @@ record of institutional truth are indefensible against prompt injection. Ours ca
 
 ## 10. Threat model summary (STRIDE)
 
-Full model in `docs/research/THREAT_MODEL.md` (Phase 1 deliverable, in progress). Highest-priority
-threats identified so far:
+Full model, including the Privacy Impact Assessment, in
+[`docs/research/THREAT_MODEL.md`](../docs/research/THREAT_MODEL.md) — Phase 1 deliverable 1.7,
+drafted, pending Security Lead and QA Lead sign-off. Highest-priority threats identified so far:
 
 | # | Threat | STRIDE | Priority | Primary mitigation |
 |---|---|---|---|---|
