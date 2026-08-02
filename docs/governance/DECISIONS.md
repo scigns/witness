@@ -36,6 +36,8 @@ Tracked in [`STATUS.md`](../../STATUS.md) until resolved, then recorded here.
 | D-4 | Graph store: Neo4j Community vs Apache AGE for constrained deployments | KG Lead | Phase 4 |
 | D-5 | Foundation host for long-term stewardship | Founder | Phase 8 |
 | ~~D-6~~ | ~~Product and architecture reconciliation~~ | CTO & Founder | ✅ **Resolved 2026-08-01** — see below |
+| D-7 | Agent persona layer: adopt subordinate, fold in, or replace the charters | CTO & Product Director | Before Phase 2 |
+| D-8 | `engineering/README.md`: build, rewrite, or deprecate | CTO | Before Phase 2 |
 
 D-1 is the most time-sensitive. It is trivial to resolve now and becomes practically impossible once
 the SDK and contract directories carry substantive third-party contributions, because relicensing

@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-08-01
+**Last updated:** 2026-08-02
 **Updated by:** CTO
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -88,6 +88,28 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 
 ## What changed recently
 
+### 2026-08-02 — Developer Preview reconciled into main
+
+- **The Developer Preview was not on `main`.** PR #1 merged the architecture branch into `main` at
+  03:07:08; PR #2 merged the preview into that same branch at 03:07:53 — 45 seconds after it had
+  already been merged away. All 84 files were stranded on `f1dce48`. This was a consequence of the
+  stacked-PR structure: PR #2 could only reach `main` through PR #1's branch, and merging #1 first
+  closed that path.
+- **Reconciled** on `reconcile/developer-preview-to-main`, branched from current `main` and merged
+  with `f1dce48`. No Git conflicts.
+- **Preserved from `main`:** the CodeQL action bump to v4.37.4 (a security update — `f1dce48` had
+  only reformatted a comment in that file), the Dependabot markdownlint bump (which matched the
+  branch's value exactly), and all ten files added to `main` independently.
+- **Applied from the branch:** the full Developer Preview, and the ADR-0021 deletions that had
+  never landed — including `memory/changelog.md`, the fictional implementation history.
+- **Reconciled structures:** five agent personas, three prompt templates, an alternative operating
+  model and one task file. Nothing deleted. Recorded in
+  [`AGENT_STRUCTURE_RECONCILIATION.md`](docs/engineering/AGENT_STRUCTURE_RECONCILIATION.md), with
+  D-7 and D-8 raised for the owner.
+- **`tasks/task-001-authentication.md` gated** as PHASE 2 / GATED / NOT STARTED. It specified JWT
+  login with password hashing, which would make Witness its own identity provider — the option
+  ADR-0007 considered and rejected. No authentication code was written.
+
 ### 2026-08-01 — Developer Preview 0.1.0
 
 - **D-6 resolved** ([ADR-0021](architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md)).
@@ -149,6 +171,8 @@ chain fail — then restoring it and watching it pass.
 | D-3 | ASR engine: faster-whisper vs whisper.cpp vs WhisperX composition | AI Lead | Phase 5 | Blocked on benchmark against target languages |
 | D-4 | Graph store: confirm Neo4j Community vs Apache AGE for constrained deployments | Knowledge Graph Lead | Phase 4 | Licensing/footprint trade-off, ADR-0004 |
 | D-5 | Foundation host for long-term stewardship | Founder | Phase 8 | Candidates under consideration |
+| D-7 | Agent persona layer: adopt subordinate, fold into charters, or replace charters | CTO & Product Director | Before Phase 2 | `main` gained five execution personas (`agents/architect.md` etc.) alongside the 19 role charters. They are different artefacts — personas describe behaviour, charters describe authority — and both are retained with the personas explicitly subordinate. Whether that is the end state is a governance call. See [`AGENT_STRUCTURE_RECONCILIATION.md`](docs/engineering/AGENT_STRUCTURE_RECONCILIATION.md) §8 |
+| D-8 | `engineering/README.md`: build the layout it describes, rewrite it, or deprecate it | CTO | Before Phase 2 | It directs agents to `engineering/vision/`, `engineering/standards/` and four other paths that do not exist. Retained with a banner; an agent following it literally fails at step one |
 | D-6 | Product and architecture reconciliation | CTO & Founder | **Phase 1 — resolved 2026-08-01** | ✅ **Resolved** by [ADR-0021](architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md). `VISION.md` is canonical product scope; ADR-0000–0020 are the canonical architecture. `docs/vision.md`, `docs/architecture.md`, `docs/coding-standards.md` and `memory/decisions.md` are superseded; `memory/changelog.md` (fictional implementation history) removed. Sector material preserved as explicitly non-canonical in [`docs/product/SECTOR_APPLICATIONS.md`](docs/product/SECTOR_APPLICATIONS.md). **Reversible via a superseding ADR if the multi-sector framing reflects a stakeholder commitment the engineering organisation is not party to** |
 
 ---

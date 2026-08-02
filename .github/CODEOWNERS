@@ -153,3 +153,18 @@
 # ─── D6 Security, Privacy & Sovereignty ───────────────────────────────────────
 /services/api-gateway/src/authz/          @scigns/security-lead
 /packages/config/                         @scigns/security-lead @scigns/principal-architect
+
+# ─── Structures introduced on main, reconciled 2026-08-02 ─────────────────────
+# See docs/engineering/AGENT_STRUCTURE_RECONCILIATION.md. The persona files under
+# agents/ are subordinate to the role charters in agents/<function>/; both are
+# owned by the CTO so the two layers cannot drift apart unnoticed.
+/agents/architect.md                    @scigns/cto @scigns/principal-architect
+/agents/backend.md                      @scigns/cto @scigns/backend-lead
+/agents/frontend.md                     @scigns/cto @scigns/frontend-lead
+/agents/qa.md                           @scigns/cto @scigns/qa-lead
+/agents/security.md                     @scigns/cto @scigns/security-lead
+/prompts/                               @scigns/cto @scigns/developer-experience-lead
+/engineering/                           @scigns/cto
+# A task file can start gated work. Both the engineering manager and the CTO see them.
+/tasks/                                 @scigns/engineering-manager @scigns/cto
+/docs/engineering/AGENT_STRUCTURE_RECONCILIATION.md @scigns/cto
