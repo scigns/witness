@@ -36,22 +36,29 @@ import {
 
 /** Role → permitted actions. Anything not listed is denied. */
 const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.freeze({
-  reader: ['record:read', 'organisation:read', 'workspace:read'],
-  contributor: ['record:read', 'record:create', 'organisation:read', 'workspace:read'],
+  // `role:read` (the static role/permission catalog) is granted broadly:
+  // it is reference data, not per-user information, and understanding what
+  // a role permits is useful to everyone who might be assigned one — unlike
+  // membership and role-*assignment* management, which stay admin-only
+  // below for the same "administrative by definition" reasoning as ever.
+  reader: ['record:read', 'organisation:read', 'workspace:read', 'role:read'],
+  contributor: ['record:read', 'record:create', 'organisation:read', 'workspace:read', 'role:read'],
   reviewer: [
     'record:read',
     'record:create',
     'record:review',
     'organisation:read',
     'workspace:read',
+    'role:read',
   ],
   // Least privilege (Constitution, Authority and Access): organisation and
   // workspace creation are the privileged actions in this slice, so they are the
   // only grants `admin` adds on top of what `reviewer` already has — not a
-  // blanket superuser role. User and membership management is administrative by
-  // definition (BUILD_ROADMAP.md Milestone 1.1: "an organisation administrator
-  // needs to...") — reader/contributor/reviewer get none of it, not even read,
-  // until a Roles capability decides otherwise.
+  // blanket superuser role. User, membership, and role-assignment management
+  // is administrative by definition (BUILD_ROADMAP.md Milestone 1.1: "an
+  // organisation administrator needs to...") — reader/contributor/reviewer
+  // get none of it, not even read, until a further Authorisation capability
+  // decides otherwise.
   admin: [
     'record:read',
     'record:create',
@@ -68,6 +75,10 @@ const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.freeze({
     'workspace_membership:read',
     'workspace_membership:create',
     'workspace_membership:update',
+    'role:read',
+    'role_assignment:read',
+    'role_assignment:write',
+    'role_assignment:delete',
   ],
 });
 

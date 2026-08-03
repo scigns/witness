@@ -35,6 +35,9 @@ export const AUDIT_ACTIONS = [
   'organisation_membership.state_changed',
   'workspace_membership.created',
   'workspace_membership.state_changed',
+  'role_assignment.created',
+  'role_assignment.changed',
+  'role_assignment.removed',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -52,6 +55,7 @@ export const AUDIT_SUBJECT_TYPES = [
   'user',
   'organisation_membership',
   'workspace_membership',
+  'role_assignment',
 ] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 

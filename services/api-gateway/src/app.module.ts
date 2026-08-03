@@ -15,15 +15,20 @@ import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
 import { OrganisationMembershipsController } from './organisation-memberships/organisation-memberships.controller.js';
 import { OrganisationMembershipsService } from './organisation-memberships/organisation-memberships.service.js';
+import { OrganisationRoleAssignmentsController } from './organisation-role-assignments/organisation-role-assignments.controller.js';
+import { OrganisationRoleAssignmentsService } from './organisation-role-assignments/organisation-role-assignments.service.js';
 import { OrganisationsController } from './organisations/organisations.controller.js';
 import { OrganisationsService } from './organisations/organisations.service.js';
 import { RecordsController } from './records/records.controller.js';
 import { RecordsService } from './records/records.service.js';
+import { RolesController } from './roles/roles.controller.js';
 import { WITNESS_CONFIG } from './tokens.js';
 import { UsersController } from './users/users.controller.js';
 import { UsersService } from './users/users.service.js';
 import { WorkspaceMembershipsController } from './workspace-memberships/workspace-memberships.controller.js';
 import { WorkspaceMembershipsService } from './workspace-memberships/workspace-memberships.service.js';
+import { WorkspaceRoleAssignmentsController } from './workspace-role-assignments/workspace-role-assignments.controller.js';
+import { WorkspaceRoleAssignmentsService } from './workspace-role-assignments/workspace-role-assignments.service.js';
 import { WorkspacesController } from './workspaces/workspaces.controller.js';
 import { WorkspacesService } from './workspaces/workspaces.service.js';
 
@@ -36,6 +41,9 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     UsersController,
     OrganisationMembershipsController,
     WorkspaceMembershipsController,
+    RolesController,
+    OrganisationRoleAssignmentsController,
+    WorkspaceRoleAssignmentsController,
   ],
   providers: [
     PrismaService,
@@ -45,6 +53,8 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     UsersService,
     OrganisationMembershipsService,
     WorkspaceMembershipsService,
+    OrganisationRoleAssignmentsService,
+    WorkspaceRoleAssignmentsService,
     {
       // Configuration is validated once, at construction. If it violates the
       // deployment-profile contract, loadConfigOrExit terminates the process

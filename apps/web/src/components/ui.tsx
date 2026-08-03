@@ -9,9 +9,14 @@
  * reconcile with.
  */
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
-import type { MembershipState, ReviewState } from '@witness/contracts';
+import type {
+  MembershipState,
+  ReviewState,
+  RoleAssignmentView,
+  RoleDefinition,
+} from '@witness/contracts';
 
 const STATE_LABELS: Record<ReviewState, string> = {
   draft: 'Draft',
@@ -122,6 +127,75 @@ export function ErrorNotice({ message }: { message: string }) {
       className="rounded border border-red-700 bg-red-50 p-4 text-sm text-red-900 dark:bg-red-950 dark:text-red-200"
     >
       {message}
+    </div>
+  );
+}
+
+/**
+ * Assign, change, or remove a member's role in one organisation or
+ * workspace — deliberately separate from membership status
+ * (`MembershipStateBadge`/status actions above): membership answers "does
+ * this person belong here", this answers "what may they do here"
+ * (BUILD_ROADMAP.md Milestone 1.2).
+ *
+ * `assignment.role` may be `null` — no role assigned yet is the normal
+ * starting state, not an error, so the control reads "No role assigned"
+ * rather than showing an empty or broken-looking badge.
+ */
+export function RoleAssignmentControl({
+  roles,
+  assignment,
+  busy,
+  onAssign,
+  onRemove,
+}: {
+  roles: RoleDefinition[];
+  assignment: RoleAssignmentView;
+  busy: boolean;
+  onAssign: (role: string) => void;
+  onRemove: () => void;
+}) {
+  const [selected, setSelected] = useState(assignment.role ?? '');
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <div>
+        {assignment.role === null ? (
+          <span className="text-xs text-[var(--color-ink-muted)]">No role assigned</span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-full border border-current px-2 py-0.5 text-xs font-medium text-[var(--color-ink)]">
+            {assignment.roleLabel}
+          </span>
+        )}
+      </div>
+      <label className="sr-only" htmlFor={`role-${assignment.membershipId}`}>
+        Role for {assignment.userDisplayName}
+      </label>
+      <select
+        id={`role-${assignment.membershipId}`}
+        value={selected}
+        onChange={(event) => setSelected(event.target.value)}
+        className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-2 py-1 text-xs"
+      >
+        <option value="">Choose a role…</option>
+        {roles.map((definition) => (
+          <option key={definition.role} value={definition.role} title={definition.description}>
+            {definition.label}
+          </option>
+        ))}
+      </select>
+      <Button
+        variant="secondary"
+        disabled={busy || selected === '' || selected === assignment.role}
+        onClick={() => onAssign(selected)}
+      >
+        {assignment.role === null ? 'Assign role' : 'Change role'}
+      </Button>
+      {assignment.role !== null && (
+        <Button variant="danger" disabled={busy} onClick={onRemove}>
+          Remove role
+        </Button>
+      )}
     </div>
   );
 }

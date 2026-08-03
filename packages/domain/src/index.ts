@@ -22,3 +22,5 @@ export * from './membership.js';
 export * from './user.js';
 export * from './organisation-membership.js';
 export * from './workspace-membership.js';
+export * from './role.js';
+export * from './role-assignment.js';

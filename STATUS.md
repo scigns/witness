@@ -88,6 +88,78 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 
 ## What changed recently
 
+### 2026-08-03 — Roles and Permission Assignment (BUILD_ROADMAP.md Milestone 1.2) shipped
+
+- **Continuous Product Delivery mode**: verified before starting — `main` at the merged Users and
+  Memberships (PR #19) and documentation-baseline (PR #20) commits, no overlapping open PR, `main`
+  green. Also restored the pre-existing `Documentation`/aggregate `CI gate` baseline failure in PR
+  #20 (markdownlint violations in four documents committed directly to `main` outside the lint-gated
+  PR flow) before starting this capability.
+- **Roles and Permission Assignment** (Milestone 1.2) shipped: a new, deliberately separate concept
+  from membership. Membership (`organisation-membership.ts`/`workspace-membership.ts`) answers "does
+  this user belong here"; `packages/domain/src/role.ts` and `role-assignment.ts` answer "what may
+  they do here". Six canonical roles — `admin`, `facilitator`, `contributor`, `reviewer`,
+  `participant`, `reader` — preserving the existing `reader`/`contributor`/`reviewer`/`admin` names
+  from `DevelopmentAuthorizationAdapter` rather than renaming them, and adding `facilitator`/
+  `participant` as new. Each role maps to an explicit, least-privilege permitted-actions list
+  (`ROLE_PERMISSIONS_BY_ROLE`) in the vocabulary of the one capability that exists today (records) —
+  no role inheritance, no hierarchy.
+- One role assignment per (user, scope): assigning where none exists creates it, assigning where one
+  already exists replaces it (`changeRoleAssignment`), refusing a no-op "change" to the role already
+  held (duplicate-assignment prevention). A role assignment can never create membership implicitly —
+  it is always resolved from an *existing* membership row, and requires that membership (and, for a
+  workspace-scoped assignment, the *parent organisation* membership, re-checked at assignment time
+  rather than assumed from the workspace membership having once been valid) to be in good standing.
+  Real foreign keys throughout; one `role_assignment` table with mutually-exclusive nullable
+  `organisationId`/`workspaceId` columns, a CHECK constraint enforcing that exclusivity, and two
+  `@@unique` constraints that give independent "one row per (organisation, user)" and "one row per
+  (workspace, user)" using Postgres's NULL-never-equals-NULL semantics rather than a partial index.
+- API: `GET /api/v1/roles` (the static catalog); `GET`/`PUT`/`DELETE
+  /api/v1/{organisations,workspaces}/{scopeId}/memberships/{membershipId}/role`. All four new
+  actions (`role:read`, `role_assignment:{read,write,delete}`) admin-only except `role:read`, which
+  is broadly granted — understanding what a role permits is useful to everyone, unlike managing
+  assignments. Self-promotion prevention is enforced today only as a corollary of "role-assignment
+  management is admin-only, full stop" — there is no real identity yet (Milestone 1.3) for the domain
+  to compare "assigner" against "assignee" directly; recorded as a known limitation, not silently
+  assumed solved.
+- Web UI: a `RoleAssignmentControl` extends the existing membership tables on `/organisations/[id]`
+  and `/workspaces/[id]` with a "Role" column — current role (or "No role assigned"), a role picker
+  with a plain-language label and description per option, and assign/change/remove actions. No new
+  page; no generic administration console.
+- Audit: `role_assignment.created`/`.changed`/`.removed`, hash-chained through the existing
+  mechanism, same as every other subject type. Verified against a real local PostgreSQL 16 database
+  (not just service-level fakes) — all 17 manual-verification steps in the PR, including cross-
+  organisation and cross-workspace manipulation attempts (denied `MEMBERSHIP_NOT_FOUND`, matching the
+  existing membership-service pattern) and a non-admin dev-header caller's assignment attempt (denied
+  `FORBIDDEN`).
+- **Tests**: 12 new domain tests (54 total — up from 42), 19 new API-gateway service tests (60
+  total — up from 41), 4 new adversarial tests (30 total — up from 26). All existing tests preserved
+  and passing.
+- **`docs/MVP_CHECKLIST.md`** — the Roles and Authorisation items under §B Trusted Access marked
+  ready pending merge; per the checklist's own rule, an open PR does not count as complete.
+- **Known limitations, stated plainly**: no production authentication, no Keycloak, no centralised
+  Casbin enforcement, current development identity remains temporary (`X-Witness-Dev-User`,
+  unverified), no delegated administration beyond the flat admin/non-admin split. See the PR for the
+  full account, including the two inherited concurrency risks (audit tail-read race,
+  actor-resolution TOCTOU) now formally logged in `docs/engineering/TECH_DEBT.md` rather than only
+  mentioned in review threads.
+
+### 2026-08-03 — Baseline markdownlint failures fixed (PR #20)
+
+- The `Documentation` CI check (and the aggregate `CI gate` it feeds) had been red since
+  `docs/PRODUCT_ROADMAP.md` was committed directly to `main` outside the lint-gated PR flow —
+  flagged and left as an out-of-scope, pre-existing failure on PRs #17, #18, and #19. Fixed here:
+  the same root cause (documents committed straight to `main`) also broke `BUILD_ROADMAP.md`,
+  `MVP_CHECKLIST.md`, and `governance/PRODUCT_CONSTITUTION.md`, so all four were corrected with the
+  same mechanical, meaning-preserving treatment — collapsed multiple blank lines, escaped periods on
+  plain-text numbered section headings CommonMark was mis-parsing as ordered-list continuations,
+  word-wrapped over-length lines, bolded existing Owner/Status header fields. Verified with a
+  word-boundary diff against `origin/main`: the only content-level change anywhere is 29 escaped
+  periods — everything else is whitespace/line-wrap only.
+- `governance/PRODUCT_CONSTITUTION.md` still has no Owner/Status metadata at all (not just
+  unbolded); left as a known, deliberately unfixed gap rather than inventing governance metadata
+  this branch has no authority to decide.
+
 ### 2026-08-03 — Users and Memberships (BUILD_ROADMAP.md Milestone 1.1) shipped
 
 - **Continuous Product Delivery mode**: `docs/BUILD_ROADMAP.md` was restructured around milestones

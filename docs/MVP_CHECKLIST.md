@@ -82,21 +82,42 @@ deployable version** — this checklist is a binary release gate, not a PR-revie
 
 Roles and Authorisation
 
-Roles are explicitly defined
+Roles are explicitly defined — READY (PR #21, not yet merged — per this checklist's own rule, an
+open PR does not count as complete). Six canonical roles (`admin`, `facilitator`, `contributor`,
+`reviewer`, `participant`, `reader`) in `packages/domain/src/role.ts`, each mapped to an explicit
+permitted-actions list. No inheritance.
 
-Role assignment has organisation or workspace scope
+Role assignment has organisation or workspace scope — READY (PR #21, not yet merged).
+`packages/domain/src/role-assignment.ts`; one assignment per (user, scope); a role cannot be
+assigned without membership — and, for a workspace scope, the parent organisation membership too —
+in good standing.
 
-API denies unauthorised actions
+API denies unauthorised actions — READY (PR #21, not yet merged), for role-assignment management
+specifically: `role_assignment:{read,write,delete}` are admin-only, verified against a real
+database and by 30/30 adversarial tests. Broader request-time enforcement across every action in
+the system is Milestone 1.4, not this PR.
 
-UI reflects, but does not replace, API enforcement
+UI reflects, but does not replace, API enforcement — READY (PR #21, not yet merged). The role
+picker on `/organisations/[id]` and `/workspaces/[id]` shows server-computed permitted actions; a
+non-admin caller is refused by the API regardless of what the UI renders.
 
-Invalid or invented roles are rejected
+Invalid or invented roles are rejected — READY (PR #21, not yet merged). Domain-level
+(`INVALID_ROLE`) and contract-level (`assignRoleRequestSchema`'s `z.enum`) validation.
 
-Cross-organisation access is denied
+Cross-organisation access is denied — READY (PR #21, not yet merged), for role assignment
+specifically: a role assignment addressed through the wrong organisation's URL is refused
+`MEMBERSHIP_NOT_FOUND`, verified against a real database. General cross-tenant data isolation
+beyond role/membership management remains Phase 3 (`architecture/domains/DOMAIN_MODEL.md` §1).
 
-Cross-workspace access is denied
+Cross-workspace access is denied — READY (PR #21, not yet merged), same scope and same evidence as
+the organisation case above, for workspace-scoped role assignment.
 
-Adversarial authorisation tests pass
+Adversarial authorisation tests pass — READY (PR #21, not yet merged). 30/30, up from 26 —
+administrator-permitted, reviewer-denied-write, facilitator-self-promotion-denied, and
+read-only-denied cases for every new action.
+
+**Mark these DONE only after PR #21 merges to `main` and the workflow is re-verified on the
+deployable version** — this checklist is a binary release gate, not a PR-review tracker.
 
 Authentication
 

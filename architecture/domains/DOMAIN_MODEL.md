@@ -117,26 +117,38 @@ terminal — shared by both membership kinds), `organisation-membership.ts` and
 `organisation-memberships/` and `workspace-memberships/`. A workspace membership cannot exist
 without an organisation membership in good standing *for that workspace's specific organisation* —
 the eligibility check the domain enforces from a state the service reads and passes in, which is
-what stops standing in one organisation being used to justify workspace access under another. Role
-and Group remain unimplemented, as does tenant-scoped row-level security (§`Invariants` above) —
-nothing on `Record` or `Source` references an organisation, workspace, or user, so cross-tenant
-isolation is still not enforced anywhere; membership answers "does this user belong here", not "what
-may they do here" (that is Milestone 1.2, Roles and Permission Assignment, deliberately not this
-PR). The Developer Preview's `DevelopmentAuthorizationAdapter`
-(`services/api-gateway/src/authz/development.adapter.ts`) still resolves a principal from an
-unverified `X-Witness-Dev-User` header, unrelated to and unchanged by this — real identity remains
-Milestone 1.3.
+what stops standing in one organisation being used to justify workspace access under another.
+Membership answers "does this user belong here", not "what may they do here".
+
+Milestone 1.2 (Roles and Permission Assignment) adds `packages/domain/src/role.ts` (six canonical
+roles — `admin`, `facilitator`, `contributor`, `reviewer`, `participant`, `reader`, preserving the
+`reader`/`contributor`/`reviewer`/`admin` names already used by `DevelopmentAuthorizationAdapter`
+rather than renaming them — each mapped to an explicit permitted-actions list, no inheritance) and
+`role-assignment.ts` (one assignment per user per organisation-or-workspace scope; requires the
+scope's own membership, and — for a workspace scope — the *parent organisation's* membership too,
+to be in good standing at assignment time, not merely to have once been valid), plus
+`services/api-gateway/src/organisation-role-assignments/` and `workspace-role-assignments/`. This
+is a persisted, queryable answer to "what may this member do here" — but it is not yet consulted by
+request-time enforcement: `AuthorizationGuard` still decides every request from the unverified
+`X-Witness-Dev-User` header via `DevelopmentAuthorizationAdapter`'s own hard-coded grants, completely
+independently of the `RoleAssignment` table. The two will merge once Milestone 1.3 (Authentication)
+gives a `Principal` a real, verified link to a `User` — until then, a `RoleAssignment` is real,
+audited, and enforced for its own management (only a dev-header `admin` may create, change, or
+remove one), but does not yet gate anything else. Row-level security (§`Invariants` above) also
+remains unimplemented — nothing on `Record` or `Source` references an organisation, workspace, or
+user, so cross-tenant isolation is still not enforced anywhere.
 
 **Future implementation mapping.** `services/identity` (named in `ARCHITECTURE.md`'s container view
 as `SIDENT`). Milestone 1.3 (Authentication).
 
-**Classification.** `PARTIALLY IMPLEMENTED` (isolation root, its workspaces, registered users, and
-organisation/workspace membership — no role assignment, no row-level security, no authentication;
+**Classification.** `PARTIALLY IMPLEMENTED` (isolation root, its workspaces, registered users,
+organisation/workspace membership, and role assignment — no row-level security, no authentication;
 ADR-0007 still decides the identity approach and no identity service exists). Drift:
 `PREVIEW SIMPLIFICATION` — a user can now be a member of an organisation and, transitively, a
-workspace, but nothing enforces that membership against `Record`/`Source` access, so nothing is
-actually tenant-isolated yet; every other context in this document still correctly treats Identity &
-Tenancy as not delivering isolation.
+workspace, and can now hold a role in either scope, but nothing enforces either against `Record`/
+`Source` access and the role assignment itself is not yet consulted by request-time authorisation,
+so nothing is actually tenant-isolated yet; every other context in this document still correctly
+treats Identity & Tenancy as not delivering isolation.
 
 ---
 
@@ -273,7 +285,11 @@ permission-aware filtering").
 seam), `AuthorizationGuard` (deny-by-default enforcement), `DevelopmentAuthorizationAdapter` (the
 one implementation today, explicitly a development-only stand-in). This is the **most implemented**
 context in 0.1.0 relative to its final design: the port/guard shape is the real, permanent
-architecture: only the adapter behind the port is temporary.
+architecture: only the adapter behind the port is temporary. Milestone 1.2 (Roles and Permission
+Assignment, §1) added a persisted `RoleAssignment` per organisation/workspace member — that data
+does not feed this context's decisions yet, the same way Consent (§2) does not either; both remain
+future inputs to the same decision point once it is Casbin-backed, not additional decision points of
+their own.
 
 **Future implementation mapping.** Casbin-backed adapter implementing the same `AuthorizationPort`,
 replacing `DevelopmentAuthorizationAdapter` (`DEPARTMENT_ASSIGNMENTS.md` row
@@ -836,7 +852,7 @@ for this context; it is deployment-time, not an administrative bounded context.
 
 | # | Context | Department | Status | Drift |
 |---|---|---|---|---|
-| 1 | Identity & Tenancy | D6 | PARTIALLY IMPLEMENTED (organisation/workspace + users + membership, no roles/auth) | PREVIEW SIMPLIFICATION (no row-level security; nothing on Record/Source scoped to an organisation yet) |
+| 1 | Identity & Tenancy | D6 | PARTIALLY IMPLEMENTED (organisation/workspace + users + membership + role assignment, no authentication) | PREVIEW SIMPLIFICATION (no row-level security; nothing on Record/Source scoped to an organisation yet; role assignment not yet wired into request-time enforcement) |
 | 2 | Consent & Legal Basis | D6 | APPROVED BUT NOT IMPLEMENTED | PREVIEW SIMPLIFICATION (`consentGrantId` nullable) |
 | 3 | Authorisation | D6 | IMPLEMENTED IN 0.1.0 (port/guard) / PLANNED-GATED (policy engine) | NO DRIFT |
 | 4 | Ingestion & Media | D3/D5 | FUTURE | n/a |

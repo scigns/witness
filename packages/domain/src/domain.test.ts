@@ -10,7 +10,9 @@ import { describe, expect, it } from 'vitest';
 import {
   addOrganisationMember,
   addWorkspaceMember,
+  assignRole,
   captureRecord,
+  changeRoleAssignment,
   confirmRecord,
   correctRecord,
   createActor,
@@ -22,6 +24,7 @@ import {
   isInstitutionalRecord,
   permittedTransitions,
   rejectRecord,
+  removeRoleAssignment,
   reopenRecord,
   submitForReview,
   toActorId,
@@ -29,6 +32,7 @@ import {
   toOrganisationId,
   toOrganisationMembershipId,
   toRecordId,
+  toRoleAssignmentId,
   toSourceId,
   toUserId,
   toWorkspaceId,
@@ -357,6 +361,205 @@ describe('workspace membership', () => {
     expect(() =>
       transitionWorkspaceMembership(activated.membership, 'invited', HUMAN, new Date()),
     ).toThrow(/active.*invited/i);
+  });
+});
+
+describe('role assignment', () => {
+  const ORGANISATION_ID = toOrganisationId('22222222-2222-4222-8222-222222222222');
+  const WORKSPACE_ID = toWorkspaceId('33333333-3333-4333-8333-333333333333');
+  const USER_ID = toUserId('55555555-5555-4555-8555-555555555555');
+  const ASSIGNMENT_ID = toRoleAssignmentId('88888888-8888-4888-8888-888888888888');
+  const AT = new Date('2026-03-14T11:00:00Z');
+
+  const organisationScope = { type: 'organisation' as const, organisationId: ORGANISATION_ID };
+  const workspaceScope = { type: 'workspace' as const, workspaceId: WORKSPACE_ID };
+
+  it('assigns an organisation-scoped role to a member in good standing', () => {
+    const outcome = assignRole({
+      id: ASSIGNMENT_ID,
+      userId: USER_ID,
+      role: 'contributor',
+      scope: organisationScope,
+      membershipState: 'active',
+      assignedBy: HUMAN,
+      at: AT,
+    });
+
+    expect(outcome.assignment.role).toBe('contributor');
+    expect(outcome.assignment.scope).toEqual(organisationScope);
+    expect(outcome.event.action).toBe('role_assignment.created');
+  });
+
+  it('assigns a workspace-scoped role when both the workspace and parent organisation membership are in good standing', () => {
+    const outcome = assignRole({
+      id: ASSIGNMENT_ID,
+      userId: USER_ID,
+      role: 'reviewer',
+      scope: workspaceScope,
+      membershipState: 'active',
+      parentOrganisationMembershipState: 'invited',
+      assignedBy: HUMAN,
+      at: AT,
+    });
+
+    expect(outcome.assignment.role).toBe('reviewer');
+    expect(outcome.assignment.scope).toEqual(workspaceScope);
+  });
+
+  it('refuses an invalid role', () => {
+    expect(() =>
+      assignRole({
+        id: ASSIGNMENT_ID,
+        userId: USER_ID,
+        role: 'superuser',
+        scope: organisationScope,
+        membershipState: 'active',
+        assignedBy: HUMAN,
+        at: AT,
+      }),
+    ).toThrow(/not a recognised Witness role/i);
+  });
+
+  it('refuses a member with no organisation membership at all', () => {
+    expect(() =>
+      assignRole({
+        id: ASSIGNMENT_ID,
+        userId: USER_ID,
+        role: 'contributor',
+        scope: organisationScope,
+        membershipState: null,
+        assignedBy: HUMAN,
+        at: AT,
+      }),
+    ).toThrow(/membership in good standing/i);
+  });
+
+  it('refuses a member whose organisation membership is suspended or revoked', () => {
+    for (const state of ['suspended', 'revoked'] as const) {
+      expect(() =>
+        assignRole({
+          id: ASSIGNMENT_ID,
+          userId: USER_ID,
+          role: 'contributor',
+          scope: organisationScope,
+          membershipState: state,
+          assignedBy: HUMAN,
+          at: AT,
+        }),
+      ).toThrow(/membership in good standing/i);
+    }
+  });
+
+  it('refuses a workspace-scoped role when the workspace membership itself is not in good standing', () => {
+    expect(() =>
+      assignRole({
+        id: ASSIGNMENT_ID,
+        userId: USER_ID,
+        role: 'reviewer',
+        scope: workspaceScope,
+        membershipState: 'suspended',
+        parentOrganisationMembershipState: 'active',
+        assignedBy: HUMAN,
+        at: AT,
+      }),
+    ).toThrow(/membership in good standing/i);
+  });
+
+  it('refuses a workspace-scoped role when the parent organisation membership has lapsed', () => {
+    expect(() =>
+      assignRole({
+        id: ASSIGNMENT_ID,
+        userId: USER_ID,
+        role: 'reviewer',
+        scope: workspaceScope,
+        membershipState: 'active',
+        parentOrganisationMembershipState: 'suspended',
+        assignedBy: HUMAN,
+        at: AT,
+      }),
+    ).toThrow(/organisation/i);
+  });
+
+  it('refuses a workspace-scoped role when no parent organisation membership state is given at all', () => {
+    expect(() =>
+      assignRole({
+        id: ASSIGNMENT_ID,
+        userId: USER_ID,
+        role: 'reviewer',
+        scope: workspaceScope,
+        membershipState: 'active',
+        assignedBy: HUMAN,
+        at: AT,
+      }),
+    ).toThrow(/organisation/i);
+  });
+
+  it('changes an existing assignment to a different role', () => {
+    const created = assignRole({
+      id: ASSIGNMENT_ID,
+      userId: USER_ID,
+      role: 'contributor',
+      scope: organisationScope,
+      membershipState: 'active',
+      assignedBy: HUMAN,
+      at: AT,
+    }).assignment;
+
+    const changed = changeRoleAssignment(created, 'reviewer', HUMAN, new Date());
+
+    expect(changed.assignment.role).toBe('reviewer');
+    expect(changed.event.action).toBe('role_assignment.changed');
+    expect(changed.event.metadata['from']).toBe('contributor');
+    expect(changed.event.metadata['to']).toBe('reviewer');
+  });
+
+  it('refuses to change to an invalid role', () => {
+    const created = assignRole({
+      id: ASSIGNMENT_ID,
+      userId: USER_ID,
+      role: 'contributor',
+      scope: organisationScope,
+      membershipState: 'active',
+      assignedBy: HUMAN,
+      at: AT,
+    }).assignment;
+
+    expect(() => changeRoleAssignment(created, 'superuser', HUMAN, new Date())).toThrow(
+      /not a recognised Witness role/i,
+    );
+  });
+
+  it('refuses to "change" a role assignment to the role it already has — duplicate assignment prevention', () => {
+    const created = assignRole({
+      id: ASSIGNMENT_ID,
+      userId: USER_ID,
+      role: 'contributor',
+      scope: organisationScope,
+      membershipState: 'active',
+      assignedBy: HUMAN,
+      at: AT,
+    }).assignment;
+
+    expect(() => changeRoleAssignment(created, 'contributor', HUMAN, new Date())).toThrow(
+      /already holds/i,
+    );
+  });
+
+  it('removes an assignment, producing an audit event that names the role that was removed', () => {
+    const created = assignRole({
+      id: ASSIGNMENT_ID,
+      userId: USER_ID,
+      role: 'reviewer',
+      scope: organisationScope,
+      membershipState: 'active',
+      assignedBy: HUMAN,
+      at: AT,
+    }).assignment;
+
+    const event = removeRoleAssignment(created, HUMAN);
+
+    expect(event.action).toBe('role_assignment.removed');
+    expect(event.metadata['role']).toBe('reviewer');
   });
 });
 

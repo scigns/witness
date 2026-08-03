@@ -288,6 +288,59 @@ describe('ATTACK — escalate privilege through the authorisation adapter', () =
     expect((await adapter.decide(principal!, 'user:create')).allowed).toBe(false);
   });
 
+  it('an administrator is permitted every role-assignment action', async () => {
+    const principal = await adapter.authenticate('Admin|admin');
+    expect(principal).not.toBeNull();
+    for (const action of [
+      'role:read',
+      'role_assignment:read',
+      'role_assignment:write',
+      'role_assignment:delete',
+    ] as const) {
+      expect((await adapter.decide(principal!, action)).allowed).toBe(true);
+    }
+  });
+
+  it('a reviewer may read the role catalog but may not read, write, or delete a role assignment', async () => {
+    const principal = await adapter.authenticate('Attacker|reviewer');
+    expect(principal).not.toBeNull();
+    expect((await adapter.decide(principal!, 'role:read')).allowed).toBe(true);
+    for (const action of [
+      'role_assignment:read',
+      'role_assignment:write',
+      'role_assignment:delete',
+    ] as const) {
+      expect((await adapter.decide(principal!, action)).allowed).toBe(false);
+    }
+  });
+
+  it('a facilitator (an invented role in the dev-header world) may not assign itself the administrator role', async () => {
+    // There is no real identity yet (Milestone 1.3), so "self" cannot be
+    // compared at the domain level — the guarantee this PR can make is that
+    // role-assignment management is admin-only, full stop. A caller with any
+    // non-admin role — including one claiming to be a facilitator — is denied
+    // before role or target are ever considered.
+    const principal = await adapter.authenticate('Attacker|facilitator');
+    expect(principal?.roles).toEqual([]);
+    expect((await adapter.decide(principal!, 'role_assignment:write')).allowed).toBe(false);
+  });
+
+  it('a read-only dev-header caller is denied every role-assignment action', async () => {
+    // `reader` is a real dev-header role (unlike `facilitator`/`participant`
+    // above, which exist only in the `WitnessRole` vocabulary and are not
+    // dev-header roles at all) — this confirms the denial holds for a
+    // recognised low-privilege caller, not only for an unrecognised one.
+    const principal = await adapter.authenticate('Attacker|reader');
+    expect(principal?.roles).toEqual(['reader']);
+    for (const action of [
+      'role_assignment:read',
+      'role_assignment:write',
+      'role_assignment:delete',
+    ] as const) {
+      expect((await adapter.decide(principal!, action)).allowed).toBe(false);
+    }
+  });
+
   it('an empty header does not yield an anonymous principal', async () => {
     expect(await adapter.authenticate('')).toBeNull();
   });
