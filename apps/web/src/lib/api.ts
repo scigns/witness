@@ -12,11 +12,13 @@
 import type {
   CreateOrganisationRequest,
   CreateRecordRequest,
+  CreateWorkspaceRequest,
   HealthResponse,
   OrganisationSummary,
   RecordDetail,
   RecordSummary,
   ReviewAction,
+  WorkspaceSummary,
 } from '@witness/contracts';
 
 const BASE_URL = process.env['NEXT_PUBLIC_WITNESS_API_URL'] ?? 'http://localhost:3001';
@@ -109,6 +111,15 @@ export const api = {
     user: ActingUser,
   ): Promise<OrganisationSummary> =>
     request<OrganisationSummary>('/api/v1/organisations', user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  listWorkspaces: (user: ActingUser): Promise<{ workspaces: WorkspaceSummary[] }> =>
+    request<{ workspaces: WorkspaceSummary[] }>('/api/v1/workspaces', user),
+
+  createWorkspace: (body: CreateWorkspaceRequest, user: ActingUser): Promise<WorkspaceSummary> =>
+    request<WorkspaceSummary>('/api/v1/workspaces', user, {
       method: 'POST',
       body: JSON.stringify(body),
     }),

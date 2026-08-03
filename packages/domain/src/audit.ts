@@ -29,6 +29,7 @@ export const AUDIT_ACTIONS = [
   'record.rejected',
   'record.reopened',
   'organisation.created',
+  'workspace.created',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -39,7 +40,7 @@ export type AuditAction = (typeof AUDIT_ACTIONS)[number];
  * organisation Y" are two independent chains, not one global one, so that adding
  * a new subject type never requires renumbering or re-hashing an existing one.
  */
-export const AUDIT_SUBJECT_TYPES = ['record', 'organisation'] as const;
+export const AUDIT_SUBJECT_TYPES = ['record', 'organisation', 'workspace'] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 
 export interface AuditEvent {

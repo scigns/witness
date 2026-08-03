@@ -85,15 +85,37 @@ model Record {
 
 /// The tenant boundary (BUILD_ROADMAP.md, Release 0.2, item 1).
 ///
-/// Deliberately minimal: this Developer Preview only covers creation. Workspaces,
-/// membership and multi-tenant scoping of Record/Source are later roadmap items —
-/// modelling them now, before anything reads or writes them, would be fiction.
+/// Deliberately minimal: this Developer Preview only covers creation. Membership
+/// and multi-tenant scoping of Record/Source are later roadmap items — modelling
+/// them now, before anything reads or writes them, would be fiction.
 model Organisation {
   id        String   @id @db.Uuid
   name      String   @db.VarChar(200)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  workspaces Workspace[]
+
   @@map("organisation")
+}
+
+/// A scoped working area inside an organisation (BUILD_ROADMAP.md, Release 0.2,
+/// item 2). Sessions, participants and records are scoped to a workspace in
+/// later roadmap items (6, 7, 9) — not yet, since none of those exist here.
+///
+/// Unlike `AuditEvent.subjectId`, this is a real foreign key: a workspace always
+/// belongs to exactly one organisation, never a polymorphic set of parents, so
+/// there is no reason to give up referential integrity here.
+model Workspace {
+  id             String       @id @db.Uuid
+  name           String       @db.VarChar(200)
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([organisationId])
+  @@map("workspace")
 }
 
 /// Append-only, hash-chained audit trail (roadmap 3.7).
