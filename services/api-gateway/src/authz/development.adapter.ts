@@ -48,7 +48,10 @@ const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.freeze({
   // Least privilege (Constitution, Authority and Access): organisation and
   // workspace creation are the privileged actions in this slice, so they are the
   // only grants `admin` adds on top of what `reviewer` already has — not a
-  // blanket superuser role.
+  // blanket superuser role. User and membership management is administrative by
+  // definition (BUILD_ROADMAP.md Milestone 1.1: "an organisation administrator
+  // needs to...") — reader/contributor/reviewer get none of it, not even read,
+  // until a Roles capability decides otherwise.
   admin: [
     'record:read',
     'record:create',
@@ -57,6 +60,14 @@ const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.freeze({
     'organisation:create',
     'workspace:read',
     'workspace:create',
+    'user:read',
+    'user:create',
+    'organisation_membership:read',
+    'organisation_membership:create',
+    'organisation_membership:update',
+    'workspace_membership:read',
+    'workspace_membership:create',
+    'workspace_membership:update',
   ],
 });
 

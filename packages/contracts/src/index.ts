@@ -24,6 +24,12 @@ export type SourceKind = (typeof SOURCE_KINDS)[number];
 export const ACTOR_KINDS = ['human', 'model', 'system'] as const;
 export type ActorKind = (typeof ACTOR_KINDS)[number];
 
+export const ACCOUNT_STATES = ['invited', 'active', 'suspended', 'deactivated'] as const;
+export type AccountState = (typeof ACCOUNT_STATES)[number];
+
+export const MEMBERSHIP_STATES = ['invited', 'active', 'suspended', 'revoked'] as const;
+export type MembershipState = (typeof MEMBERSHIP_STATES)[number];
+
 // ─── Requests ────────────────────────────────────────────────────────────────
 
 export const createRecordRequestSchema = z.object({
@@ -56,6 +62,34 @@ export const createWorkspaceRequestSchema = z.object({
   organisationId: z.string().uuid('A valid organisation id is required'),
 });
 export type CreateWorkspaceRequest = z.infer<typeof createWorkspaceRequestSchema>;
+
+export const createUserRequestSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'An email address is required')
+    .max(320)
+    .email('A valid email address is required'),
+  displayName: z.string().trim().min(1, 'A display name is required').max(200),
+});
+export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;
+
+export const addMembershipRequestSchema = z.object({
+  userId: z.string().uuid('A valid user id is required'),
+});
+export type AddMembershipRequest = z.infer<typeof addMembershipRequestSchema>;
+
+/**
+ * Mirrors the review-action pattern (`reviewActionSchema` above): a named
+ * transition rather than a raw target state, so an invalid transition is a
+ * validation error with a clear name rather than an opaque enum value.
+ */
+export const membershipActionSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('activate') }),
+  z.object({ action: z.literal('suspend') }),
+  z.object({ action: z.literal('revoke') }),
+]);
+export type MembershipAction = z.infer<typeof membershipActionSchema>;
 
 // ─── Responses ───────────────────────────────────────────────────────────────
 
@@ -119,6 +153,40 @@ export interface WorkspaceSummary {
   name: string;
   organisationId: string;
   createdAt: string;
+}
+
+export interface UserSummary {
+  id: string;
+  email: string;
+  displayName: string;
+  accountState: AccountState;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrganisationMembershipView {
+  id: string;
+  organisationId: string;
+  userId: string;
+  userEmail: string;
+  userDisplayName: string;
+  state: MembershipState;
+  /** Permitted next actions, server-computed — same reasoning as `RecordDetail.permittedActions`. */
+  permittedActions: MembershipAction['action'][];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkspaceMembershipView {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  userEmail: string;
+  userDisplayName: string;
+  state: MembershipState;
+  permittedActions: MembershipAction['action'][];
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────────

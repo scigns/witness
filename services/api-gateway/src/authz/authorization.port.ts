@@ -32,7 +32,15 @@ export type Action =
   | 'organisation:read'
   | 'organisation:create'
   | 'workspace:read'
-  | 'workspace:create';
+  | 'workspace:create'
+  | 'user:read'
+  | 'user:create'
+  | 'organisation_membership:read'
+  | 'organisation_membership:create'
+  | 'organisation_membership:update'
+  | 'workspace_membership:read'
+  | 'workspace_membership:create'
+  | 'workspace_membership:update';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;

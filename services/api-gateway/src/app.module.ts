@@ -13,21 +13,38 @@ import { AuthorizationPort } from './authz/authorization.port.js';
 import { DevelopmentAuthorizationAdapter } from './authz/development.adapter.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
+import { OrganisationMembershipsController } from './organisation-memberships/organisation-memberships.controller.js';
+import { OrganisationMembershipsService } from './organisation-memberships/organisation-memberships.service.js';
 import { OrganisationsController } from './organisations/organisations.controller.js';
 import { OrganisationsService } from './organisations/organisations.service.js';
 import { RecordsController } from './records/records.controller.js';
 import { RecordsService } from './records/records.service.js';
 import { WITNESS_CONFIG } from './tokens.js';
+import { UsersController } from './users/users.controller.js';
+import { UsersService } from './users/users.service.js';
+import { WorkspaceMembershipsController } from './workspace-memberships/workspace-memberships.controller.js';
+import { WorkspaceMembershipsService } from './workspace-memberships/workspace-memberships.service.js';
 import { WorkspacesController } from './workspaces/workspaces.controller.js';
 import { WorkspacesService } from './workspaces/workspaces.service.js';
 
 @Module({
-  controllers: [HealthController, RecordsController, OrganisationsController, WorkspacesController],
+  controllers: [
+    HealthController,
+    RecordsController,
+    OrganisationsController,
+    WorkspacesController,
+    UsersController,
+    OrganisationMembershipsController,
+    WorkspaceMembershipsController,
+  ],
   providers: [
     PrismaService,
     RecordsService,
     OrganisationsService,
     WorkspacesService,
+    UsersService,
+    OrganisationMembershipsService,
+    WorkspaceMembershipsService,
     {
       // Configuration is validated once, at construction. If it violates the
       // deployment-profile contract, loadConfigOrExit terminates the process

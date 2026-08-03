@@ -93,7 +93,8 @@ model Organisation {
   name      String   @db.VarChar(200)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  workspaces Workspace[]
+  workspaces  Workspace[]
+  memberships OrganisationMembership[]
 
   @@map("organisation")
 }
@@ -114,8 +115,88 @@ model Workspace {
 
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  memberships WorkspaceMembership[]
+
   @@index([organisationId])
   @@map("workspace")
+}
+
+/// A registered Witness account (BUILD_ROADMAP.md Milestone 1.1, Users and
+/// Memberships). Deliberately independent of `Actor` — see `packages/domain/src/user.ts`
+/// for why the two concepts do not merge yet.
+///
+/// The table is mapped to `witness_user` rather than `user`: Prisma always
+/// quotes identifiers so the SQL keyword conflict is not a functional problem,
+/// but every other model here reads cleanly as an unquoted `SELECT * FROM x`
+/// and there is no reason this one shouldn't too.
+model User {
+  id           String   @id @db.Uuid
+  email        String   @unique @db.VarChar(320)
+  displayName  String   @map("display_name") @db.VarChar(200)
+  accountState String   @map("account_state") @db.VarChar(24)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organisationMemberships OrganisationMembership[]
+  workspaceMemberships    WorkspaceMembership[]
+
+  @@index([accountState])
+  @@map("witness_user")
+}
+
+/// "Does this user belong to this organisation" — nothing about what they may
+/// do there (that is Milestone 1.2, Roles and Permission Assignment).
+///
+/// The unique constraint on (organisationId, userId) is the enforcement point
+/// for "a user must not have duplicate active membership records for the same
+/// organisation": a membership is one row per (organisation, user) pair for
+/// its whole lifecycle, transitioning state rather than being recreated.
+model OrganisationMembership {
+  id             String       @id @db.Uuid
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  state String @db.VarChar(24)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organisationId, userId])
+  @@index([organisationId, state])
+  @@index([userId])
+  @@map("organisation_membership")
+}
+
+/// "Does this user belong to this workspace". A real foreign key to `Workspace`
+/// and `User` — same reasoning as `Workspace.organisationId` — because a
+/// workspace membership always has exactly one workspace and one user.
+///
+/// Nothing here enforces "the user has a valid relationship with the
+/// workspace's parent organisation" at the database level — that check reads
+/// the user's `OrganisationMembership` for the workspace's `organisationId`,
+/// which spans two tables Postgres cannot express as a single constraint. It is
+/// enforced in `packages/domain/src/workspace-membership.ts` and the service
+/// that reads the organisation membership before calling in.
+model WorkspaceMembership {
+  id          String    @id @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  state String @db.VarChar(24)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId, state])
+  @@index([userId])
+  @@map("workspace_membership")
 }
 
 /// Append-only, hash-chained audit trail (roadmap 3.7).

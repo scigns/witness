@@ -248,6 +248,46 @@ describe('ATTACK — escalate privilege through the authorisation adapter', () =
     expect((await adapter.decide(principal!, 'workspace:create')).allowed).toBe(false);
   });
 
+  it('an administrator is permitted every user and membership action', async () => {
+    const principal = await adapter.authenticate('Admin|admin');
+    expect(principal).not.toBeNull();
+    for (const action of [
+      'user:read',
+      'user:create',
+      'organisation_membership:read',
+      'organisation_membership:create',
+      'organisation_membership:update',
+      'workspace_membership:read',
+      'workspace_membership:create',
+      'workspace_membership:update',
+    ] as const) {
+      expect((await adapter.decide(principal!, action)).allowed).toBe(true);
+    }
+  });
+
+  it('a reviewer — the most privileged non-administrative role — is denied every user and membership action', async () => {
+    const principal = await adapter.authenticate('Attacker|reviewer');
+    expect(principal).not.toBeNull();
+    for (const action of [
+      'user:read',
+      'user:create',
+      'organisation_membership:read',
+      'organisation_membership:create',
+      'organisation_membership:update',
+      'workspace_membership:read',
+      'workspace_membership:create',
+      'workspace_membership:update',
+    ] as const) {
+      expect((await adapter.decide(principal!, action)).allowed).toBe(false);
+    }
+  });
+
+  it('an invented role is denied user creation, same as any other action', async () => {
+    const principal = await adapter.authenticate('Attacker|superuser');
+    expect(principal).not.toBeNull();
+    expect((await adapter.decide(principal!, 'user:create')).allowed).toBe(false);
+  });
+
   it('an empty header does not yield an anonymous principal', async () => {
     expect(await adapter.authenticate('')).toBeNull();
   });
