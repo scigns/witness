@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
 import { Shell } from '@/components/shell';
+import { AuthProvider } from '@/lib/auth';
 import { SessionProvider } from '@/lib/session';
 
 import './globals.css';
@@ -19,9 +20,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <SessionProvider>
-          <Shell>{children}</Shell>
-        </SessionProvider>
+        <AuthProvider>
+          <SessionProvider>
+            <Shell>{children}</Shell>
+          </SessionProvider>
+        </AuthProvider>
       </body>
     </html>
   );

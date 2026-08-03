@@ -57,6 +57,19 @@ const schema = z.object({
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
+  // ── OIDC / Keycloak (ADR-0007) ─────────────────────────────────────────────
+  // Names match the ones already scaffolded in .env.example — reused rather than
+  // reinvented. Empty is valid only in the development profile (validated below);
+  // every other profile refuses to start without real identity-provider config.
+  OIDC_ISSUER: z.string().optional().default(''),
+  KEYCLOAK_CLIENT_ID: z.string().optional().default(''),
+  KEYCLOAK_CLIENT_SECRET: z.string().optional().default(''),
+  JWT_AUDIENCE: z.string().optional().default(''),
+  // Where Keycloak redirects back to after sign-in. Derived from the API port
+  // when empty, same pattern as WITNESS_WEB_ORIGIN below.
+  WITNESS_OIDC_REDIRECT_URI: z.string().optional().default(''),
+  WITNESS_SESSION_TTL_MINUTES: z.coerce.number().int().min(1).default(480),
+
   // Egress-related. Empty is the sovereign default.
   EXTERNAL_MODEL_PROVIDER: z.string().optional().default(''),
   EXTERNAL_MODEL_API_KEY: z.string().optional().default(''),
@@ -84,6 +97,15 @@ export interface WitnessConfig {
   /** True only when the profile permits egress AND a provider is configured. */
   readonly externalInferenceEnabled: boolean;
   readonly externalModelProvider: string;
+
+  /** Empty in the development profile — validated non-empty everywhere else. */
+  readonly oidcIssuer: string;
+  readonly oidcClientId: string;
+  /** Empty for a public PKCE-only client; set for a confidential client. */
+  readonly oidcClientSecret: string;
+  readonly jwtAudience: string;
+  readonly oidcRedirectUri: string;
+  readonly sessionTtlMinutes: number;
 }
 
 /**
@@ -146,6 +168,33 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
     );
   }
 
+  // ── ADR-0007: real identity is required outside development ────────────────
+  // The development profile is the only one permitted to run without a real
+  // identity provider (KeycloakOidcAdapter's development-only double stands in).
+  // Every other profile fails closed here, before the process accepts traffic —
+  // the same "refuse to start rather than serve requests with no identity"
+  // posture ADR-0013 already applies to the deployment-profile contract itself.
+  if (value.WITNESS_DEPLOYMENT_PROFILE !== 'development') {
+    if (value.OIDC_ISSUER.trim() === '') {
+      problems.push(
+        `WITNESS_DEPLOYMENT_PROFILE=${value.WITNESS_DEPLOYMENT_PROFILE} requires OIDC_ISSUER ` +
+          '(the Keycloak realm issuer URL) — real authentication cannot start without it.',
+      );
+    }
+    if (value.KEYCLOAK_CLIENT_ID.trim() === '') {
+      problems.push(
+        `WITNESS_DEPLOYMENT_PROFILE=${value.WITNESS_DEPLOYMENT_PROFILE} requires ` +
+          'KEYCLOAK_CLIENT_ID.',
+      );
+    }
+    if (value.JWT_AUDIENCE.trim() === '') {
+      problems.push(
+        `WITNESS_DEPLOYMENT_PROFILE=${value.WITNESS_DEPLOYMENT_PROFILE} requires JWT_AUDIENCE ` +
+          '— ID tokens are refused unless their audience is checked against a known value.',
+      );
+    }
+  }
+
   // ── Hybrid must be deliberate, not accidental ──────────────────────────────
   if (
     value.WITNESS_DEPLOYMENT_PROFILE === 'hybrid' &&
@@ -183,6 +232,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
       providerConfigured &&
       value.ALLOW_EXTERNAL_MODEL_EGRESS,
     externalModelProvider: value.EXTERNAL_MODEL_PROVIDER,
+    oidcIssuer: value.OIDC_ISSUER,
+    oidcClientId: value.KEYCLOAK_CLIENT_ID,
+    oidcClientSecret: value.KEYCLOAK_CLIENT_SECRET,
+    jwtAudience: value.JWT_AUDIENCE,
+    oidcRedirectUri:
+      value.WITNESS_OIDC_REDIRECT_URI.trim() !== ''
+        ? value.WITNESS_OIDC_REDIRECT_URI.trim()
+        : `http://localhost:${value.WITNESS_API_PORT}/api/v1/auth/callback`,
+    sessionTtlMinutes: value.WITNESS_SESSION_TTL_MINUTES,
   };
 }
 

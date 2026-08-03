@@ -88,6 +88,75 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 
 ## What changed recently
 
+### 2026-08-03 — Authentication (BUILD_ROADMAP.md Milestone 1.3) delivered, PR open
+
+- **Continuous Product Delivery mode**: verified before starting — `main` at the merged Roles and
+  Permission Assignment commit (PR #21), no overlapping open PR, `main` green.
+- **Authentication** (Milestone 1.3) delivered as a vertical slice, per the accepted identity
+  decision ([ADR-0007](architecture/decisions/ADR-0007-identity-and-access.md)): OIDC
+  authorization-code-with-PKCE against Keycloak. `IdentityProviderPort` is the reversal seam;
+  `KeycloakOidcAdapter` uses the standard OIDC discovery document rather than Keycloak-specific
+  paths, so any spec-compliant provider (Zitadel, Authentik — both named acceptable in ADR-0007)
+  can replace it without a domain or API change.
+- **No live Keycloak container is available in this sandbox** (no container runtime — `docker ps`
+  fails, nested containerization is not permitted here). This is a sandbox limitation on *manual*
+  verification, not a technical-impossibility finding against ADR-0007: the real
+  `KeycloakOidcAdapter` is built and shipped exactly as specified. A protocol-faithful
+  `DevelopmentIdentityProviderAdapter` — the same port, a locally generated RSA keypair, real
+  `jose` `SignJWT`/`jwtVerify` calls — lets the full PKCE flow and JWT/JWKS verification be
+  genuinely exercised end to end in development and in tests, never a "trust an unverified header"
+  shortcut.
+- **Identity mapped by verified provider subject, never email as the ongoing key.**
+  `IdentityLink.provider` + `.providerSubject` (unique together) is the permanent link; email is a
+  one-time bootstrap lookup at first sign-in only. First sign-in activates an account only when it
+  is currently `invited` and the provider confirms `email_verified` — never onto an already-active,
+  suspended, or deactivated account without an existing link, and never by auto-creating a user.
+  Suspended/deactivated denial, and the activation itself, are audited
+  (`authentication.denied`, `identity_link.created`, `user.activated`).
+- **Session delivery: bearer token, not a cookie.** Chosen because the existing architecture already
+  has the browser calling the API cross-origin directly (`main.ts`'s CORS configuration) — a
+  cross-origin cookie would need `SameSite=None; Secure`, which doesn't fit local development
+  without disproportionate complexity. The token travels once, in the callback URL's fragment
+  (`/auth/callback#token=...`, never sent to any server), then lives in `sessionStorage` and is
+  sent as `Authorization: Bearer`. The server stores only its SHA-256 hash, never the raw token —
+  the same "store the hash, not the secret" treatment as a password.
+- **Deliberate, documented authorisation boundary — not full hardening.** A signed-in principal's
+  roles are computed by flattening every held `RoleAssignment` into the pre-existing
+  `reader`/`contributor`/`reviewer` grant tiers, but the scope-relative `admin` `WitnessRole` never
+  maps to the global admin grant through a session
+  (`services/api-gateway/src/authz/session-authenticator.ts`) — no session-derived principal can
+  reach an admin-gated action. This is the deliberate, fail-closed edge Authorisation hardening
+  (the next capability) is expected to resolve; it is not silently assumed solved.
+- The pre-existing `X-Witness-Dev-User` dev-header path is untouched and still development-profile-
+  only, but a real session now takes priority over it whenever both are present on a request — a
+  forged dev header can no longer widen what an authenticated caller may do.
+- Web UI: `/signin`, `/auth/callback`, `/auth/error` (plain-language per-reason denial messages);
+  the shell header shows **Signed in as `<name>`** / **Sign out** once authenticated (additive to,
+  not replacing, the existing "Acting as" role switcher); the dashboard's new **Your access**
+  section lists only the organisations and workspaces the signed-in user actually belongs to.
+- Health/readiness (`GET /ready`) now performs a real, time-bounded reachability check of the
+  identity provider's OIDC discovery document for non-development profiles, replacing the previous
+  static `not_configured` label.
+- **Tests**: 109 API-gateway tests (up from 60), including 16 tests exercising real cryptographic
+  JWT/JWKS verification against the development identity-provider double (tampered signature, wrong
+  key, wrong issuer/audience, expired token, nonce mismatch, PKCE mismatch, redirect-URI mismatch,
+  replayed/unknown code), 13 covering the full authentication service (first-sign-in activation, no
+  duplicate link/user on repeat sign-in or email change, unknown-identity/suspended/deactivated
+  denial with audit, single-use state, sign-out revocation), and 11 covering session-to-principal
+  resolution including the admin-tier exclusion attack case. 62 domain tests (up from 54). Verified
+  against a real local PostgreSQL 16 database, not only service-level fakes: first sign-in, repeat
+  sign-in, suspension denial, sign-out invalidation, and a forged-dev-header-alongside-a-real-
+  session privilege-escalation attempt (denied), each confirmed against actual database rows,
+  through a real browser (Chromium), and via the running API.
+- **`docs/MVP_CHECKLIST.md`** — the six Authentication items and the pilot-blocking gate under §B
+  Trusted Access marked ready pending merge; per the checklist's own rule, an open PR does not
+  count as complete.
+- **Known limitations, stated plainly**: no centralised Casbin policy-engine enforcement yet
+  (Authorisation hardening is the next capability); live Keycloak sign-in has not been manually
+  verified in this environment (no container runtime available); the `X-Witness-Dev-User` header
+  remains a separate, unverified development convenience, unchanged by this PR. See the PR for the
+  full account.
+
 ### 2026-08-03 — Roles and Permission Assignment (BUILD_ROADMAP.md Milestone 1.2) shipped
 
 - **Continuous Product Delivery mode**: verified before starting — `main` at the merged Users and

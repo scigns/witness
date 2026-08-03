@@ -40,10 +40,17 @@ async function bootstrap(): Promise<void> {
   // The browser calls the API directly from a different origin in development.
   // Narrow, explicit, and never `*` — a permissive CORS policy left in place is
   // one of the most common ways an internal API becomes a public one.
+  //
+  // `credentials: false` remains correct even with real sessions (Milestone
+  // 1.3): the session token travels as an `Authorization: Bearer` header, set
+  // explicitly by the frontend after the OIDC callback, never as a cookie —
+  // see `schema.prisma`'s `AuthSession` model for why a cross-origin cookie
+  // was rejected. `credentials: true` would be needed only if a cookie were
+  // in play; it is not, so it stays off.
   app.enableCors({
     origin: config.webOrigin,
     credentials: false,
-    allowedHeaders: ['Content-Type', 'X-Witness-Dev-User'],
+    allowedHeaders: ['Content-Type', 'X-Witness-Dev-User', 'Authorization'],
   });
 
   app.enableShutdownHooks();

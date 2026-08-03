@@ -121,21 +121,58 @@ deployable version** — this checklist is a binary release gate, not a PR-revie
 
 Authentication
 
-Sign-in works
+Sign-in works — READY (Authentication PR, not yet merged — per this checklist's own rule, an open
+PR does not count as complete). OIDC authorization-code-with-PKCE against the ADR-0007 Keycloak
+adapter (`services/api-gateway/src/authn/keycloak-oidc.adapter.ts`); verified end-to-end in this
+sandbox against a protocol-faithful development identity-provider double
+(`development-identity-provider.adapter.ts`) that performs the same real JWT/JWKS signature,
+issuer, audience, and nonce verification — live Keycloak sign-in itself could not be exercised
+here because no container runtime is available in this sandbox (see Known limitations).
 
-Sign-out works
+Sign-out works — READY (Authentication PR, not yet merged). `POST /api/v1/auth/logout` revokes the
+session server-side (`SessionService.revoke`); verified manually — a token rejected with 401 on
+`GET /api/v1/me` immediately after sign-out.
 
-Expired or invalid sessions fail safely
+Expired or invalid sessions fail safely — READY (Authentication PR, not yet merged). Sessions are
+looked up by SHA-256 hash with an `expiresAt` check (`SessionService.resolveUserId`); an
+expired, unknown, or garbage token resolves to no principal and the request is refused
+`401 UNAUTHENTICATED`, never silently downgraded to anonymous or dev access.
 
-Authenticated identity maps to a Witness user
+Authenticated identity maps to a Witness user — READY (Authentication PR, not yet merged). The
+verified OIDC subject is the permanent key (`IdentityLink.provider` + `.providerSubject`, unique
+together); email is used only as a one-time bootstrap lookup at first sign-in, never as an ongoing
+identity key. First sign-in activates an `invited` account only when the provider confirms
+`email_verified`; an already-active, suspended, deactivated, or otherwise-unmatched identity is
+refused (`unknown_identity`/`account_suspended`/`account_deactivated`) rather than auto-creating or
+silently attaching to an account. Verified against a real local PostgreSQL 16 database: first
+sign-in activation, repeat sign-in reusing the same link (no duplicate), and denial for a suspended
+account with an existing link, each confirmed against the actual database rows and audit trail.
 
-Local development authentication is documented
+Local development authentication is documented — READY (Authentication PR, not yet merged). The
+development identity-provider double, its dev-idp endpoints, and how to drive a full sign-in
+without a live Keycloak are documented in the PR and in `docs/operations/` (see PR for exact
+paths).
 
-Production identity provider is replaceable and open-source compatible
+Production identity provider is replaceable and open-source compatible — READY (Authentication PR,
+not yet merged). `IdentityProviderPort` is the reversal seam named by ADR-0007; the shipped
+`KeycloakOidcAdapter` uses the standard OIDC discovery document
+(`${issuer}/.well-known/openid-configuration`) rather than Keycloak-specific paths, so any
+spec-compliant provider (Zitadel, Authentik — both noted as acceptable in ADR-0007) can replace it
+without a domain or API change.
 
 Pilot-blocking gate
 
-A real user can sign in and access only an authorised workspace
+A real user can sign in and access only an authorised workspace — READY (Authentication PR, not
+yet merged). Verified manually end-to-end through a real browser: signed-in `GET /api/v1/me` (and
+the dashboard's "Your access" section that renders it) lists only the organisations and workspaces
+the signed-in user actually belongs to, never the full catalog — confirmed against a user with a
+narrower membership set than the database's full contents. **Caveat, stated plainly:** this gate is
+about *visibility*, not full request-time enforcement — see Known limitations below for the
+authorisation-hardening gap this PR deliberately does not close.
+
+**Mark these DONE only after the Authentication PR merges to `main` and the workflow is
+re-verified on the deployable version** — this checklist is a binary release gate, not a
+PR-review tracker.
 
 C. Session Preparation
 

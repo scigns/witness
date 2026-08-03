@@ -13,6 +13,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import type { CurrentUserView } from '@witness/contracts';
+
+import { useAuth, type AuthStatus } from '@/lib/auth';
 import { useSession } from '@/lib/session';
 import type { ActingUser } from '@/lib/api';
 
@@ -30,6 +33,7 @@ const ROLES: ReadonlyArray<ActingUser['role']> = ['reader', 'contributor', 'revi
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, setUser } = useSession();
+  const { status, currentUser, signOut } = useAuth();
 
   return (
     <div className="min-h-dvh flex flex-col">
@@ -86,6 +90,8 @@ export function Shell({ children }: { children: ReactNode }) {
               );
             })}
           </nav>
+
+          <AuthStatusBadge status={status} currentUser={currentUser} signOut={signOut} />
         </div>
 
         <div className="border-t border-[var(--color-line)] bg-[var(--color-paper)]">
@@ -127,6 +133,52 @@ export function Shell({ children }: { children: ReactNode }) {
       </main>
 
       <Footer />
+    </div>
+  );
+}
+
+/**
+ * Real, signed-in status — distinct from the "Acting as" dev-header switcher
+ * below it. When authenticated, only the organisations and workspaces the
+ * signed-in user actually belongs to are visible here, because that's all
+ * `GET /api/v1/me` (and therefore `currentUser`) ever returns.
+ */
+function AuthStatusBadge({
+  status,
+  currentUser,
+  signOut,
+}: {
+  status: AuthStatus;
+  currentUser: CurrentUserView | null;
+  signOut: () => void;
+}) {
+  if (status === 'loading') {
+    return <span className="text-sm text-[var(--color-ink-muted)]">Checking sign-in…</span>;
+  }
+
+  if (status === 'unauthenticated' || currentUser === null) {
+    return (
+      <Link
+        href="/signin"
+        className="rounded px-3 py-1.5 text-sm font-medium text-[var(--color-accent)] hover:underline"
+      >
+        Sign in
+      </Link>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span title={currentUser.email} className="text-[var(--color-ink-muted)]">
+        Signed in as <strong className="text-[var(--color-ink)]">{currentUser.displayName}</strong>
+      </span>
+      <button
+        type="button"
+        onClick={signOut}
+        className="rounded px-2 py-1 text-[var(--color-ink-muted)] underline hover:text-[var(--color-ink)]"
+      >
+        Sign out
+      </button>
     </div>
   );
 }

@@ -18,7 +18,7 @@
 
 import { Controller, Get, Header, HttpCode, Inject } from '@nestjs/common';
 
-import type { HealthResponse } from '@witness/contracts';
+import type { HealthComponent, HealthResponse } from '@witness/contracts';
 import type { WitnessConfig } from '@witness/config';
 
 import { PrismaService } from '../infrastructure/prisma.service.js';
@@ -37,7 +37,7 @@ const NOT_IMPLEMENTED: readonly string[] = [
   'Transcription and diarisation (Phase 5)',
   'Knowledge graph projection (Phase 4)',
   'Consent service — grants, scopes, revocation (Phase 3)',
-  'Keycloak authentication and Casbin authorisation (Phase 2)',
+  'Casbin policy-engine authorisation — Authorisation hardening is the next capability after Milestone 1.3',
   'Hybrid search (Phase 6)',
   'Multi-tenant isolation and row-level security (Phase 3)',
   'Event-driven projection rebuild (Phase 4)',
@@ -92,7 +92,7 @@ export class HealthController {
     // does not use yet, not wonder whether the check is missing.
     components['neo4j'] = { status: 'not_configured', detail: 'Graph projection — Phase 4' };
     components['opensearch'] = { status: 'not_configured', detail: 'Lexical index — Phase 6' };
-    components['keycloak'] = { status: 'not_configured', detail: 'Identity — Phase 2 (ADR-0007)' };
+    components['keycloak'] = await this.checkIdentityProvider();
     components['ollama'] = {
       status: 'not_configured',
       detail: 'Local inference — Phase 5 (ADR-0009)',
@@ -117,5 +117,41 @@ export class HealthController {
       components,
       notImplemented: [...NOT_IMPLEMENTED],
     };
+  }
+
+  /**
+   * Real reachability, not a static label — identity-provider availability
+   * matters here (Milestone 1.3): a readiness probe that reports "ok" while
+   * sign-in is actually broken is worse than no check at all.
+   */
+  private async checkIdentityProvider(): Promise<HealthComponent> {
+    if (this.config.profile === 'development') {
+      return {
+        status: 'not_configured',
+        detail: 'Development identity provider double active (never reaches production)',
+      };
+    }
+
+    if (this.config.oidcIssuer.trim() === '') {
+      // loadConfigOrExit (ADR-0013) refuses to start in this state outside
+      // development, so this branch is unreachable in practice — kept as an
+      // honest fallback rather than assumed away.
+      return { status: 'down', detail: 'OIDC_ISSUER is not configured' };
+    }
+
+    const started = Date.now();
+    try {
+      const response = await fetch(`${this.config.oidcIssuer}/.well-known/openid-configuration`, {
+        signal: AbortSignal.timeout(2000),
+      });
+      return response.ok
+        ? { status: 'ok', detail: 'Identity provider (ADR-0007)', latencyMs: Date.now() - started }
+        : { status: 'down', detail: `Discovery document returned HTTP ${response.status}` };
+    } catch (error) {
+      return {
+        status: 'down',
+        detail: `Unreachable: ${error instanceof Error ? error.message.slice(0, 120) : 'unknown'}`,
+      };
+    }
   }
 }

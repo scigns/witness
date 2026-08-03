@@ -17,6 +17,14 @@ const base = {
   WITNESS_DEPLOYMENT_PROFILE: 'development',
 } satisfies NodeJS.ProcessEnv;
 
+/** `base`, plus the real identity-provider config every non-development profile requires. */
+const oidcBase = {
+  ...base,
+  OIDC_ISSUER: 'https://keycloak.example.org/realms/witness',
+  KEYCLOAK_CLIENT_ID: 'witness-api',
+  JWT_AUDIENCE: 'witness-api',
+} satisfies NodeJS.ProcessEnv;
+
 describe('loadConfig', () => {
   it('accepts a minimal valid development configuration', () => {
     const config = loadConfig({ ...base });
@@ -38,7 +46,7 @@ describe('loadConfig', () => {
   it('reports every problem at once, not one per restart', () => {
     try {
       loadConfig({
-        ...base,
+        ...oidcBase,
         WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
         EXTERNAL_MODEL_PROVIDER: 'openai',
         ALLOW_EXTERNAL_MODEL_EGRESS: 'true',
@@ -99,11 +107,43 @@ describe('sovereign profile (ADR-0009, principle P1)', () => {
 
   it('starts happily when nothing external is configured', () => {
     const config = loadConfig({
-      ...base,
+      ...oidcBase,
       NODE_ENV: 'production',
       WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
     });
     expect(config.externalInferenceEnabled).toBe(false);
+  });
+});
+
+describe('OIDC identity provider (ADR-0007)', () => {
+  it('REFUSES TO START outside development without OIDC_ISSUER, KEYCLOAK_CLIENT_ID, or JWT_AUDIENCE', () => {
+    expect(() => loadConfig({ ...base, WITNESS_DEPLOYMENT_PROFILE: 'sovereign' })).toThrow(
+      /requires OIDC_ISSUER/i,
+    );
+  });
+
+  it('the development profile does not require OIDC configuration', () => {
+    expect(() => loadConfig({ ...base })).not.toThrow();
+  });
+
+  it('starts with real identity-provider configuration', () => {
+    const config = loadConfig({ ...oidcBase, WITNESS_DEPLOYMENT_PROFILE: 'sovereign' });
+    expect(config.oidcIssuer).toBe('https://keycloak.example.org/realms/witness');
+    expect(config.oidcClientId).toBe('witness-api');
+    expect(config.jwtAudience).toBe('witness-api');
+  });
+
+  it('derives the redirect URI from the API port when not set explicitly', () => {
+    const config = loadConfig({ ...base, WITNESS_API_PORT: '4001' });
+    expect(config.oidcRedirectUri).toBe('http://localhost:4001/api/v1/auth/callback');
+  });
+
+  it('honours an explicit redirect URI', () => {
+    const config = loadConfig({
+      ...base,
+      WITNESS_OIDC_REDIRECT_URI: 'https://witness.gov.example/api/v1/auth/callback',
+    });
+    expect(config.oidcRedirectUri).toBe('https://witness.gov.example/api/v1/auth/callback');
   });
 });
 
@@ -129,7 +169,7 @@ describe('hybrid profile', () => {
 
   it('enables external inference only when profile and opt-in agree', () => {
     const config = loadConfig({
-      ...base,
+      ...oidcBase,
       WITNESS_DEPLOYMENT_PROFILE: 'hybrid',
       EXTERNAL_MODEL_PROVIDER: 'openai',
       ALLOW_EXTERNAL_MODEL_EGRESS: 'true',

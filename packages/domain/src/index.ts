@@ -24,3 +24,4 @@ export * from './organisation-membership.js';
 export * from './workspace-membership.js';
 export * from './role.js';
 export * from './role-assignment.js';
+export * from './identity-link.js';

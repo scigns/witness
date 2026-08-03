@@ -16,6 +16,7 @@ import type {
   CreateRecordRequest,
   CreateUserRequest,
   CreateWorkspaceRequest,
+  CurrentUserView,
   HealthResponse,
   MembershipAction,
   OrganisationMembershipView,
@@ -282,4 +283,45 @@ export const api = {
     request<void>(`/api/v1/workspaces/${workspaceId}/memberships/${membershipId}/role`, user, {
       method: 'DELETE',
     }),
+};
+
+/**
+ * The real, signed-in session (BUILD_ROADMAP.md Milestone 1.3) — separate
+ * from `api` above, which sends the Developer Preview's unverified
+ * `X-Witness-Dev-User` header. These calls send a verified bearer session
+ * token instead, and never touch that header.
+ */
+export const authApi = {
+  /** Where the browser navigates to start a real sign-in. Not a fetch — a full-page redirect. */
+  loginUrl: (): string => `${BASE_URL}/api/v1/auth/login`,
+
+  me: async (sessionToken: string): Promise<CurrentUserView> => {
+    const response = await fetch(`${BASE_URL}/api/v1/me`, {
+      headers: { Authorization: `Bearer ${sessionToken}` },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new ApiError(
+        `Session is not valid (HTTP ${response.status}).`,
+        response.status,
+        'UNAUTHENTICATED',
+      );
+    }
+
+    return (await response.json()) as CurrentUserView;
+  },
+
+  logout: async (sessionToken: string): Promise<void> => {
+    try {
+      await fetch(`${BASE_URL}/api/v1/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      });
+    } catch {
+      // Sign-out is a local action first (the token is discarded client-side
+      // regardless) — a network failure here must not trap the user in a
+      // signed-in-looking state they cannot leave.
+    }
+  },
 };

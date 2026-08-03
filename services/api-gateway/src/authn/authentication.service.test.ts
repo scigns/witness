@@ -1,0 +1,392 @@
+/**
+ * User-mapping and sign-in orchestration tests, against a stub
+ * `IdentityProviderPort` (the identity verification itself is exercised for
+ * real in `development-identity-provider.adapter.test.ts`) and an in-memory
+ * Prisma double.
+ */
+
+import { describe, expect, it, vi } from 'vitest';
+
+import type { PrismaService } from '../infrastructure/prisma.service.js';
+import { IdentityProviderPort, type VerifiedIdentity } from './identity-provider.port.js';
+import { AuthenticationDeniedError, AuthenticationService } from './authentication.service.js';
+import { SessionService } from './session.service.js';
+
+const REDIRECT_URI = 'http://localhost:3001/api/v1/auth/callback';
+const INVITED_USER = '11111111-1111-4111-8111-111111111111';
+const SUSPENDED_USER = '22222222-2222-4222-8222-222222222222';
+const LINK_1 = '33333333-3333-4333-8333-333333333333';
+
+class StubIdentityProvider extends IdentityProviderPort {
+  readonly provider = 'keycloak';
+  verified: VerifiedIdentity = {
+    subject: 'sub-1',
+    email: 'invited@example.com',
+    emailVerified: true,
+    name: 'Invited Person',
+  };
+
+  async buildAuthorizationRequest(input: { state: string }) {
+    return { url: `https://idp.example/authorize?state=${input.state}`, state: input.state };
+  }
+
+  async exchangeCode() {
+    return { idToken: 'stub-id-token' };
+  }
+
+  async verifyIdToken() {
+    return this.verified;
+  }
+}
+
+function fakePrisma() {
+  const authLoginAttempts: Record<string, unknown>[] = [];
+  const identityLinks: Record<string, unknown>[] = [];
+  const users: Record<string, unknown>[] = [
+    {
+      id: INVITED_USER,
+      email: 'invited@example.com',
+      displayName: 'Invited Person',
+      accountState: 'invited',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    {
+      id: SUSPENDED_USER,
+      email: 'suspended@example.com',
+      displayName: 'Suspended Person',
+      accountState: 'suspended',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ];
+  const actors: Record<string, unknown>[] = [];
+  const auditEvents: Record<string, unknown>[] = [];
+  const authSessions: Record<string, unknown>[] = [];
+
+  const prisma = {
+    authLoginAttempt: {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        authLoginAttempts.push({ ...data });
+        return { ...data };
+      },
+      findUnique: async ({ where }: { where: { state: string } }) => {
+        const row = authLoginAttempts.find((a) => a['state'] === where.state);
+        return row === undefined ? null : { ...row };
+      },
+      delete: async ({ where }: { where: { state: string } }) => {
+        const index = authLoginAttempts.findIndex((a) => a['state'] === where.state);
+        if (index === -1) throw new Error('not found');
+        const [removed] = authLoginAttempts.splice(index, 1);
+        return removed;
+      },
+    },
+    identityLink: {
+      findUnique: async ({
+        where,
+      }: {
+        where: { provider_providerSubject: { provider: string; providerSubject: string } };
+      }) => {
+        const key = where.provider_providerSubject;
+        const row = identityLinks.find(
+          (l) => l['provider'] === key.provider && l['providerSubject'] === key.providerSubject,
+        );
+        return row === undefined ? null : { ...row };
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        identityLinks.push({ ...data });
+        return { ...data };
+      },
+      update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        const row = identityLinks.find((l) => l['id'] === where.id);
+        Object.assign(row!, data);
+        return { ...row };
+      },
+    },
+    user: {
+      findUnique: async ({ where }: { where: { id?: string; email?: string } }) => {
+        const row = users.find((u) =>
+          where.id ? u['id'] === where.id : u['email'] === where.email,
+        );
+        return row === undefined ? null : { ...row };
+      },
+      findUniqueOrThrow: async ({ where }: { where: { id: string } }) => {
+        const row = users.find((u) => u['id'] === where.id);
+        if (row === undefined) throw new Error('not found');
+        return { ...row };
+      },
+      update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        const row = users.find((u) => u['id'] === where.id);
+        Object.assign(row!, data);
+        return { ...row };
+      },
+    },
+    actor: {
+      findFirst: async ({ where }: { where: { displayName: string; kind: string } }) => {
+        const row = actors.find(
+          (a) => a['displayName'] === where.displayName && a['kind'] === where.kind,
+        );
+        return row === undefined ? null : { ...row };
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        actors.push({ ...data });
+        return { ...data };
+      },
+    },
+    auditEvent: {
+      findFirst: async ({ where }: { where: { subjectType: string; subjectId: string } }) => {
+        const matching = auditEvents.filter(
+          (e) => e['subjectType'] === where.subjectType && e['subjectId'] === where.subjectId,
+        );
+        return matching.at(-1) ?? null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        auditEvents.push({ ...data });
+        return { ...data };
+      },
+    },
+    authSession: {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        authSessions.push({ ...data });
+        return { ...data };
+      },
+      findUnique: async ({ where }: { where: { tokenHash: string } }) => {
+        const row = authSessions.find((s) => s['tokenHash'] === where.tokenHash);
+        return row === undefined ? null : { ...row };
+      },
+      deleteMany: async ({ where }: { where: { tokenHash: string } }) => {
+        const before = authSessions.length;
+        for (let i = authSessions.length - 1; i >= 0; i -= 1) {
+          if (authSessions[i]!['tokenHash'] === where.tokenHash) authSessions.splice(i, 1);
+        }
+        return { count: before - authSessions.length };
+      },
+    },
+    organisationMembership: {
+      findMany: async () => [],
+    },
+    workspaceMembership: {
+      findMany: async () => [],
+    },
+    $transaction: async <T>(fn: (tx: typeof prisma) => Promise<T>) => fn(prisma),
+  };
+
+  return {
+    prisma: prisma as unknown as PrismaService,
+    authLoginAttempts,
+    identityLinks,
+    users,
+    auditEvents,
+    authSessions,
+  };
+}
+
+async function primeLoginAttempt(prisma: PrismaService, state: string) {
+  await prisma.authLoginAttempt.create({
+    data: {
+      state,
+      nonce: 'nonce-1',
+      codeVerifier: 'verifier-1',
+      redirectUri: REDIRECT_URI,
+      expiresAt: new Date(Date.now() + 600_000),
+    },
+  });
+}
+
+describe('AuthenticationService — sign-in and user mapping', () => {
+  it('activates an invited user on first sign-in and links the identity', async () => {
+    const { prisma, identityLinks, users, auditEvents } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await primeLoginAttempt(prisma, 'state-1');
+    const issued = await service.handleCallback('code-1', 'state-1');
+
+    expect(issued.token).toBeTruthy();
+    expect(identityLinks).toHaveLength(1);
+    expect(identityLinks[0]).toMatchObject({ provider: 'keycloak', providerSubject: 'sub-1' });
+    expect(
+      (users.find((u) => u['id'] === INVITED_USER) as Record<string, unknown>)['accountState'],
+    ).toBe('active');
+    expect(auditEvents.some((e) => e['action'] === 'identity_link.created')).toBe(true);
+    expect(auditEvents.some((e) => e['action'] === 'user.activated')).toBe(true);
+  });
+
+  it('signs in an already-linked user without creating a second link', async () => {
+    const { prisma, identityLinks } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await primeLoginAttempt(prisma, 'state-1');
+    await service.handleCallback('code-1', 'state-1');
+    expect(identityLinks).toHaveLength(1);
+
+    await primeLoginAttempt(prisma, 'state-2');
+    await service.handleCallback('code-2', 'state-2');
+    expect(identityLinks).toHaveLength(1); // still one — second sign-in reused it
+  });
+
+  it('an email change at the provider does not create a duplicate user once linked', async () => {
+    const { prisma, users } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await primeLoginAttempt(prisma, 'state-1');
+    await service.handleCallback('code-1', 'state-1');
+
+    idp.verified = { ...idp.verified, email: 'newaddress@example.com' };
+    await primeLoginAttempt(prisma, 'state-2');
+    await service.handleCallback('code-2', 'state-2');
+
+    expect(users).toHaveLength(2); // invited-user + suspended-user, no third created
+  });
+
+  it('ATTACK — denies an unknown identity (no link, no matching invited account)', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    idp.verified = {
+      subject: 'nobody',
+      email: 'nobody@example.com',
+      emailVerified: true,
+      name: null,
+    };
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await primeLoginAttempt(prisma, 'state-1');
+    await expect(service.handleCallback('code-1', 'state-1')).rejects.toMatchObject({
+      reason: 'unknown_identity',
+    });
+  });
+
+  it('ATTACK — denies linking via an unverified email, even if it matches an invited account', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    idp.verified = { ...idp.verified, emailVerified: false };
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await primeLoginAttempt(prisma, 'state-1');
+    await expect(service.handleCallback('code-1', 'state-1')).rejects.toMatchObject({
+      reason: 'unknown_identity',
+    });
+  });
+
+  it('ATTACK — denies sign-in for a suspended account and audits the denial', async () => {
+    const { prisma, auditEvents } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    idp.verified = {
+      subject: 'suspended-sub',
+      email: 'suspended@example.com',
+      emailVerified: true,
+      name: null,
+    };
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    // The suspended fixture user is not `invited`, so first-link activation
+    // does not apply — this exercises denial via an EXISTING link instead.
+    await prisma.identityLink.create({
+      data: {
+        id: LINK_1,
+        provider: 'keycloak',
+        providerSubject: 'suspended-sub',
+        userId: SUSPENDED_USER,
+        linkedAt: new Date(),
+        lastSignInAt: new Date(),
+      },
+    });
+
+    await primeLoginAttempt(prisma, 'state-1');
+    await expect(service.handleCallback('code-1', 'state-1')).rejects.toMatchObject({
+      reason: 'account_suspended',
+    });
+    expect(auditEvents.some((e) => e['action'] === 'authentication.denied')).toBe(true);
+  });
+
+  it('ATTACK — rejects a callback with an unknown or reused state (invalid_callback)', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await expect(service.handleCallback('code-1', 'never-registered-state')).rejects.toMatchObject({
+      reason: 'invalid_callback',
+    });
+  });
+
+  it('ATTACK — rejects a malformed callback missing code or state', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await expect(service.handleCallback('', '')).rejects.toBeInstanceOf(AuthenticationDeniedError);
+  });
+
+  it('a state is single-use — a replayed callback is rejected', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await primeLoginAttempt(prisma, 'state-1');
+    await service.handleCallback('code-1', 'state-1');
+
+    await expect(service.handleCallback('code-1', 'state-1')).rejects.toMatchObject({
+      reason: 'invalid_callback',
+    });
+  });
+
+  it('propagates identity-provider verification failure as invalid_callback', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    idp.verifyIdToken = vi.fn().mockRejectedValue(new Error('bad signature'));
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await primeLoginAttempt(prisma, 'state-1');
+    await expect(service.handleCallback('code-1', 'state-1')).rejects.toMatchObject({
+      reason: 'invalid_callback',
+    });
+  });
+
+  it('signOut revokes the session so it can no longer be resolved', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await primeLoginAttempt(prisma, 'state-1');
+    const issued = await service.handleCallback('code-1', 'state-1');
+
+    expect(await sessions.resolveUserId(issued.token)).not.toBeNull();
+    await service.signOut(issued.token);
+    expect(await sessions.resolveUserId(issued.token)).toBeNull();
+  });
+
+  it('getCurrentUser returns only organisations and workspaces the user actually belongs to', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    // No memberships wired into this fake — asserts the shape degrades to empty lists cleanly.
+    const current = await service.getCurrentUser(INVITED_USER);
+    expect(current?.organisations).toEqual([]);
+    expect(current?.workspaces).toEqual([]);
+    expect(current?.email).toBe('invited@example.com');
+  });
+
+  it('getCurrentUser returns null for an unknown user id', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    expect(await service.getCurrentUser('nonexistent')).toBeNull();
+  });
+});

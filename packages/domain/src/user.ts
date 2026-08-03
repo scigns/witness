@@ -156,3 +156,56 @@ export function createUser(input: {
     },
   };
 }
+
+/**
+ * Controlled first-sign-in activation (Milestone 1.3, Authentication).
+ *
+ * An administrator registering a user (`createUser`, above) does not grant
+ * access — it records that the person is *supposed* to have it. Activation
+ * is the one, narrow transition that turns a verified external sign-in into
+ * "this account may now be used", and it only ever applies to an account an
+ * administrator already created; nothing in this module creates a `User`
+ * that was not explicitly registered first (BUILD_ROADMAP.md Milestone 1.2's
+ * "do not automatically create unrestricted users", carried forward here).
+ */
+export function activateAccount(user: User, activatedBy: Actor, at: Date): UserOutcome {
+  if (user.accountState !== 'invited') {
+    throw new InvariantViolation(
+      `Cannot activate a user from account state '${user.accountState}' — only an invited ` +
+        'account can complete first sign-in.',
+      'INVALID_ACCOUNT_STATE',
+    );
+  }
+
+  return {
+    user: { ...user, accountState: 'active', updatedAt: at },
+    event: {
+      action: 'user.activated',
+      actor: activatedBy,
+      metadata: { email: user.email },
+    },
+  };
+}
+
+/**
+ * Whether a sign-in may proceed for an account in this state. `invited` is
+ * accessible — that is precisely the state `activateAccount` exists to move
+ * out of — but `suspended` and `deactivated` are not, and each gets its own
+ * code so the API can return a denial that names the actual reason rather
+ * than one generic "access denied".
+ */
+export function assertAccountAccessible(accountState: AccountState): void {
+  if (accountState === 'suspended') {
+    throw new InvariantViolation(
+      'This account has been suspended and cannot sign in.',
+      'ACCOUNT_SUSPENDED',
+    );
+  }
+
+  if (accountState === 'deactivated') {
+    throw new InvariantViolation(
+      'This account has been deactivated and cannot sign in.',
+      'ACCOUNT_DEACTIVATED',
+    );
+  }
+}

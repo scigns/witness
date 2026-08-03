@@ -8,8 +8,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  activateAccount,
   addOrganisationMember,
   addWorkspaceMember,
+  assertAccountAccessible,
   assignRole,
   captureRecord,
   changeRoleAssignment,
@@ -22,13 +24,17 @@ import {
   createUser,
   createWorkspace,
   isInstitutionalRecord,
+  linkIdentity,
   permittedTransitions,
+  recordSignIn,
   rejectRecord,
+  removeIdentityLink,
   removeRoleAssignment,
   reopenRecord,
   submitForReview,
   toActorId,
   toAuditEventId,
+  toIdentityLinkId,
   toOrganisationId,
   toOrganisationMembershipId,
   toRecordId,
@@ -220,6 +226,41 @@ describe('users', () => {
         registeredAt: new Date('2026-03-14T11:00:00Z'),
       }),
     ).toThrow(/display name/i);
+  });
+});
+
+describe('account activation (Milestone 1.3, Authentication)', () => {
+  const invited = () =>
+    createUser({
+      id: toUserId('55555555-5555-4555-8555-555555555555'),
+      email: 'person@example.com',
+      displayName: 'Person',
+      registeredBy: HUMAN,
+      registeredAt: new Date('2026-03-14T11:00:00Z'),
+    }).user;
+
+  it('activates an invited user on first sign-in', () => {
+    const outcome = activateAccount(invited(), HUMAN, new Date('2026-03-15T09:00:00Z'));
+    expect(outcome.user.accountState).toBe('active');
+    expect(outcome.event.action).toBe('user.activated');
+  });
+
+  it('refuses to activate a user who is not invited', () => {
+    const active = activateAccount(invited(), HUMAN, new Date()).user;
+    expect(() => activateAccount(active, HUMAN, new Date())).toThrow(/only an invited account/i);
+  });
+
+  it('permits sign-in for invited and active accounts', () => {
+    expect(() => assertAccountAccessible('invited')).not.toThrow();
+    expect(() => assertAccountAccessible('active')).not.toThrow();
+  });
+
+  it('refuses sign-in for a suspended account, naming the reason', () => {
+    expect(() => assertAccountAccessible('suspended')).toThrow(/suspended/i);
+  });
+
+  it('refuses sign-in for a deactivated account, naming the reason', () => {
+    expect(() => assertAccountAccessible('deactivated')).toThrow(/deactivated/i);
   });
 });
 
@@ -560,6 +601,60 @@ describe('role assignment', () => {
 
     expect(event.action).toBe('role_assignment.removed');
     expect(event.metadata['role']).toBe('reviewer');
+  });
+});
+
+describe('identity link (Milestone 1.3, Authentication)', () => {
+  const USER_ID = toUserId('55555555-5555-4555-8555-555555555555');
+  const LINK_ID = toIdentityLinkId('99999999-9999-4999-8999-999999999999');
+  const AT = new Date('2026-03-16T09:00:00Z');
+
+  it('records the first link between a verified external identity and a Witness user', () => {
+    const outcome = linkIdentity({
+      id: LINK_ID,
+      userId: USER_ID,
+      provider: 'keycloak',
+      providerSubject: 'a1b2c3',
+      linkedBy: HUMAN,
+      at: AT,
+    });
+
+    expect(outcome.link.provider).toBe('keycloak');
+    expect(outcome.link.providerSubject).toBe('a1b2c3');
+    expect(outcome.link.lastSignInAt).toEqual(AT);
+    expect(outcome.event.action).toBe('identity_link.created');
+  });
+
+  it('records a subsequent sign-in without creating a new link', () => {
+    const link = linkIdentity({
+      id: LINK_ID,
+      userId: USER_ID,
+      provider: 'keycloak',
+      providerSubject: 'a1b2c3',
+      linkedBy: HUMAN,
+      at: AT,
+    }).link;
+
+    const later = new Date('2026-03-17T09:00:00Z');
+    const updated = recordSignIn(link, later);
+
+    expect(updated.id).toBe(link.id);
+    expect(updated.lastSignInAt).toEqual(later);
+  });
+
+  it('produces an audit event when an administrator removes a link', () => {
+    const link = linkIdentity({
+      id: LINK_ID,
+      userId: USER_ID,
+      provider: 'keycloak',
+      providerSubject: 'a1b2c3',
+      linkedBy: HUMAN,
+      at: AT,
+    }).link;
+
+    const event = removeIdentityLink(link, HUMAN);
+    expect(event.action).toBe('identity_link.removed');
+    expect(event.metadata['provider']).toBe('keycloak');
   });
 });
 

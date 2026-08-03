@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "license": "GPL-3.0-or-later",
-  "description": "Witness API gateway \u2014 HTTP adapter over the domain (ADR-0003, ADR-0006).",
+  "description": "Witness API gateway — HTTP adapter over the domain (ADR-0003, ADR-0006).",
   "type": "module",
   "main": "./dist/main.js",
   "scripts": {
@@ -25,11 +25,13 @@
     "@witness/config": "workspace:*",
     "@witness/contracts": "workspace:*",
     "@witness/domain": "workspace:*",
+    "jose": "^6.2.7",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "prisma": "^5.22.0",
     "tsx": "^4.19.2"
   }

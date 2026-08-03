@@ -38,6 +38,10 @@ export const AUDIT_ACTIONS = [
   'role_assignment.created',
   'role_assignment.changed',
   'role_assignment.removed',
+  'user.activated',
+  'identity_link.created',
+  'identity_link.removed',
+  'authentication.denied',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -56,6 +60,7 @@ export const AUDIT_SUBJECT_TYPES = [
   'organisation_membership',
   'workspace_membership',
   'role_assignment',
+  'identity_link',
 ] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 
