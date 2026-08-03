@@ -250,6 +250,7 @@ describe('ATTACK — escalate privilege through the authorisation adapter', () =
 
   it('an administrator is permitted every user and membership action', async () => {
     const principal = await adapter.authenticate('Admin|admin');
+    expect(principal).not.toBeNull();
     for (const action of [
       'user:read',
       'user:create',
@@ -266,6 +267,7 @@ describe('ATTACK — escalate privilege through the authorisation adapter', () =
 
   it('a reviewer — the most privileged non-administrative role — is denied every user and membership action', async () => {
     const principal = await adapter.authenticate('Attacker|reviewer');
+    expect(principal).not.toBeNull();
     for (const action of [
       'user:read',
       'user:create',
@@ -282,6 +284,7 @@ describe('ATTACK — escalate privilege through the authorisation adapter', () =
 
   it('an invented role is denied user creation, same as any other action', async () => {
     const principal = await adapter.authenticate('Attacker|superuser');
+    expect(principal).not.toBeNull();
     expect((await adapter.decide(principal!, 'user:create')).allowed).toBe(false);
   });
 

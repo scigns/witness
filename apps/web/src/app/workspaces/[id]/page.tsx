@@ -16,6 +16,7 @@ import { use, useCallback, useEffect, useState } from 'react';
 
 import type {
   MembershipAction,
+  MembershipState,
   OrganisationMembershipView,
   OrganisationSummary,
   WorkspaceMembershipView,
@@ -32,7 +33,7 @@ const ACTION_LABELS: Record<MembershipAction['action'], string> = {
   revoke: 'Revoke membership',
 };
 
-const GOOD_STANDING = new Set(['invited', 'active']);
+const GOOD_STANDING: ReadonlySet<MembershipState> = new Set<MembershipState>(['invited', 'active']);
 
 export default function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -47,44 +48,56 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const [workspacesResult, organisationsResult, membershipsResult] = await Promise.all([
-        api.listWorkspaces(user),
-        api.listOrganisations(user),
-        api.listWorkspaceMemberships(id, user),
-      ]);
+  const load = useCallback(
+    async (cancelledRef: { current: boolean }) => {
+      try {
+        const [workspacesResult, organisationsResult, membershipsResult] = await Promise.all([
+          api.listWorkspaces(user),
+          api.listOrganisations(user),
+          api.listWorkspaceMemberships(id, user),
+        ]);
+        if (cancelledRef.current) return;
 
-      const foundWorkspace = workspacesResult.workspaces.find((w) => w.id === id) ?? null;
-      setWorkspace(foundWorkspace);
-      setOrganisation(
-        foundWorkspace === null
-          ? null
-          : (organisationsResult.organisations.find(
-              (o) => o.id === foundWorkspace.organisationId,
-            ) ?? null),
-      );
-      setMemberships(membershipsResult.memberships);
-
-      if (foundWorkspace !== null) {
-        const orgMembersResult = await api.listOrganisationMemberships(
-          foundWorkspace.organisationId,
-          user,
+        const foundWorkspace = workspacesResult.workspaces.find((w) => w.id === id) ?? null;
+        setWorkspace(foundWorkspace);
+        setOrganisation(
+          foundWorkspace === null
+            ? null
+            : (organisationsResult.organisations.find(
+                (o) => o.id === foundWorkspace.organisationId,
+              ) ?? null),
         );
-        setOrganisationMembers(orgMembersResult.memberships);
-      }
+        setMemberships(membershipsResult.memberships);
 
-      setError(null);
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
-    } finally {
-      setLoading(false);
-    }
-  }, [id, user]);
+        if (foundWorkspace !== null) {
+          const orgMembersResult = await api.listOrganisationMemberships(
+            foundWorkspace.organisationId,
+            user,
+          );
+          if (cancelledRef.current) return;
+          setOrganisationMembers(orgMembersResult.memberships);
+        }
+
+        setError(null);
+      } catch (caught) {
+        if (cancelledRef.current) return;
+        setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+      } finally {
+        if (!cancelledRef.current) setLoading(false);
+      }
+    },
+    [id, user],
+  );
 
   useEffect(() => {
     if (!ready) return;
-    void load();
+
+    const cancelledRef = { current: false };
+    void load(cancelledRef);
+
+    return () => {
+      cancelledRef.current = true;
+    };
   }, [ready, load]);
 
   const workspaceMemberUserIds = new Set(memberships.map((m) => m.userId));
@@ -98,7 +111,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     try {
       await api.addWorkspaceMembership(id, { userId: selectedUserId }, user);
       setSelectedUserId('');
-      await load();
+      await load({ current: false });
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
@@ -110,7 +123,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     setBusy(true);
     try {
       await api.transitionWorkspaceMembership(id, membershipId, { action }, user);
-      await load();
+      await load({ current: false });
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
@@ -145,7 +158,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         <h1 className="text-2xl font-semibold tracking-tight">{workspace.name}</h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
           {organisation === null ? (
-            'Organisation'
+            'Organisation: unknown'
           ) : (
             <>
               Organisation:{' '}
@@ -242,11 +255,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                             key={action}
                             variant={action === 'revoke' ? 'danger' : 'secondary'}
                             disabled={busy}
-                            onClick={() =>
-                              void applyAction(membership.id, action as MembershipAction['action'])
-                            }
+                            onClick={() => void applyAction(membership.id, action)}
                           >
-                            {ACTION_LABELS[action as MembershipAction['action']]}
+                            {ACTION_LABELS[action]}
                           </Button>
                         ))}
                       </div>

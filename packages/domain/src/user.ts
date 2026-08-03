@@ -47,6 +47,9 @@ const DISPLAY_NAME_MAX = 200;
  */
 const NO_WHITESPACE_OR_AT = /^[^\s@]+$/;
 
+/** Matches the `witness_user.email` column (`VARCHAR(320)`) — defence in depth, same reasoning as `DISPLAY_NAME_MAX`. */
+const EMAIL_MAX = 320;
+
 export interface User {
   readonly id: UserId;
   /** Normalised (trimmed, lower-cased) — see `normaliseEmail`. */
@@ -90,6 +93,13 @@ export function normaliseEmail(email: string): string {
 
   if (!valid) {
     throw new InvariantViolation(`'${email}' is not a valid email address.`, 'INVALID_EMAIL');
+  }
+
+  if (trimmed.length > EMAIL_MAX) {
+    throw new InvariantViolation(
+      `An email address must be ${EMAIL_MAX} characters or fewer, received ${trimmed.length}.`,
+      'EMAIL_TOO_LONG',
+    );
   }
 
   return trimmed;

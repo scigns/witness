@@ -101,42 +101,48 @@ Users and Memberships
 
 
 
-User domain model exists — DONE. `packages/domain/src/user.ts` (`createUser`), 42 domain tests
+User domain model exists — READY (PR #19, not yet merged — per this checklist's own rule, an open
+PR does not count as complete). `packages/domain/src/user.ts` (`createUser`), 42 domain tests
 including email normalisation and duplicate-prevention cases.
 
 
 
-Organisation membership exists — DONE. `packages/domain/src/organisation-membership.ts`, unique
+Organisation membership exists — READY (PR #19, not yet merged). `packages/domain/src/organisation-membership.ts`, unique
 constraint on (organisationId, userId), `invited → active ⇄ suspended → revoked` state machine.
 
 
 
-Workspace membership exists — DONE. `packages/domain/src/workspace-membership.ts`; refuses
+Workspace membership exists — READY (PR #19, not yet merged). `packages/domain/src/workspace-membership.ts`; refuses
 creation unless the user has an organisation membership in good standing for that workspace's
 specific organisation (verified by adversarial cross-organisation test).
 
 
 
-Administrator can add or invite a user — DONE, with a caveat: "invited" means registered, not that
-an email was sent — Witness does not deliver invitation email yet, and the UI says so on every
-screen that uses the word. `/users/new`, `POST /api/v1/users`, admin-only.
+Administrator can add or invite a user — READY (PR #19, not yet merged), with a caveat: "invited"
+means registered, not that an email was sent — Witness does not deliver invitation email yet, and
+the UI says so on every screen that uses the word. `/users/new`, `POST /api/v1/users`, admin-only.
 
 
 
-Duplicate membership is prevented — DONE. Unique constraints in the schema plus a pre-check
-returning `409 DUPLICATE_MEMBERSHIP`; covered by service tests for both organisation and
-workspace membership.
+Duplicate membership is prevented — READY (PR #19, not yet merged). Unique constraints in the
+schema plus a pre-check returning `409 DUPLICATE_MEMBERSHIP`; covered by service tests for both
+organisation and workspace membership.
 
 
 
-Membership changes create audit events — DONE. `organisation_membership.created`/`.state_changed`
+Membership changes create audit events — READY (PR #19, not yet merged). `organisation_membership.created`/`.state_changed`
 and `workspace_membership.created`/`.state_changed`, hash-chained through the existing audit
 mechanism (`packages/domain/src/audit.ts`), same as every other subject type.
 
 
 
-User list and membership state are visible in the UI — DONE. `/users`, and membership management
+User list and membership state are visible in the UI — READY (PR #19, not yet merged). `/users`, and membership management
 (add, activate, suspend, revoke) on `/organisations/[id]` and `/workspaces/[id]`.
+
+
+
+**Mark these DONE only after PR #19 merges to `main` and the workflow is re-verified on the
+deployable version** — this checklist is a binary release gate, not a PR-review tracker.
 
 
 

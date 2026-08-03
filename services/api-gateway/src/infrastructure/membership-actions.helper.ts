@@ -21,7 +21,9 @@ const STATE_TO_MEMBERSHIP_ACTION: Partial<Record<MembershipState, MembershipActi
 };
 
 /** Named actions a membership in `state` may currently take — for `permittedActions` in an API response. */
-export function permittedMembershipActionNames(state: MembershipState): string[] {
+export function permittedMembershipActionNames(
+  state: MembershipState,
+): MembershipAction['action'][] {
   return permittedMembershipTransitions(state)
     .map((next) => STATE_TO_MEMBERSHIP_ACTION[next])
     .filter((action): action is MembershipAction['action'] => action !== undefined);

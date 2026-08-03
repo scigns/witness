@@ -40,27 +40,39 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const [organisationsResult, membershipsResult, usersResult] = await Promise.all([
-        api.listOrganisations(user),
-        api.listOrganisationMemberships(id, user),
-        api.listUsers(user),
-      ]);
-      setOrganisation(organisationsResult.organisations.find((o) => o.id === id) ?? null);
-      setMemberships(membershipsResult.memberships);
-      setUsers(usersResult.users);
-      setError(null);
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
-    } finally {
-      setLoading(false);
-    }
-  }, [id, user]);
+  const load = useCallback(
+    async (cancelledRef: { current: boolean }) => {
+      try {
+        const [organisationsResult, membershipsResult, usersResult] = await Promise.all([
+          api.listOrganisations(user),
+          api.listOrganisationMemberships(id, user),
+          api.listUsers(user),
+        ]);
+        if (cancelledRef.current) return;
+
+        setOrganisation(organisationsResult.organisations.find((o) => o.id === id) ?? null);
+        setMemberships(membershipsResult.memberships);
+        setUsers(usersResult.users);
+        setError(null);
+      } catch (caught) {
+        if (cancelledRef.current) return;
+        setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+      } finally {
+        if (!cancelledRef.current) setLoading(false);
+      }
+    },
+    [id, user],
+  );
 
   useEffect(() => {
     if (!ready) return;
-    void load();
+
+    const cancelledRef = { current: false };
+    void load(cancelledRef);
+
+    return () => {
+      cancelledRef.current = true;
+    };
   }, [ready, load]);
 
   const memberUserIds = new Set(memberships.map((m) => m.userId));
@@ -72,7 +84,7 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
     try {
       await api.addOrganisationMembership(id, { userId: selectedUserId }, user);
       setSelectedUserId('');
-      await load();
+      await load({ current: false });
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
@@ -84,7 +96,7 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
     setBusy(true);
     try {
       await api.transitionOrganisationMembership(id, membershipId, { action }, user);
-      await load();
+      await load({ current: false });
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
@@ -204,11 +216,9 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
                             key={action}
                             variant={action === 'revoke' ? 'danger' : 'secondary'}
                             disabled={busy}
-                            onClick={() =>
-                              void applyAction(membership.id, action as MembershipAction['action'])
-                            }
+                            onClick={() => void applyAction(membership.id, action)}
                           >
-                            {ACTION_LABELS[action as MembershipAction['action']]}
+                            {ACTION_LABELS[action]}
                           </Button>
                         ))}
                       </div>

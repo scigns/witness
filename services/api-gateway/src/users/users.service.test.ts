@@ -10,6 +10,7 @@
  */
 
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { InvariantViolation } from '@witness/domain';
 import { describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../infrastructure/prisma.service.js';
@@ -99,6 +100,18 @@ describe('UsersService', () => {
     await expect(
       service.create({ email: 'Mele@EXAMPLE.com', displayName: 'Someone Else' }, ADMIN),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('rejects a malformed email before persisting anything', async () => {
+    const { prisma, users, auditEvents } = fakePrisma();
+    const service = new UsersService(prisma);
+
+    await expect(
+      service.create({ email: 'not-an-email', displayName: 'Someone' }, ADMIN),
+    ).rejects.toThrow(InvariantViolation);
+
+    expect(users).toHaveLength(0);
+    expect(auditEvents).toHaveLength(0);
   });
 
   it('lists created users', async () => {

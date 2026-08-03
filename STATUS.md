@@ -121,10 +121,12 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   available in this environment; see "Known limitations" in PR for what that does and doesn't cover),
   `test:invariants` 20/20 unchanged, `test:adversarial` 26/26 (up from 23 — administrator-permitted,
   reviewer-denied and invented-role-denied cases for every new action).
-- **`docs/MVP_CHECKLIST.md`** — the four Users and Memberships items under §B Trusted Access marked
-  done (user domain model, organisation membership, workspace membership, admin can add a user,
-  duplicate membership prevented, membership changes audited, user list and membership state visible
-  in UI); Roles/Authentication items in the same section remain unchecked — out of scope for this PR.
+- **`docs/MVP_CHECKLIST.md`** — the seven Users and Memberships items under §B Trusted Access marked
+  ready pending merge (user domain model, organisation membership, workspace membership, admin can
+  add a user, duplicate membership prevented, membership changes audited, user list and membership
+  state visible in UI) — per the checklist's own rule that an open PR does not count as complete, they
+  read READY rather than DONE until this merges. Roles/Authentication items in the same section remain
+  unchecked — out of scope for this PR.
 
 ### 2026-08-03 — Workspaces (BUILD_ROADMAP.md Release 0.2, item 2) shipped
 

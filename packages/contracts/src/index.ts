@@ -172,7 +172,7 @@ export interface OrganisationMembershipView {
   userDisplayName: string;
   state: MembershipState;
   /** Permitted next actions, server-computed — same reasoning as `RecordDetail.permittedActions`. */
-  permittedActions: string[];
+  permittedActions: MembershipAction['action'][];
   createdAt: string;
   updatedAt: string;
 }
@@ -184,7 +184,7 @@ export interface WorkspaceMembershipView {
   userEmail: string;
   userDisplayName: string;
   state: MembershipState;
-  permittedActions: string[];
+  permittedActions: MembershipAction['action'][];
   createdAt: string;
   updatedAt: string;
 }
