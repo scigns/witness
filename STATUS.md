@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-08-02
+**Last updated:** 2026-08-03
 **Updated by:** CTO
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -87,6 +87,27 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-03 — Implementation authorised; Organisations (BUILD_ROADMAP.md Release 0.2, item 1) shipped
+
+- **`docs/BUILD_AUTHORIZATION.md`, `docs/BUILD_ROADMAP.md` and `docs/governance/PRODUCT_CONSTITUTION.md`
+  added to `main`** (direct commits, Founder-approved). `BUILD_AUTHORIZATION.md` declares the
+  planning phase complete and implementation authorised; outstanding Phase 1 deliverables (1.3–1.5,
+  1.8) continue in parallel and do not block. This entry records two open discrepancies rather than
+  silently resolving them: **ADR-0022**, cited by the authorising instruction, does not exist in
+  `architecture/decisions/` (ADR-0000–0021 do); and the instruction to "use ROADMAP.md" is read here
+  as `docs/BUILD_ROADMAP.md` — the only document with a concrete, ordered capability list — rather
+  than the pre-existing root `ROADMAP.md`, which has none.
+- **Organisations** (`BUILD_ROADMAP.md` Release 0.2, item 1 — the first item on the new roadmap with
+  nothing yet built) shipped as a full vertical slice: `packages/domain/src/organisation.ts`
+  (`createOrganisation`), a `subject_type`/`subject_id` migration generalising the audit hash-chain
+  from record-only to polymorphic (so the same tamper-evident mechanism serves any future aggregate,
+  not just `Record`), contracts, an authorised `OrganisationsController`/`OrganisationsService`, and
+  `/organisations` + `/organisations/new` in the web app. A new `admin` role gates
+  `organisation:create` under least privilege — `reader`/`contributor`/`reviewer` get
+  `organisation:read` only. `make verify`-equivalent (format, lint, typecheck, test, build) and
+  `test:invariants` / `test:adversarial` all pass; no database was available to run the migration
+  live, so it is unexecuted-but-reviewed pending a real Postgres instance.
 
 ### 2026-08-02 — Sign-off status reconciled; Phase 1 deliverable 1.2 (domain model) drafted
 

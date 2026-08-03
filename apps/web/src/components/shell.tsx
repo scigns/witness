@@ -20,9 +20,10 @@ const NAV = [
   { href: '/', label: 'Dashboard' },
   { href: '/records', label: 'Records' },
   { href: '/records/new', label: 'Capture' },
+  { href: '/organisations', label: 'Organisations' },
 ] as const;
 
-const ROLES: ReadonlyArray<ActingUser['role']> = ['reader', 'contributor', 'reviewer'];
+const ROLES: ReadonlyArray<ActingUser['role']> = ['reader', 'contributor', 'reviewer', 'admin'];
 
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();

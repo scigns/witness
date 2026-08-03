@@ -10,8 +10,10 @@
  */
 
 import type {
+  CreateOrganisationRequest,
   CreateRecordRequest,
   HealthResponse,
+  OrganisationSummary,
   RecordDetail,
   RecordSummary,
   ReviewAction,
@@ -32,7 +34,7 @@ export class ApiError extends Error {
 
 export interface ActingUser {
   name: string;
-  role: 'reader' | 'contributor' | 'reviewer';
+  role: 'reader' | 'contributor' | 'reviewer' | 'admin';
 }
 
 async function request<T>(path: string, user: ActingUser | null, init?: RequestInit): Promise<T> {
@@ -97,5 +99,17 @@ export const api = {
     request<RecordDetail>(`/api/v1/records/${id}/review`, user, {
       method: 'POST',
       body: JSON.stringify(action),
+    }),
+
+  listOrganisations: (user: ActingUser): Promise<{ organisations: OrganisationSummary[] }> =>
+    request<{ organisations: OrganisationSummary[] }>('/api/v1/organisations', user),
+
+  createOrganisation: (
+    body: CreateOrganisationRequest,
+    user: ActingUser,
+  ): Promise<OrganisationSummary> =>
+    request<OrganisationSummary>('/api/v1/organisations', user, {
+      method: 'POST',
+      body: JSON.stringify(body),
     }),
 };

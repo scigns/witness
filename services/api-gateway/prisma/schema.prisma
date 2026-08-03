@@ -78,23 +78,38 @@ model Record {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  auditEvents AuditEvent[]
-
   @@index([reviewState])
   @@index([capturedAt])
   @@map("record")
 }
 
+/// The tenant boundary (BUILD_ROADMAP.md, Release 0.2, item 1).
+///
+/// Deliberately minimal: this Developer Preview only covers creation. Workspaces,
+/// membership and multi-tenant scoping of Record/Source are later roadmap items —
+/// modelling them now, before anything reads or writes them, would be fiction.
+model Organisation {
+  id        String   @id @db.Uuid
+  name      String   @db.VarChar(200)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("organisation")
+}
+
 /// Append-only, hash-chained audit trail (roadmap 3.7).
 ///
-/// There is deliberately no update or delete path in the application. Postgres
-/// cannot express "append-only" as a constraint, so this is enforced in the
-/// repository layer today and moves to a database trigger plus a restricted role
-/// in Phase 3 — tracked, not forgotten.
+/// `subjectType` + `subjectId` is a polymorphic association rather than a foreign
+/// key to a single table, because the same tamper-evident chain now serves more
+/// than one aggregate (Record, Organisation, and more as the roadmap adds
+/// aggregates). Postgres cannot express "references exactly one of these tables"
+/// as a constraint, so referential integrity here is enforced by the application
+/// layer, the same way append-only itself already is — tracked, not forgotten.
+///
+/// There is deliberately no update or delete path in the application.
 model AuditEvent {
   id           String   @id @db.Uuid
-  recordId     String   @map("record_id") @db.Uuid
-  record       Record   @relation(fields: [recordId], references: [id], onDelete: Restrict)
+  subjectType  String   @map("subject_type") @db.VarChar(24)
+  subjectId    String   @map("subject_id") @db.Uuid
 
   action       String   @db.VarChar(64)
 
@@ -103,7 +118,7 @@ model AuditEvent {
 
   occurredAt   DateTime @map("occurred_at") @db.Timestamptz(6)
 
-  /// Null only for the first event in a record's chain.
+  /// Null only for the first event in a subject's chain.
   previousHash String?  @map("previous_hash") @db.VarChar(64)
   hash         String   @unique @db.VarChar(64)
 
@@ -113,6 +128,6 @@ model AuditEvent {
 
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  @@index([recordId, occurredAt])
+  @@index([subjectType, subjectId, occurredAt])
   @@map("audit_event")
 }

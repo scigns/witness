@@ -177,7 +177,8 @@ describe('INV-4 — the audit chain is tamper-evident', () => {
     const first = createAuditEvent(
       {
         id: toAuditEventId('66666666-6666-4666-8666-666666666661'),
-        recordId: toRecordId('44444444-4444-4444-8444-444444444444'),
+        subjectType: 'record',
+        subjectId: toRecordId('44444444-4444-4444-8444-444444444444'),
         action: 'record.captured',
         actor: HUMAN,
         occurredAt: new Date('2026-03-14T11:00:00Z'),
@@ -189,7 +190,8 @@ describe('INV-4 — the audit chain is tamper-evident', () => {
     const second = createAuditEvent(
       {
         id: toAuditEventId('66666666-6666-4666-8666-666666666662'),
-        recordId: toRecordId('44444444-4444-4444-8444-444444444444'),
+        subjectType: 'record',
+        subjectId: toRecordId('44444444-4444-4444-8444-444444444444'),
         action: 'record.confirmed',
         actor: HUMAN,
         occurredAt: new Date('2026-03-15T11:00:00Z'),

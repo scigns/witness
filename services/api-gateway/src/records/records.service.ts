@@ -88,11 +88,7 @@ export class RecordsService {
   async get(id: string): Promise<RecordDetail> {
     const row = await this.prisma.record.findUnique({
       where: { id },
-      include: {
-        source: true,
-        capturedBy: true,
-        auditEvents: { orderBy: { occurredAt: 'asc' }, include: { actor: true } },
-      },
+      include: { source: true, capturedBy: true },
     });
 
     if (row === null) {
@@ -101,11 +97,20 @@ export class RecordsService {
       });
     }
 
+    // Audit events are a polymorphic association (subjectType + subjectId), not a
+    // Prisma relation, so they're a separate query rather than an `include`.
+    const auditEvents = await this.prisma.auditEvent.findMany({
+      where: { subjectType: 'record', subjectId: id },
+      orderBy: { occurredAt: 'asc' },
+      include: { actor: true },
+    });
+
     // Reconstruct the domain events so the chain is verified with the same code
     // the domain uses, rather than a second implementation that can drift.
-    const domainEvents: AuditEvent[] = row.auditEvents.map((event) => ({
+    const domainEvents: AuditEvent[] = auditEvents.map((event) => ({
       id: toAuditEventId(event.id),
-      recordId: toRecordId(event.recordId),
+      subjectType: 'record',
+      subjectId: event.subjectId,
       action: event.action as AuditEvent['action'],
       actor: this.toDomainActor(event.actor),
       occurredAt: event.occurredAt,
@@ -150,7 +155,7 @@ export class RecordsService {
         capturedAt: row.capturedAt.toISOString(),
         consentGrantId: row.consentGrantId,
       },
-      auditTrail: row.auditEvents.map((event): AuditEventView => ({
+      auditTrail: auditEvents.map((event): AuditEventView => ({
         id: event.id,
         action: event.action,
         actor: {
@@ -362,7 +367,7 @@ export class RecordsService {
     at: Date,
   ): Promise<void> {
     const tail = await tx.auditEvent.findFirst({
-      where: { recordId: outcome.record.id },
+      where: { subjectType: 'record', subjectId: outcome.record.id },
       orderBy: { occurredAt: 'desc' },
       select: { hash: true },
     });
@@ -370,7 +375,8 @@ export class RecordsService {
     const event = createAuditEvent(
       {
         id: toAuditEventId(randomUUID()),
-        recordId: outcome.record.id,
+        subjectType: 'record',
+        subjectId: outcome.record.id,
         action: outcome.event.action,
         actor: outcome.event.actor,
         occurredAt: at,
@@ -383,7 +389,8 @@ export class RecordsService {
     await tx.auditEvent.create({
       data: {
         id: event.id,
-        recordId: event.recordId,
+        subjectType: event.subjectType,
+        subjectId: event.subjectId,
         action: event.action,
         actorId: event.actor.id,
         occurredAt: event.occurredAt,

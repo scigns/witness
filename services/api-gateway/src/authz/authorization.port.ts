@@ -25,7 +25,8 @@ export interface Principal {
   readonly roles: readonly string[];
 }
 
-export type Action = 'record:read' | 'record:create' | 'record:review';
+export type Action =
+  'record:read' | 'record:create' | 'record:review' | 'organisation:read' | 'organisation:create';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;
