@@ -97,8 +97,8 @@ context — see §3.
 **Retention/deletion responsibilities.** Tenant offboarding and user deprovisioning — not yet
 designed; flagged as a gap this document surfaces rather than silently omits.
 
-**Current implementation mapping.** Partial, as of `BUILD_ROADMAP.md` Release 0.2 items 1–2.
-`packages/domain/src/organisation.ts` (`createOrganisation`) and
+**Current implementation mapping.** Partial, as of `BUILD_ROADMAP.md` Release 0.2 items 1–2 and
+Milestone 1.1. `packages/domain/src/organisation.ts` (`createOrganisation`) and
 `services/api-gateway/src/organisations/` implement creation and listing of the isolation root this
 section calls `Tenant` — named `Organisation` in code, matching `ARCHITECTURE.md` §3's "Owns
 Organisations, workspaces, users, roles, groups" rather than `DATA_MODEL.md` §2's `Tenant` label; the
@@ -107,23 +107,36 @@ resolve that, only proceed under the roadmap's term.
 `packages/domain/src/workspace.ts` (`createWorkspace`) and `services/api-gateway/src/workspaces/`
 add a `Workspace` scoped to exactly one organisation via a real foreign key — unlike `AuditEvent`'s
 polymorphic subject reference, a workspace has exactly one parent type, so referential integrity is
-a database constraint here, not an application-layer promise. User, Role and Group remain
-unimplemented, as does tenant-scoped row-level security (§`Invariants` above) — nothing on `Record`
-or `Source` references an organisation or workspace, so cross-tenant isolation is not yet enforced
-anywhere; a workspace is a container with nothing in it yet. The Developer Preview's
-`DevelopmentAuthorizationAdapter` (`services/api-gateway/src/authz/development.adapter.ts`) still
-resolves a principal from an unverified `X-Witness-Dev-User` header, unrelated to and unchanged by
-this — real identity remains Phase 2.
+a database constraint here, not an application-layer promise.
+
+Milestone 1.1 (Users and Memberships) adds `packages/domain/src/user.ts` (`createUser` — a
+registered account, deliberately independent of `Actor`; see that file's own header for why),
+`packages/domain/src/membership.ts` (one state machine — `invited → active ⇄ suspended`, `revoked`
+terminal — shared by both membership kinds), `organisation-membership.ts` and
+`workspace-membership.ts`, plus `services/api-gateway/src/users/`,
+`organisation-memberships/` and `workspace-memberships/`. A workspace membership cannot exist
+without an organisation membership in good standing *for that workspace's specific organisation* —
+the eligibility check the domain enforces from a state the service reads and passes in, which is
+what stops standing in one organisation being used to justify workspace access under another. Role
+and Group remain unimplemented, as does tenant-scoped row-level security (§`Invariants` above) —
+nothing on `Record` or `Source` references an organisation, workspace, or user, so cross-tenant
+isolation is still not enforced anywhere; membership answers "does this user belong here", not "what
+may they do here" (that is Milestone 1.2, Roles and Permission Assignment, deliberately not this
+PR). The Developer Preview's `DevelopmentAuthorizationAdapter`
+(`services/api-gateway/src/authz/development.adapter.ts`) still resolves a principal from an
+unverified `X-Witness-Dev-User` header, unrelated to and unchanged by this — real identity remains
+Milestone 1.3.
 
 **Future implementation mapping.** `services/identity` (named in `ARCHITECTURE.md`'s container view
-as `SIDENT`). Phase 2, deliverable 2.5.
+as `SIDENT`). Milestone 1.3 (Authentication).
 
-**Classification.** `PARTIALLY IMPLEMENTED` (creation/listing of the isolation root and its
-workspaces only; ADR-0007 still decides the identity approach and no identity service exists).
-Drift: `PREVIEW SIMPLIFICATION` — an organisation can now contain workspaces, but neither carries
-membership or row-level-security enforcement, and nothing else in the system is scoped to either
-yet, so nothing is actually tenant-isolated; every other context in this document still correctly
-treats Identity & Tenancy as not delivering isolation.
+**Classification.** `PARTIALLY IMPLEMENTED` (isolation root, its workspaces, registered users, and
+organisation/workspace membership — no role assignment, no row-level security, no authentication;
+ADR-0007 still decides the identity approach and no identity service exists). Drift:
+`PREVIEW SIMPLIFICATION` — a user can now be a member of an organisation and, transitively, a
+workspace, but nothing enforces that membership against `Record`/`Source` access, so nothing is
+actually tenant-isolated yet; every other context in this document still correctly treats Identity &
+Tenancy as not delivering isolation.
 
 ---
 
@@ -823,7 +836,7 @@ for this context; it is deployment-time, not an administrative bounded context.
 
 | # | Context | Department | Status | Drift |
 |---|---|---|---|---|
-| 1 | Identity & Tenancy | D6 | PARTIALLY IMPLEMENTED (organisation + workspace creation/listing only) | PREVIEW SIMPLIFICATION (no membership or row-level security; nothing else scoped to a workspace yet) |
+| 1 | Identity & Tenancy | D6 | PARTIALLY IMPLEMENTED (organisation/workspace + users + membership, no roles/auth) | PREVIEW SIMPLIFICATION (no row-level security; nothing on Record/Source scoped to an organisation yet) |
 | 2 | Consent & Legal Basis | D6 | APPROVED BUT NOT IMPLEMENTED | PREVIEW SIMPLIFICATION (`consentGrantId` nullable) |
 | 3 | Authorisation | D6 | IMPLEMENTED IN 0.1.0 (port/guard) / PLANNED-GATED (policy engine) | NO DRIFT |
 | 4 | Ingestion & Media | D3/D5 | FUTURE | n/a |

@@ -23,6 +23,9 @@ export type SourceId = Branded<string, 'SourceId'>;
 export type AuditEventId = Branded<string, 'AuditEventId'>;
 export type OrganisationId = Branded<string, 'OrganisationId'>;
 export type WorkspaceId = Branded<string, 'WorkspaceId'>;
+export type UserId = Branded<string, 'UserId'>;
+export type OrganisationMembershipId = Branded<string, 'OrganisationMembershipId'>;
+export type WorkspaceMembershipId = Branded<string, 'WorkspaceMembershipId'>;
 
 /**
  * UUID v4/v7 shape. We accept both: v7 is time-ordered, which matters for the
@@ -64,4 +67,19 @@ export function toOrganisationId(value: string): OrganisationId {
 export function toWorkspaceId(value: string): WorkspaceId {
   assertUuid(value, 'WorkspaceId');
   return value as WorkspaceId;
+}
+
+export function toUserId(value: string): UserId {
+  assertUuid(value, 'UserId');
+  return value as UserId;
+}
+
+export function toOrganisationMembershipId(value: string): OrganisationMembershipId {
+  assertUuid(value, 'OrganisationMembershipId');
+  return value as OrganisationMembershipId;
+}
+
+export function toWorkspaceMembershipId(value: string): WorkspaceMembershipId {
+  assertUuid(value, 'WorkspaceMembershipId');
+  return value as WorkspaceMembershipId;
 }

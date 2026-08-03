@@ -18,3 +18,7 @@ export * from './audit.js';
 export * from './record.js';
 export * from './organisation.js';
 export * from './workspace.js';
+export * from './membership.js';
+export * from './user.js';
+export * from './organisation-membership.js';
+export * from './workspace-membership.js';

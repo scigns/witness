@@ -101,31 +101,42 @@ Users and Memberships
 
 
 
-User domain model exists
+User domain model exists — DONE. `packages/domain/src/user.ts` (`createUser`), 42 domain tests
+including email normalisation and duplicate-prevention cases.
 
 
 
-Organisation membership exists
+Organisation membership exists — DONE. `packages/domain/src/organisation-membership.ts`, unique
+constraint on (organisationId, userId), `invited → active ⇄ suspended → revoked` state machine.
 
 
 
-Workspace membership exists
+Workspace membership exists — DONE. `packages/domain/src/workspace-membership.ts`; refuses
+creation unless the user has an organisation membership in good standing for that workspace's
+specific organisation (verified by adversarial cross-organisation test).
 
 
 
-Administrator can add or invite a user
+Administrator can add or invite a user — DONE, with a caveat: "invited" means registered, not that
+an email was sent — Witness does not deliver invitation email yet, and the UI says so on every
+screen that uses the word. `/users/new`, `POST /api/v1/users`, admin-only.
 
 
 
-Duplicate membership is prevented
+Duplicate membership is prevented — DONE. Unique constraints in the schema plus a pre-check
+returning `409 DUPLICATE_MEMBERSHIP`; covered by service tests for both organisation and
+workspace membership.
 
 
 
-Membership changes create audit events
+Membership changes create audit events — DONE. `organisation_membership.created`/`.state_changed`
+and `workspace_membership.created`/`.state_changed`, hash-chained through the existing audit
+mechanism (`packages/domain/src/audit.ts`), same as every other subject type.
 
 
 
-User list and membership state are visible in the UI
+User list and membership state are visible in the UI — DONE. `/users`, and membership management
+(add, activate, suspend, revoke) on `/organisations/[id]` and `/workspaces/[id]`.
 
 
 

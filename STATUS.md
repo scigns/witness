@@ -88,6 +88,44 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 
 ## What changed recently
 
+### 2026-08-03 — Users and Memberships (BUILD_ROADMAP.md Milestone 1.1) shipped
+
+- **Continuous Product Delivery mode**: `docs/BUILD_ROADMAP.md` was restructured around milestones
+  toward a usable MVP (`docs/PRODUCT_ROADMAP.md` and `docs/MVP_CHECKLIST.md` also added); Organisations
+  and Workspaces (Release 0.2 items 1–2, PRs #17/#18) are the completed baseline this milestone builds
+  on. Verified before starting: `main` green (lint, typecheck, test, build, `test:invariants` 20/20,
+  `test:adversarial` 23/23), no overlapping open PR.
+- **Users and Memberships** (Milestone 1.1) shipped: user registration
+  (`packages/domain/src/user.ts`, email normalised and deduplicated), a shared membership state
+  machine (`packages/domain/src/membership.ts`: `invited → active ⇄ suspended`, `revoked` terminal)
+  reused by both `organisation-membership.ts` and `workspace-membership.ts`. A workspace membership
+  cannot be created without an *organisation* membership in good standing for that workspace's
+  specific parent organisation — enforced in the domain from a state the service reads and passes in,
+  which is what stops standing in one organisation being used to justify workspace access under
+  another. Real foreign keys and unique constraints throughout (`witness_user`,
+  `organisation_membership`, `workspace_membership` — no polymorphic references, unlike `AuditEvent`,
+  because none of these relationships are genuinely polymorphic). All five new mutations
+  (`user.created`, `organisation_membership.created`/`.state_changed`,
+  `workspace_membership.created`/`.state_changed`) are hash-chained through the existing audit
+  mechanism. Every new action (`user:read`/`:create`, `organisation_membership:*`,
+  `workspace_membership:*`) is admin-only — this capability is explicitly administrative
+  (`BUILD_ROADMAP.md`: "an organisation administrator needs to..."), so reader/contributor/reviewer
+  get none of it, not even read.
+- Web UI: `/users` + `/users/new`, and membership management added to `/organisations/[id]` and
+  `/workspaces/[id]` (add member, activate/suspend/revoke, all server-computed `permittedActions`
+  the same way `RecordDetail` already works). No page claims an invitation email was sent — Witness
+  does not deliver email yet, and every "invited" label says so.
+- **Tests**: 42 domain tests (up from 29 — user/membership creation, email normalisation,
+  transition rules, cross-organisation and cross-workspace rejection), 40 API-gateway tests (up from
+  20 — three new service test files against an in-memory Prisma double, since no live Postgres was
+  available in this environment; see "Known limitations" in PR for what that does and doesn't cover),
+  `test:invariants` 20/20 unchanged, `test:adversarial` 26/26 (up from 23 — administrator-permitted,
+  reviewer-denied and invented-role-denied cases for every new action).
+- **`docs/MVP_CHECKLIST.md`** — the four Users and Memberships items under §B Trusted Access marked
+  done (user domain model, organisation membership, workspace membership, admin can add a user,
+  duplicate membership prevented, membership changes audited, user list and membership state visible
+  in UI); Roles/Authentication items in the same section remain unchecked — out of scope for this PR.
+
 ### 2026-08-03 — Workspaces (BUILD_ROADMAP.md Release 0.2, item 2) shipped
 
 - **Product Delivery Execution Mode**: continuing directly from the merged Organisations PR (#17),

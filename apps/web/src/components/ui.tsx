@@ -11,7 +11,7 @@
 
 import type { ReactNode } from 'react';
 
-import type { ReviewState } from '@witness/contracts';
+import type { MembershipState, ReviewState } from '@witness/contracts';
 
 const STATE_LABELS: Record<ReviewState, string> = {
   draft: 'Draft',
@@ -45,6 +45,30 @@ export function StateBadge({ state }: { state: ReviewState }) {
       <span className="sr-only">
         {accepted ? ' — accepted as institutional record' : ' — candidate, not yet accepted'}
       </span>
+    </span>
+  );
+}
+
+const MEMBERSHIP_STATE_LABELS: Record<MembershipState, string> = {
+  invited: 'Invited',
+  active: 'Active',
+  suspended: 'Suspended',
+  revoked: 'Revoked',
+};
+
+const MEMBERSHIP_STATE_CLASSES: Record<MembershipState, string> = {
+  invited: 'border-current text-[var(--color-ink-muted)]',
+  active: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  suspended: 'border-amber-600 text-amber-700 dark:text-amber-400',
+  revoked: 'border-red-700 text-red-700 dark:text-red-400',
+};
+
+export function MembershipStateBadge({ state }: { state: MembershipState }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${MEMBERSHIP_STATE_CLASSES[state]}`}
+    >
+      {MEMBERSHIP_STATE_LABELS[state]}
     </span>
   );
 }

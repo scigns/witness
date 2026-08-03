@@ -8,6 +8,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  addOrganisationMember,
+  addWorkspaceMember,
   captureRecord,
   confirmRecord,
   correctRecord,
@@ -15,6 +17,7 @@ import {
   createAuditEvent,
   createProvenance,
   createSource,
+  createUser,
   createWorkspace,
   isInstitutionalRecord,
   permittedTransitions,
@@ -24,9 +27,14 @@ import {
   toActorId,
   toAuditEventId,
   toOrganisationId,
+  toOrganisationMembershipId,
   toRecordId,
   toSourceId,
+  toUserId,
   toWorkspaceId,
+  toWorkspaceMembershipId,
+  transitionOrganisationMembership,
+  transitionWorkspaceMembership,
   verifyChain,
   type AuditEvent,
 } from './index.js';
@@ -149,6 +157,206 @@ describe('workspace', () => {
         createdAt: new Date('2026-03-14T11:00:00Z'),
       }),
     ).toThrow(/200/);
+  });
+});
+
+describe('users', () => {
+  it('creates a user, normalising the email address', () => {
+    const outcome = createUser({
+      id: toUserId('55555555-5555-4555-8555-555555555555'),
+      email: '  Someone@Example.COM ',
+      displayName: 'Someone',
+      registeredBy: HUMAN,
+      registeredAt: new Date('2026-03-14T11:00:00Z'),
+    });
+
+    expect(outcome.user.email).toBe('someone@example.com');
+    expect(outcome.user.accountState).toBe('invited');
+    expect(outcome.event.action).toBe('user.created');
+    expect(outcome.event.metadata['email']).toBe('someone@example.com');
+  });
+
+  it('rejects an address with no @ or no domain dot', () => {
+    expect(() =>
+      createUser({
+        id: toUserId('55555555-5555-4555-8555-555555555555'),
+        email: 'not-an-email',
+        displayName: 'Someone',
+        registeredBy: HUMAN,
+        registeredAt: new Date('2026-03-14T11:00:00Z'),
+      }),
+    ).toThrow(/valid email/i);
+  });
+
+  it('two addresses differing only by case normalise to the same value', () => {
+    const a = createUser({
+      id: toUserId('55555555-5555-4555-8555-555555555555'),
+      email: 'Person@Example.com',
+      displayName: 'Person',
+      registeredBy: HUMAN,
+      registeredAt: new Date('2026-03-14T11:00:00Z'),
+    });
+    const b = createUser({
+      id: toUserId('55555555-5555-4555-8555-555555555555'),
+      email: 'person@example.com',
+      displayName: 'Person',
+      registeredBy: HUMAN,
+      registeredAt: new Date('2026-03-14T11:00:00Z'),
+    });
+    expect(a.user.email).toBe(b.user.email);
+  });
+
+  it('refuses an empty display name', () => {
+    expect(() =>
+      createUser({
+        id: toUserId('55555555-5555-4555-8555-555555555555'),
+        email: 'person@example.com',
+        displayName: '   ',
+        registeredBy: HUMAN,
+        registeredAt: new Date('2026-03-14T11:00:00Z'),
+      }),
+    ).toThrow(/display name/i);
+  });
+});
+
+describe('organisation membership', () => {
+  const ORGANISATION_ID = toOrganisationId('22222222-2222-4222-8222-222222222222');
+  const USER_ID = toUserId('55555555-5555-4555-8555-555555555555');
+
+  const membership = () =>
+    addOrganisationMember({
+      id: toOrganisationMembershipId('66666666-6666-4666-8666-666666666666'),
+      organisationId: ORGANISATION_ID,
+      userId: USER_ID,
+      addedBy: HUMAN,
+      at: new Date('2026-03-14T11:00:00Z'),
+    }).membership;
+
+  it('starts invited', () => {
+    const outcome = addOrganisationMember({
+      id: toOrganisationMembershipId('66666666-6666-4666-8666-666666666666'),
+      organisationId: ORGANISATION_ID,
+      userId: USER_ID,
+      addedBy: HUMAN,
+      at: new Date('2026-03-14T11:00:00Z'),
+    });
+
+    expect(outcome.membership.state).toBe('invited');
+    expect(outcome.event.action).toBe('organisation_membership.created');
+  });
+
+  it('permits invited -> active -> suspended -> active -> revoked', () => {
+    let current = membership();
+
+    current = transitionOrganisationMembership(current, 'active', HUMAN, new Date()).membership;
+    expect(current.state).toBe('active');
+
+    current = transitionOrganisationMembership(current, 'suspended', HUMAN, new Date()).membership;
+    expect(current.state).toBe('suspended');
+
+    current = transitionOrganisationMembership(current, 'active', HUMAN, new Date()).membership;
+    expect(current.state).toBe('active');
+
+    const revoked = transitionOrganisationMembership(current, 'revoked', HUMAN, new Date());
+    expect(revoked.membership.state).toBe('revoked');
+    expect(revoked.event.action).toBe('organisation_membership.state_changed');
+    expect(revoked.event.metadata['from']).toBe('active');
+    expect(revoked.event.metadata['to']).toBe('revoked');
+  });
+
+  it('refuses to transition out of revoked — revoked is terminal', () => {
+    const revoked = transitionOrganisationMembership(
+      membership(),
+      'revoked',
+      HUMAN,
+      new Date(),
+    ).membership;
+    expect(() => transitionOrganisationMembership(revoked, 'active', HUMAN, new Date())).toThrow(
+      /revoked/i,
+    );
+  });
+
+  it('refuses to jump straight from invited to suspended', () => {
+    expect(() =>
+      transitionOrganisationMembership(membership(), 'suspended', HUMAN, new Date()),
+    ).toThrow(/invited.*suspended/i);
+  });
+});
+
+describe('workspace membership', () => {
+  const WORKSPACE_ID = toWorkspaceId('33333333-3333-4333-8333-333333333333');
+  const USER_ID = toUserId('55555555-5555-4555-8555-555555555555');
+
+  it('admits a user who is invited or active in the parent organisation', () => {
+    for (const state of ['invited', 'active'] as const) {
+      const outcome = addWorkspaceMember({
+        id: toWorkspaceMembershipId('77777777-7777-4777-8777-777777777777'),
+        workspaceId: WORKSPACE_ID,
+        userId: USER_ID,
+        organisationMembershipState: state,
+        addedBy: HUMAN,
+        at: new Date('2026-03-14T11:00:00Z'),
+      });
+      expect(outcome.membership.state).toBe('invited');
+      expect(outcome.event.action).toBe('workspace_membership.created');
+    }
+  });
+
+  it('refuses a user with no organisation membership at all', () => {
+    expect(() =>
+      addWorkspaceMember({
+        id: toWorkspaceMembershipId('77777777-7777-4777-8777-777777777777'),
+        workspaceId: WORKSPACE_ID,
+        userId: USER_ID,
+        organisationMembershipState: null,
+        addedBy: HUMAN,
+        at: new Date('2026-03-14T11:00:00Z'),
+      }),
+    ).toThrow(/organisation/i);
+  });
+
+  it('refuses a user whose organisation membership is suspended', () => {
+    expect(() =>
+      addWorkspaceMember({
+        id: toWorkspaceMembershipId('77777777-7777-4777-8777-777777777777'),
+        workspaceId: WORKSPACE_ID,
+        userId: USER_ID,
+        organisationMembershipState: 'suspended',
+        addedBy: HUMAN,
+        at: new Date('2026-03-14T11:00:00Z'),
+      }),
+    ).toThrow(/organisation/i);
+  });
+
+  it('refuses a user whose organisation membership was revoked', () => {
+    expect(() =>
+      addWorkspaceMember({
+        id: toWorkspaceMembershipId('77777777-7777-4777-8777-777777777777'),
+        workspaceId: WORKSPACE_ID,
+        userId: USER_ID,
+        organisationMembershipState: 'revoked',
+        addedBy: HUMAN,
+        at: new Date('2026-03-14T11:00:00Z'),
+      }),
+    ).toThrow(/organisation/i);
+  });
+
+  it('follows the same transition rules as organisation membership', () => {
+    const created = addWorkspaceMember({
+      id: toWorkspaceMembershipId('77777777-7777-4777-8777-777777777777'),
+      workspaceId: WORKSPACE_ID,
+      userId: USER_ID,
+      organisationMembershipState: 'active',
+      addedBy: HUMAN,
+      at: new Date('2026-03-14T11:00:00Z'),
+    }).membership;
+
+    const activated = transitionWorkspaceMembership(created, 'active', HUMAN, new Date());
+    expect(activated.membership.state).toBe('active');
+
+    expect(() =>
+      transitionWorkspaceMembership(activated.membership, 'invited', HUMAN, new Date()),
+    ).toThrow(/active.*invited/i);
   });
 });
 

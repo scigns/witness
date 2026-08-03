@@ -16,12 +16,16 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ACCOUNT_STATES as CONTRACT_ACCOUNT_STATES,
   ACTOR_KINDS as CONTRACT_ACTOR_KINDS,
+  MEMBERSHIP_STATES as CONTRACT_MEMBERSHIP_STATES,
   REVIEW_STATES as CONTRACT_REVIEW_STATES,
   SOURCE_KINDS as CONTRACT_SOURCE_KINDS,
 } from '@witness/contracts';
 import {
+  ACCOUNT_STATES as DOMAIN_ACCOUNT_STATES,
   ACTOR_KINDS as DOMAIN_ACTOR_KINDS,
+  MEMBERSHIP_STATES as DOMAIN_MEMBERSHIP_STATES,
   REVIEW_STATES as DOMAIN_REVIEW_STATES,
   SOURCE_KINDS as DOMAIN_SOURCE_KINDS,
 } from '@witness/domain';
@@ -37,5 +41,13 @@ describe('contracts and domain agree across the licence boundary', () => {
 
   it('actor kinds are identical', () => {
     expect([...CONTRACT_ACTOR_KINDS].sort()).toEqual([...DOMAIN_ACTOR_KINDS].sort());
+  });
+
+  it('account states are identical', () => {
+    expect([...CONTRACT_ACCOUNT_STATES].sort()).toEqual([...DOMAIN_ACCOUNT_STATES].sort());
+  });
+
+  it('membership states are identical', () => {
+    expect([...CONTRACT_MEMBERSHIP_STATES].sort()).toEqual([...DOMAIN_MEMBERSHIP_STATES].sort());
   });
 });

@@ -22,6 +22,7 @@ const NAV = [
   { href: '/records/new', label: 'Capture' },
   { href: '/organisations', label: 'Organisations' },
   { href: '/workspaces', label: 'Workspaces' },
+  { href: '/users', label: 'Users' },
 ] as const;
 
 const ROLES: ReadonlyArray<ActingUser['role']> = ['reader', 'contributor', 'reviewer', 'admin'];

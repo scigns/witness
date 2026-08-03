@@ -10,14 +10,20 @@
  */
 
 import type {
+  AddMembershipRequest,
   CreateOrganisationRequest,
   CreateRecordRequest,
+  CreateUserRequest,
   CreateWorkspaceRequest,
   HealthResponse,
+  MembershipAction,
+  OrganisationMembershipView,
   OrganisationSummary,
   RecordDetail,
   RecordSummary,
   ReviewAction,
+  UserSummary,
+  WorkspaceMembershipView,
   WorkspaceSummary,
 } from '@witness/contracts';
 
@@ -123,4 +129,79 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  listUsers: (user: ActingUser): Promise<{ users: UserSummary[] }> =>
+    request<{ users: UserSummary[] }>('/api/v1/users', user),
+
+  createUser: (body: CreateUserRequest, user: ActingUser): Promise<UserSummary> =>
+    request<UserSummary>('/api/v1/users', user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  listOrganisationMemberships: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<{ memberships: OrganisationMembershipView[] }> =>
+    request<{ memberships: OrganisationMembershipView[] }>(
+      `/api/v1/organisations/${organisationId}/memberships`,
+      user,
+    ),
+
+  addOrganisationMembership: (
+    organisationId: string,
+    body: AddMembershipRequest,
+    user: ActingUser,
+  ): Promise<OrganisationMembershipView> =>
+    request<OrganisationMembershipView>(
+      `/api/v1/organisations/${organisationId}/memberships`,
+      user,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
+
+  transitionOrganisationMembership: (
+    organisationId: string,
+    membershipId: string,
+    action: MembershipAction,
+    user: ActingUser,
+  ): Promise<OrganisationMembershipView> =>
+    request<OrganisationMembershipView>(
+      `/api/v1/organisations/${organisationId}/memberships/${membershipId}/status`,
+      user,
+      { method: 'POST', body: JSON.stringify(action) },
+    ),
+
+  listWorkspaceMemberships: (
+    workspaceId: string,
+    user: ActingUser,
+  ): Promise<{ memberships: WorkspaceMembershipView[] }> =>
+    request<{ memberships: WorkspaceMembershipView[] }>(
+      `/api/v1/workspaces/${workspaceId}/memberships`,
+      user,
+    ),
+
+  addWorkspaceMembership: (
+    workspaceId: string,
+    body: AddMembershipRequest,
+    user: ActingUser,
+  ): Promise<WorkspaceMembershipView> =>
+    request<WorkspaceMembershipView>(`/api/v1/workspaces/${workspaceId}/memberships`, user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  transitionWorkspaceMembership: (
+    workspaceId: string,
+    membershipId: string,
+    action: MembershipAction,
+    user: ActingUser,
+  ): Promise<WorkspaceMembershipView> =>
+    request<WorkspaceMembershipView>(
+      `/api/v1/workspaces/${workspaceId}/memberships/${membershipId}/status`,
+      user,
+      { method: 'POST', body: JSON.stringify(action) },
+    ),
 };

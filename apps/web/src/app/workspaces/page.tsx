@@ -103,7 +103,11 @@ export default function WorkspacesPage() {
             <tbody>
               {workspaces.map((workspace) => (
                 <tr key={workspace.id} className="border-b border-[var(--color-line)]">
-                  <td className="py-3 pr-4 font-medium">{workspace.name}</td>
+                  <td className="py-3 pr-4 font-medium">
+                    <Link href={`/workspaces/${workspace.id}`} className="hover:underline">
+                      {workspace.name}
+                    </Link>
+                  </td>
                   <td className="py-3 pr-4 text-[var(--color-ink-muted)]">
                     {organisationName(workspace.organisationId)}
                   </td>
