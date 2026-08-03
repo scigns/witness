@@ -19,13 +19,22 @@ import type {
   MembershipState,
   OrganisationMembershipView,
   OrganisationSummary,
+  RoleAssignmentView,
+  RoleDefinition,
+  WitnessRole,
   WorkspaceMembershipView,
   WorkspaceSummary,
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { Button, Card, ErrorNotice, MembershipStateBadge } from '@/components/ui';
+import {
+  Button,
+  Card,
+  ErrorNotice,
+  MembershipStateBadge,
+  RoleAssignmentControl,
+} from '@/components/ui';
 
 const ACTION_LABELS: Record<MembershipAction['action'], string> = {
   activate: 'Activate',
@@ -43,6 +52,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [organisation, setOrganisation] = useState<OrganisationSummary | null>(null);
   const [memberships, setMemberships] = useState<WorkspaceMembershipView[]>([]);
   const [organisationMembers, setOrganisationMembers] = useState<OrganisationMembershipView[]>([]);
+  const [roles, setRoles] = useState<RoleDefinition[]>([]);
+  const [roleAssignments, setRoleAssignments] = useState<Record<string, RoleAssignmentView>>({});
   const [selectedUserId, setSelectedUserId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,11 +62,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
       try {
-        const [workspacesResult, organisationsResult, membershipsResult] = await Promise.all([
-          api.listWorkspaces(user),
-          api.listOrganisations(user),
-          api.listWorkspaceMemberships(id, user),
-        ]);
+        const [workspacesResult, organisationsResult, membershipsResult, rolesResult] =
+          await Promise.all([
+            api.listWorkspaces(user),
+            api.listOrganisations(user),
+            api.listWorkspaceMemberships(id, user),
+            api.listRoles(user),
+          ]);
         if (cancelledRef.current) return;
 
         const foundWorkspace = workspacesResult.workspaces.find((w) => w.id === id) ?? null;
@@ -68,6 +81,15 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               ) ?? null),
         );
         setMemberships(membershipsResult.memberships);
+        setRoles(rolesResult.roles);
+
+        const assignments = await Promise.all(
+          membershipsResult.memberships.map((membership) =>
+            api.getWorkspaceRoleAssignment(id, membership.id, user),
+          ),
+        );
+        if (cancelledRef.current) return;
+        setRoleAssignments(Object.fromEntries(assignments.map((a) => [a.membershipId, a])));
 
         if (foundWorkspace !== null) {
           const orgMembersResult = await api.listOrganisationMemberships(
@@ -123,6 +145,30 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     setBusy(true);
     try {
       await api.transitionWorkspaceMembership(id, membershipId, { action }, user);
+      await load({ current: false });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const assignRole = async (membershipId: string, role: string) => {
+    setBusy(true);
+    try {
+      await api.assignWorkspaceRole(id, membershipId, { role: role as WitnessRole }, user);
+      await load({ current: false });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeRole = async (membershipId: string) => {
+    setBusy(true);
+    try {
+      await api.removeWorkspaceRole(id, membershipId, user);
       await load({ current: false });
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
@@ -231,39 +277,64 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   <th scope="col" className="py-2 pr-4 font-medium">
                     Membership status
                   </th>
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Role
+                  </th>
                   <th scope="col" className="py-2 font-medium">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {memberships.map((membership) => (
-                  <tr key={membership.id} className="border-b border-[var(--color-line)]">
-                    <td className="py-3 pr-4">
-                      <div className="font-medium">{membership.userDisplayName}</div>
-                      <div className="text-xs text-[var(--color-ink-muted)]">
-                        {membership.userEmail}
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <MembershipStateBadge state={membership.state} />
-                    </td>
-                    <td className="py-3">
-                      <div className="flex flex-wrap gap-2">
-                        {membership.permittedActions.map((action) => (
-                          <Button
-                            key={action}
-                            variant={action === 'revoke' ? 'danger' : 'secondary'}
-                            disabled={busy}
-                            onClick={() => void applyAction(membership.id, action)}
-                          >
-                            {ACTION_LABELS[action]}
-                          </Button>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {memberships.map((membership) => {
+                  const assignment: RoleAssignmentView = roleAssignments[membership.id] ?? {
+                    membershipId: membership.id,
+                    userId: membership.userId,
+                    userEmail: membership.userEmail,
+                    userDisplayName: membership.userDisplayName,
+                    role: null,
+                    roleLabel: null,
+                    permittedActions: [],
+                    updatedAt: null,
+                  };
+
+                  return (
+                    <tr key={membership.id} className="border-b border-[var(--color-line)]">
+                      <td className="py-3 pr-4">
+                        <div className="font-medium">{membership.userDisplayName}</div>
+                        <div className="text-xs text-[var(--color-ink-muted)]">
+                          {membership.userEmail}
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <MembershipStateBadge state={membership.state} />
+                      </td>
+                      <td className="py-3 pr-4">
+                        <RoleAssignmentControl
+                          roles={roles}
+                          assignment={assignment}
+                          busy={busy}
+                          onAssign={(role) => void assignRole(membership.id, role)}
+                          onRemove={() => void removeRole(membership.id)}
+                        />
+                      </td>
+                      <td className="py-3">
+                        <div className="flex flex-wrap gap-2">
+                          {membership.permittedActions.map((action) => (
+                            <Button
+                              key={action}
+                              variant={action === 'revoke' ? 'danger' : 'secondary'}
+                              disabled={busy}
+                              onClick={() => void applyAction(membership.id, action)}
+                            >
+                              {ACTION_LABELS[action]}
+                            </Button>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -11,6 +11,7 @@
 
 import type {
   AddMembershipRequest,
+  AssignRoleRequest,
   CreateOrganisationRequest,
   CreateRecordRequest,
   CreateUserRequest,
@@ -22,6 +23,8 @@ import type {
   RecordDetail,
   RecordSummary,
   ReviewAction,
+  RoleAssignmentView,
+  RoleDefinition,
   UserSummary,
   WorkspaceMembershipView,
   WorkspaceSummary,
@@ -83,6 +86,12 @@ async function request<T>(path: string, user: ActingUser | null, init?: RequestI
     }
 
     throw new ApiError(message, response.status, code);
+  }
+
+  // A 204 (e.g. removing a role assignment) has no body — `response.json()`
+  // would throw on it rather than return an absence.
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return (await response.json()) as T;
@@ -204,4 +213,73 @@ export const api = {
       user,
       { method: 'POST', body: JSON.stringify(action) },
     ),
+
+  listRoles: (user: ActingUser): Promise<{ roles: RoleDefinition[] }> =>
+    request<{ roles: RoleDefinition[] }>('/api/v1/roles', user),
+
+  getOrganisationRoleAssignment: (
+    organisationId: string,
+    membershipId: string,
+    user: ActingUser,
+  ): Promise<RoleAssignmentView> =>
+    request<RoleAssignmentView>(
+      `/api/v1/organisations/${organisationId}/memberships/${membershipId}/role`,
+      user,
+    ),
+
+  assignOrganisationRole: (
+    organisationId: string,
+    membershipId: string,
+    body: AssignRoleRequest,
+    user: ActingUser,
+  ): Promise<RoleAssignmentView> =>
+    request<RoleAssignmentView>(
+      `/api/v1/organisations/${organisationId}/memberships/${membershipId}/role`,
+      user,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
+  removeOrganisationRole: (
+    organisationId: string,
+    membershipId: string,
+    user: ActingUser,
+  ): Promise<void> =>
+    request<void>(
+      `/api/v1/organisations/${organisationId}/memberships/${membershipId}/role`,
+      user,
+      {
+        method: 'DELETE',
+      },
+    ),
+
+  getWorkspaceRoleAssignment: (
+    workspaceId: string,
+    membershipId: string,
+    user: ActingUser,
+  ): Promise<RoleAssignmentView> =>
+    request<RoleAssignmentView>(
+      `/api/v1/workspaces/${workspaceId}/memberships/${membershipId}/role`,
+      user,
+    ),
+
+  assignWorkspaceRole: (
+    workspaceId: string,
+    membershipId: string,
+    body: AssignRoleRequest,
+    user: ActingUser,
+  ): Promise<RoleAssignmentView> =>
+    request<RoleAssignmentView>(
+      `/api/v1/workspaces/${workspaceId}/memberships/${membershipId}/role`,
+      user,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
+  removeWorkspaceRole: (
+    workspaceId: string,
+    membershipId: string,
+    user: ActingUser,
+  ): Promise<void> =>
+    request<void>(`/api/v1/workspaces/${workspaceId}/memberships/${membershipId}/role`, user, {
+      method: 'DELETE',
+    }),
 };

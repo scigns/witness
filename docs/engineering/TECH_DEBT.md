@@ -44,6 +44,8 @@ quietly not doing.
 | ID | Title | Severity | Incurred | Owner | Review by | Rationale | Exit |
 |---|---|---|---|---|---|---|---|
 | **TD-001** | Dependency review gate is not running — GitHub Dependency graph unavailable on this repository | **S2** | 2026-07-31 (#1) | Security Lead | **2026-10-31** | Platform feature is off; the action hard-failed on every run, turning the whole security workflow permanently red | Enable Dependency graph in repository settings, or make the repository public |
+| **TD-002** | Audit hash-chain tail-read race — concurrent appends to the same subject can chain onto the same predecessor | **S2** | 2026-08-03 (#19) | Backend Lead | **2026-10-03** | `appendAuditEvent` reads the current tail inside the caller's transaction under Postgres's default read-committed isolation, which does not itself prevent two concurrent transactions both reading the same tail before either commits | Serialisable isolation or a `SELECT ... FOR UPDATE` on the subject's tail row, scoped to write paths only |
+| **TD-003** | Actor-resolution TOCTOU — `resolveActor`'s find-or-create has no unique constraint on `(displayName, kind)` | **S3** | 2026-08-03 (#19) | Backend Lead | **2026-10-03** | Two concurrent requests from the same unauthenticated dev-header identity can both miss the `findFirst` and both `create`, producing two `Actor` rows for what should be one identity | Unique constraint on `(display_name, kind)` plus an upsert, or resolve actors through real authenticated identity once Milestone 1.3 lands, which may make this moot rather than worth fixing directly |
 
 ### TD-001 — Dependency review gate is not running
 
@@ -73,6 +75,71 @@ is tracked rather than fixed in a commit.
 **Trigger to fix.**
 **Before Phase 2 introduces the first real dependency.** A supply-chain gate that is switched off at
 the moment dependencies arrive is worse than one that was never claimed.
+
+### TD-002 — Audit hash-chain tail-read race
+
+**Severity:** S2 · **Incurred:** 2026-08-03 in #19 · **Owner:** Backend Lead
+**Review by:** 2026-10-03 · **Area:** `services/api-gateway/src/infrastructure/audit.helper.ts`
+
+**What was done and why.**
+`appendAuditEvent` (shared by the users, membership, and role-assignment services) reads a subject's
+current tail hash with `findFirst` inside the caller's own transaction, then appends onto it —
+exactly the pattern `RecordsService.appendAudit` already used before this capability existed. Postgres's
+default read-committed isolation does not itself stop two concurrent transactions against the *same*
+subject both reading the same tail before either commits, which would let both compute a hash chained
+onto the same predecessor. It was identified during CodeRabbit review of #19, judged pre-existing and
+inherited rather than introduced by that PR, and deliberately not fixed inside a single-capability PR
+per the instruction not to silently redesign a cross-cutting system in service of one feature.
+
+**Cost of carrying it.**
+Real today only under genuine concurrent writes to the *same* subject — a single administrator working
+through the UI serially never triggers it. Its blast radius grows every time a new capability starts
+writing to the audit trail (four subject types now do, up from one), since more capabilities means
+more surface area for two writers to collide on one subject.
+
+**What it would take to fix.**
+Serialisable transaction isolation for audit-append transactions specifically (a scoped, not global,
+isolation-level change), or a `SELECT ... FOR UPDATE` on the subject's tail row before computing the
+next hash. Both are small, contained changes to one shared helper — the reason this is tracked rather
+than fixed inline is that it touches every write path that appends audit events at once, which is a
+cross-cutting change deserving its own review, not a side effect of a role-assignment PR.
+
+**Trigger to fix.**
+Before any capability introduces genuinely concurrent writers to the same subject (e.g. two
+facilitators editing the same session simultaneously) — Milestone 2 (Co-design Sessions) is the first
+plausible candidate.
+
+### TD-003 — Actor-resolution TOCTOU
+
+**Severity:** S3 · **Incurred:** 2026-08-03 in #19 · **Owner:** Backend Lead
+**Review by:** 2026-10-03 · **Area:** `services/api-gateway/src/infrastructure/actor.helper.ts`
+
+**What was done and why.**
+`resolveActor` finds-or-creates an `Actor` row by `(displayName, kind)` — a find, then a create if
+nothing was found, with no unique database constraint on that pair and no transaction wrapping the
+two steps together. Two concurrent requests carrying the same unverified dev-header identity can both
+miss the `findFirst` and both proceed to `create`, producing two `Actor` rows for what a human would
+consider one identity. Also identified during #19's review, also inherited from the pre-existing
+`OrganisationsService`/`WorkspacesService` copies of the same pattern rather than introduced by the
+capability that factored it into a shared helper, and deliberately not fixed for the same
+single-capability-PR reasoning as TD-002.
+
+**Cost of carrying it.**
+Cosmetic today: duplicate `Actor` rows split one identity's provenance history across two ids,
+confusing but not incorrect (each row is internally consistent, and the audit chain per subject is
+unaffected). Concurrent requests from the *same* dev-header identity are uncommon in the current
+single-operator development workflow.
+
+**What it would take to fix.**
+A unique constraint on `(display_name, kind)` plus an upsert (`ON CONFLICT DO NOTHING` /
+`findFirst`-then-`create`-in-a-transaction), or — more likely to actually happen — resolving actors
+through real authenticated identity once Milestone 1.3 (Authentication) lands, which may make the
+current find-or-create pattern moot entirely rather than something worth hardening in its current form.
+
+**Trigger to fix.**
+Before Milestone 1.3 (Authentication) ships, decide explicitly whether `resolveActor` is fixed as-is
+or superseded by identity-backed actor resolution — don't let it survive unexamined into the
+authenticated system.
 
 ### Entry format
 

@@ -15,12 +15,21 @@ import type {
   MembershipAction,
   OrganisationMembershipView,
   OrganisationSummary,
+  RoleAssignmentView,
+  RoleDefinition,
   UserSummary,
+  WitnessRole,
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { Button, Card, ErrorNotice, MembershipStateBadge } from '@/components/ui';
+import {
+  Button,
+  Card,
+  ErrorNotice,
+  MembershipStateBadge,
+  RoleAssignmentControl,
+} from '@/components/ui';
 
 const ACTION_LABELS: Record<MembershipAction['action'], string> = {
   activate: 'Activate',
@@ -35,6 +44,8 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
   const [organisation, setOrganisation] = useState<OrganisationSummary | null>(null);
   const [memberships, setMemberships] = useState<OrganisationMembershipView[]>([]);
   const [users, setUsers] = useState<UserSummary[]>([]);
+  const [roles, setRoles] = useState<RoleDefinition[]>([]);
+  const [roleAssignments, setRoleAssignments] = useState<Record<string, RoleAssignmentView>>({});
   const [selectedUserId, setSelectedUserId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,16 +54,28 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
       try {
-        const [organisationsResult, membershipsResult, usersResult] = await Promise.all([
-          api.listOrganisations(user),
-          api.listOrganisationMemberships(id, user),
-          api.listUsers(user),
-        ]);
+        const [organisationsResult, membershipsResult, usersResult, rolesResult] =
+          await Promise.all([
+            api.listOrganisations(user),
+            api.listOrganisationMemberships(id, user),
+            api.listUsers(user),
+            api.listRoles(user),
+          ]);
         if (cancelledRef.current) return;
 
         setOrganisation(organisationsResult.organisations.find((o) => o.id === id) ?? null);
         setMemberships(membershipsResult.memberships);
         setUsers(usersResult.users);
+        setRoles(rolesResult.roles);
+
+        const assignments = await Promise.all(
+          membershipsResult.memberships.map((membership) =>
+            api.getOrganisationRoleAssignment(id, membership.id, user),
+          ),
+        );
+        if (cancelledRef.current) return;
+        setRoleAssignments(Object.fromEntries(assignments.map((a) => [a.membershipId, a])));
+
         setError(null);
       } catch (caught) {
         if (cancelledRef.current) return;
@@ -96,6 +119,30 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
     setBusy(true);
     try {
       await api.transitionOrganisationMembership(id, membershipId, { action }, user);
+      await load({ current: false });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const assignRole = async (membershipId: string, role: string) => {
+    setBusy(true);
+    try {
+      await api.assignOrganisationRole(id, membershipId, { role: role as WitnessRole }, user);
+      await load({ current: false });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeRole = async (membershipId: string) => {
+    setBusy(true);
+    try {
+      await api.removeOrganisationRole(id, membershipId, user);
       await load({ current: false });
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
@@ -192,39 +239,64 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
                   <th scope="col" className="py-2 pr-4 font-medium">
                     Membership status
                   </th>
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Role
+                  </th>
                   <th scope="col" className="py-2 font-medium">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {memberships.map((membership) => (
-                  <tr key={membership.id} className="border-b border-[var(--color-line)]">
-                    <td className="py-3 pr-4">
-                      <div className="font-medium">{membership.userDisplayName}</div>
-                      <div className="text-xs text-[var(--color-ink-muted)]">
-                        {membership.userEmail}
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <MembershipStateBadge state={membership.state} />
-                    </td>
-                    <td className="py-3">
-                      <div className="flex flex-wrap gap-2">
-                        {membership.permittedActions.map((action) => (
-                          <Button
-                            key={action}
-                            variant={action === 'revoke' ? 'danger' : 'secondary'}
-                            disabled={busy}
-                            onClick={() => void applyAction(membership.id, action)}
-                          >
-                            {ACTION_LABELS[action]}
-                          </Button>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {memberships.map((membership) => {
+                  const assignment: RoleAssignmentView = roleAssignments[membership.id] ?? {
+                    membershipId: membership.id,
+                    userId: membership.userId,
+                    userEmail: membership.userEmail,
+                    userDisplayName: membership.userDisplayName,
+                    role: null,
+                    roleLabel: null,
+                    permittedActions: [],
+                    updatedAt: null,
+                  };
+
+                  return (
+                    <tr key={membership.id} className="border-b border-[var(--color-line)]">
+                      <td className="py-3 pr-4">
+                        <div className="font-medium">{membership.userDisplayName}</div>
+                        <div className="text-xs text-[var(--color-ink-muted)]">
+                          {membership.userEmail}
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <MembershipStateBadge state={membership.state} />
+                      </td>
+                      <td className="py-3 pr-4">
+                        <RoleAssignmentControl
+                          roles={roles}
+                          assignment={assignment}
+                          busy={busy}
+                          onAssign={(role) => void assignRole(membership.id, role)}
+                          onRemove={() => void removeRole(membership.id)}
+                        />
+                      </td>
+                      <td className="py-3">
+                        <div className="flex flex-wrap gap-2">
+                          {membership.permittedActions.map((action) => (
+                            <Button
+                              key={action}
+                              variant={action === 'revoke' ? 'danger' : 'secondary'}
+                              disabled={busy}
+                              onClick={() => void applyAction(membership.id, action)}
+                            >
+                              {ACTION_LABELS[action]}
+                            </Button>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

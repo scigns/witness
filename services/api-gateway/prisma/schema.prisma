@@ -93,8 +93,9 @@ model Organisation {
   name      String   @db.VarChar(200)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  workspaces  Workspace[]
-  memberships OrganisationMembership[]
+  workspaces      Workspace[]
+  memberships     OrganisationMembership[]
+  roleAssignments RoleAssignment[]
 
   @@map("organisation")
 }
@@ -115,7 +116,8 @@ model Workspace {
 
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  memberships WorkspaceMembership[]
+  memberships     WorkspaceMembership[]
+  roleAssignments RoleAssignment[]
 
   @@index([organisationId])
   @@map("workspace")
@@ -139,6 +141,7 @@ model User {
 
   organisationMemberships OrganisationMembership[]
   workspaceMemberships    WorkspaceMembership[]
+  roleAssignments         RoleAssignment[]
 
   @@index([accountState])
   @@map("witness_user")
@@ -197,6 +200,49 @@ model WorkspaceMembership {
   @@index([workspaceId, state])
   @@index([userId])
   @@map("workspace_membership")
+}
+
+/// "What may this member do here" (BUILD_ROADMAP.md Milestone 1.2, Roles and
+/// Permission Assignment) — strictly separate from `OrganisationMembership`/
+/// `WorkspaceMembership`, which only answer "does this member belong here".
+///
+/// One row per (user, scope): `organisationId`/`workspaceId` are mutually
+/// exclusive per `scopeType`, enforced by the `role_assignment_scope_check`
+/// CHECK constraint added in this model's migration (Prisma's schema DSL has
+/// no way to express it directly). The two `@@unique` constraints below give
+/// an independent "one row per (organisation, user)" and "one row per
+/// (workspace, user)" without a partial index, because Postgres never treats
+/// NULL as equal to NULL in a unique constraint — multiple workspace-scoped
+/// rows (organisationId = NULL) do not collide with each other, and vice
+/// versa.
+///
+/// Deliberately does not duplicate membership data (state, timestamps) —
+/// only the identifiers needed to scope and query the assignment itself; the
+/// membership tables above remain the sole source of truth for "in good
+/// standing", re-read by the service layer at assignment time
+/// (`packages/domain/src/role-assignment.ts`).
+model RoleAssignment {
+  id        String @id @db.Uuid
+  scopeType String @map("scope_type") @db.VarChar(16)
+
+  organisationId String?       @map("organisation_id") @db.Uuid
+  organisation   Organisation? @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String?    @map("workspace_id") @db.Uuid
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  role String @db.VarChar(24)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organisationId, userId])
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("role_assignment")
 }
 
 /// Append-only, hash-chained audit trail (roadmap 3.7).

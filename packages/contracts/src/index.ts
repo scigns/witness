@@ -30,6 +30,16 @@ export type AccountState = (typeof ACCOUNT_STATES)[number];
 export const MEMBERSHIP_STATES = ['invited', 'active', 'suspended', 'revoked'] as const;
 export type MembershipState = (typeof MEMBERSHIP_STATES)[number];
 
+export const WITNESS_ROLES = [
+  'admin',
+  'facilitator',
+  'contributor',
+  'reviewer',
+  'participant',
+  'reader',
+] as const;
+export type WitnessRole = (typeof WITNESS_ROLES)[number];
+
 // ─── Requests ────────────────────────────────────────────────────────────────
 
 export const createRecordRequestSchema = z.object({
@@ -90,6 +100,11 @@ export const membershipActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('revoke') }),
 ]);
 export type MembershipAction = z.infer<typeof membershipActionSchema>;
+
+export const assignRoleRequestSchema = z.object({
+  role: z.enum(WITNESS_ROLES, { message: 'A recognised Witness role is required' }),
+});
+export type AssignRoleRequest = z.infer<typeof assignRoleRequestSchema>;
 
 // ─── Responses ───────────────────────────────────────────────────────────────
 
@@ -187,6 +202,32 @@ export interface WorkspaceMembershipView {
   permittedActions: MembershipAction['action'][];
   createdAt: string;
   updatedAt: string;
+}
+
+/** The static role catalog — same for every organisation and workspace. */
+export interface RoleDefinition {
+  role: WitnessRole;
+  /** Plain-language name, for an administrator who should never have to read a role identifier. */
+  label: string;
+  description: string;
+  permittedActions: string[];
+}
+
+/**
+ * A member's current role assignment in one organisation or workspace, or
+ * the absence of one — `role: null` means the member has no assignment yet,
+ * a normal and expected state rather than an error (BUILD_ROADMAP.md
+ * Milestone 1.2: role assignment never happens implicitly).
+ */
+export interface RoleAssignmentView {
+  membershipId: string;
+  userId: string;
+  userEmail: string;
+  userDisplayName: string;
+  role: WitnessRole | null;
+  roleLabel: string | null;
+  permittedActions: string[];
+  updatedAt: string | null;
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────────
