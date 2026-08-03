@@ -37,8 +37,15 @@ const DISPLAY_NAME_MAX = 200;
  * mistakes an administrator will make — a missing `@`, a stray space, a typo'd
  * domain with no dot. RFC 5322's full grammar is not worth the false sense of
  * rigour it would buy here.
+ *
+ * No single regex here on purpose. A pattern like `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`
+ * lets the middle and trailing groups both match `.`, so a non-matching input
+ * forces the engine to retry every possible split between them — polynomial
+ * backtracking on attacker-controlled input (flagged by CodeQL). Splitting on
+ * the single `@` first makes the local/domain boundary unambiguous, so there is
+ * nothing left to backtrack over.
  */
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const NO_WHITESPACE_OR_AT = /^[^\s@]+$/;
 
 export interface User {
   readonly id: UserId;
@@ -66,8 +73,22 @@ export interface UserOutcome {
  */
 export function normaliseEmail(email: string): string {
   const trimmed = email.trim().toLowerCase();
+  const at = trimmed.indexOf('@');
+  // A second '@' would make the split ambiguous — indexOf finds the first,
+  // so an address like 'a@b@c' fails the local/domain checks below rather
+  // than being silently split at the wrong position.
+  const local = at === -1 ? '' : trimmed.slice(0, at);
+  const domain = at === -1 ? '' : trimmed.slice(at + 1);
 
-  if (!EMAIL_PATTERN.test(trimmed)) {
+  const valid =
+    at > 0 &&
+    NO_WHITESPACE_OR_AT.test(local) &&
+    NO_WHITESPACE_OR_AT.test(domain) &&
+    domain.includes('.') &&
+    !domain.startsWith('.') &&
+    !domain.endsWith('.');
+
+  if (!valid) {
     throw new InvariantViolation(`'${email}' is not a valid email address.`, 'INVALID_EMAIL');
   }
 
