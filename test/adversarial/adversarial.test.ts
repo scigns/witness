@@ -236,9 +236,16 @@ describe('ATTACK — escalate privilege through the authorisation adapter', () =
   it('the real admin role does not grant an action it was not given', async () => {
     const principal = await adapter.authenticate('Attacker|admin');
     expect(principal?.roles).toEqual(['admin']);
-    // admin exists to gate organisation:create — it must not be a silent
-    // superuser that happens to grant everything else too.
+    // admin exists to gate organisation:create and workspace:create — it must
+    // not be a silent superuser that happens to grant everything else too.
     expect((await adapter.decide(principal!, 'organisation:create')).allowed).toBe(true);
+    expect((await adapter.decide(principal!, 'workspace:create')).allowed).toBe(true);
+  });
+
+  it('a reviewer cannot create a workspace — that privilege is admin-only', async () => {
+    const principal = await adapter.authenticate('Attacker|reviewer');
+    expect((await adapter.decide(principal!, 'workspace:read')).allowed).toBe(true);
+    expect((await adapter.decide(principal!, 'workspace:create')).allowed).toBe(false);
   });
 
   it('an empty header does not yield an anonymous principal', async () => {

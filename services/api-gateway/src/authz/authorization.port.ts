@@ -26,7 +26,13 @@ export interface Principal {
 }
 
 export type Action =
-  'record:read' | 'record:create' | 'record:review' | 'organisation:read' | 'organisation:create';
+  | 'record:read'
+  | 'record:create'
+  | 'record:review'
+  | 'organisation:read'
+  | 'organisation:create'
+  | 'workspace:read'
+  | 'workspace:create';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;

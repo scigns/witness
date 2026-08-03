@@ -18,13 +18,16 @@ import { OrganisationsService } from './organisations/organisations.service.js';
 import { RecordsController } from './records/records.controller.js';
 import { RecordsService } from './records/records.service.js';
 import { WITNESS_CONFIG } from './tokens.js';
+import { WorkspacesController } from './workspaces/workspaces.controller.js';
+import { WorkspacesService } from './workspaces/workspaces.service.js';
 
 @Module({
-  controllers: [HealthController, RecordsController, OrganisationsController],
+  controllers: [HealthController, RecordsController, OrganisationsController, WorkspacesController],
   providers: [
     PrismaService,
     RecordsService,
     OrganisationsService,
+    WorkspacesService,
     {
       // Configuration is validated once, at construction. If it violates the
       // deployment-profile contract, loadConfigOrExit terminates the process

@@ -17,3 +17,4 @@ export * from './review.js';
 export * from './audit.js';
 export * from './record.js';
 export * from './organisation.js';
+export * from './workspace.js';

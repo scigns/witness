@@ -15,6 +15,7 @@ import {
   createAuditEvent,
   createProvenance,
   createSource,
+  createWorkspace,
   isInstitutionalRecord,
   permittedTransitions,
   rejectRecord,
@@ -22,8 +23,10 @@ import {
   submitForReview,
   toActorId,
   toAuditEventId,
+  toOrganisationId,
   toRecordId,
   toSourceId,
+  toWorkspaceId,
   verifyChain,
   type AuditEvent,
 } from './index.js';
@@ -94,6 +97,58 @@ describe('actors', () => {
 describe('identifiers', () => {
   it('rejects a non-UUID identifier', () => {
     expect(() => toRecordId('not-a-uuid')).toThrow(/UUID/i);
+  });
+});
+
+describe('workspace', () => {
+  const ORGANISATION_ID = toOrganisationId('22222222-2222-4222-8222-222222222222');
+
+  it('creates a workspace scoped to an organisation', () => {
+    const outcome = createWorkspace({
+      id: toWorkspaceId('33333333-3333-4333-8333-333333333333'),
+      organisationId: ORGANISATION_ID,
+      name: 'Water Committee Programme',
+      createdBy: HUMAN,
+      createdAt: new Date('2026-03-14T11:00:00Z'),
+    });
+
+    expect(outcome.workspace.organisationId).toBe(ORGANISATION_ID);
+    expect(outcome.workspace.name).toBe('Water Committee Programme');
+    expect(outcome.event.action).toBe('workspace.created');
+    expect(outcome.event.metadata['organisationId']).toBe(ORGANISATION_ID);
+  });
+
+  it('trims the name and refuses an empty one', () => {
+    const withPadding = createWorkspace({
+      id: toWorkspaceId('33333333-3333-4333-8333-333333333333'),
+      organisationId: ORGANISATION_ID,
+      name: '  Padded  ',
+      createdBy: HUMAN,
+      createdAt: new Date('2026-03-14T11:00:00Z'),
+    });
+    expect(withPadding.workspace.name).toBe('Padded');
+
+    expect(() =>
+      createWorkspace({
+        id: toWorkspaceId('33333333-3333-4333-8333-333333333333'),
+        organisationId: ORGANISATION_ID,
+        name: '   ',
+        createdBy: HUMAN,
+        createdAt: new Date('2026-03-14T11:00:00Z'),
+      }),
+    ).toThrow(/name/i);
+  });
+
+  it('refuses a name over the length bound', () => {
+    expect(() =>
+      createWorkspace({
+        id: toWorkspaceId('33333333-3333-4333-8333-333333333333'),
+        organisationId: ORGANISATION_ID,
+        name: 'x'.repeat(201),
+        createdBy: HUMAN,
+        createdAt: new Date('2026-03-14T11:00:00Z'),
+      }),
+    ).toThrow(/200/);
   });
 });
 

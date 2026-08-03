@@ -88,6 +88,29 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 
 ## What changed recently
 
+### 2026-08-03 — Workspaces (BUILD_ROADMAP.md Release 0.2, item 2) shipped
+
+- **Product Delivery Execution Mode**: continuing directly from the merged Organisations PR (#17),
+  per the standing instruction to select the next incomplete `BUILD_ROADMAP.md` capability, implement
+  it as one vertical slice, open one PR, and stop.
+- **Workspaces** shipped: `packages/domain/src/workspace.ts` (`createWorkspace`, with domain unit
+  tests — the previous PR shipped `createOrganisation` without any, a gap not backfilled here to keep
+  this PR scoped to workspaces), a real foreign-key `workspace` table (unlike `AuditEvent`'s
+  necessarily-polymorphic association, a workspace always belongs to exactly one organisation, so
+  referential integrity is enforced by Postgres, not the application layer), contracts, an
+  authorised `WorkspacesController`/`WorkspacesService` that 404s creation against a
+  non-existent `organisationId`, and `/workspaces` + `/workspaces/new` in the web app (the create
+  form lists organisations to choose from, since a workspace cannot exist without one). `admin` gains
+  `workspace:create`; all four roles get `workspace:read`, matching the least-privilege shape already
+  established for organisations.
+- All checks green: lint, typecheck, build, full test suite (29 domain tests, up from 26), `pnpm
+  test:invariants` (20/20), `pnpm test:adversarial` (23/23, one new "reviewer cannot create a
+  workspace" case). As with Organisations, no live Postgres was available in this environment — the
+  migration is schema-validated but not executed against a real database.
+- **Open discrepancies from the previous PR remain unresolved** (not this capability's job to fix):
+  ADR-0022 still does not exist; `Tenant` vs `Organisation` naming is still split between
+  `DATA_MODEL.md` and `ARCHITECTURE.md`.
+
 ### 2026-08-03 — Implementation authorised; Organisations (BUILD_ROADMAP.md Release 0.2, item 1) shipped
 
 - **`docs/BUILD_AUTHORIZATION.md`, `docs/BUILD_ROADMAP.md` and `docs/governance/PRODUCT_CONSTITUTION.md`

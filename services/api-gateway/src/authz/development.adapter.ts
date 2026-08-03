@@ -36,18 +36,27 @@ import {
 
 /** Role → permitted actions. Anything not listed is denied. */
 const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.freeze({
-  reader: ['record:read', 'organisation:read'],
-  contributor: ['record:read', 'record:create', 'organisation:read'],
-  reviewer: ['record:read', 'record:create', 'record:review', 'organisation:read'],
-  // Least privilege (Constitution, Authority and Access): organisation creation
-  // is the one privileged action in this slice, so it is the one grant `admin`
-  // adds on top of what `reviewer` already has — not a blanket superuser role.
+  reader: ['record:read', 'organisation:read', 'workspace:read'],
+  contributor: ['record:read', 'record:create', 'organisation:read', 'workspace:read'],
+  reviewer: [
+    'record:read',
+    'record:create',
+    'record:review',
+    'organisation:read',
+    'workspace:read',
+  ],
+  // Least privilege (Constitution, Authority and Access): organisation and
+  // workspace creation are the privileged actions in this slice, so they are the
+  // only grants `admin` adds on top of what `reviewer` already has — not a
+  // blanket superuser role.
   admin: [
     'record:read',
     'record:create',
     'record:review',
     'organisation:read',
     'organisation:create',
+    'workspace:read',
+    'workspace:create',
   ],
 });
 

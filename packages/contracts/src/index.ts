@@ -51,6 +51,12 @@ export const createOrganisationRequestSchema = z.object({
 });
 export type CreateOrganisationRequest = z.infer<typeof createOrganisationRequestSchema>;
 
+export const createWorkspaceRequestSchema = z.object({
+  name: z.string().trim().min(1, 'A name is required').max(200),
+  organisationId: z.string().uuid('A valid organisation id is required'),
+});
+export type CreateWorkspaceRequest = z.infer<typeof createWorkspaceRequestSchema>;
+
 // ─── Responses ───────────────────────────────────────────────────────────────
 
 export interface ActorView {
@@ -105,6 +111,13 @@ export interface RecordDetail extends RecordSummary {
 export interface OrganisationSummary {
   id: string;
   name: string;
+  createdAt: string;
+}
+
+export interface WorkspaceSummary {
+  id: string;
+  name: string;
+  organisationId: string;
   createdAt: string;
 }
 
