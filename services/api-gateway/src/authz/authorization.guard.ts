@@ -18,6 +18,7 @@ import {
 import { Reflector } from '@nestjs/core';
 
 import { AuthorizationPort, type Action, type Principal } from './authorization.port.js';
+import { SessionAuthenticator } from './session-authenticator.js';
 
 export const REQUIRED_ACTION = 'witness:required-action';
 
@@ -36,6 +37,7 @@ export class AuthorizationGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly authorization: AuthorizationPort,
+    private readonly sessionAuthenticator: SessionAuthenticator,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -61,18 +63,26 @@ export class AuthorizationGuard implements CanActivate {
       });
     }
 
-    const header = request.headers['x-witness-dev-user'];
-    const principal = await this.authorization.authenticate(
-      Array.isArray(header) ? header[0] : header,
+    // A real, verified session always wins when present — the dev header is
+    // a fallback for local iteration, never a competing source of truth.
+    const authorizationHeader = request.headers['authorization'];
+    const sessionPrincipal = await this.sessionAuthenticator.authenticate(
+      Array.isArray(authorizationHeader) ? authorizationHeader[0] : authorizationHeader,
     );
+
+    const devHeader = request.headers['x-witness-dev-user'];
+    const principal =
+      sessionPrincipal ??
+      (await this.authorization.authenticate(Array.isArray(devHeader) ? devHeader[0] : devHeader));
 
     if (principal === null) {
       throw new UnauthorizedException({
         error: {
           code: 'UNAUTHENTICATED',
           message:
-            'No principal. In the Developer Preview, send X-Witness-Dev-User: "Name|reviewer". ' +
-            'This header is unverified and exists only in the development profile.',
+            'No principal. Sign in and send Authorization: Bearer <session token>. In the ' +
+            'development profile only, X-Witness-Dev-User: "Name|reviewer" is also accepted — ' +
+            'that header is unverified and never trusted outside development.',
         },
       });
     }

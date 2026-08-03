@@ -129,9 +129,40 @@ and a list of what this build does not implement.
    which role was missing. That denial comes from the server, not from a hidden button.
 
 > **"Acting as" is not a login.** The `X-Witness-Dev-User` header is unverified and trivially forged.
-> It exists so the authorisation _boundary_ can be demonstrated without shipping a fake sign-in screen
-> that teaches everyone who sees it that authentication exists. It does not. Keycloak and Casbin are
-> Phase 2 (ADR-0007), and the adapter behind this refuses to load outside the development profile.
+> It exists so the authorisation _boundary_ can be demonstrated without a real identity. It remains
+> available in the development profile alongside real sign-in (below) — the two are additive, and a
+> real session always takes priority when both are present. Casbin policy-engine authorisation is
+> still not built (Authorisation hardening, the capability after Milestone 1.3) — signing in proves
+> who you are, not yet everything you are allowed to do at request time.
+
+### Sign in for real (Milestone 1.3, Authentication)
+
+There is no live Keycloak container in this preview yet (it is scaffolded in
+`infrastructure/docker/docker-compose.yml` behind the `full` profile, step 9, but its realm has not
+been provisioned). In the `development` profile, Witness instead uses a **development identity
+provider double** — the same `IdentityProviderPort` contract the real `KeycloakOidcAdapter` uses,
+running the identical OIDC authorization-code-with-PKCE flow and real JWT/JWKS signature
+verification against a locally generated key, so the sign-in code path is genuinely exercised rather
+than mocked away.
+
+1. Visit <http://localhost:3000/signin> and select **Sign in**.
+2. You land back on the dashboard signed in as a fixed development identity
+   (`dev@example.com`) — unless that identity is separately linked or invited to a Witness account
+   (see below), you will see `/auth/error?reason=unknown_identity`. This is correct: Witness never
+   auto-creates an unrestricted account for an unrecognised sign-in.
+3. To sign in as a specific invited user during development, an administrator first creates that
+   user (`/users/new`, `POST /api/v1/users`) with the matching email, leaving it in the `invited`
+   state. Signing in with that email activates the account and links the identity — Witness never
+   auto-creates the user itself, only the link and the activation.
+4. Once signed in, the header reads **Signed in as `<name>`**, and the dashboard's **Your access**
+   section lists only the organisations and workspaces that account actually belongs to.
+5. **Sign out** revokes the session server-side immediately — a captured token cannot be reused
+   afterwards.
+
+A signed-in session's roles are computed from real `RoleAssignment` rows (Milestone 1.2), but the
+scope-relative `admin` role never grants the global admin tier through a session — that boundary is
+deliberate and documented in `services/api-gateway/src/authz/session-authenticator.ts`, pending
+Authorisation hardening.
 
 ## 8. Run the checks
 

@@ -9,8 +9,18 @@ import { Module } from '@nestjs/common';
 
 import { loadConfigOrExit, type WitnessConfig } from '@witness/config';
 
+import {
+  AuthenticationController,
+  CurrentUserController,
+} from './authn/authentication.controller.js';
+import { AuthenticationService } from './authn/authentication.service.js';
+import { DevelopmentIdentityProviderAdapter } from './authn/development-identity-provider.adapter.js';
+import { IdentityProviderPort } from './authn/identity-provider.port.js';
+import { KeycloakOidcAdapter } from './authn/keycloak-oidc.adapter.js';
+import { SessionService } from './authn/session.service.js';
 import { AuthorizationPort } from './authz/authorization.port.js';
-import { DevelopmentAuthorizationAdapter } from './authz/development.adapter.js';
+import { SessionAuthenticator } from './authz/session-authenticator.js';
+import { SessionBackedAuthorizationAdapter } from './authz/session-backed.adapter.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
 import { OrganisationMembershipsController } from './organisation-memberships/organisation-memberships.controller.js';
@@ -44,6 +54,8 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     RolesController,
     OrganisationRoleAssignmentsController,
     WorkspaceRoleAssignmentsController,
+    AuthenticationController,
+    CurrentUserController,
   ],
   providers: [
     PrismaService,
@@ -55,6 +67,8 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     WorkspaceMembershipsService,
     OrganisationRoleAssignmentsService,
     WorkspaceRoleAssignmentsService,
+    SessionService,
+    SessionAuthenticator,
     {
       // Configuration is validated once, at construction. If it violates the
       // deployment-profile contract, loadConfigOrExit terminates the process
@@ -63,23 +77,60 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
       useFactory: (): WitnessConfig => loadConfigOrExit(),
     },
     {
+      // Bound in every profile now (Milestone 1.3): SessionBackedAuthorizationAdapter's
+      // decide() is the shared, profile-independent role-grants table; its
+      // authenticate() — the unverified dev-header path — only ever does
+      // anything in the development profile, exactly as before.
       provide: AuthorizationPort,
       inject: [WITNESS_CONFIG],
-      useFactory: (config: WitnessConfig): AuthorizationPort => {
-        // Selecting the adapter by profile here — rather than reading an env var
-        // inside the adapter — keeps the decision visible at the composition
-        // root, which is where someone auditing "how does this authenticate?"
-        // will look first.
+      useFactory: (config: WitnessConfig): AuthorizationPort =>
+        new SessionBackedAuthorizationAdapter(config.profile),
+    },
+    {
+      // Selecting the adapter by profile here — rather than reading an env var
+      // inside the adapter — keeps the decision visible at the composition
+      // root, which is where someone auditing "how does this authenticate?"
+      // will look first. `DevelopmentIdentityProviderAdapter` is the only
+      // implementation available in this sandbox: it cannot run a live
+      // Keycloak container (no working Docker daemon), so the real
+      // `KeycloakOidcAdapter` is written and unit-tested but not
+      // manually verified against a live IdP here — see the PR's Known
+      // Limitations.
+      provide: IdentityProviderPort,
+      inject: [WITNESS_CONFIG],
+      useFactory: (config: WitnessConfig): IdentityProviderPort => {
         if (config.profile === 'development') {
-          return new DevelopmentAuthorizationAdapter(config.profile);
+          return new DevelopmentIdentityProviderAdapter(
+            config.profile,
+            `http://localhost:${config.apiPort}`,
+            config.jwtAudience,
+          );
         }
 
-        throw new Error(
-          `No authorisation adapter is available for the '${config.profile}' profile. ` +
-            'Keycloak and Casbin integration is Phase 2 (ADR-0007, roadmap 2.5/2.6). ' +
-            'Witness refuses to start rather than serve requests with no authorisation.',
+        return new KeycloakOidcAdapter(
+          config.oidcIssuer,
+          config.oidcClientId,
+          config.oidcClientSecret,
+          config.jwtAudience,
         );
       },
+    },
+    {
+      provide: AuthenticationService,
+      inject: [PrismaService, IdentityProviderPort, SessionService, WITNESS_CONFIG],
+      useFactory: (
+        prisma: PrismaService,
+        identityProvider: IdentityProviderPort,
+        sessions: SessionService,
+        config: WitnessConfig,
+      ): AuthenticationService =>
+        new AuthenticationService(
+          prisma,
+          identityProvider,
+          sessions,
+          config.oidcRedirectUri,
+          config.sessionTtlMinutes,
+        ),
     },
   ],
 })

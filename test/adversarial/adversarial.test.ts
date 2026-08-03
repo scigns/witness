@@ -77,7 +77,15 @@ const fresh = (): InstitutionalRecord =>
   }).record;
 
 describe('ATTACK — smuggle an external model provider past the sovereign profile', () => {
-  const base = { DATABASE_URL: 'postgresql://u:p@localhost:5432/w' };
+  const base = {
+    DATABASE_URL: 'postgresql://u:p@localhost:5432/w',
+    // Every non-development profile now requires real identity-provider
+    // configuration (ADR-0007) — orthogonal to what these tests exercise, so
+    // it is supplied here rather than left to trip each test individually.
+    OIDC_ISSUER: 'https://keycloak.example.org/realms/witness',
+    KEYCLOAK_CLIENT_ID: 'witness-api',
+    JWT_AUDIENCE: 'witness-api',
+  };
 
   it('cannot use the base URL alone as a side channel', () => {
     expect(() =>

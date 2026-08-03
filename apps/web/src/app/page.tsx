@@ -14,11 +14,13 @@ import { useEffect, useState } from 'react';
 import type { HealthResponse, RecordSummary } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
 import { Card, ErrorNotice, StateBadge } from '@/components/ui';
 
 export default function DashboardPage() {
   const { user, ready } = useSession();
+  const { status: authStatus, currentUser } = useAuth();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [records, setRecords] = useState<RecordSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +70,54 @@ export default function DashboardPage() {
       </div>
 
       {error !== null && <ErrorNotice message={error} />}
+
+      {authStatus === 'authenticated' && currentUser !== null && (
+        <section aria-labelledby="access-heading" className="space-y-3">
+          <h2 id="access-heading" className="text-lg font-semibold">
+            Your access
+          </h2>
+          <p className="text-sm text-[var(--color-ink-muted)]">
+            Only the organisations and workspaces {currentUser.displayName} actually belongs to —
+            never the full catalog.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Card>
+              <h3 className="mb-2 font-medium">Organisations</h3>
+              {currentUser.organisations.length === 0 ? (
+                <p className="text-sm text-[var(--color-ink-muted)]">
+                  No organisation memberships.
+                </p>
+              ) : (
+                <ul className="space-y-1 text-sm">
+                  {currentUser.organisations.map((org) => (
+                    <li key={org.id}>
+                      <Link href={`/organisations/${org.id}`} className="hover:underline">
+                        {org.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+            <Card>
+              <h3 className="mb-2 font-medium">Workspaces</h3>
+              {currentUser.workspaces.length === 0 ? (
+                <p className="text-sm text-[var(--color-ink-muted)]">No workspace memberships.</p>
+              ) : (
+                <ul className="space-y-1 text-sm">
+                  {currentUser.workspaces.map((workspace) => (
+                    <li key={workspace.id}>
+                      <Link href={`/workspaces/${workspace.id}`} className="hover:underline">
+                        {workspace.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+        </section>
+      )}
 
       <section aria-labelledby="status-heading" className="space-y-3">
         <h2 id="status-heading" className="text-lg font-semibold">

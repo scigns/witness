@@ -142,9 +142,81 @@ model User {
   organisationMemberships OrganisationMembership[]
   workspaceMemberships    WorkspaceMembership[]
   roleAssignments         RoleAssignment[]
+  identityLinks           IdentityLink[]
+  authSessions            AuthSession[]
 
   @@index([accountState])
   @@map("witness_user")
+}
+
+/// The stable connection between an external identity provider's subject and
+/// a Witness user (BUILD_ROADMAP.md Milestone 1.3, Authentication). See
+/// `packages/domain/src/identity-link.ts` for why this is keyed on
+/// `(provider, providerSubject)` rather than email.
+model IdentityLink {
+  id              String    @id @db.Uuid
+  provider        String    @db.VarChar(32)
+  providerSubject String    @map("provider_subject") @db.VarChar(255)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  linkedAt     DateTime  @map("linked_at") @db.Timestamptz(6)
+  lastSignInAt DateTime? @map("last_sign_in_at") @db.Timestamptz(6)
+
+  @@unique([provider, providerSubject])
+  @@index([userId])
+  @@map("identity_link")
+}
+
+/// A signed-in session. `tokenHash` is a SHA-256 hash of the opaque bearer
+/// token handed to the browser — the raw token is never persisted, the same
+/// reasoning as never storing a password: a database read must not be
+/// enough to impersonate a session.
+///
+/// Delivered as a bearer token rather than a cookie deliberately: the
+/// browser already calls the API directly, cross-origin, from a different
+/// port (`main.ts`'s CORS configuration predates this capability) — a
+/// cross-site cookie would need `SameSite=None; Secure`, which requires
+/// HTTPS everywhere including local development. A bearer token sent via
+/// `Authorization` header (mirroring the existing, now-superseded-in-
+/// production `X-Witness-Dev-User` header shape) avoids that without
+/// changing the application's deployment topology.
+model AuthSession {
+  id        String   @id @db.Uuid
+  tokenHash String   @unique @map("token_hash") @db.VarChar(64)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("auth_session")
+}
+
+/// A single in-flight OIDC authorization-code-with-PKCE exchange. Short-lived
+/// and single-use — the row is deleted the moment the callback completes or
+/// fails, so it is intentionally not modelled with the same permanence as
+/// everything else in this file. State is stored server-side (rather than
+/// signed and round-tripped through the browser) so the callback verifies
+/// against something Witness itself wrote, not something it merely trusts a
+/// redirect to still contain.
+model AuthLoginAttempt {
+  /// The OIDC `state` parameter — a high-entropy value the callback must
+  /// present unchanged.
+  state        String @id @db.VarChar(64)
+  nonce        String @db.VarChar(64)
+  codeVerifier String @map("code_verifier") @db.VarChar(128)
+  redirectUri  String @map("redirect_uri") @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@index([expiresAt])
+  @@map("auth_login_attempt")
 }
 
 /// "Does this user belong to this organisation" — nothing about what they may

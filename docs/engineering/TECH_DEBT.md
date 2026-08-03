@@ -45,7 +45,7 @@ quietly not doing.
 |---|---|---|---|---|---|---|---|
 | **TD-001** | Dependency review gate is not running — GitHub Dependency graph unavailable on this repository | **S2** | 2026-07-31 (#1) | Security Lead | **2026-10-31** | Platform feature is off; the action hard-failed on every run, turning the whole security workflow permanently red | Enable Dependency graph in repository settings, or make the repository public |
 | **TD-002** | Audit hash-chain tail-read race — concurrent appends to the same subject can chain onto the same predecessor | **S2** | 2026-08-03 (#19) | Backend Lead | **2026-10-03** | `appendAuditEvent` reads the current tail inside the caller's transaction under Postgres's default read-committed isolation, which does not itself prevent two concurrent transactions both reading the same tail before either commits | Serialisable isolation or a `SELECT ... FOR UPDATE` on the subject's tail row, scoped to write paths only |
-| **TD-003** | Actor-resolution TOCTOU — `resolveActor`'s find-or-create has no unique constraint on `(displayName, kind)` | **S3** | 2026-08-03 (#19) | Backend Lead | **2026-10-03** | Two concurrent requests from the same unauthenticated dev-header identity can both miss the `findFirst` and both `create`, producing two `Actor` rows for what should be one identity | Unique constraint on `(display_name, kind)` plus an upsert, or resolve actors through real authenticated identity once Milestone 1.3 lands, which may make this moot rather than worth fixing directly |
+| **TD-003** | Actor-resolution TOCTOU — `resolveActor`'s find-or-create has no unique constraint on `(displayName, kind)` | **S3** | 2026-08-03 (#19) | Backend Lead | **2026-11-03** | Two concurrent first-sign-ins for the same identity (or, still, the same dev-header string) can both miss the `findFirst` and both `create`, producing two `Actor` rows for what should be one identity. Examined at the Milestone 1.3 trigger and deliberately not fixed — see full entry | Unique constraint on `(display_name, kind)` plus an upsert. Must land before Milestone 1.4 (Authorisation hardening) or any external pilot |
 
 ### TD-001 — Dependency review gate is not running
 
@@ -140,6 +140,20 @@ current find-or-create pattern moot entirely rather than something worth hardeni
 Before Milestone 1.3 (Authentication) ships, decide explicitly whether `resolveActor` is fixed as-is
 or superseded by identity-backed actor resolution — don't let it survive unexamined into the
 authenticated system.
+
+**Examined at the trigger (Milestone 1.3, Authentication PR).** Decision: **not superseded, still
+open.** `AuthenticationService` reuses the existing `resolveActor(prisma, principal)` helper
+unchanged — for first-sign-in activation, and for the system-principal audit of a denied sign-in —
+rather than adding a second, identity-aware resolution path. The race is narrower than before
+(the identity side of `(displayName, kind)` is now a stable, provider-verified subject rather than
+an arbitrary dev-header string, so collisions require the same *provider identity* signing in
+concurrently for the first time, not merely the same typed name), but the underlying find-or-create
+without a unique constraint or transaction is unchanged and the race is still reachable. Deferred
+again, deliberately, as out of scope for a single-capability PR — the same reasoning as TD-002.
+**Owner and review date extended accordingly: Backend Lead, review by 2026-11-03; must be resolved
+before Milestone 1.4 (Authorisation hardening) or any external pilot, whichever comes first**, since
+Authorisation hardening is expected to introduce concurrent first-sign-in load this register should
+not let outrun the fix a second time.
 
 ### Entry format
 

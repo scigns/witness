@@ -33,54 +33,7 @@ import {
   type AuthorizationDecision,
   type Principal,
 } from './authorization.port.js';
-
-/** Role → permitted actions. Anything not listed is denied. */
-const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.freeze({
-  // `role:read` (the static role/permission catalog) is granted broadly:
-  // it is reference data, not per-user information, and understanding what
-  // a role permits is useful to everyone who might be assigned one — unlike
-  // membership and role-*assignment* management, which stay admin-only
-  // below for the same "administrative by definition" reasoning as ever.
-  reader: ['record:read', 'organisation:read', 'workspace:read', 'role:read'],
-  contributor: ['record:read', 'record:create', 'organisation:read', 'workspace:read', 'role:read'],
-  reviewer: [
-    'record:read',
-    'record:create',
-    'record:review',
-    'organisation:read',
-    'workspace:read',
-    'role:read',
-  ],
-  // Least privilege (Constitution, Authority and Access): organisation and
-  // workspace creation are the privileged actions in this slice, so they are the
-  // only grants `admin` adds on top of what `reviewer` already has — not a
-  // blanket superuser role. User, membership, and role-assignment management
-  // is administrative by definition (BUILD_ROADMAP.md Milestone 1.1: "an
-  // organisation administrator needs to...") — reader/contributor/reviewer
-  // get none of it, not even read, until a further Authorisation capability
-  // decides otherwise.
-  admin: [
-    'record:read',
-    'record:create',
-    'record:review',
-    'organisation:read',
-    'organisation:create',
-    'workspace:read',
-    'workspace:create',
-    'user:read',
-    'user:create',
-    'organisation_membership:read',
-    'organisation_membership:create',
-    'organisation_membership:update',
-    'workspace_membership:read',
-    'workspace_membership:create',
-    'workspace_membership:update',
-    'role:read',
-    'role_assignment:read',
-    'role_assignment:write',
-    'role_assignment:delete',
-  ],
-});
+import { decideByRoleGrants, ROLE_GRANTS } from './role-grants.js';
 
 @Injectable()
 export class DevelopmentAuthorizationAdapter extends AuthorizationPort {
@@ -135,18 +88,6 @@ export class DevelopmentAuthorizationAdapter extends AuthorizationPort {
   }
 
   async decide(principal: Principal, action: Action): Promise<AuthorizationDecision> {
-    for (const role of principal.roles) {
-      if ((ROLE_GRANTS[role] ?? []).includes(action)) {
-        return { allowed: true, reason: `role '${role}' grants '${action}'` };
-      }
-    }
-
-    return {
-      allowed: false,
-      reason:
-        principal.roles.length === 0
-          ? `principal has no recognised role, so '${action}' is denied by default`
-          : `no role in [${principal.roles.join(', ')}] grants '${action}'`,
-    };
+    return decideByRoleGrants(principal, action);
   }
 }

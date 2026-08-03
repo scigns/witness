@@ -230,6 +230,21 @@ export interface RoleAssignmentView {
   updatedAt: string | null;
 }
 
+/**
+ * The signed-in user, as returned by `GET /api/v1/me`. Only organisations and
+ * workspaces the user actually belongs to are listed — never the full
+ * catalog — so a client that renders this response directly cannot
+ * accidentally show access the user does not have.
+ */
+export interface CurrentUserView {
+  id: string;
+  displayName: string;
+  email: string;
+  accountState: AccountState;
+  organisations: OrganisationSummary[];
+  workspaces: WorkspaceSummary[];
+}
+
 // ─── Health ──────────────────────────────────────────────────────────────────
 
 export type ComponentStatus = 'ok' | 'degraded' | 'down' | 'not_configured';
