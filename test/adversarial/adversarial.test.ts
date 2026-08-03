@@ -160,7 +160,8 @@ describe('ATTACK — rewrite the audit trail', () => {
       const event = createAuditEvent(
         {
           id: toAuditEventId(`66666666-6666-4666-8666-66666666666${i}`),
-          recordId: RECORD_ID,
+          subjectType: 'record',
+          subjectId: RECORD_ID,
           action: 'record.captured',
           actor: HUMAN,
           occurredAt: new Date(Date.UTC(2026, 2, 14, 11, i)),
@@ -196,7 +197,8 @@ describe('ATTACK — rewrite the audit trail', () => {
     const a = createAuditEvent(
       {
         id: toAuditEventId('66666666-6666-4666-8666-666666666671'),
-        recordId: RECORD_ID,
+        subjectType: 'record',
+        subjectId: RECORD_ID,
         action: 'record.confirmed',
         actor: HUMAN,
         occurredAt: new Date('2026-03-15T11:00:00Z'),
@@ -208,7 +210,8 @@ describe('ATTACK — rewrite the audit trail', () => {
     const b = createAuditEvent(
       {
         id: toAuditEventId('66666666-6666-4666-8666-666666666671'),
-        recordId: RECORD_ID,
+        subjectType: 'record',
+        subjectId: RECORD_ID,
         action: 'record.confirmed',
         actor: HUMAN,
         occurredAt: new Date('2026-03-15T11:00:00Z'),
@@ -225,9 +228,17 @@ describe('ATTACK — escalate privilege through the authorisation adapter', () =
   const adapter = new DevelopmentAuthorizationAdapter('development');
 
   it('an invented role grants nothing rather than defaulting to something', async () => {
-    const principal = await adapter.authenticate('Attacker|admin');
+    const principal = await adapter.authenticate('Attacker|superuser');
     expect(principal?.roles).toEqual([]);
     expect((await adapter.decide(principal!, 'record:review')).allowed).toBe(false);
+  });
+
+  it('the real admin role does not grant an action it was not given', async () => {
+    const principal = await adapter.authenticate('Attacker|admin');
+    expect(principal?.roles).toEqual(['admin']);
+    // admin exists to gate organisation:create — it must not be a silent
+    // superuser that happens to grant everything else too.
+    expect((await adapter.decide(principal!, 'organisation:create')).allowed).toBe(true);
   });
 
   it('an empty header does not yield an anonymous principal', async () => {

@@ -21,7 +21,8 @@ const hash = (input: string): string => createHash('sha256').update(input, 'utf8
 
 const canonicalise = (event: {
   id: string;
-  recordId: string;
+  subjectType: string;
+  subjectId: string;
   action: string;
   actorId: string;
   occurredAt: Date;
@@ -30,7 +31,8 @@ const canonicalise = (event: {
 }): string =>
   [
     event.id,
-    event.recordId,
+    event.subjectType,
+    event.subjectId,
     event.action,
     event.actorId,
     event.occurredAt.toISOString(),
@@ -185,7 +187,8 @@ async function main(): Promise<void> {
       const computed = hash(
         canonicalise({
           id,
-          recordId: fixture.recordId,
+          subjectType: 'record',
+          subjectId: fixture.recordId,
           action: step.action,
           actorId: actor.id,
           occurredAt,
@@ -197,7 +200,8 @@ async function main(): Promise<void> {
       await prisma.auditEvent.create({
         data: {
           id,
-          recordId: fixture.recordId,
+          subjectType: 'record',
+          subjectId: fixture.recordId,
           action: step.action,
           actorId: actor.id,
           occurredAt,

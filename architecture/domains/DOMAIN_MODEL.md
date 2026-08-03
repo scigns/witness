@@ -97,18 +97,28 @@ context — see §3.
 **Retention/deletion responsibilities.** Tenant offboarding and user deprovisioning — not yet
 designed; flagged as a gap this document surfaces rather than silently omits.
 
-**Current implementation mapping.** None. The Developer Preview's `DevelopmentAuthorizationAdapter`
-(`services/api-gateway/src/authz/development.adapter.ts`) resolves a principal from an unverified
-`X-Witness-Dev-User` header — explicitly not this context, and the file's own header says so:
-"DEVELOPMENT ONLY — NOT AN AUTHENTICATION SYSTEM."
+**Current implementation mapping.** Partial, as of `BUILD_ROADMAP.md` Release 0.2 item 1.
+`packages/domain/src/organisation.ts` (`createOrganisation`) and
+`services/api-gateway/src/organisations/` implement creation and listing of the isolation root this
+section calls `Tenant` — named `Organisation` in code, matching `ARCHITECTURE.md` §3's "Owns
+Organisations, workspaces, users, roles, groups" rather than `DATA_MODEL.md` §2's `Tenant` label; the
+two documents do not yet agree on one name for this aggregate, and this implementation did not
+resolve that, only proceed under the roadmap's term. Workspace, User, Role and Group remain
+unimplemented, as does tenant-scoped row-level security (§`Invariants` above) — nothing yet
+references `organisation_id`, so cross-tenant isolation is not yet enforced anywhere. The
+Developer Preview's `DevelopmentAuthorizationAdapter`
+(`services/api-gateway/src/authz/development.adapter.ts`) still resolves a principal from an
+unverified `X-Witness-Dev-User` header, unrelated to and unchanged by this — real identity remains
+Phase 2.
 
 **Future implementation mapping.** `services/identity` (named in `ARCHITECTURE.md`'s container view
 as `SIDENT`). Phase 2, deliverable 2.5.
 
-**Classification.** `APPROVED BUT NOT IMPLEMENTED` (ADR-0007 decides the approach; no service exists).
-Drift: not applicable — no 0.1.0 code claims to implement this context, so there is nothing to
-compare against it. The development adapter is a distinct, explicitly-labelled stand-in, not a
-simplification of this context.
+**Classification.** `PARTIALLY IMPLEMENTED` (creation/listing of the isolation root only; ADR-0007
+still decides the identity approach and no identity service exists). Drift: `PREVIEW SIMPLIFICATION`
+— an organisation exists with no workspace, membership or row-level-security enforcement beneath it,
+so nothing is actually tenant-isolated yet; every other context in this document still correctly
+treats Identity & Tenancy as not delivering isolation.
 
 ---
 
@@ -808,7 +818,7 @@ for this context; it is deployment-time, not an administrative bounded context.
 
 | # | Context | Department | Status | Drift |
 |---|---|---|---|---|
-| 1 | Identity & Tenancy | D6 | APPROVED BUT NOT IMPLEMENTED | n/a |
+| 1 | Identity & Tenancy | D6 | PARTIALLY IMPLEMENTED (organisation creation/listing only) | PREVIEW SIMPLIFICATION (no workspace, membership or row-level security) |
 | 2 | Consent & Legal Basis | D6 | APPROVED BUT NOT IMPLEMENTED | PREVIEW SIMPLIFICATION (`consentGrantId` nullable) |
 | 3 | Authorisation | D6 | IMPLEMENTED IN 0.1.0 (port/guard) / PLANNED-GATED (policy engine) | NO DRIFT |
 | 4 | Ingestion & Media | D3/D5 | FUTURE | n/a |

@@ -21,6 +21,7 @@ export type RecordId = Branded<string, 'RecordId'>;
 export type ActorId = Branded<string, 'ActorId'>;
 export type SourceId = Branded<string, 'SourceId'>;
 export type AuditEventId = Branded<string, 'AuditEventId'>;
+export type OrganisationId = Branded<string, 'OrganisationId'>;
 
 /**
  * UUID v4/v7 shape. We accept both: v7 is time-ordered, which matters for the
@@ -52,4 +53,9 @@ export function toSourceId(value: string): SourceId {
 export function toAuditEventId(value: string): AuditEventId {
   assertUuid(value, 'AuditEventId');
   return value as AuditEventId;
+}
+
+export function toOrganisationId(value: string): OrganisationId {
+  assertUuid(value, 'OrganisationId');
+  return value as OrganisationId;
 }

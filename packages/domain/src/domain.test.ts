@@ -270,7 +270,8 @@ describe('audit chain', () => {
     const first = createAuditEvent(
       {
         id: toAuditEventId('55555555-5555-4555-8555-555555555551'),
-        recordId,
+        subjectType: 'record',
+        subjectId: recordId,
         action: 'record.captured',
         actor: HUMAN,
         occurredAt: new Date('2026-03-14T11:00:00Z'),
@@ -282,7 +283,8 @@ describe('audit chain', () => {
     const second = createAuditEvent(
       {
         id: toAuditEventId('55555555-5555-4555-8555-555555555552'),
-        recordId,
+        subjectType: 'record',
+        subjectId: recordId,
         action: 'record.confirmed',
         actor: HUMAN,
         occurredAt: new Date('2026-03-15T11:00:00Z'),
@@ -320,7 +322,8 @@ describe('audit chain', () => {
   it('produces a stable hash regardless of metadata key order', () => {
     const base = {
       id: toAuditEventId('55555555-5555-4555-8555-555555555553'),
-      recordId,
+      subjectType: 'record',
+      subjectId: recordId,
       action: 'record.confirmed' as const,
       actor: HUMAN,
       occurredAt: new Date('2026-03-15T11:00:00Z'),

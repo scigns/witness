@@ -46,6 +46,11 @@ export const reviewActionSchema = z.discriminatedUnion('action', [
 ]);
 export type ReviewAction = z.infer<typeof reviewActionSchema>;
 
+export const createOrganisationRequestSchema = z.object({
+  name: z.string().trim().min(1, 'A name is required').max(200),
+});
+export type CreateOrganisationRequest = z.infer<typeof createOrganisationRequestSchema>;
+
 // ─── Responses ───────────────────────────────────────────────────────────────
 
 export interface ActorView {
@@ -95,6 +100,12 @@ export interface RecordDetail extends RecordSummary {
   permittedActions: string[];
   /** Whether the audit chain for this record verifies right now. */
   auditChainValid: boolean;
+}
+
+export interface OrganisationSummary {
+  id: string;
+  name: string;
+  createdAt: string;
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────────

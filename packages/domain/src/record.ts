@@ -26,7 +26,7 @@
 import { HumanConfirmationRequired, InvariantViolation } from './errors.js';
 import { assertTransition, isAccepted, type ReviewState } from './review.js';
 import { isHuman, type Actor } from './actor.js';
-import type { AuditAction } from './audit.js';
+import type { AuditAction, PendingAuditEvent } from './audit.js';
 import type { Provenance } from './provenance.js';
 import type { RecordId } from './ids.js';
 
@@ -41,16 +41,6 @@ export interface InstitutionalRecord {
   readonly reviewState: ReviewState;
   readonly createdAt: Date;
   readonly updatedAt: Date;
-}
-
-/**
- * What the domain decided happened. The application layer turns this into a
- * persisted, hash-chained audit event.
- */
-export interface PendingAuditEvent {
-  readonly action: AuditAction;
-  readonly actor: Actor;
-  readonly metadata: Readonly<Record<string, string>>;
 }
 
 export interface RecordOutcome {

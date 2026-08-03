@@ -19,7 +19,7 @@
 
 import { InvariantViolation } from './errors.js';
 import type { Actor } from './actor.js';
-import type { AuditEventId, RecordId } from './ids.js';
+import type { AuditEventId } from './ids.js';
 
 export const AUDIT_ACTIONS = [
   'record.captured',
@@ -28,13 +28,30 @@ export const AUDIT_ACTIONS = [
   'record.corrected',
   'record.rejected',
   'record.reopened',
+  'organisation.created',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
+/**
+ * What the audit event is about. The chain is scoped per (subjectType, subjectId)
+ * pair — verifying "the audit trail for record X" and "the audit trail for
+ * organisation Y" are two independent chains, not one global one, so that adding
+ * a new subject type never requires renumbering or re-hashing an existing one.
+ */
+export const AUDIT_SUBJECT_TYPES = ['record', 'organisation'] as const;
+export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
+
 export interface AuditEvent {
   readonly id: AuditEventId;
-  readonly recordId: RecordId;
+  readonly subjectType: AuditSubjectType;
+  /**
+   * The branded ID of the subject, widened to `string`. A single field cannot be
+   * typed as `RecordId | OrganisationId | ...` and still let this module stay
+   * ignorant of every subject type that will ever exist — the branding is
+   * re-applied by the caller, which already knows which subject type it has.
+   */
+  readonly subjectId: string;
   readonly action: AuditAction;
   readonly actor: Actor;
   readonly occurredAt: Date;
@@ -55,10 +72,22 @@ export interface AuditEvent {
 /** Injected hash function. Implemented by an adapter (node:crypto in practice). */
 export type HashFunction = (input: string) => string;
 
+/**
+ * What the domain decided happened. The application layer turns this into a
+ * persisted, hash-chained audit event (ADR-0003) — the domain itself never
+ * touches an identifier, a clock or a hash function.
+ */
+export interface PendingAuditEvent {
+  readonly action: AuditAction;
+  readonly actor: Actor;
+  readonly metadata: Readonly<Record<string, string>>;
+}
+
 /** Canonical serialisation — field order is fixed so hashes are reproducible. */
 export function canonicalise(event: {
   id: AuditEventId;
-  recordId: RecordId;
+  subjectType: AuditSubjectType;
+  subjectId: string;
   action: AuditAction;
   actorId: string;
   occurredAt: Date;
@@ -72,7 +101,8 @@ export function canonicalise(event: {
 
   return [
     event.id,
-    event.recordId,
+    event.subjectType,
+    event.subjectId,
     event.action,
     event.actorId,
     event.occurredAt.toISOString(),
@@ -84,7 +114,8 @@ export function canonicalise(event: {
 export function createAuditEvent(
   input: {
     id: AuditEventId;
-    recordId: RecordId;
+    subjectType: AuditSubjectType;
+    subjectId: string;
     action: AuditAction;
     actor: Actor;
     occurredAt: Date;
@@ -102,7 +133,8 @@ export function createAuditEvent(
   const computed = hash(
     canonicalise({
       id: input.id,
-      recordId: input.recordId,
+      subjectType: input.subjectType,
+      subjectId: input.subjectId,
       action: input.action,
       actorId: input.actor.id,
       occurredAt: input.occurredAt,
@@ -113,7 +145,8 @@ export function createAuditEvent(
 
   return {
     id: input.id,
-    recordId: input.recordId,
+    subjectType: input.subjectType,
+    subjectId: input.subjectId,
     action: input.action,
     actor: input.actor,
     occurredAt: input.occurredAt,
@@ -156,7 +189,8 @@ export function verifyChain(events: readonly AuditEvent[], hash: HashFunction): 
     const recomputed = hash(
       canonicalise({
         id: event.id,
-        recordId: event.recordId,
+        subjectType: event.subjectType,
+        subjectId: event.subjectId,
         action: event.action,
         actorId: event.actor.id,
         occurredAt: event.occurredAt,

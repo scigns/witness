@@ -13,15 +13,18 @@ import { AuthorizationPort } from './authz/authorization.port.js';
 import { DevelopmentAuthorizationAdapter } from './authz/development.adapter.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
+import { OrganisationsController } from './organisations/organisations.controller.js';
+import { OrganisationsService } from './organisations/organisations.service.js';
 import { RecordsController } from './records/records.controller.js';
 import { RecordsService } from './records/records.service.js';
 import { WITNESS_CONFIG } from './tokens.js';
 
 @Module({
-  controllers: [HealthController, RecordsController],
+  controllers: [HealthController, RecordsController, OrganisationsController],
   providers: [
     PrismaService,
     RecordsService,
+    OrganisationsService,
     {
       // Configuration is validated once, at construction. If it violates the
       // deployment-profile contract, loadConfigOrExit terminates the process
