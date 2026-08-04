@@ -16,12 +16,25 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
   // a role permits is useful to everyone who might be assigned one — unlike
   // membership and role-*assignment* management, which stay admin-only
   // below for the same "administrative by definition" reasoning as ever.
-  reader: ['record:read', 'organisation:read', 'workspace:read', 'role:read', 'session:read'],
+  reader: [
+    'record:read',
+    'organisation:read',
+    'workspace:read',
+    'role:read',
+    'session:read',
+    'participant:read',
+  ],
   // `session:update`/`session:transition` are workspace-wide, not
   // per-session: any contributor in a workspace's scope may rename, close,
   // reopen, or archive any session there, not only ones they facilitate.
   // There is no "assigned facilitator" ownership check in Milestone 2 — see
-  // packages/policy/policy.csv's header comment for the full reasoning.
+  // packages/policy/policy.csv's header comment for the full reasoning. The
+  // same reasoning applies to `participant:*` (Milestone 3): any contributor
+  // in scope may manage any session's participants, and
+  // `participant:manage_restricted` (facilitator notes, and a pseudonymous
+  // participant's linked-user identity) is granted at the same tier, not a
+  // narrower one — Milestone 3 does not introduce a fifth tier just for
+  // restricted participant data.
   contributor: [
     'record:read',
     'record:create',
@@ -32,6 +45,10 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'session:create',
     'session:update',
     'session:transition',
+    'participant:read',
+    'participant:create',
+    'participant:update',
+    'participant:manage_restricted',
   ],
   reviewer: [
     'record:read',
@@ -41,6 +58,7 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'workspace:read',
     'role:read',
     'session:read',
+    'participant:read',
   ],
   // Least privilege (Constitution, Authority and Access): organisation and
   // workspace creation are the privileged actions in this slice, so they are the
@@ -81,6 +99,10 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'session:create',
     'session:update',
     'session:transition',
+    'participant:read',
+    'participant:create',
+    'participant:update',
+    'participant:manage_restricted',
   ],
 });
 

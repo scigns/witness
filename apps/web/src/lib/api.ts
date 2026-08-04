@@ -11,6 +11,7 @@
 
 import type {
   AddMembershipRequest,
+  AddSessionParticipantRequest,
   AssignRoleRequest,
   CoDesignSessionDetail,
   CoDesignSessionSummary,
@@ -30,8 +31,13 @@ import type {
   RoleAssignmentView,
   RoleDefinition,
   SessionLifecycleEventView,
+  SessionParticipantDetail,
+  SessionParticipantSummary,
+  SessionParticipantTransitionRequest,
   SessionTransitionRequest,
   UpdateCoDesignSessionRequest,
+  UpdateParticipantNotesRequest,
+  UpdateSessionParticipantRequest,
   UserSummary,
   WorkspaceMembershipView,
   WorkspaceSummary,
@@ -352,6 +358,99 @@ export const api = {
     request<{ events: SessionLifecycleEventView[] }>(
       `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/history`,
       user,
+    ),
+
+  listParticipants: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<{ participants: SessionParticipantSummary[] }> =>
+    request<{ participants: SessionParticipantSummary[] }>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants`,
+      user,
+    ),
+
+  getParticipant: (
+    workspaceId: string,
+    sessionId: string,
+    participantId: string,
+    user: ActingUser,
+  ): Promise<SessionParticipantDetail> =>
+    request<SessionParticipantDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}`,
+      user,
+    ),
+
+  getParticipantHistory: (
+    workspaceId: string,
+    sessionId: string,
+    participantId: string,
+    user: ActingUser,
+  ): Promise<{ events: SessionLifecycleEventView[] }> =>
+    request<{ events: SessionLifecycleEventView[] }>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}/history`,
+      user,
+    ),
+
+  exportParticipants: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<{ participants: SessionParticipantSummary[] }> =>
+    request<{ participants: SessionParticipantSummary[] }>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/export`,
+      user,
+    ),
+
+  addParticipant: (
+    workspaceId: string,
+    sessionId: string,
+    body: AddSessionParticipantRequest,
+    user: ActingUser,
+  ): Promise<SessionParticipantDetail> =>
+    request<SessionParticipantDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateParticipant: (
+    workspaceId: string,
+    sessionId: string,
+    participantId: string,
+    body: UpdateSessionParticipantRequest,
+    user: ActingUser,
+  ): Promise<SessionParticipantDetail> =>
+    request<SessionParticipantDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  updateParticipantNotes: (
+    workspaceId: string,
+    sessionId: string,
+    participantId: string,
+    body: UpdateParticipantNotesRequest,
+    user: ActingUser,
+  ): Promise<SessionParticipantDetail> =>
+    request<SessionParticipantDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}/notes`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  transitionParticipant: (
+    workspaceId: string,
+    sessionId: string,
+    participantId: string,
+    body: SessionParticipantTransitionRequest,
+    user: ActingUser,
+  ): Promise<SessionParticipantDetail> =>
+    request<SessionParticipantDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}/transition`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
     ),
 };
 

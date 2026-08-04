@@ -18,7 +18,7 @@ import type { SessionLifecycleEventView, SessionStatus } from '@witness/contract
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { Button, Card, ErrorNotice, SessionStatusBadge } from '@/components/ui';
+import { Button, Card, ErrorNotice, LinkButton, SessionStatusBadge } from '@/components/ui';
 
 type SessionDetailState = Awaited<ReturnType<typeof api.getSession>>;
 
@@ -276,11 +276,16 @@ export default function SessionDetailPage({
             {session.sessionType} · {session.deliveryMode.replace('_', ' ')}
           </p>
         </div>
-        {!isArchived && (
-          <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>
-            {editing ? 'Cancel edit' : 'Edit details'}
-          </Button>
-        )}
+        <div className="flex gap-2">
+          <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/participants`}>
+            Participants →
+          </LinkButton>
+          {!isArchived && (
+            <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>
+              {editing ? 'Cancel edit' : 'Edit details'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {isArchived && (

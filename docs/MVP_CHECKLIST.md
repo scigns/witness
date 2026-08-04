@@ -226,28 +226,28 @@ yet merged). `organisationId`/`workspaceId` are required, non-nullable fields on
 the database row; every route nests under `:workspaceId`, so `AuthorizationGuard`'s existing scope
 resolution (Milestone 1.4) Casbin-scopes every session action to that workspace automatically.
 
-Session has title — READY (Co-design Session Management PR, not yet merged). Required, validated,
+Session has title — READY (Co-design Session Management, PR #26 merged). Required, validated,
 editable.
 
-Session has purpose or objectives — READY (Co-design Session Management PR, not yet merged).
+Session has purpose or objectives — READY (Co-design Session Management, PR #26 merged).
 `purpose` is a required field, distinct from the optional `description`.
 
-Session has date and time — READY (Co-design Session Management PR, not yet merged). The
+Session has date and time — READY (Co-design Session Management, PR #26 merged). The
 `schedule` lifecycle transition sets `startAt`/`endAt`/`timezone`.
 
-Session has location or online format — READY (Co-design Session Management PR, not yet merged).
+Session has location or online format — READY (Co-design Session Management, PR #26 merged).
 `location` (free text) and `deliveryMode` (`in_person`/`online`/`hybrid`/`asynchronous`/`other`).
 
-Session has language metadata — READY (Co-design Session Management PR, not yet merged).
+Session has language metadata — READY (Co-design Session Management, PR #26 merged).
 `supportedLanguages`, a list of language codes on the session itself — distinct from
 participant-level language/accessibility needs, which are Participant Management's job (Milestone
 3, below).
 
-Session status is visible — READY (Co-design Session Management PR, not yet merged). Server-side
+Session status is visible — READY (Co-design Session Management, PR #26 merged). Server-side
 `status` field, rendered via a status badge on every session screen; `permittedTransitions` is
 server-computed so the frontend never reimplements the lifecycle state machine.
 
-Session can be edited before completion — READY (Co-design Session Management PR, not yet merged).
+Session can be edited before completion — READY (Co-design Session Management, PR #26 merged).
 Editable in every status except `archived` (enforced in the domain layer, not just the UI); the
 `update` endpoint uses optimistic concurrency (`expectedVersion`) so a stale edit is rejected rather
 than silently overwriting a concurrent change.
@@ -259,17 +259,23 @@ delete — the row and its full history remain, `archived` is a terminal, read-o
 Agenda items can be added and ordered — NOT THIS MILESTONE. No agenda-item concept exists yet;
 out of scope for Co-design Session Management, not silently dropped.
 
-Facilitator can add participants — NOT THIS MILESTONE. Participant Management (Milestone 3, not
-started).
+Facilitator can add participants — READY (Participant Management PR, not yet merged — per this
+checklist's own rule, an open PR does not count as complete).
+`packages/domain/src/session-participant.ts`'s `addParticipant`; `POST
+/api/v1/workspaces/:workspaceId/sessions/:sessionId/participants`;
+`/workspaces/[id]/sessions/[sessionId]/participants/new`. Named, pseudonymous, anonymous,
+registered, and non-registered participation are all supported — a participant is never required
+to hold a Witness user account.
 
-Participant preferred name can be recorded — NOT THIS MILESTONE. Participant Management
-(Milestone 3).
+Participant preferred name can be recorded — READY (Participant Management PR, not yet merged).
+`preferredName`, optional, cleared automatically for anonymous participants.
 
-Participant affiliation is optional — NOT THIS MILESTONE. Participant Management (Milestone 3).
+Participant affiliation is optional — READY (Participant Management PR, not yet merged).
+`affiliation` (organisation or community), optional, same anonymous-clearing rule.
 
-Language or accessibility needs can be recorded — NOT THIS MILESTONE, for participants
-specifically. Participant Management (Milestone 3); session-level supported languages are READY,
-above.
+Language or accessibility needs can be recorded — READY (Participant Management PR, not yet
+merged), for participants specifically. `languagePreference`/`accessibilityRequirements` on
+`SessionParticipant`; session-level supported languages were already READY, above.
 
 Session dashboard shows the next required action — NOT THIS MILESTONE. No such dashboard exists
 yet; the session detail screen shows current status and available transitions, not a guided
@@ -278,9 +284,48 @@ next-action prompt.
 Pilot-blocking gate
 
 A facilitator can prepare a real session without an external setup spreadsheet — NOT READY.
-Session creation and lifecycle management are READY (above), but "prepare a real session" in the
-pilot sense needs participants (Milestone 3) and consent (Milestone 4) too — this gate is not met
-until both land.
+Session creation and lifecycle management (Milestone 2) and participant management (Milestone 3)
+are READY (above), but "prepare a real session" in the pilot sense also needs consent (Milestone
+4) — this gate is not met until it lands.
+
+C.1 Participant Privacy (Milestone 3)
+
+Anonymous participation records no identifying details — READY (Participant Management PR, not
+yet merged). `addParticipant` forces `displayName` to a fixed generic label and clears
+`preferredName`/`pronouns`/`affiliation` for `identityMode: 'anonymous'`, regardless of what the
+caller sends — enforced in the domain layer, not the frontend form.
+
+Anonymous participation cannot be linked to a registered account — READY (Participant Management
+PR, not yet merged). `addParticipant`/`changeLinkedUser` reject a `linkedUserId` for an anonymous
+participant with a domain invariant (`ANONYMOUS_CANNOT_BE_LINKED`).
+
+Pseudonymous participation retains an internal record without exposing it through ordinary reads
+— READY (Participant Management PR, not yet merged). A pseudonymous participant's `linkedUserId`
+is stored but never included in `SessionParticipantSummary` (the list/export shape has no such
+field at all) and only included in `SessionParticipantDetail` for a caller holding
+`participant:manage_restricted`.
+
+Restricted facilitator notes require explicit permission, not just session access — READY
+(Participant Management PR, not yet merged). Gated by `participant:manage_restricted`, a
+narrower Casbin action than ordinary `participant:update`, enforced server-side via an imperative
+policy decision inside `ParticipantsService` (`participants.service.test.ts`'s privacy-projection
+tests).
+
+Redacted export never includes restricted fields, regardless of exporter's own access — READY
+(Participant Management PR, not yet merged). `exportRedacted` always applies the unprivileged
+redaction rule, tested directly (`participants.service.test.ts`).
+
+Cross-session, cross-workspace, and cross-organisation participant access is denied — READY
+(Participant Management PR, not yet merged), covered by adversarial unit tests
+(`participants.service.test.ts`), not yet by a live-database manual walkthrough — see Known
+limitations.
+
+No per-session or per-participant ownership check — KNOWN LIMITATION, deliberate, same shape as
+Milestone 2's session gap. Any contributor- or admin-tier holder in a session's organisation or
+workspace may manage ANY participant there, not only ones they facilitate. There is also no
+self-service view letting a signed-in registered user see only their own participant record —
+`participant:read`/`participant:manage_restricted` are workspace-scoped tiers, not row-level
+ownership.
 
 D. Consent and Participant Rights
 

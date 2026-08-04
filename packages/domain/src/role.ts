@@ -54,6 +54,8 @@ export const ROLE_PERMISSIONS = [
   'session:read',
   'session:create',
   'session:manage',
+  'participant:read',
+  'participant:manage',
 ] as const;
 
 export type RolePermission = (typeof ROLE_PERMISSIONS)[number];
@@ -75,10 +77,9 @@ export type RolePermission = (typeof ROLE_PERMISSIONS)[number];
  * split them onto their own tiers can do so without this table changing
  * shape.
  *
- * `participant` grants `record:read` and `session:read` only:
- * session-level participant management (Milestone 3) is not built yet, so a
- * participant role assignment today can only honestly promise what the
- * current product surface can enforce.
+ * `participant` grants `record:read`, `session:read` and `participant:read`
+ * only — never `participant:manage`: a `participant` role assignment means
+ * "is part of sessions", not "administers who else is part of them".
  *
  * `admin` is scope-relative here — an `admin` `RoleAssignment` on
  * Organisation X means "administers Organisation X", not the global
@@ -89,14 +90,16 @@ export type RolePermission = (typeof ROLE_PERMISSIONS)[number];
  */
 export const ROLE_PERMISSIONS_BY_ROLE: Readonly<Record<WitnessRole, readonly RolePermission[]>> =
   Object.freeze({
-    reader: ['record:read', 'session:read'],
-    participant: ['record:read', 'session:read'],
+    reader: ['record:read', 'session:read', 'participant:read'],
+    participant: ['record:read', 'session:read', 'participant:read'],
     contributor: [
       'record:read',
       'record:create',
       'session:read',
       'session:create',
       'session:manage',
+      'participant:read',
+      'participant:manage',
     ],
     facilitator: [
       'record:read',
@@ -104,8 +107,10 @@ export const ROLE_PERMISSIONS_BY_ROLE: Readonly<Record<WitnessRole, readonly Rol
       'session:read',
       'session:create',
       'session:manage',
+      'participant:read',
+      'participant:manage',
     ],
-    reviewer: ['record:read', 'record:create', 'record:review', 'session:read'],
+    reviewer: ['record:read', 'record:create', 'record:review', 'session:read', 'participant:read'],
     admin: [
       'record:read',
       'record:create',
@@ -115,6 +120,8 @@ export const ROLE_PERMISSIONS_BY_ROLE: Readonly<Record<WitnessRole, readonly Rol
       'session:read',
       'session:create',
       'session:manage',
+      'participant:read',
+      'participant:manage',
     ],
   });
 

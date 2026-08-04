@@ -37,11 +37,24 @@
 # admin-tier holder in the session's organisation or workspace may manage
 # ANY session there, not only ones assigned to them. Both gaps are named as
 # known limitations in this milestone's PR, not hidden.
+#
+# participant:* (BUILD_ROADMAP.md Milestone 3, Participant Management):
+# same contributor/admin tier as session:*, same reasoning — no per-session
+# ownership check. `participant:manage_restricted` gates the two things this
+# milestone's privacy rules single out as needing "explicit permission": a
+# participant's restricted facilitator notes, and a pseudonymous
+# participant's `linkedUserId` (never exposed through an ordinary
+# `participant:read`). It is granted at the same contributor/admin tier as
+# every other participant action, not a narrower one — a future milestone
+# that needs a genuinely separate "may see restricted participant data"
+# grant, distinct from "may manage participants at all", can split it onto
+# its own tier without this file's shape changing.
 p, reader, record:read
 p, reader, organisation:read
 p, reader, workspace:read
 p, reader, role:read
 p, reader, session:read
+p, reader, participant:read
 
 p, contributor, record:read
 p, contributor, record:create
@@ -52,6 +65,10 @@ p, contributor, session:read
 p, contributor, session:create
 p, contributor, session:update
 p, contributor, session:transition
+p, contributor, participant:read
+p, contributor, participant:create
+p, contributor, participant:update
+p, contributor, participant:manage_restricted
 
 p, reviewer, record:read
 p, reviewer, record:create
@@ -60,6 +77,7 @@ p, reviewer, organisation:read
 p, reviewer, workspace:read
 p, reviewer, role:read
 p, reviewer, session:read
+p, reviewer, participant:read
 
 p, admin, record:read
 p, admin, record:create
@@ -84,3 +102,7 @@ p, admin, session:read
 p, admin, session:create
 p, admin, session:update
 p, admin, session:transition
+p, admin, participant:read
+p, admin, participant:create
+p, admin, participant:update
+p, admin, participant:manage_restricted
