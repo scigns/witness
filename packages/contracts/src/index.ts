@@ -106,6 +106,118 @@ export const assignRoleRequestSchema = z.object({
 });
 export type AssignRoleRequest = z.infer<typeof assignRoleRequestSchema>;
 
+// ─── Co-design sessions (BUILD_ROADMAP.md Milestone 2) ────────────────────────
+
+export const SESSION_STATUSES = ['draft', 'scheduled', 'open', 'closed', 'archived'] as const;
+export type SessionStatus = (typeof SESSION_STATUSES)[number];
+
+export const SESSION_DELIVERY_MODES = [
+  'in_person',
+  'online',
+  'hybrid',
+  'asynchronous',
+  'other',
+] as const;
+export type SessionDeliveryMode = (typeof SESSION_DELIVERY_MODES)[number];
+
+export const SESSION_PARTICIPANT_VISIBILITIES = [
+  'visible_to_all_participants',
+  'facilitators_only',
+] as const;
+export type SessionParticipantVisibility = (typeof SESSION_PARTICIPANT_VISIBILITIES)[number];
+
+export const SESSION_CONSENT_CONFIGURATION_STATES = ['not_configured', 'configured'] as const;
+export type SessionConsentConfigurationState =
+  (typeof SESSION_CONSENT_CONFIGURATION_STATES)[number];
+
+/**
+ * A suggested starting point for the frontend's session-type picker — NOT a
+ * closed enum. The request schema below accepts any non-empty string up to
+ * 100 characters: culturally specific practices such as "talanoa" are not
+ * decorative labels for a generic workflow, and an organisation must be able
+ * to name a protocol this list does not anticipate without engineering
+ * involvement.
+ */
+export const SUGGESTED_SESSION_TYPES = [
+  'co_design_workshop',
+  'community_consultation',
+  'talanoa',
+  'policy_meeting',
+  'focus_group',
+  'interview',
+  'training_workshop',
+  'internal_planning_session',
+  'formal_proceeding',
+  'other',
+] as const;
+
+const sessionLanguagesSchema = z
+  .array(z.string().trim().min(1).max(50))
+  .max(20, 'At most 20 supported languages may be listed');
+
+export const createCoDesignSessionRequestSchema = z.object({
+  title: z.string().trim().min(1, 'A title is required').max(200),
+  purpose: z.string().trim().min(1, 'A purpose is required').max(2000),
+  description: z.string().trim().max(5000).optional(),
+  sessionType: z.string().trim().min(1, 'A session type is required').max(100),
+  location: z.string().trim().max(300).optional(),
+  deliveryMode: z.enum(SESSION_DELIVERY_MODES),
+  primaryFacilitatorId: z.string().uuid('A valid facilitator id is required'),
+  supportedLanguages: sessionLanguagesSchema.optional(),
+  culturalProtocolNotes: z.string().trim().max(5000).optional(),
+  participantVisibility: z.enum(SESSION_PARTICIPANT_VISIBILITIES).optional(),
+});
+export type CreateCoDesignSessionRequest = z.infer<typeof createCoDesignSessionRequestSchema>;
+
+/**
+ * `expectedVersion` backs optimistic concurrency (`CoDesignSessionDetail.version`):
+ * the client submits the version it last read, and the server rejects the
+ * write with `409 STALE_VERSION` rather than silently overwriting a change
+ * it never saw. Required, not optional — an update with no version to check
+ * against defeats the purpose of asking for one.
+ */
+export const updateCoDesignSessionRequestSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  purpose: z.string().trim().min(1).max(2000).optional(),
+  description: z.string().trim().max(5000).nullable().optional(),
+  sessionType: z.string().trim().min(1).max(100).optional(),
+  location: z.string().trim().max(300).nullable().optional(),
+  deliveryMode: z.enum(SESSION_DELIVERY_MODES).optional(),
+  supportedLanguages: sessionLanguagesSchema.optional(),
+  culturalProtocolNotes: z.string().trim().max(5000).nullable().optional(),
+  participantVisibility: z.enum(SESSION_PARTICIPANT_VISIBILITIES).optional(),
+  primaryFacilitatorId: z.string().uuid().optional(),
+  expectedVersion: z.number().int().positive(),
+});
+export type UpdateCoDesignSessionRequest = z.infer<typeof updateCoDesignSessionRequestSchema>;
+
+/**
+ * Mirrors `reviewActionSchema`: a named transition rather than a raw target
+ * state, so an invalid transition is a validation error with a clear name
+ * rather than an opaque status string. Every variant carries
+ * `expectedVersion` for the same optimistic-concurrency reason as the update
+ * schema above.
+ */
+export const sessionTransitionRequestSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('schedule'),
+    startAt: z.string().datetime({ offset: true }),
+    endAt: z.string().datetime({ offset: true }).optional(),
+    timezone: z.string().trim().max(64).optional(),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({ action: z.literal('unschedule'), expectedVersion: z.number().int().positive() }),
+  z.object({ action: z.literal('open'), expectedVersion: z.number().int().positive() }),
+  z.object({ action: z.literal('close'), expectedVersion: z.number().int().positive() }),
+  z.object({
+    action: z.literal('reopen'),
+    reason: z.string().trim().min(1, 'A reason is required').max(2000),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({ action: z.literal('archive'), expectedVersion: z.number().int().positive() }),
+]);
+export type SessionTransitionRequest = z.infer<typeof sessionTransitionRequestSchema>;
+
 // ─── Responses ───────────────────────────────────────────────────────────────
 
 export interface ActorView {
@@ -261,6 +373,49 @@ export interface CurrentUserView {
   accountState: AccountState;
   organisations: CurrentUserOrganisationView[];
   workspaces: CurrentUserWorkspaceView[];
+}
+
+export interface CoDesignSessionSummary {
+  id: string;
+  organisationId: string;
+  workspaceId: string;
+  title: string;
+  sessionType: string;
+  deliveryMode: SessionDeliveryMode;
+  status: SessionStatus;
+  startAt: string | null;
+  endAt: string | null;
+  primaryFacilitatorId: string;
+  updatedAt: string;
+}
+
+export interface CoDesignSessionDetail extends CoDesignSessionSummary {
+  purpose: string;
+  description: string | null;
+  location: string | null;
+  timezone: string | null;
+  supportedLanguages: string[];
+  culturalProtocolNotes: string | null;
+  participantVisibility: SessionParticipantVisibility;
+  consentConfigurationState: SessionConsentConfigurationState;
+  createdAt: string;
+  openedAt: string | null;
+  closedAt: string | null;
+  archivedAt: string | null;
+  /** Optimistic-concurrency counter — send back as `expectedVersion` on the next write. */
+  version: number;
+  /** Server-computed, so a client never has to reimplement the lifecycle state machine. */
+  permittedTransitions: SessionStatus[];
+  /** Whether the session currently accepts evidence capture — derived from `status`, not stored. */
+  canCaptureEvidence: boolean;
+}
+
+export interface SessionLifecycleEventView {
+  id: string;
+  action: string;
+  actor: ActorView;
+  occurredAt: string;
+  metadata: Record<string, string>;
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────────

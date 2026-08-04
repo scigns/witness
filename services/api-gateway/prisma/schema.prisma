@@ -57,18 +57,18 @@ model Source {
 /// line of defence for an invariant the application already enforces — because
 /// applications get rewritten and this constraint should outlive them.
 model Record {
-  id           String   @id @db.Uuid
-  title        String   @db.VarChar(200)
-  body         String   @db.Text
-  reviewState  String   @map("review_state") @db.VarChar(24)
+  id          String @id @db.Uuid
+  title       String @db.VarChar(200)
+  body        String @db.Text
+  reviewState String @map("review_state") @db.VarChar(24)
 
-  sourceId     String   @map("source_id") @db.Uuid
-  source       Source   @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  sourceId String @map("source_id") @db.Uuid
+  source   Source @relation(fields: [sourceId], references: [id], onDelete: Restrict)
 
-  capturedById String   @map("captured_by_id") @db.Uuid
-  capturedBy   Actor    @relation("CapturedBy", fields: [capturedById], references: [id], onDelete: Restrict)
+  capturedById String @map("captured_by_id") @db.Uuid
+  capturedBy   Actor  @relation("CapturedBy", fields: [capturedById], references: [id], onDelete: Restrict)
 
-  capturedAt   DateTime @map("captured_at") @db.Timestamptz(6)
+  capturedAt DateTime @map("captured_at") @db.Timestamptz(6)
 
   /// Consent grant authorising processing (P2). Nullable ONLY because the consent
   /// service does not exist yet — Phase 3, roadmap 3.4. It becomes NOT NULL then,
@@ -93,9 +93,10 @@ model Organisation {
   name      String   @db.VarChar(200)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  workspaces      Workspace[]
-  memberships     OrganisationMembership[]
-  roleAssignments RoleAssignment[]
+  workspaces       Workspace[]
+  memberships      OrganisationMembership[]
+  roleAssignments  RoleAssignment[]
+  coDesignSessions CoDesignSession[]
 
   @@map("organisation")
 }
@@ -108,16 +109,17 @@ model Organisation {
 /// belongs to exactly one organisation, never a polymorphic set of parents, so
 /// there is no reason to give up referential integrity here.
 model Workspace {
-  id             String       @id @db.Uuid
-  name           String       @db.VarChar(200)
+  id   String @id @db.Uuid
+  name String @db.VarChar(200)
 
   organisationId String       @map("organisation_id") @db.Uuid
   organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
 
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  memberships     WorkspaceMembership[]
-  roleAssignments RoleAssignment[]
+  memberships      WorkspaceMembership[]
+  roleAssignments  RoleAssignment[]
+  coDesignSessions CoDesignSession[]
 
   @@index([organisationId])
   @@map("workspace")
@@ -144,6 +146,7 @@ model User {
   roleAssignments         RoleAssignment[]
   identityLinks           IdentityLink[]
   authSessions            AuthSession[]
+  facilitatedSessions     CoDesignSession[]
 
   @@index([accountState])
   @@map("witness_user")
@@ -154,9 +157,9 @@ model User {
 /// `packages/domain/src/identity-link.ts` for why this is keyed on
 /// `(provider, providerSubject)` rather than email.
 model IdentityLink {
-  id              String    @id @db.Uuid
-  provider        String    @db.VarChar(32)
-  providerSubject String    @map("provider_subject") @db.VarChar(255)
+  id              String @id @db.Uuid
+  provider        String @db.VarChar(32)
+  providerSubject String @map("provider_subject") @db.VarChar(255)
 
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
@@ -183,8 +186,8 @@ model IdentityLink {
 /// production `X-Witness-Dev-User` header shape) avoids that without
 /// changing the application's deployment topology.
 model AuthSession {
-  id        String   @id @db.Uuid
-  tokenHash String   @unique @map("token_hash") @db.VarChar(64)
+  id        String @id @db.Uuid
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
 
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
@@ -317,6 +320,68 @@ model RoleAssignment {
   @@map("role_assignment")
 }
 
+/// A co-design workshop, consultation, or similar structured conversation
+/// (BUILD_ROADMAP.md Milestone 2) — the first core product capability after
+/// identity and access management. Scoped to exactly one organisation and
+/// workspace, mirroring `Workspace.organisationId`: a real foreign key, not
+/// a polymorphic association, because a session always belongs to exactly
+/// one workspace under exactly one organisation.
+///
+/// `createdBy` is deliberately NOT a column here — same convention as
+/// `Organisation`/`Workspace`: who created it is recorded once, on the
+/// `co_design_session.created` audit event, not duplicated onto the row
+/// itself. `primaryFacilitatorId` IS a column because it is live business
+/// data a session can reassign (`co_design_session.facilitator_changed`),
+/// not a point-in-time provenance fact.
+///
+/// `version` backs optimistic concurrency: a concurrent update supplies the
+/// version it last read, and the service layer's conditional update
+/// (`WHERE id = ? AND version = ?`) rejects a write based on stale data
+/// rather than silently overwriting a change it never saw.
+model CoDesignSession {
+  id             String       @id @db.Uuid
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  title       String  @db.VarChar(200)
+  purpose     String  @db.Text
+  description String? @db.Text
+
+  sessionType  String  @map("session_type") @db.VarChar(100)
+  location     String? @db.VarChar(300)
+  deliveryMode String  @map("delivery_mode") @db.VarChar(24)
+
+  startAt  DateTime? @map("start_at") @db.Timestamptz(6)
+  endAt    DateTime? @map("end_at") @db.Timestamptz(6)
+  timezone String?   @db.VarChar(64)
+
+  primaryFacilitatorId String @map("primary_facilitator_id") @db.Uuid
+  primaryFacilitator   User   @relation(fields: [primaryFacilitatorId], references: [id], onDelete: Restrict)
+
+  status String @db.VarChar(16)
+
+  supportedLanguages        String[] @default([]) @map("supported_languages")
+  culturalProtocolNotes     String?  @map("cultural_protocol_notes") @db.Text
+  participantVisibility     String   @map("participant_visibility") @db.VarChar(32)
+  consentConfigurationState String   @default("not_configured") @map("consent_configuration_state") @db.VarChar(24)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  openedAt   DateTime? @map("opened_at") @db.Timestamptz(6)
+  closedAt   DateTime? @map("closed_at") @db.Timestamptz(6)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  version Int @default(1)
+
+  @@index([organisationId])
+  @@index([workspaceId, status])
+  @@index([primaryFacilitatorId])
+  @@map("co_design_session")
+}
+
 /// Append-only, hash-chained audit trail (roadmap 3.7).
 ///
 /// `subjectType` + `subjectId` is a polymorphic association rather than a foreign
@@ -328,26 +393,26 @@ model RoleAssignment {
 ///
 /// There is deliberately no update or delete path in the application.
 model AuditEvent {
-  id           String   @id @db.Uuid
-  subjectType  String   @map("subject_type") @db.VarChar(24)
-  subjectId    String   @map("subject_id") @db.Uuid
+  id          String @id @db.Uuid
+  subjectType String @map("subject_type") @db.VarChar(24)
+  subjectId   String @map("subject_id") @db.Uuid
 
-  action       String   @db.VarChar(64)
+  action String @db.VarChar(64)
 
-  actorId      String   @map("actor_id") @db.Uuid
-  actor        Actor    @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  actorId String @map("actor_id") @db.Uuid
+  actor   Actor  @relation(fields: [actorId], references: [id], onDelete: Restrict)
 
-  occurredAt   DateTime @map("occurred_at") @db.Timestamptz(6)
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
 
   /// Null only for the first event in a subject's chain.
-  previousHash String?  @map("previous_hash") @db.VarChar(64)
-  hash         String   @unique @db.VarChar(64)
+  previousHash String? @map("previous_hash") @db.VarChar(64)
+  hash         String  @unique @db.VarChar(64)
 
   /// Context only — never record content. The audit log answers "who did what,
   /// when", and is retained under a different policy from the content itself.
-  metadata     Json     @default("{}")
+  metadata Json @default("{}")
 
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([subjectType, subjectId, occurredAt])
   @@map("audit_event")

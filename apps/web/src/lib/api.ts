@@ -12,6 +12,9 @@
 import type {
   AddMembershipRequest,
   AssignRoleRequest,
+  CoDesignSessionDetail,
+  CoDesignSessionSummary,
+  CreateCoDesignSessionRequest,
   CreateOrganisationRequest,
   CreateRecordRequest,
   CreateUserRequest,
@@ -26,6 +29,9 @@ import type {
   ReviewAction,
   RoleAssignmentView,
   RoleDefinition,
+  SessionLifecycleEventView,
+  SessionTransitionRequest,
+  UpdateCoDesignSessionRequest,
   UserSummary,
   WorkspaceMembershipView,
   WorkspaceSummary,
@@ -283,6 +289,70 @@ export const api = {
     request<void>(`/api/v1/workspaces/${workspaceId}/memberships/${membershipId}/role`, user, {
       method: 'DELETE',
     }),
+
+  listSessions: (
+    workspaceId: string,
+    user: ActingUser,
+  ): Promise<{ sessions: CoDesignSessionSummary[] }> =>
+    request<{ sessions: CoDesignSessionSummary[] }>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions`,
+      user,
+    ),
+
+  getSession: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<CoDesignSessionDetail> =>
+    request<CoDesignSessionDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}`,
+      user,
+    ),
+
+  createSession: (
+    workspaceId: string,
+    body: CreateCoDesignSessionRequest,
+    user: ActingUser,
+  ): Promise<CoDesignSessionDetail> =>
+    request<CoDesignSessionDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateSession: (
+    workspaceId: string,
+    sessionId: string,
+    body: UpdateCoDesignSessionRequest,
+    user: ActingUser,
+  ): Promise<CoDesignSessionDetail> =>
+    request<CoDesignSessionDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  transitionSession: (
+    workspaceId: string,
+    sessionId: string,
+    body: SessionTransitionRequest,
+    user: ActingUser,
+  ): Promise<CoDesignSessionDetail> =>
+    request<CoDesignSessionDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/transition`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  getSessionHistory: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<{ events: SessionLifecycleEventView[] }> =>
+    request<{ events: SessionLifecycleEventView[] }>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/history`,
+      user,
+    ),
 };
 
 /**

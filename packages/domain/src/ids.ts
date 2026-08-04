@@ -28,6 +28,7 @@ export type OrganisationMembershipId = Branded<string, 'OrganisationMembershipId
 export type WorkspaceMembershipId = Branded<string, 'WorkspaceMembershipId'>;
 export type RoleAssignmentId = Branded<string, 'RoleAssignmentId'>;
 export type IdentityLinkId = Branded<string, 'IdentityLinkId'>;
+export type CoDesignSessionId = Branded<string, 'CoDesignSessionId'>;
 
 /**
  * UUID v4/v7 shape. We accept both: v7 is time-ordered, which matters for the
@@ -94,4 +95,9 @@ export function toRoleAssignmentId(value: string): RoleAssignmentId {
 export function toIdentityLinkId(value: string): IdentityLinkId {
   assertUuid(value, 'IdentityLinkId');
   return value as IdentityLinkId;
+}
+
+export function toCoDesignSessionId(value: string): CoDesignSessionId {
+  assertUuid(value, 'CoDesignSessionId');
+  return value as CoDesignSessionId;
 }

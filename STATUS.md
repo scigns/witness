@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-08-04
+**Last updated:** 2026-08-04 (Milestone 2)
 **Updated by:** CTO
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -60,11 +60,11 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 | Governance | `governance` | Governance Lead | 🟡 | Consent framework drafted; Indigenous protocols need external review |
 | Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun; Casbin-based, organisation/workspace-scoped authorisation shipped (ADR-0007); real identity is Phase 2 |
 | Infrastructure | `infrastructure` | Infrastructure Lead | 🟡 | Compose stack running; observability overlay added, wiring pending |
-| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0 |
+| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle shipped (Milestone 2) |
 | Knowledge graph | `knowledge-graph` | Knowledge Graph Lead | 🟡 | Ontology v0.1 in design |
 | AI platform | `ai-platform` | AI Lead | ⚪ | Awaiting Phase 5; model policy drafted |
-| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; design system awaits Phase 6 |
-| Testing | `testing` | QA Lead | 🟡 | 276 tests across all packages (177 API-gateway); invariant and adversarial suites live |
+| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session screens added (Milestone 2); design system awaits Phase 6 |
+| Testing | `testing` | QA Lead | 🟡 | 331 tests across all packages (200 API-gateway); invariant and adversarial suites live |
 | Release | `release` | Release Manager | 🟢 | Strategy and versioning defined |
 
 ---
@@ -87,6 +87,83 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-04 — Co-design Session Management delivered (BUILD_ROADMAP.md Milestone 2), PR open
+
+- **First core product capability after identity and access management.** With Authentication (PR
+  #22/#23) and Authorisation Hardening (PR #25) both merged, this is the first milestone in the
+  "WITNESS — CO-DESIGN MVP BUILD COMPLETION" sequence: a facilitator can now create, schedule, open,
+  manage, close, archive, and reopen a co-design session within an organisation and workspace, with
+  every action authorised through the existing Casbin scope-tier boundary — no new authorisation
+  mechanism invented for this milestone.
+- **`CoDesignSession` domain aggregate** (`packages/domain/src/co-design-session.ts`): an explicit
+  five-state lifecycle (`draft → scheduled → open → closed → archived`, plus `scheduled → draft` and
+  an audited, reasoned `closed → open` reopen) — mirrors `review.ts`'s "reopening emits an audit
+  event, so the previous state is never lost" reasoning. Archived sessions are read-only, enforced
+  in the domain layer (`assertNotArchived`), not just the UI. `sessionType` is a free-form,
+  organisation-supplied string rather than a closed enum — "talanoa," "formal proceeding," and
+  "community consultation" carry distinct protocol expectations a fixed list would either flatten or
+  perpetually chase; `packages/contracts` ships a suggested set for the frontend picker only.
+  `evidenceCaptureState` from the milestone brief is deliberately NOT a stored field — it is fully
+  determined by `status` (`canCaptureEvidence()`), so Milestone 5 (Evidence Capture) will call that
+  function rather than read a value that could drift from the state it describes.
+  `consentConfigurationState` IS stored (`not_configured` at creation) because Milestone 4 (Consent)
+  will need to set it independently of lifecycle status, but gets no mutator of its own yet — a
+  named, deliberate gap, not an oversight.
+- **Optimistic concurrency, new to this codebase.** Every update and transition of an existing
+  session carries a client-supplied `expectedVersion`; the persistence-layer write is a single
+  conditional `updateMany({ where: { id, version: expectedVersion } })`, and zero rows matched is a
+  `409 STALE_VERSION` — the entire
+  transaction, including the audit event, rolls back rather than silently overwriting a change the
+  client never saw. `sessions.service.test.ts` verifies the case that actually matters: a client
+  acting on a version it read *before* someone else's write landed is rejected identically whether
+  the conflicting write happened during this exact request or five minutes earlier.
+- **Authorisation reuses the existing Casbin boundary exactly, with two named simplifications.**
+  Four new actions (`session:read`/`session:create`/`session:update`/`session:transition`) were
+  added to `packages/policy/policy.csv` and the deprecated dev-header fallback table
+  (`role-grants.ts`), granted to the `contributor` tier (which `facilitator` collapses onto via
+  `RoleResolutionService.ROLE_TO_TIER` — unchanged from Milestone 1.4). Two things this creates,
+  named rather than hidden: (1) a plain `contributor` WitnessRole can create and manage sessions too,
+  not only `facilitator` — splitting them onto separate tiers was judged out of scope; (2) there is
+  no per-session "only the assigned facilitator may manage this specific session" ownership check —
+  any contributor- or admin-tier holder in the session's organisation or workspace may manage *any*
+  session there. Every session route nests under `:workspaceId`
+  (`/api/v1/workspaces/:workspaceId/sessions/...`), which is what makes `AuthorizationGuard`'s
+  existing scope resolution (Milestone 1.4) correctly Casbin-scope every session action without any
+  change to the guard itself.
+- **API**: `list`/`get`/`create`/`update`/`transition`/`history` under
+  `/api/v1/workspaces/:workspaceId/sessions`, mirroring `RecordsController`'s
+  parse-authorise-delegate-serialise shape; lifecycle transitions
+  (schedule/unschedule/open/close/reopen/archive) are bundled behind one `session:transition`
+  permission on `POST :sessionId/transition`, the same shape `record:review` uses for its own
+  submit/confirm/correct/reject/reopen family. Lifecycle history reuses the existing polymorphic
+  `AuditEvent` table filtered to lifecycle-action types — no new history table.
+- **Frontend**: `/workspaces/[id]/sessions` (list + create link), `/workspaces/[id]/sessions/new`
+  (create form — session-type picker with a free-text "Other" fallback, facilitator picker scoped to
+  workspace members), and `/workspaces/[id]/sessions/[sessionId]` (detail, inline edit, lifecycle
+  controls rendered from the server-computed `permittedTransitions` list, schedule/reopen sub-forms,
+  and lifecycle history) — plus a "Co-design sessions →" link added to the existing workspace detail
+  page. A distinct `staleUpdate` UI state (not folded into the generic error banner) handles
+  `409 STALE_VERSION` with a "someone else changed this — reload" prompt, and a distinct `forbidden`
+  state handles a 403 separately from "not found."
+- **Known limitation, stated plainly**: this milestone's frontend, like every existing
+  organisation/workspace/membership management page, drives the API through the unverified
+  `X-Witness-Dev-User` header, not a real session — unchanged scope decision from Milestone 1.4, not
+  reopened here.
+- **No live Postgres or Docker was available in this sandbox** (unchanged from every prior
+  milestone), so this could not be walked through end-to-end in a browser against a live database.
+  Verification here is: 32 new domain tests (`co-design-session.test.ts`) covering every lifecycle
+  transition and its adversarial rejections; 15 new service tests
+  (`sessions.service.test.ts`) covering creation, scoping 404s, transitions, archived immutability,
+  and optimistic concurrency against an in-memory Prisma double; 4 new policy-engine tests against
+  the real, on-disk Casbin policy data; a hand-authored SQL migration (no live DB to generate a diff
+  against, matching the same constraint every prior milestone's migration was written under) plus a
+  successful `prisma generate`/`prisma validate`; and a full Next.js production build that
+  type-checks and statically renders every new route. A live-database, live-browser manual
+  walkthrough remains unverified — stated as such, not claimed.
+- **Tests**: 331 tests across all packages (up from 276) — 94 domain (up from 62), 200 API-gateway
+  (up from 177). `test:invariants` 20/20 and `test:adversarial` 30/30 unchanged. Full `pnpm verify`
+  (format, lint, typecheck, test, build) green.
 
 ### 2026-08-04 — Authorisation Hardening delivered (BUILD_ROADMAP.md Milestone 1.4), PR open
 

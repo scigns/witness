@@ -44,7 +44,11 @@ export type Action =
   | 'role:read'
   | 'role_assignment:read'
   | 'role_assignment:write'
-  | 'role_assignment:delete';
+  | 'role_assignment:delete'
+  | 'session:read'
+  | 'session:create'
+  | 'session:update'
+  | 'session:transition';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;

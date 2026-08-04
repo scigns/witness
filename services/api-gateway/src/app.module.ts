@@ -35,6 +35,8 @@ import { OrganisationsService } from './organisations/organisations.service.js';
 import { RecordsController } from './records/records.controller.js';
 import { RecordsService } from './records/records.service.js';
 import { RolesController } from './roles/roles.controller.js';
+import { SessionsController } from './sessions/sessions.controller.js';
+import { SessionsService } from './sessions/sessions.service.js';
 import { WITNESS_CONFIG } from './tokens.js';
 import { UsersController } from './users/users.controller.js';
 import { UsersService } from './users/users.service.js';
@@ -57,6 +59,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     RolesController,
     OrganisationRoleAssignmentsController,
     WorkspaceRoleAssignmentsController,
+    SessionsController,
     AuthenticationController,
     CurrentUserController,
   ],
@@ -70,6 +73,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     WorkspaceMembershipsService,
     OrganisationRoleAssignmentsService,
     WorkspaceRoleAssignmentsService,
+    SessionsService,
     SessionService,
     RoleResolutionService,
     PolicyEngineService,

@@ -51,6 +51,9 @@ export const ROLE_PERMISSIONS = [
   'record:review',
   'membership:manage',
   'role_assignment:manage',
+  'session:read',
+  'session:create',
+  'session:manage',
 ] as const;
 
 export type RolePermission = (typeof ROLE_PERMISSIONS)[number];
@@ -59,17 +62,23 @@ export type RolePermission = (typeof ROLE_PERMISSIONS)[number];
  * Role → permitted actions, least privilege by construction: a role grants
  * exactly the actions listed, nothing implied by name or hierarchy.
  *
- * `facilitator` grants the same record actions as `contributor` today —
- * both generate evidence but hold no review authority — because Co-design
- * Sessions (BUILD_ROADMAP.md Milestone 2) do not exist yet to give
- * `facilitator` session-specific permissions of its own. The two roles are
- * kept distinct rather than merged because they answer different questions
- * ("runs the session" vs. "contributes to it") that will diverge once
- * sessions exist, even though their grants are identical today.
+ * `facilitator` and `contributor` diverge as of Milestone 2 (Co-design
+ * Session Management): both still hold the same record actions (both
+ * generate evidence, neither holds review authority), and both now also
+ * hold `session:read`/`session:create`/`session:manage` — Casbin resolves
+ * the two onto the same request-time tier
+ * (`services/api-gateway/src/authz/role-resolution.ts`'s `ROLE_TO_TIER`),
+ * so a plain `contributor` can create and manage sessions too, not only a
+ * `facilitator`. That is a deliberate, named simplification for this
+ * milestone (see `packages/policy/policy.csv`'s header comment), not the
+ * two roles actually being identical — a future milestone that needs to
+ * split them onto their own tiers can do so without this table changing
+ * shape.
  *
- * `participant` grants read only, for the same reason: Participants
- * (Milestone 2.3) are not built, so a participant role assignment today can
- * only honestly promise what the current product surface can enforce.
+ * `participant` grants `record:read` and `session:read` only:
+ * session-level participant management (Milestone 3) is not built yet, so a
+ * participant role assignment today can only honestly promise what the
+ * current product surface can enforce.
  *
  * `admin` is scope-relative here — an `admin` `RoleAssignment` on
  * Organisation X means "administers Organisation X", not the global
@@ -80,17 +89,32 @@ export type RolePermission = (typeof ROLE_PERMISSIONS)[number];
  */
 export const ROLE_PERMISSIONS_BY_ROLE: Readonly<Record<WitnessRole, readonly RolePermission[]>> =
   Object.freeze({
-    reader: ['record:read'],
-    participant: ['record:read'],
-    contributor: ['record:read', 'record:create'],
-    facilitator: ['record:read', 'record:create'],
-    reviewer: ['record:read', 'record:create', 'record:review'],
+    reader: ['record:read', 'session:read'],
+    participant: ['record:read', 'session:read'],
+    contributor: [
+      'record:read',
+      'record:create',
+      'session:read',
+      'session:create',
+      'session:manage',
+    ],
+    facilitator: [
+      'record:read',
+      'record:create',
+      'session:read',
+      'session:create',
+      'session:manage',
+    ],
+    reviewer: ['record:read', 'record:create', 'record:review', 'session:read'],
     admin: [
       'record:read',
       'record:create',
       'record:review',
       'membership:manage',
       'role_assignment:manage',
+      'session:read',
+      'session:create',
+      'session:manage',
     ],
   });
 

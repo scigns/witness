@@ -16,6 +16,7 @@ import type {
   ReviewState,
   RoleAssignmentView,
   RoleDefinition,
+  SessionStatus,
   WitnessRole,
 } from '@witness/contracts';
 
@@ -99,6 +100,32 @@ export function RoleBadge({ role }: { role: WitnessRole | null }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-accent)] px-2 py-0.5 text-xs font-medium text-[var(--color-accent)]">
       {role.charAt(0).toUpperCase() + role.slice(1)}
+    </span>
+  );
+}
+
+const SESSION_STATUS_LABELS: Record<SessionStatus, string> = {
+  draft: 'Draft',
+  scheduled: 'Scheduled',
+  open: 'Open',
+  closed: 'Closed',
+  archived: 'Archived',
+};
+
+const SESSION_STATUS_CLASSES: Record<SessionStatus, string> = {
+  draft: 'border-current text-[var(--color-ink-muted)]',
+  scheduled: 'border-amber-600 text-amber-700 dark:text-amber-400',
+  open: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  closed: 'border-current text-[var(--color-ink-muted)]',
+  archived: 'border-current text-[var(--color-ink-muted)]',
+};
+
+export function SessionStatusBadge({ status }: { status: SessionStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${SESSION_STATUS_CLASSES[status]}`}
+    >
+      {SESSION_STATUS_LABELS[status]}
     </span>
   );
 }
