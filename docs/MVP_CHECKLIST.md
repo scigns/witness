@@ -163,16 +163,54 @@ without a domain or API change.
 Pilot-blocking gate
 
 A real user can sign in and see only the organisations and workspaces they actually belong to —
-READY (Authentication PR, not yet merged). Verified manually end-to-end through a real browser:
+READY (Authentication PR, merged). Verified manually end-to-end through a real browser:
 signed-in `GET /api/v1/me` (and the dashboard's "Your access" section that renders it) lists only
 the organisations and workspaces the signed-in user actually belongs to, never the full catalog —
-confirmed against a user with a narrower membership set than the database's full contents. **This
-is membership-based *visibility*, not request-time *authorization*** — workspace and organisation
-APIs do not yet enforce the session principal's scope on every action, only `GET /api/v1/me` and
-what it renders. Full request-time enforcement is Authorisation hardening's job (the next
-capability); see Known limitations below.
+confirmed against a user with a narrower membership set than the database's full contents.
+`GET /api/v1/organisations` and `GET /api/v1/workspaces` now apply the same membership-based
+visibility filter for a real session (Authorisation Hardening PR, not yet merged) — see below.
 
 **Mark these DONE only after the Authentication PR merges to `main` and the workflow is
+re-verified on the deployable version** — this checklist is a binary release gate, not a
+PR-review tracker.
+
+Authorisation Hardening (BUILD_ROADMAP.md Milestone 1.4)
+
+A Casbin policy decision point exists — READY (Authorisation Hardening PR, not yet merged).
+`packages/policy/model.conf` + `packages/policy/policy.csv` (versioned, reviewed, unit-tested in
+isolation per ADR-0007) are the single source of truth for what a request-time grant tier may do;
+`PolicyEngineService` loads them via a real Casbin `Enforcer`. `role-grants.ts`'s table is now the
+deprecated fallback for the unverified development header only.
+
+Organisation- and workspace-scoped actions are authorised per exact scope — READY (Authorisation
+Hardening PR, not yet merged). `PolicyEnforcementService` resolves the caller's role tiers for the
+specific organisation or workspace a request concerns (`RoleResolutionService.scopedGrantTiers`,
+`admin` included only within that one scope) before consulting the policy engine; `AuthorizationGuard`
+calls it with a scope resolved from the route's path parameters or a creation body. Covers
+organisation-membership, workspace-membership, and role-assignment management actions.
+Cross-organisation and cross-workspace leakage are covered by adversarial unit tests
+(`role-resolution.service.test.ts`), not yet by a live-database manual walkthrough — see Known
+limitations.
+
+Deny-by-default and fail-closed on internal error — READY (Authorisation Hardening PR, not yet
+merged). No role in scope, an unresolvable policy engine, or a role-resolution database error are
+all denials, never a silent allow (`policy-enforcement.service.test.ts`).
+
+`record:*`/`user:*` actions remain global, not organisation/workspace-scoped — KNOWN LIMITATION,
+deliberate. `Record`/`Source` carry no organisation or workspace foreign key in the current schema;
+scoping them would require new domain modelling this milestone does not invent.
+`organisation:create`/`user:create` remain unreachable via a real session (the *global* tier
+resolution never includes `admin`) — the same fail-closed boundary Milestone 1.3 documented,
+re-deferred rather than resolved here.
+
+Existing organisation/workspace/membership management UI is not yet migrated to real sessions —
+KNOWN LIMITATION, deliberate. `/organisations/[id]`, `/workspaces/[id]`, and their member-management
+flows still call the API through the unverified `X-Witness-Dev-User` header. The scoped enforcement
+above is real and reachable by any client sending a real session's bearer token, but not yet
+reachable by clicking through the existing management pages in a browser — migrating them was
+judged out of scope for this milestone.
+
+**Mark these DONE only after the Authorisation Hardening PR merges to `main` and the workflow is
 re-verified on the deployable version** — this checklist is a binary release gate, not a
 PR-review tracker.
 

@@ -1,0 +1,62 @@
+# Casbin policy data (ADR-0007) — role -> permitted action, one line per grant.
+# Ported 1:1 from the pre-Milestone-1.4 table in
+# services/api-gateway/src/authz/role-grants.ts (kept there only as a
+# deprecated fallback for the unverified development header - see that
+# file's own comment). This file is now the single source of truth for what
+# a role tier permits; role-grants.ts's table must not drift from it.
+#
+# Format: p, <tier>, <action>
+#
+# "tier" here is the four request-time grant tiers Witness has used since
+# the Developer Preview (reader/contributor/reviewer/admin) - not the six
+# product-facing WitnessRoles (packages/domain/src/role.ts), which map onto
+# these tiers in services/api-gateway/src/authz/role-resolution.ts.
+#
+# role:read is granted broadly (reference data, useful to anyone who might
+# be assigned a role). Membership and role-assignment management stay
+# admin-only. organisation:create and user:create have no organisation or
+# workspace to scope to - they stay admin-only in the *global* tier
+# resolution, which never includes 'admin' for a real signed-in session
+# (see role-resolution.ts's globalGrantTiers) - deliberately unreachable via
+# real authentication until a platform-administrator concept is designed,
+# same fail-closed boundary Milestone 1.3 documented and left for this
+# capability to either close or explicitly re-defer. It is re-deferred here,
+# on purpose: nothing in the accepted domain model says who may create an
+# organisation from nothing, and this PR does not invent an answer.
+p, reader, record:read
+p, reader, organisation:read
+p, reader, workspace:read
+p, reader, role:read
+
+p, contributor, record:read
+p, contributor, record:create
+p, contributor, organisation:read
+p, contributor, workspace:read
+p, contributor, role:read
+
+p, reviewer, record:read
+p, reviewer, record:create
+p, reviewer, record:review
+p, reviewer, organisation:read
+p, reviewer, workspace:read
+p, reviewer, role:read
+
+p, admin, record:read
+p, admin, record:create
+p, admin, record:review
+p, admin, organisation:read
+p, admin, organisation:create
+p, admin, workspace:read
+p, admin, workspace:create
+p, admin, user:read
+p, admin, user:create
+p, admin, organisation_membership:read
+p, admin, organisation_membership:create
+p, admin, organisation_membership:update
+p, admin, workspace_membership:read
+p, admin, workspace_membership:create
+p, admin, workspace_membership:update
+p, admin, role:read
+p, admin, role_assignment:read
+p, admin, role_assignment:write
+p, admin, role_assignment:delete

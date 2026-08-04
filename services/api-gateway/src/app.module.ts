@@ -19,6 +19,9 @@ import { IdentityProviderPort } from './authn/identity-provider.port.js';
 import { KeycloakOidcAdapter } from './authn/keycloak-oidc.adapter.js';
 import { SessionService } from './authn/session.service.js';
 import { AuthorizationPort } from './authz/authorization.port.js';
+import { PolicyEngineService } from './authz/policy-engine.service.js';
+import { PolicyEnforcementService } from './authz/policy-enforcement.service.js';
+import { RoleResolutionService } from './authz/role-resolution.service.js';
 import { SessionAuthenticator } from './authz/session-authenticator.js';
 import { SessionBackedAuthorizationAdapter } from './authz/session-backed.adapter.js';
 import { HealthController } from './health/health.controller.js';
@@ -68,6 +71,9 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     OrganisationRoleAssignmentsService,
     WorkspaceRoleAssignmentsService,
     SessionService,
+    RoleResolutionService,
+    PolicyEngineService,
+    PolicyEnforcementService,
     SessionAuthenticator,
     {
       // Configuration is validated once, at construction. If it violates the

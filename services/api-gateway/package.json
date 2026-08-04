@@ -25,6 +25,7 @@
     "@witness/config": "workspace:*",
     "@witness/contracts": "workspace:*",
     "@witness/domain": "workspace:*",
+    "casbin": "^5.51.1",
     "jose": "^6.2.7",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",

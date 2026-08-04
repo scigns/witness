@@ -10,52 +10,30 @@
  * is always available, in every profile, and `AuthorizationGuard` tries it
  * first.
  *
- * `principal.roles` is computed by flattening every `WitnessRole` the
- * signed-in user holds via any organisation- or workspace-scoped
- * `RoleAssignment` into the existing `reader`/`contributor`/`reviewer` grant
- * tiers `role-grants.ts` already defines — deliberately EXCLUDING `admin`.
- * An `admin` `RoleAssignment` is scope-relative ("administers organisation
- * X"); it must not grant the *global* actions `role-grants.ts` gates behind
- * the literal string `'admin'` (organisation:create, user:create, every
- * membership/role-assignment write). Precisely resolving *scoped*
- * administration is Authorisation hardening's job (the next capability);
- * this class fails closed on it rather than approximating it unsafely.
- *
- * This flattening is not a precision loss for `record:*` actions
- * specifically: nothing on `Record` is organisation- or workspace-scoped
- * yet (`architecture/domains/DOMAIN_MODEL.md` §1), so "the user holds this
- * role somewhere" is exactly as precise as the system can honestly be today.
+ * `principal.roles` is the *global* grant tier set from
+ * `RoleResolutionService.globalGrantTiers` — every `WitnessRole` the
+ * signed-in user holds anywhere, flattened, `admin` EXCLUDED. This is used
+ * only for actions that have no organisation or workspace to scope to
+ * (`record:*`, `user:*`, `role:read`) — the actual per-request,
+ * scope-aware decision for organisation- and workspace-bound actions is
+ * `PolicyEnforcementService`'s job (Milestone 1.4, Authorisation
+ * hardening), not this class's. See `role-resolution.service.ts` for why
+ * `admin` is excluded here specifically.
  */
 
 import { Injectable } from '@nestjs/common';
 
-import { isInGoodStanding, type MembershipState, type WitnessRole } from '@witness/domain';
-
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { SessionService } from '../authn/session.service.js';
+import { RoleResolutionService } from './role-resolution.service.js';
 import type { Principal } from './authorization.port.js';
-
-/**
- * A held `WitnessRole` → the dev-grant tier it carries into
- * `role-grants.ts`. `admin` maps to nothing (see the file header). Multiple
- * `WitnessRole`s can map to the same tier — `facilitator` and `participant`
- * exist as distinct product-facing roles (`packages/domain/src/role.ts`)
- * without needing their own request-authorisation tier yet.
- */
-const WITNESS_ROLE_TO_GRANT_TIER: Readonly<Record<WitnessRole, string | null>> = Object.freeze({
-  admin: null,
-  facilitator: 'contributor',
-  contributor: 'contributor',
-  reviewer: 'reviewer',
-  participant: 'reader',
-  reader: 'reader',
-});
 
 @Injectable()
 export class SessionAuthenticator {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sessions: SessionService,
+    private readonly roleResolution: RoleResolutionService,
   ) {}
 
   /** `authorizationHeader` is the raw `Authorization` header value, e.g. `'Bearer <token>'`. */
@@ -81,7 +59,7 @@ export class SessionAuthenticator {
     // technically valid.
     if (user === null || user.accountState !== 'active') return null;
 
-    const roles = await this.effectiveRoleGrantTiers(userId);
+    const roles = await this.roleResolution.globalGrantTiers(userId);
 
     return {
       subject: `user:${user.id}`,
@@ -89,79 +67,5 @@ export class SessionAuthenticator {
       kind: 'human',
       roles,
     };
-  }
-
-  /**
-   * `AuthorizationGuard` calls `authenticate` on every guarded request, so
-   * this is on the hot path. Re-verifying each assignment's backing
-   * membership one query at a time — as an earlier version of this method
-   * did — costs one sequential round trip to PostgreSQL per role
-   * assignment a user holds, before any handler runs. Collecting the
-   * distinct organisation/workspace ids up front and resolving standing
-   * with two batched `findMany` calls keeps the cost constant in the
-   * number of *distinct scopes queried*, not the number of assignments.
-   */
-  private async effectiveRoleGrantTiers(userId: string): Promise<string[]> {
-    const assignments = await this.prisma.roleAssignment.findMany({
-      where: { userId },
-      select: { role: true, organisationId: true, workspaceId: true },
-    });
-
-    if (assignments.length === 0) return [];
-
-    const organisationIds = [
-      ...new Set(
-        assignments.map((a) => a.organisationId).filter((id): id is string => id !== null),
-      ),
-    ];
-    const workspaceIds = [
-      ...new Set(assignments.map((a) => a.workspaceId).filter((id): id is string => id !== null)),
-    ];
-
-    // Re-verify the membership backing each assignment is still in good
-    // standing — a role assignment survives a later membership suspension
-    // as a *record*, but must not go on granting access once the
-    // membership it depends on has lapsed.
-    const [organisationMemberships, workspaceMemberships] = await Promise.all([
-      organisationIds.length === 0
-        ? Promise.resolve([])
-        : this.prisma.organisationMembership.findMany({
-            where: { userId, organisationId: { in: organisationIds } },
-            select: { organisationId: true, state: true },
-          }),
-      workspaceIds.length === 0
-        ? Promise.resolve([])
-        : this.prisma.workspaceMembership.findMany({
-            where: { userId, workspaceId: { in: workspaceIds } },
-            select: { workspaceId: true, state: true },
-          }),
-    ]);
-
-    const goodOrganisations = new Set(
-      organisationMemberships
-        .filter((m) => isInGoodStanding(m.state as MembershipState))
-        .map((m) => m.organisationId),
-    );
-    const goodWorkspaces = new Set(
-      workspaceMemberships
-        .filter((m) => isInGoodStanding(m.state as MembershipState))
-        .map((m) => m.workspaceId),
-    );
-
-    const tiers = new Set<string>();
-
-    for (const assignment of assignments) {
-      const inGoodStanding =
-        assignment.organisationId !== null
-          ? goodOrganisations.has(assignment.organisationId)
-          : assignment.workspaceId !== null && goodWorkspaces.has(assignment.workspaceId);
-
-      if (!inGoodStanding) continue;
-
-      const tier = WITNESS_ROLE_TO_GRANT_TIER[assignment.role as WitnessRole];
-      if (tier !== null && tier !== undefined) tiers.add(tier);
-    }
-
-    return [...tiers];
   }
 }

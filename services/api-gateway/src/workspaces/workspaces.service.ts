@@ -30,8 +30,27 @@ import type { Principal } from '../authz/authorization.port.js';
 export class WorkspacesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(): Promise<WorkspaceSummary[]> {
+  /**
+   * A real, verified session only sees workspaces it can reach: a direct
+   * workspace membership, or membership in the workspace's parent
+   * organisation (mirrors the "an organisation administrator's remit
+   * extends to the workspaces under their organisation" cascade in
+   * `RoleResolutionService`). The unverified `X-Witness-Dev-User` path is
+   * untouched — see `OrganisationsService.list` for why.
+   */
+  async list(principal: Principal): Promise<WorkspaceSummary[]> {
+    const reach = await this.memberReach(principal);
+
     const rows = await this.prisma.workspace.findMany({
+      where:
+        reach === null
+          ? {}
+          : {
+              OR: [
+                { id: { in: reach.workspaceIds } },
+                { organisationId: { in: reach.organisationIds } },
+              ],
+            },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
@@ -42,6 +61,30 @@ export class WorkspacesService {
       organisationId: row.organisationId,
       createdAt: row.createdAt.toISOString(),
     }));
+  }
+
+  /** `null` means "unscoped — return everything" (the dev-header path). */
+  private async memberReach(
+    principal: Principal,
+  ): Promise<{ workspaceIds: string[]; organisationIds: string[] } | null> {
+    if (!principal.subject.startsWith('user:')) return null;
+
+    const userId = principal.subject.slice('user:'.length);
+    const [workspaceMemberships, organisationMemberships] = await Promise.all([
+      this.prisma.workspaceMembership.findMany({
+        where: { userId },
+        select: { workspaceId: true },
+      }),
+      this.prisma.organisationMembership.findMany({
+        where: { userId },
+        select: { organisationId: true },
+      }),
+    ]);
+
+    return {
+      workspaceIds: workspaceMemberships.map((m) => m.workspaceId),
+      organisationIds: organisationMemberships.map((m) => m.organisationId),
+    };
   }
 
   async create(
