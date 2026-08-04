@@ -79,9 +79,20 @@ describe('the authorization-code-with-PKCE flow, end to end, against real signed
     const idp = adapter();
     const { idToken, nonce } = await completeSignIn(idp);
 
-    // Flip a character deep in the signature segment.
+    // Flip a character in the *middle* of the signature segment, not the
+    // last one: base64url's final character of a 256-byte RSA signature
+    // encodes only 2 significant bits plus 4 "don't-care" padding bits, so a
+    // last-character flip can — rarely, depending on the random signature
+    // bytes — decode to the exact same byte and silently fail to tamper
+    // anything, making the test flaky. A middle character always encodes a
+    // full 6 bits of real signature data, so flipping it always corrupts it.
     const parts = idToken.split('.');
-    const tamperedSignature = parts[2]!.slice(0, -1) + (parts[2]!.endsWith('A') ? 'B' : 'A');
+    const signature = parts[2]!;
+    const middle = Math.floor(signature.length / 2);
+    const tamperedSignature =
+      signature.slice(0, middle) +
+      (signature[middle] === 'A' ? 'B' : 'A') +
+      signature.slice(middle + 1);
     const tampered = `${parts[0]}.${parts[1]}.${tamperedSignature}`;
 
     await expect(idp.verifyIdToken(tampered, nonce)).rejects.toThrow();
