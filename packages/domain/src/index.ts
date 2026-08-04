@@ -27,3 +27,7 @@ export * from './role-assignment.js';
 export * from './identity-link.js';
 export * from './co-design-session.js';
 export * from './session-participant.js';
+export * from './consent-template.js';
+export * from './session-consent-configuration.js';
+export * from './participant-consent-record.js';
+export * from './consent-decision.js';

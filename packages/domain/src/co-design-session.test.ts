@@ -18,6 +18,7 @@ import {
   closeSession,
   createActor,
   createCoDesignSession,
+  markConsentConfigured,
   openSession,
   permittedSessionTransitions,
   reopenSession,
@@ -403,5 +404,32 @@ describe('evidence capture eligibility', () => {
 
     const closed = closeSession(open, HUMAN, NOW).session;
     expect(canCaptureEvidence(closed)).toBe(false);
+  });
+});
+
+describe('markConsentConfigured', () => {
+  it('transitions consentConfigurationState from not_configured to configured', () => {
+    const draft = draftSession();
+    expect(draft.consentConfigurationState).toBe('not_configured');
+
+    const outcome = markConsentConfigured(draft, HUMAN, NOW);
+    expect(outcome.session.consentConfigurationState).toBe('configured');
+    expect(outcome.session.version).toBe(draft.version + 1);
+    expect(outcome.event.action).toBe('co_design_session.updated');
+    expect(outcome.event.metadata['changedFields']).toBe('consentConfigurationState');
+  });
+
+  it('ATTACK — rejects marking an already-configured session configured again', () => {
+    const configured = markConsentConfigured(draftSession(), HUMAN, NOW).session;
+    expect(() => markConsentConfigured(configured, HUMAN, NOW)).toThrow(
+      /already has a consent configuration/i,
+    );
+  });
+
+  it('ATTACK — rejects configuring consent on an archived session', () => {
+    const open = openSession(draftSession(), HUMAN, NOW).session;
+    const closed = closeSession(open, HUMAN, NOW).session;
+    const archived = archiveSession(closed, HUMAN, NOW).session;
+    expect(() => markConsentConfigured(archived, HUMAN, NOW)).toThrow(/read-only/i);
   });
 });

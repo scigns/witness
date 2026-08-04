@@ -34,6 +34,7 @@ import {
   Button,
   Card,
   ErrorNotice,
+  LinkButton,
   ParticipantAttendanceBadge,
   ParticipantInvitationBadge,
 } from '@/components/ui';
@@ -371,11 +372,18 @@ export default function ParticipantDetailPage({
             </p>
           )}
         </div>
-        {!participant.withdrawn && (
-          <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>
-            {editing ? 'Cancel edit' : 'Edit details'}
-          </Button>
-        )}
+        <div className="flex gap-2">
+          <LinkButton
+            href={`/workspaces/${workspaceId}/sessions/${sessionId}/participants/${participantId}/consent`}
+          >
+            Consent →
+          </LinkButton>
+          {!participant.withdrawn && (
+            <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>
+              {editing ? 'Cancel edit' : 'Edit details'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {editing ? (

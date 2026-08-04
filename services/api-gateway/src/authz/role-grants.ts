@@ -23,6 +23,9 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'role:read',
     'session:read',
     'participant:read',
+    'consent_template:read',
+    'session_consent:read',
+    'participant_consent:read',
   ],
   // `session:update`/`session:transition` are workspace-wide, not
   // per-session: any contributor in a workspace's scope may rename, close,
@@ -35,6 +38,26 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
   // participant's linked-user identity) is granted at the same tier, not a
   // narrower one — Milestone 3 does not introduce a fifth tier just for
   // restricted participant data.
+  // `session_consent:*`/`participant_consent:*` (Milestone 4, Consent
+  // Management) follow `session:*`/`participant:*`'s exact precedent: any
+  // contributor in scope may configure a session's consent and capture,
+  // amend or withdraw a participant's consent — there is no per-session
+  // "assigned facilitator" ownership check here either, and
+  // `participant_consent:manage_restricted` (withdrawal reasons, detailed
+  // category-decision views) is granted at this same tier rather than a
+  // narrower one, mirroring `participant:manage_restricted`. Consent
+  // capture is facilitator-mediated, not participant self-service (Milestone
+  // 3 already established most participants cannot sign in to Witness at
+  // all), so there is no separate participant-facing grant here.
+  //
+  // `consent_template:manage` is deliberately admin-only, NOT contributor —
+  // unlike a session or its participants, a template is an organisation-wide
+  // (or workspace-wide) governance artifact that every session in scope may
+  // end up bound to, the same "administrative by definition" reasoning that
+  // keeps membership and role-assignment management admin-only above.
+  // `consent_template:read` stays broad, like `role:read`/`session:read` —
+  // understanding what a template asks for is useful to anyone who might
+  // configure or capture consent against it.
   contributor: [
     'record:read',
     'record:create',
@@ -49,6 +72,12 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'participant:create',
     'participant:update',
     'participant:manage_restricted',
+    'consent_template:read',
+    'session_consent:read',
+    'session_consent:manage',
+    'participant_consent:read',
+    'participant_consent:manage',
+    'participant_consent:manage_restricted',
   ],
   reviewer: [
     'record:read',
@@ -59,6 +88,9 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'role:read',
     'session:read',
     'participant:read',
+    'consent_template:read',
+    'session_consent:read',
+    'participant_consent:read',
   ],
   // Least privilege (Constitution, Authority and Access): organisation and
   // workspace creation are the privileged actions in this slice, so they are the
@@ -103,6 +135,13 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'participant:create',
     'participant:update',
     'participant:manage_restricted',
+    'consent_template:read',
+    'consent_template:manage',
+    'session_consent:read',
+    'session_consent:manage',
+    'participant_consent:read',
+    'participant_consent:manage',
+    'participant_consent:manage_restricted',
   ],
 });
 

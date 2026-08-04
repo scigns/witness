@@ -106,11 +106,28 @@ export const PARTICIPANT_ATTENDANCE_STATUSES = [
 export type ParticipantAttendanceStatus = (typeof PARTICIPANT_ATTENDANCE_STATUSES)[number];
 
 /**
- * Milestone 4 (Consent) will replace this with a real, category-level
- * summary computed from `ParticipantConsentRecord`. Until then there is
- * exactly one value — no mutator in this module sets anything else.
+ * A participant's consent status at a glance (BUILD_ROADMAP.md Milestone 4)
+ * — `not_configured` (the session has no consent configuration yet) and
+ * `not_requested` (configured, but nothing captured for this participant
+ * yet) describe the *absence* of a `ParticipantConsentRecord`; the rest
+ * mirror `ParticipantConsentRecordStatus` (`participant-consent-record.ts`)
+ * for the participant's currently active record. `superseded` is
+ * deliberately excluded — a superseded record is a step in the history, not
+ * the participant's current position, so it never surfaces as a summary.
+ * Computing this value from a participant's records is a service-layer
+ * concern (`services/api-gateway`), not this module's — see
+ * `consent-decision.ts` for why "does an active record exist" is resolved
+ * one level up from the record's own fields.
  */
-export const PARTICIPANT_CONSENT_STATUS_SUMMARIES = ['not_configured'] as const;
+export const PARTICIPANT_CONSENT_STATUS_SUMMARIES = [
+  'not_configured',
+  'not_requested',
+  'granted',
+  'partially_granted',
+  'refused',
+  'withdrawn',
+  'expired',
+] as const;
 export type ParticipantConsentStatusSummary = (typeof PARTICIPANT_CONSENT_STATUS_SUMMARIES)[number];
 
 /**

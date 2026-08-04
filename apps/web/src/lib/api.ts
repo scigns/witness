@@ -13,9 +13,17 @@ import type {
   AddMembershipRequest,
   AddSessionParticipantRequest,
   AssignRoleRequest,
+  CaptureParticipantConsentRequest,
   CoDesignSessionDetail,
   CoDesignSessionSummary,
+  ConfigureSessionConsentRequest,
+  ConsentFacilitatorDashboardView,
+  ConsentTemplateAction,
+  ConsentTemplateDetail,
+  ConsentTemplateSummary,
   CreateCoDesignSessionRequest,
+  CreateConsentTemplateRequest,
+  CreateConsentTemplateVersionRequest,
   CreateOrganisationRequest,
   CreateRecordRequest,
   CreateUserRequest,
@@ -25,11 +33,14 @@ import type {
   MembershipAction,
   OrganisationMembershipView,
   OrganisationSummary,
+  ParticipantConsentRecordDetail,
+  ReconfigureSessionConsentRequest,
   RecordDetail,
   RecordSummary,
   ReviewAction,
   RoleAssignmentView,
   RoleDefinition,
+  SessionConsentConfigurationView,
   SessionLifecycleEventView,
   SessionParticipantDetail,
   SessionParticipantSummary,
@@ -39,6 +50,7 @@ import type {
   UpdateParticipantNotesRequest,
   UpdateSessionParticipantRequest,
   UserSummary,
+  WithdrawParticipantConsentRequest,
   WorkspaceMembershipView,
   WorkspaceSummary,
 } from '@witness/contracts';
@@ -449,6 +461,175 @@ export const api = {
   ): Promise<SessionParticipantDetail> =>
     request<SessionParticipantDetail>(
       `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}/transition`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  listConsentTemplates: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<{ templates: ConsentTemplateSummary[] }> =>
+    request<{ templates: ConsentTemplateSummary[] }>(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/consent-templates`,
+      user,
+    ),
+
+  getConsentTemplate: (
+    organisationId: string,
+    templateId: string,
+    user: ActingUser,
+  ): Promise<ConsentTemplateDetail> =>
+    request<ConsentTemplateDetail>(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/consent-templates/${encodeURIComponent(templateId)}`,
+      user,
+    ),
+
+  getConsentTemplateVersions: (
+    organisationId: string,
+    templateId: string,
+    user: ActingUser,
+  ): Promise<{ versions: ConsentTemplateDetail[] }> =>
+    request<{ versions: ConsentTemplateDetail[] }>(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/consent-templates/${encodeURIComponent(templateId)}/versions`,
+      user,
+    ),
+
+  createConsentTemplate: (
+    organisationId: string,
+    body: CreateConsentTemplateRequest,
+    user: ActingUser,
+  ): Promise<ConsentTemplateDetail> =>
+    request<ConsentTemplateDetail>(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/consent-templates`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  createConsentTemplateVersion: (
+    organisationId: string,
+    templateId: string,
+    body: CreateConsentTemplateVersionRequest,
+    user: ActingUser,
+  ): Promise<ConsentTemplateDetail> =>
+    request<ConsentTemplateDetail>(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/consent-templates/${encodeURIComponent(templateId)}/versions`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  applyConsentTemplateAction: (
+    organisationId: string,
+    templateId: string,
+    body: ConsentTemplateAction,
+    user: ActingUser,
+  ): Promise<ConsentTemplateDetail> =>
+    request<ConsentTemplateDetail>(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/consent-templates/${encodeURIComponent(templateId)}/actions`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  getSessionConsentConfiguration: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<SessionConsentConfigurationView> =>
+    request<SessionConsentConfigurationView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/consent-configuration`,
+      user,
+    ),
+
+  configureSessionConsent: (
+    workspaceId: string,
+    sessionId: string,
+    body: ConfigureSessionConsentRequest,
+    user: ActingUser,
+  ): Promise<SessionConsentConfigurationView> =>
+    request<SessionConsentConfigurationView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/consent-configuration`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  reconfigureSessionConsent: (
+    workspaceId: string,
+    sessionId: string,
+    body: ReconfigureSessionConsentRequest,
+    user: ActingUser,
+  ): Promise<SessionConsentConfigurationView> =>
+    request<SessionConsentConfigurationView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/consent-configuration`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  getConsentDashboard: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<ConsentFacilitatorDashboardView> =>
+    request<ConsentFacilitatorDashboardView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/consent-dashboard`,
+      user,
+    ),
+
+  getActiveParticipantConsent: (
+    workspaceId: string,
+    sessionId: string,
+    participantId: string,
+    user: ActingUser,
+  ): Promise<ParticipantConsentRecordDetail> =>
+    request<ParticipantConsentRecordDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}/consent`,
+      user,
+    ),
+
+  getParticipantConsentHistory: (
+    workspaceId: string,
+    sessionId: string,
+    participantId: string,
+    user: ActingUser,
+  ): Promise<{ records: ParticipantConsentRecordDetail[] }> =>
+    request<{ records: ParticipantConsentRecordDetail[] }>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}/consent/history`,
+      user,
+    ),
+
+  captureParticipantConsent: (
+    workspaceId: string,
+    sessionId: string,
+    participantId: string,
+    body: CaptureParticipantConsentRequest,
+    user: ActingUser,
+  ): Promise<ParticipantConsentRecordDetail> =>
+    request<ParticipantConsentRecordDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}/consent`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  amendParticipantConsent: (
+    workspaceId: string,
+    sessionId: string,
+    participantId: string,
+    body: CaptureParticipantConsentRequest,
+    user: ActingUser,
+  ): Promise<ParticipantConsentRecordDetail> =>
+    request<ParticipantConsentRecordDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}/consent/amend`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  withdrawParticipantConsent: (
+    workspaceId: string,
+    sessionId: string,
+    participantId: string,
+    body: WithdrawParticipantConsentRequest,
+    user: ActingUser,
+  ): Promise<ParticipantConsentRecordDetail> =>
+    request<ParticipantConsentRecordDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}/consent/withdraw`,
       user,
       { method: 'POST', body: JSON.stringify(body) },
     ),

@@ -30,6 +30,9 @@ export type RoleAssignmentId = Branded<string, 'RoleAssignmentId'>;
 export type IdentityLinkId = Branded<string, 'IdentityLinkId'>;
 export type CoDesignSessionId = Branded<string, 'CoDesignSessionId'>;
 export type SessionParticipantId = Branded<string, 'SessionParticipantId'>;
+export type ConsentTemplateId = Branded<string, 'ConsentTemplateId'>;
+export type SessionConsentConfigurationId = Branded<string, 'SessionConsentConfigurationId'>;
+export type ParticipantConsentRecordId = Branded<string, 'ParticipantConsentRecordId'>;
 
 /**
  * UUID v4/v7 shape. We accept both: v7 is time-ordered, which matters for the
@@ -106,4 +109,19 @@ export function toCoDesignSessionId(value: string): CoDesignSessionId {
 export function toSessionParticipantId(value: string): SessionParticipantId {
   assertUuid(value, 'SessionParticipantId');
   return value as SessionParticipantId;
+}
+
+export function toConsentTemplateId(value: string): ConsentTemplateId {
+  assertUuid(value, 'ConsentTemplateId');
+  return value as ConsentTemplateId;
+}
+
+export function toSessionConsentConfigurationId(value: string): SessionConsentConfigurationId {
+  assertUuid(value, 'SessionConsentConfigurationId');
+  return value as SessionConsentConfigurationId;
+}
+
+export function toParticipantConsentRecordId(value: string): ParticipantConsentRecordId {
+  assertUuid(value, 'ParticipantConsentRecordId');
+  return value as ParticipantConsentRecordId;
 }

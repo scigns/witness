@@ -284,9 +284,10 @@ next-action prompt.
 Pilot-blocking gate
 
 A facilitator can prepare a real session without an external setup spreadsheet — NOT READY.
-Session creation and lifecycle management (Milestone 2) and participant management (Milestone 3)
-are READY (above), but "prepare a real session" in the pilot sense also needs consent (Milestone
-4) — this gate is not met until it lands.
+Session creation and lifecycle management (Milestone 2), participant management (Milestone 3), and
+consent management (Milestone 4) are all READY (above, Milestone 4 via a PR not yet merged), but
+"prepare a real session" in the pilot sense also needs structured evidence capture (Milestone 5) —
+this gate is not met until it lands.
 
 C.1 Participant Privacy (Milestone 3)
 
@@ -329,35 +330,81 @@ ownership.
 
 D. Consent and Participant Rights
 
-Consent statement is versioned
+Consent statement is versioned — READY (Consent Management PR, not yet merged — per this
+checklist's own rule, an open PR does not count as complete). `ConsentTemplate` is structurally
+versioned: each row IS one immutable version, grouped by a shared `familyId`; there is no "edit
+template" function anywhere, so a used version cannot be changed, only superseded by a new one
+(`createNewTemplateVersion`).
 
-Consent is linked to a participant and session
+Consent is linked to a participant and session — READY (Consent Management PR, not yet merged).
+`ParticipantConsentRecord` carries `sessionId`+`participantId`+`consentTemplateId`+
+`templateVersion`; `SessionConsentConfiguration` links a session to the template version and
+categories governing it.
 
-Recording permission is explicit
+Recording permission is explicit — READY (Consent Management PR, not yet merged).
+`audio_recording`/`video_recording`/`photography` are distinct, independently-decided categories,
+never bundled into a single "consent to participate" checkbox.
 
-Processing purpose is explicit
+Processing purpose is explicit — READY (Consent Management PR, not yet merged).
+`ai_processing`/`transcription`/`internal_use`/`external_reporting`/`research_use`/`future_reuse`/
+`knowledge_graph_inclusion` are each distinct categories a participant grants or refuses
+independently.
 
-Sharing or publication permission is explicit where applicable
+Sharing or publication permission is explicit where applicable — READY (Consent Management PR, not
+yet merged). `attributed_quotation`/`anonymous_quotation`/`publication` are distinct categories,
+separate from participation and from each other.
 
-Consent capture method and time are recorded
+Consent capture method and time are recorded — READY (Consent Management PR, not yet merged).
+`ParticipantConsentRecord.captureMethod` (free text, e.g. "in-person verbal") and `capturedAt` are
+required on every capture.
 
-Consent can be restricted
+Consent can be restricted — READY (Consent Management PR, not yet merged). A session's
+`SessionConsentConfiguration` chooses which of a template's categories are required vs optional;
+`captureParticipantConsent` rejects a decision for any category not in that configured set.
 
-Consent can be withdrawn
+Consent can be withdrawn — READY (Consent Management PR, not yet merged).
+`withdrawParticipantConsent`; a withdrawn record is never treated as active by the decision
+boundary (`consent-decision.ts`), and there is deliberately no "restore" — re-granting after
+withdrawal is a fresh capture, not an undo, so the audit trail preserves "withdrew, then changed
+their mind again" as its own event.
 
-Withdrawal is visible to authorised users
+Withdrawal is visible to authorised users — READY (Consent Management PR, not yet merged).
+`withdrawnAt` is visible on the record to any `participant_consent:read` holder; the withdrawal
+*reason* is additionally restricted to `participant_consent:manage_restricted`.
 
-Processing cannot silently exceed recorded consent
+Processing cannot silently exceed recorded consent — READY, as a decision boundary (Consent
+Management PR, not yet merged), NOT YET WIRED to an actual processing capability. `ConsentPolicyService`
+(`services/api-gateway/src/consent/consent-policy.service.ts`) answers each processing question
+(`mayRecordAudio`, `mayProcessWithAi`, `mayPublish`, ...) fail-closed — missing, expired, withdrawn
+or superseded-without-replacement consent all deny by construction — but no capability yet calls
+it, because Structured Evidence Capture (Milestone 5), the first thing that would, does not exist.
+This item is the decision boundary a future capability cannot bypass without deliberately not
+calling it, not yet a proven end-to-end guarantee.
 
-Consent changes are auditable
+Consent changes are auditable — READY (Consent Management PR, not yet merged).
+`consent_template.created`/`.version_created`/`.activated`/`.retired`,
+`session_consent_configuration.created`/`.updated`, and
+`participant_consent_record.captured`/`.superseded`/`.withdrawn` all hash-chained through the
+existing `AuditEvent` mechanism, same as every other subject type.
 
-Sensitive participant information is access-controlled
+Sensitive participant information is access-controlled — READY (Consent Management PR, not yet
+merged). Category-by-category decisions and withdrawal reasons require
+`participant_consent:manage_restricted`; a general `participant_consent:read` caller sees only a
+computed status summary, the same structurally-absent-not-null convention Milestone 3 established.
 
-Plain-language participant explanation is available
+Plain-language participant explanation is available — READY (Consent Management PR, not yet
+merged). `ConsentTemplate.plainLanguageSummary` (required on every template) and
+`SessionConsentConfiguration.participantIntroduction` (optional, session-specific) are both
+free-text fields intended for a general audience, rendered on the participant consent capture
+screen before the category form.
 
 Pilot-blocking gate
 
-Every contribution processed by Witness is covered by valid consent
+Every contribution processed by Witness is covered by valid consent — NOT READY. The decision
+boundary exists and fails closed (above), but nothing calls it yet — Structured Evidence Capture
+(Milestone 5), the capability that would actually process a contribution, has not been built. This
+gate is not met until Milestone 5 exists and demonstrably calls `ConsentPolicyService` before
+recording or using anything a participant said.
 
 E. Evidence Capture
 

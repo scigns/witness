@@ -432,6 +432,52 @@ export function changeSessionFacilitator(
 }
 
 /**
+ * Record that this session now has a consent configuration attached
+ * (BUILD_ROADMAP.md Milestone 4) — the mutator this file's header comment
+ * named as a deliberate gap left for Consent Management to fill.
+ * `SessionConsentConfigurationsService` (services/api-gateway) calls this
+ * in the same transaction as `configureSessionConsent`
+ * (`session-consent-configuration.ts`) the first time a session is
+ * configured, so the session row and the new configuration row change
+ * together or not at all. Only the *first* configuration call needs this —
+ * `reconfigureSessionConsent` (replacing an existing configuration) leaves
+ * `consentConfigurationState` exactly as it already is, so the service
+ * does not call this a second time; calling it on an already-configured
+ * session is rejected rather than silently accepted, so a caller cannot
+ * mistake "no-op" for "nothing needed doing".
+ */
+export function markConsentConfigured(
+  session: CoDesignSession,
+  actor: Actor,
+  at: Date,
+): CoDesignSessionOutcome {
+  assertNotArchived(session);
+
+  if (session.consentConfigurationState === 'configured') {
+    throw new InvariantViolation(
+      'This session already has a consent configuration.',
+      'CONSENT_ALREADY_CONFIGURED',
+    );
+  }
+
+  const next: CoDesignSession = {
+    ...session,
+    consentConfigurationState: 'configured',
+    updatedAt: at,
+    version: session.version + 1,
+  };
+
+  return {
+    session: next,
+    event: {
+      action: 'co_design_session.updated',
+      actor,
+      metadata: { changedFields: 'consentConfigurationState' },
+    },
+  };
+}
+
+/**
  * Set or change the session's schedule. Also performs the `draft ->
  * scheduled` transition when the session is still a draft — scheduling a
  * session and marking it Scheduled are the same real-world action, so they

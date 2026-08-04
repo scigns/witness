@@ -280,6 +280,11 @@ export default function SessionDetailPage({
           <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/participants`}>
             Participants →
           </LinkButton>
+          <LinkButton
+            href={`/workspaces/${workspaceId}/sessions/${sessionId}/consent-configuration`}
+          >
+            Consent →
+          </LinkButton>
           {!isArchived && (
             <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>
               {editing ? 'Cancel edit' : 'Edit details'}
