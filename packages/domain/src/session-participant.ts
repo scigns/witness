@@ -101,7 +101,7 @@ export const PARTICIPANT_ATTENDANCE_STATUSES = [
   'present',
   'absent',
   'partially_attended',
-  'withdrawn',
+  'left_early',
 ] as const;
 export type ParticipantAttendanceStatus = (typeof PARTICIPANT_ATTENDANCE_STATUSES)[number];
 
@@ -147,18 +147,26 @@ export function permittedInvitationTransitions(
  * `expected`/`present`/`absent`/`partially_attended` — a facilitator
  * correcting a mistaken attendance mark after the fact is a routine
  * administrative act, not an institutional decision requiring the
- * `reopenSession`-style human-actor-and-reason guard. `withdrawn` (left
- * partway through and did not return) is reachable from and correctable back
- * to any of the other four for the same reason.
+ * `reopenSession`-style human-actor-and-reason guard. `left_early` (present
+ * for part of the session, then gone, without returning) is reachable from
+ * and correctable back to any of the other four for the same reason.
+ *
+ * Deliberately named `left_early`, not `withdrawn`: this is attendance
+ * bookkeeping for one occurrence of the session, a different concept from
+ * `withdrawParticipant`/`SessionParticipant.withdrawnAt` below, which removes
+ * the participant from the session's roster entirely. The two must never
+ * share a word — a caller reading `attendanceStatus` and `withdrawn` off the
+ * same response needs them to answer two different questions, not
+ * (dis)agree about one.
  */
 const ATTENDANCE_TRANSITIONS: Readonly<
   Record<ParticipantAttendanceStatus, readonly ParticipantAttendanceStatus[]>
 > = Object.freeze({
-  expected: ['present', 'absent', 'partially_attended', 'withdrawn'],
-  present: ['absent', 'partially_attended', 'withdrawn'],
-  absent: ['present', 'partially_attended', 'withdrawn'],
-  partially_attended: ['present', 'absent', 'withdrawn'],
-  withdrawn: ['present', 'absent', 'partially_attended'],
+  expected: ['present', 'absent', 'partially_attended', 'left_early'],
+  present: ['absent', 'partially_attended', 'left_early'],
+  absent: ['present', 'partially_attended', 'left_early'],
+  partially_attended: ['present', 'absent', 'left_early'],
+  left_early: ['present', 'absent', 'partially_attended'],
 });
 
 export function canTransitionAttendance(

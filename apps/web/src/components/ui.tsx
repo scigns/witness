@@ -9,6 +9,7 @@
  * reconcile with.
  */
 
+import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 
 import type {
@@ -163,7 +164,7 @@ const ATTENDANCE_STATUS_LABELS: Record<ParticipantAttendanceStatus, string> = {
   present: 'Present',
   absent: 'Absent',
   partially_attended: 'Partially attended',
-  withdrawn: 'Withdrawn',
+  left_early: 'Left early',
 };
 
 const ATTENDANCE_STATUS_CLASSES: Record<ParticipantAttendanceStatus, string> = {
@@ -171,7 +172,7 @@ const ATTENDANCE_STATUS_CLASSES: Record<ParticipantAttendanceStatus, string> = {
   present: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
   absent: 'border-red-700 text-red-700 dark:text-red-400',
   partially_attended: 'border-amber-600 text-amber-700 dark:text-amber-400',
-  withdrawn: 'border-current text-[var(--color-ink-muted)]',
+  left_early: 'border-current text-[var(--color-ink-muted)]',
 };
 
 export function ParticipantAttendanceBadge({ status }: { status: ParticipantAttendanceStatus }) {
@@ -194,6 +195,18 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
   );
 }
 
+type ButtonVariant = 'primary' | 'secondary' | 'danger';
+
+const BUTTON_VARIANT_STYLES: Record<ButtonVariant, string> = {
+  primary: 'bg-[var(--color-accent)] text-white hover:opacity-90',
+  secondary:
+    'border border-[var(--color-line)] bg-[var(--color-paper)] hover:bg-[var(--color-accent-soft)]',
+  danger: 'border border-red-700 text-red-700 hover:bg-red-50 dark:hover:bg-red-950',
+};
+
+const BUTTON_BASE_CLASSES =
+  'rounded px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50';
+
 export function Button({
   children,
   onClick,
@@ -204,25 +217,44 @@ export function Button({
   children: ReactNode;
   onClick?: () => void;
   type?: 'button' | 'submit';
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: ButtonVariant;
   disabled?: boolean;
 }) {
-  const styles = {
-    primary: 'bg-[var(--color-accent)] text-white hover:opacity-90',
-    secondary:
-      'border border-[var(--color-line)] bg-[var(--color-paper)] hover:bg-[var(--color-accent-soft)]',
-    danger: 'border border-red-700 text-red-700 hover:bg-red-50 dark:hover:bg-red-950',
-  }[variant];
-
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`rounded px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${styles}`}
+      className={`${BUTTON_BASE_CLASSES} ${BUTTON_VARIANT_STYLES[variant]}`}
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * A navigation link styled like `Button`. Renders a single `<a>`, never a
+ * `<button>` nested inside one — an `<a>` must not contain another
+ * interactive element (invalid markup, inconsistent focus and
+ * screen-reader behaviour), which `<Link><Button>...</Button></Link>`
+ * produces.
+ */
+export function LinkButton({
+  href,
+  children,
+  variant = 'secondary',
+}: {
+  href: string;
+  children: ReactNode;
+  variant?: ButtonVariant;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`inline-block ${BUTTON_BASE_CLASSES} ${BUTTON_VARIANT_STYLES[variant]}`}
+    >
+      {children}
+    </Link>
   );
 }
 

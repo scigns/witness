@@ -172,6 +172,7 @@ export default function NewParticipantPage({
               <label className="flex items-center gap-2">
                 <input
                   type="radio"
+                  name="registration"
                   checked={!isRegistered}
                   onChange={() => {
                     setIsRegistered(false);
@@ -183,6 +184,7 @@ export default function NewParticipantPage({
               <label className="flex items-center gap-2">
                 <input
                   type="radio"
+                  name="registration"
                   checked={isRegistered}
                   disabled={isAnonymous}
                   onChange={() => setIsRegistered(true)}

@@ -253,7 +253,7 @@ export const PARTICIPANT_ATTENDANCE_STATUSES = [
   'present',
   'absent',
   'partially_attended',
-  'withdrawn',
+  'left_early',
 ] as const;
 export type ParticipantAttendanceStatus = (typeof PARTICIPANT_ATTENDANCE_STATUSES)[number];
 

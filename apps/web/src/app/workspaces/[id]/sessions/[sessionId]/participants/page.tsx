@@ -21,6 +21,7 @@ import {
   Button,
   Card,
   ErrorNotice,
+  LinkButton,
   ParticipantAttendanceBadge,
   ParticipantInvitationBadge,
 } from '@/components/ui';
@@ -45,6 +46,10 @@ export default function SessionParticipantsPage({
   const [forbidden, setForbidden] = useState(false);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  // Separate from `error`: an export failure must not hide a roster that
+  // already loaded correctly — the table below reacts only to the load
+  // outcome, this banner reacts only to the export outcome.
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ready) return;
@@ -82,7 +87,7 @@ export default function SessionParticipantsPage({
 
   const exportRedacted = async () => {
     setExporting(true);
-    setError(null);
+    setExportError(null);
     try {
       const result = await api.exportParticipants(workspaceId, sessionId, user);
       const blob = new Blob([JSON.stringify(result.participants, null, 2)], {
@@ -92,10 +97,14 @@ export default function SessionParticipantsPage({
       const link = document.createElement('a');
       link.href = url;
       link.download = `session-${sessionId}-participants-redacted.json`;
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
+      link.remove();
+      // Revoking synchronously can cancel the download in some browsers —
+      // defer to the next task so the browser has started reading the blob.
+      setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+      setExportError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
       setExporting(false);
     }
@@ -129,6 +138,7 @@ export default function SessionParticipantsPage({
       </Link>
 
       {error !== null && <ErrorNotice message={error} />}
+      {exportError !== null && <ErrorNotice message={exportError} />}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -143,9 +153,12 @@ export default function SessionParticipantsPage({
           <Button variant="secondary" disabled={exporting} onClick={() => void exportRedacted()}>
             {exporting ? 'Exporting…' : 'Export redacted list'}
           </Button>
-          <Link href={`/workspaces/${workspaceId}/sessions/${sessionId}/participants/new`}>
-            <Button variant="primary">Add participant</Button>
-          </Link>
+          <LinkButton
+            href={`/workspaces/${workspaceId}/sessions/${sessionId}/participants/new`}
+            variant="primary"
+          >
+            Add participant
+          </LinkButton>
         </div>
       </div>
 

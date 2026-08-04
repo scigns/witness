@@ -127,6 +127,24 @@ describe('addParticipant', () => {
     expect(participant.identityVisibility).toBe('facilitators_only');
   });
 
+  it('rejects a display name longer than the 200-character cap', () => {
+    expect(() => addParticipant('draft', { ...baseInput(), displayName: 'a'.repeat(201) })).toThrow(
+      InvariantViolation,
+    );
+  });
+
+  it('accepts a display name exactly at the 200-character cap', () => {
+    expect(() =>
+      addParticipant('draft', { ...baseInput(), displayName: 'a'.repeat(200) }),
+    ).not.toThrow();
+  });
+
+  it('rejects a participant type longer than the 100-character cap', () => {
+    expect(() =>
+      addParticipant('draft', { ...baseInput(), participantType: 'a'.repeat(101) }),
+    ).toThrow(InvariantViolation);
+  });
+
   it.each(['draft', 'scheduled', 'open'] as const)(
     'permits adding a participant while the session is %s',
     (status) => {
@@ -337,6 +355,13 @@ describe('updateFacilitatorNotes', () => {
     const withNotes = updateFacilitatorNotes(participant, 'open', HUMAN, 'note', LATER).participant;
     const cleared = updateFacilitatorNotes(withNotes, 'open', HUMAN, null, LATER).participant;
     expect(cleared.facilitatorNotes).toBeNull();
+  });
+
+  it('rejects facilitator notes longer than the 5000-character cap', () => {
+    const participant = namedParticipant();
+    expect(() =>
+      updateFacilitatorNotes(participant, 'open', HUMAN, 'a'.repeat(5001), LATER),
+    ).toThrow(InvariantViolation);
   });
 });
 

@@ -60,10 +60,10 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 | Governance | `governance` | Governance Lead | 🟡 | Consent framework drafted; Indigenous protocols need external review |
 | Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun; Casbin-based, organisation/workspace-scoped authorisation shipped (ADR-0007); real identity is Phase 2 |
 | Infrastructure | `infrastructure` | Infrastructure Lead | 🟡 | Compose stack running; observability overlay added, wiring pending |
-| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2) and Participant Management (Milestone 3) shipped |
+| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2) shipped; Participant Management (Milestone 3) implemented in this PR, not yet merged |
 | Knowledge graph | `knowledge-graph` | Knowledge Graph Lead | 🟡 | Ontology v0.1 in design |
 | AI platform | `ai-platform` | AI Lead | ⚪ | Awaiting Phase 5; model policy drafted |
-| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2) and participant (Milestone 3) screens added; design system awaits Phase 6 |
+| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2) screens shipped; participant (Milestone 3) screens implemented in this PR, not yet merged; design system awaits Phase 6 |
 | Testing | `testing` | QA Lead | 🟡 | 409 tests across all packages (235 API-gateway); invariant and adversarial suites live |
 | Release | `release` | Release Manager | 🟢 | Strategy and versioning defined |
 

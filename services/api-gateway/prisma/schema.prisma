@@ -394,6 +394,12 @@ model CoDesignSession {
 ///
 /// `facilitatorNotes` is restricted: the API layer only ever includes it in
 /// a response for a caller holding `participant:manage_restricted`.
+///
+/// A partial unique index on `(sessionId, linkedUserId)` — WHERE
+/// `linkedUserId` IS NOT NULL — stops a registered user being linked to the
+/// same session twice. Prisma's schema DSL cannot express a partial index,
+/// so it lives only in the migration SQL (same convention as
+/// `co_design_session_status_check` above).
 model SessionParticipant {
   id             String       @id @db.Uuid
   organisationId String       @map("organisation_id") @db.Uuid

@@ -545,13 +545,19 @@ function toDetail(
 ): SessionParticipantDetail {
   const summary = toSummary(row, includeRestrictedIdentity);
   const showLinkedUser = includeRestrictedIdentity || row.identityMode === 'named';
+  // Same redaction decision `toSummary` makes for name/pronouns/affiliation —
+  // language preference and (especially) accessibility requirements are
+  // free text that can carry health or disability information, so they get
+  // no separate, weaker rule.
+  const identityRestricted =
+    row.identityVisibility === 'facilitators_only' && !includeRestrictedIdentity;
 
   return {
     ...summary,
     organisationId: row.organisationId,
     workspaceId: row.workspaceId,
-    languagePreference: row.languagePreference,
-    accessibilityRequirements: row.accessibilityRequirements,
+    languagePreference: identityRestricted ? null : row.languagePreference,
+    accessibilityRequirements: identityRestricted ? null : row.accessibilityRequirements,
     createdAt: row.createdAt.toISOString(),
     withdrawnAt: row.withdrawnAt?.toISOString() ?? null,
     version: row.version,

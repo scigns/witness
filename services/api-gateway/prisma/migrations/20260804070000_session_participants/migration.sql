@@ -36,6 +36,15 @@ CREATE INDEX "session_participant_workspace_id_idx" ON "session_participant"("wo
 -- CreateIndex
 CREATE INDEX "session_participant_linked_user_id_idx" ON "session_participant"("linked_user_id");
 
+-- CreateIndex: a registered user may be linked to a session as at most one
+-- participant. Partial (WHERE clause) because most participants have no
+-- linked user at all, and NULL <> NULL in a Postgres unique index anyway —
+-- this exists to catch a duplicate *link*, not to enforce anything about
+-- unlinked participants. Prisma's schema DSL cannot express a partial
+-- index, so this is added here directly (see the model's doc comment in
+-- schema.prisma).
+CREATE UNIQUE INDEX "session_participant_session_id_linked_user_id_key" ON "session_participant"("session_id", "linked_user_id") WHERE "linked_user_id" IS NOT NULL;
+
 -- AddForeignKey
 ALTER TABLE "session_participant" ADD CONSTRAINT "session_participant_organisation_id_fkey" FOREIGN KEY ("organisation_id") REFERENCES "organisation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -71,5 +80,5 @@ ALTER TABLE "session_participant" ADD CONSTRAINT "session_participant_invitation
 
 -- CheckConstraint: attendance_status must be one of the five recognised states.
 ALTER TABLE "session_participant" ADD CONSTRAINT "session_participant_attendance_status_check" CHECK (
-    "attendance_status" IN ('expected', 'present', 'absent', 'partially_attended', 'withdrawn')
+    "attendance_status" IN ('expected', 'present', 'absent', 'partially_attended', 'left_early')
 );

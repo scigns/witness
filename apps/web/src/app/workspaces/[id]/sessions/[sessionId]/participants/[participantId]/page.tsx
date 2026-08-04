@@ -64,7 +64,7 @@ const ATTENDANCE_LABELS: Record<ParticipantAttendanceStatus, string> = {
   present: 'Present',
   absent: 'Absent',
   partially_attended: 'Partially attended',
-  withdrawn: 'Withdrawn',
+  left_early: 'Left early',
 };
 
 const IDENTITY_VISIBILITY_LABELS: Record<ParticipantIdentityVisibility, string> = {

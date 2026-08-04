@@ -345,6 +345,47 @@ describe('ParticipantsService privacy-safe list projection', () => {
     expect(exported).not.toHaveProperty('linkedUserId');
     expect(exported).not.toHaveProperty('facilitatorNotes');
   });
+
+  it('ATTACK — a caller without restricted access does not receive languagePreference or accessibilityRequirements for a facilitators_only participant', async () => {
+    const { prisma } = fakePrisma('draft');
+    const privileged = new ParticipantsService(prisma, fakePolicyEnforcement(true));
+    const created = await privileged.add(
+      WORKSPACE_1,
+      SESSION_1,
+      addRequest({
+        identityVisibility: 'facilitators_only',
+        languagePreference: 'Samoan',
+        accessibilityRequirements: 'Wheelchair access required.',
+      }),
+      FACILITATOR,
+    );
+
+    const unprivileged = new ParticipantsService(prisma, fakePolicyEnforcement(false));
+    const detail = await unprivileged.get(WORKSPACE_1, SESSION_1, created.id, FACILITATOR);
+
+    expect(detail.languagePreference).toBeNull();
+    expect(detail.accessibilityRequirements).toBeNull();
+  });
+
+  it('a caller with restricted access still receives languagePreference and accessibilityRequirements', async () => {
+    const { prisma } = fakePrisma('draft');
+    const service = new ParticipantsService(prisma, fakePolicyEnforcement(true));
+    const created = await service.add(
+      WORKSPACE_1,
+      SESSION_1,
+      addRequest({
+        identityVisibility: 'facilitators_only',
+        languagePreference: 'Samoan',
+        accessibilityRequirements: 'Wheelchair access required.',
+      }),
+      FACILITATOR,
+    );
+
+    const detail = await service.get(WORKSPACE_1, SESSION_1, created.id, FACILITATOR);
+
+    expect(detail.languagePreference).toBe('Samoan');
+    expect(detail.accessibilityRequirements).toBe('Wheelchair access required.');
+  });
 });
 
 describe('ParticipantsService cross-scope isolation', () => {
