@@ -216,41 +216,71 @@ PR-review tracker.
 
 C. Session Preparation
 
-Facilitator can create a co-design session
+Facilitator can create a co-design session — READY (Co-design Session Management PR, not yet
+merged — per this checklist's own rule, an open PR does not count as complete).
+`packages/domain/src/co-design-session.ts`'s `createCoDesignSession`; `POST
+/api/v1/workspaces/:workspaceId/sessions`; `/workspaces/[id]/sessions/new`.
 
-Session belongs to one organisation and workspace
+Session belongs to one organisation and workspace — READY (Co-design Session Management PR, not
+yet merged). `organisationId`/`workspaceId` are required, non-nullable fields on the aggregate and
+the database row; every route nests under `:workspaceId`, so `AuthorizationGuard`'s existing scope
+resolution (Milestone 1.4) Casbin-scopes every session action to that workspace automatically.
 
-Session has title
+Session has title — READY (Co-design Session Management PR, not yet merged). Required, validated,
+editable.
 
-Session has purpose or objectives
+Session has purpose or objectives — READY (Co-design Session Management PR, not yet merged).
+`purpose` is a required field, distinct from the optional `description`.
 
-Session has date and time
+Session has date and time — READY (Co-design Session Management PR, not yet merged). The
+`schedule` lifecycle transition sets `startAt`/`endAt`/`timezone`.
 
-Session has location or online format
+Session has location or online format — READY (Co-design Session Management PR, not yet merged).
+`location` (free text) and `deliveryMode` (`in_person`/`online`/`hybrid`/`asynchronous`/`other`).
 
-Session has language metadata
+Session has language metadata — READY (Co-design Session Management PR, not yet merged).
+`supportedLanguages`, a list of language codes on the session itself — distinct from
+participant-level language/accessibility needs, which are Participant Management's job (Milestone
+3, below).
 
-Session status is visible
+Session status is visible — READY (Co-design Session Management PR, not yet merged). Server-side
+`status` field, rendered via a status badge on every session screen; `permittedTransitions` is
+server-computed so the frontend never reimplements the lifecycle state machine.
 
-Session can be edited before completion
+Session can be edited before completion — READY (Co-design Session Management PR, not yet merged).
+Editable in every status except `archived` (enforced in the domain layer, not just the UI); the
+`update` endpoint uses optimistic concurrency (`expectedVersion`) so a stale edit is rejected rather
+than silently overwriting a concurrent change.
 
-Session can be archived without silent deletion
+Session can be archived without silent deletion — READY (Co-design Session Management PR, not yet
+merged). Archiving is an audited lifecycle transition (`co_design_session.archived`), not a
+delete — the row and its full history remain, `archived` is a terminal, read-only status.
 
-Agenda items can be added and ordered
+Agenda items can be added and ordered — NOT THIS MILESTONE. No agenda-item concept exists yet;
+out of scope for Co-design Session Management, not silently dropped.
 
-Facilitator can add participants
+Facilitator can add participants — NOT THIS MILESTONE. Participant Management (Milestone 3, not
+started).
 
-Participant preferred name can be recorded
+Participant preferred name can be recorded — NOT THIS MILESTONE. Participant Management
+(Milestone 3).
 
-Participant affiliation is optional
+Participant affiliation is optional — NOT THIS MILESTONE. Participant Management (Milestone 3).
 
-Language or accessibility needs can be recorded
+Language or accessibility needs can be recorded — NOT THIS MILESTONE, for participants
+specifically. Participant Management (Milestone 3); session-level supported languages are READY,
+above.
 
-Session dashboard shows the next required action
+Session dashboard shows the next required action — NOT THIS MILESTONE. No such dashboard exists
+yet; the session detail screen shows current status and available transitions, not a guided
+next-action prompt.
 
 Pilot-blocking gate
 
-A facilitator can prepare a real session without an external setup spreadsheet
+A facilitator can prepare a real session without an external setup spreadsheet — NOT READY.
+Session creation and lifecycle management are READY (above), but "prepare a real session" in the
+pilot sense needs participants (Milestone 3) and consent (Milestone 4) too — this gate is not met
+until both land.
 
 D. Consent and Participant Rights
 

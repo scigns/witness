@@ -25,3 +25,4 @@ export * from './workspace-membership.js';
 export * from './role.js';
 export * from './role-assignment.js';
 export * from './identity-link.js';
+export * from './co-design-session.js';

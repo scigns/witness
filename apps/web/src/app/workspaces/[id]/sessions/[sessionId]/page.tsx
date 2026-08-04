@@ -1,0 +1,512 @@
+'use client';
+
+/**
+ * Co-design session detail — edit, lifecycle controls, and history
+ * (BUILD_ROADMAP.md Milestone 2).
+ *
+ * Every mutation sends the session's current `version` back as
+ * `expectedVersion` (`CoDesignSessionDetail.version`). A `409 STALE_VERSION`
+ * response means someone else changed the session since this page loaded
+ * it — handled as its own state (`staleUpdate`) rather than folded into the
+ * generic error banner, because the fix is different: reload, not retry.
+ */
+
+import Link from 'next/link';
+import { use, useCallback, useEffect, useState } from 'react';
+
+import type { SessionLifecycleEventView, SessionStatus } from '@witness/contracts';
+
+import { api, ApiError } from '@/lib/api';
+import { useSession } from '@/lib/session';
+import { Button, Card, ErrorNotice, SessionStatusBadge } from '@/components/ui';
+
+type SessionDetailState = Awaited<ReturnType<typeof api.getSession>>;
+
+const LIFECYCLE_ACTION_LABELS: Record<string, string> = {
+  'co_design_session.created': 'Created',
+  'co_design_session.scheduled': 'Scheduled',
+  'co_design_session.opened': 'Opened',
+  'co_design_session.closed': 'Closed',
+  'co_design_session.reopened': 'Reopened',
+  'co_design_session.archived': 'Archived',
+};
+
+const TRANSITION_LABELS: Partial<Record<SessionStatus, string>> = {
+  scheduled: 'Schedule',
+  open: 'Open',
+  closed: 'Close',
+  archived: 'Archive',
+  draft: 'Move back to draft',
+};
+
+export default function SessionDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string; sessionId: string }>;
+}) {
+  const { id: workspaceId, sessionId } = use(params);
+  const { user, ready } = useSession();
+
+  const [session, setSession] = useState<SessionDetailState | null>(null);
+  const [history, setHistory] = useState<SessionLifecycleEventView[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [staleUpdate, setStaleUpdate] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editPurpose, setEditPurpose] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+
+  const [scheduling, setScheduling] = useState(false);
+  const [startAt, setStartAt] = useState('');
+  const [endAt, setEndAt] = useState('');
+
+  const [reopening, setReopening] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
+
+  const load = useCallback(
+    async (cancelledRef: { current: boolean }) => {
+      try {
+        const [sessionResult, historyResult] = await Promise.all([
+          api.getSession(workspaceId, sessionId, user),
+          api.getSessionHistory(workspaceId, sessionId, user),
+        ]);
+        if (cancelledRef.current) return;
+        setSession(sessionResult);
+        setHistory(historyResult.events);
+        setEditTitle(sessionResult.title);
+        setEditPurpose(sessionResult.purpose);
+        setEditLocation(sessionResult.location ?? '');
+        setError(null);
+        setForbidden(false);
+      } catch (caught) {
+        if (cancelledRef.current) return;
+        if (caught instanceof ApiError && caught.status === 403) {
+          setForbidden(true);
+        } else {
+          setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+        }
+      } finally {
+        if (!cancelledRef.current) setLoading(false);
+      }
+    },
+    [workspaceId, sessionId, user],
+  );
+
+  useEffect(() => {
+    if (!ready) return;
+
+    const cancelledRef = { current: false };
+    void load(cancelledRef);
+
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, [ready, load]);
+
+  const runMutation = async (operation: () => Promise<SessionDetailState>) => {
+    setBusy(true);
+    setStaleUpdate(false);
+    setError(null);
+    try {
+      const updated = await operation();
+      setSession(updated);
+      const historyResult = await api.getSessionHistory(workspaceId, sessionId, user);
+      setHistory(historyResult.events);
+      return true;
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.code === 'STALE_VERSION') {
+        setStaleUpdate(true);
+      } else if (caught instanceof ApiError && caught.status === 403) {
+        setForbidden(true);
+      } else {
+        setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+      }
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (session === null) return;
+    const ok = await runMutation(() =>
+      api.updateSession(
+        workspaceId,
+        sessionId,
+        {
+          title: editTitle,
+          purpose: editPurpose,
+          location: editLocation.trim() === '' ? null : editLocation,
+          expectedVersion: session.version,
+        },
+        user,
+      ),
+    );
+    if (ok) setEditing(false);
+  };
+
+  const applyTransition = async (action: 'open' | 'close' | 'archive' | 'unschedule') => {
+    if (session === null) return;
+    await runMutation(() =>
+      api.transitionSession(
+        workspaceId,
+        sessionId,
+        { action, expectedVersion: session.version },
+        user,
+      ),
+    );
+  };
+
+  const submitSchedule = async () => {
+    if (session === null || startAt === '') return;
+    const ok = await runMutation(() =>
+      api.transitionSession(
+        workspaceId,
+        sessionId,
+        {
+          action: 'schedule',
+          startAt: new Date(startAt).toISOString(),
+          endAt: endAt === '' ? undefined : new Date(endAt).toISOString(),
+          expectedVersion: session.version,
+        },
+        user,
+      ),
+    );
+    if (ok) setScheduling(false);
+  };
+
+  const submitReopen = async () => {
+    if (session === null || reopenReason.trim() === '') return;
+    const ok = await runMutation(() =>
+      api.transitionSession(
+        workspaceId,
+        sessionId,
+        { action: 'reopen', reason: reopenReason, expectedVersion: session.version },
+        user,
+      ),
+    );
+    if (ok) {
+      setReopening(false);
+      setReopenReason('');
+    }
+  };
+
+  const reload = () => {
+    setStaleUpdate(false);
+    setLoading(true);
+    void load({ current: false });
+  };
+
+  if (loading) {
+    return <p className="text-[var(--color-ink-muted)]">Loading…</p>;
+  }
+
+  if (forbidden) {
+    return (
+      <div className="space-y-4">
+        <ErrorNotice message="You do not have permission to view this session. Ask a workspace administrator to check your role assignment." />
+        <Link href={`/workspaces/${workspaceId}/sessions`} className="text-sm underline">
+          ← Back to sessions
+        </Link>
+      </div>
+    );
+  }
+
+  if (session === null) {
+    return (
+      <div className="space-y-4">
+        <ErrorNotice message={error ?? `No session with id '${sessionId}'.`} />
+        <Link href={`/workspaces/${workspaceId}/sessions`} className="text-sm underline">
+          ← Back to sessions
+        </Link>
+      </div>
+    );
+  }
+
+  const canSchedule = session.permittedTransitions.includes('scheduled');
+  const canOpen = session.permittedTransitions.includes('open');
+  const canClose = session.permittedTransitions.includes('closed');
+  const canArchive = session.permittedTransitions.includes('archived');
+  const canReopen = session.status === 'closed' && session.permittedTransitions.includes('open');
+  const canUnschedule =
+    session.status === 'scheduled' && session.permittedTransitions.includes('draft');
+  const isArchived = session.status === 'archived';
+
+  return (
+    <div className="space-y-6">
+      <Link href={`/workspaces/${workspaceId}/sessions`} className="inline-block text-sm underline">
+        ← Back to sessions
+      </Link>
+
+      {error !== null && <ErrorNotice message={error} />}
+
+      {staleUpdate && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded border border-amber-600 bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+        >
+          <span>This session was changed by someone else since you loaded it.</span>
+          <Button variant="secondary" onClick={reload}>
+            Reload
+          </Button>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">{session.title}</h1>
+            <SessionStatusBadge status={session.status} />
+          </div>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+            {session.sessionType} · {session.deliveryMode.replace('_', ' ')}
+          </p>
+        </div>
+        {!isArchived && (
+          <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>
+            {editing ? 'Cancel edit' : 'Edit details'}
+          </Button>
+        )}
+      </div>
+
+      {isArchived && (
+        <p className="text-sm text-[var(--color-ink-muted)]" role="status">
+          This session is archived and read-only.
+        </p>
+      )}
+
+      {editing ? (
+        <Card className="space-y-4">
+          <div>
+            <label htmlFor="editTitle" className="mb-1 block text-sm font-medium">
+              Title
+            </label>
+            <input
+              id="editTitle"
+              maxLength={200}
+              value={editTitle}
+              onChange={(event) => setEditTitle(event.target.value)}
+              className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+            />
+          </div>
+          <div>
+            <label htmlFor="editPurpose" className="mb-1 block text-sm font-medium">
+              Purpose
+            </label>
+            <textarea
+              id="editPurpose"
+              maxLength={2000}
+              rows={3}
+              value={editPurpose}
+              onChange={(event) => setEditPurpose(event.target.value)}
+              className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+            />
+          </div>
+          <div>
+            <label htmlFor="editLocation" className="mb-1 block text-sm font-medium">
+              Location
+            </label>
+            <input
+              id="editLocation"
+              maxLength={300}
+              value={editLocation}
+              onChange={(event) => setEditLocation(event.target.value)}
+              className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+            />
+          </div>
+          <Button
+            variant="primary"
+            disabled={busy || editTitle.trim() === '' || editPurpose.trim() === ''}
+            onClick={() => void saveEdit()}
+          >
+            {busy ? 'Saving…' : 'Save changes'}
+          </Button>
+        </Card>
+      ) : (
+        <Card className="space-y-2 text-sm">
+          <p>{session.purpose}</p>
+          {session.location !== null && (
+            <p className="text-[var(--color-ink-muted)]">Location: {session.location}</p>
+          )}
+          {session.startAt !== null && (
+            <p className="text-[var(--color-ink-muted)]">
+              Scheduled: {new Date(session.startAt).toLocaleString()}
+              {session.endAt !== null ? ` – ${new Date(session.endAt).toLocaleString()}` : ''}
+            </p>
+          )}
+          {session.culturalProtocolNotes !== null && (
+            <p className="text-[var(--color-ink-muted)]">
+              Cultural protocol: {session.culturalProtocolNotes}
+            </p>
+          )}
+        </Card>
+      )}
+
+      {!isArchived && (
+        <section aria-labelledby="lifecycle-heading">
+          <h2 id="lifecycle-heading" className="mb-3 text-lg font-semibold">
+            Lifecycle
+          </h2>
+          <Card className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {canSchedule && (
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => setScheduling((v) => !v)}
+                >
+                  {TRANSITION_LABELS.scheduled}
+                </Button>
+              )}
+              {canUnschedule && (
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void applyTransition('unschedule')}
+                >
+                  {TRANSITION_LABELS.draft}
+                </Button>
+              )}
+              {canOpen && (
+                <Button
+                  variant="primary"
+                  disabled={busy}
+                  onClick={() => void applyTransition('open')}
+                >
+                  {TRANSITION_LABELS.open}
+                </Button>
+              )}
+              {canClose && (
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void applyTransition('close')}
+                >
+                  {TRANSITION_LABELS.closed}
+                </Button>
+              )}
+              {canReopen && (
+                <Button variant="secondary" disabled={busy} onClick={() => setReopening((v) => !v)}>
+                  Reopen
+                </Button>
+              )}
+              {canArchive && (
+                <Button
+                  variant="danger"
+                  disabled={busy}
+                  onClick={() => void applyTransition('archive')}
+                >
+                  {TRANSITION_LABELS.archived}
+                </Button>
+              )}
+              {session.permittedTransitions.length === 0 && (
+                <p className="text-sm text-[var(--color-ink-muted)]">No transitions available.</p>
+              )}
+            </div>
+
+            {scheduling && (
+              <div className="space-y-3 border-t border-[var(--color-line)] pt-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="startAt" className="mb-1 block text-sm font-medium">
+                      Start <span aria-hidden="true">*</span>
+                      <span className="sr-only">(required)</span>
+                    </label>
+                    <input
+                      id="startAt"
+                      type="datetime-local"
+                      required
+                      value={startAt}
+                      onChange={(event) => setStartAt(event.target.value)}
+                      className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="endAt" className="mb-1 block text-sm font-medium">
+                      End
+                    </label>
+                    <input
+                      id="endAt"
+                      type="datetime-local"
+                      value={endAt}
+                      onChange={(event) => setEndAt(event.target.value)}
+                      className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                    />
+                  </div>
+                </div>
+                <Button
+                  variant="primary"
+                  disabled={busy || startAt === ''}
+                  onClick={() => void submitSchedule()}
+                >
+                  Confirm schedule
+                </Button>
+              </div>
+            )}
+
+            {reopening && (
+              <div className="space-y-3 border-t border-[var(--color-line)] pt-4">
+                <label htmlFor="reopenReason" className="mb-1 block text-sm font-medium">
+                  Reason for reopening <span aria-hidden="true">*</span>
+                  <span className="sr-only">(required)</span>
+                </label>
+                <input
+                  id="reopenReason"
+                  required
+                  value={reopenReason}
+                  onChange={(event) => setReopenReason(event.target.value)}
+                  placeholder="Facilitator identified an unresolved agenda item."
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                />
+                <Button
+                  variant="primary"
+                  disabled={busy || reopenReason.trim() === ''}
+                  onClick={() => void submitReopen()}
+                >
+                  Confirm reopen
+                </Button>
+              </div>
+            )}
+          </Card>
+        </section>
+      )}
+
+      <section aria-labelledby="history-heading">
+        <h2 id="history-heading" className="mb-3 text-lg font-semibold">
+          Lifecycle history
+        </h2>
+        {history.length === 0 ? (
+          <Card>
+            <p className="text-sm text-[var(--color-ink-muted)]">No lifecycle events yet.</p>
+          </Card>
+        ) : (
+          <Card>
+            <ol className="space-y-3 text-sm">
+              {history.map((event) => (
+                <li key={event.id} className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span>
+                    <strong>{LIFECYCLE_ACTION_LABELS[event.action] ?? event.action}</strong> by{' '}
+                    {event.actor.displayName}
+                    {event.metadata['reason'] !== undefined && (
+                      <span className="text-[var(--color-ink-muted)]">
+                        {' '}
+                        — {event.metadata['reason']}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs text-[var(--color-ink-muted)]">
+                    {new Date(event.occurredAt).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </Card>
+        )}
+      </section>
+    </div>
+  );
+}

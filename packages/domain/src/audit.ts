@@ -42,6 +42,14 @@ export const AUDIT_ACTIONS = [
   'identity_link.created',
   'identity_link.removed',
   'authentication.denied',
+  'co_design_session.created',
+  'co_design_session.updated',
+  'co_design_session.facilitator_changed',
+  'co_design_session.scheduled',
+  'co_design_session.opened',
+  'co_design_session.closed',
+  'co_design_session.reopened',
+  'co_design_session.archived',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -61,6 +69,7 @@ export const AUDIT_SUBJECT_TYPES = [
   'workspace_membership',
   'role_assignment',
   'identity_link',
+  'co_design_session',
 ] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 

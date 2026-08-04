@@ -51,6 +51,40 @@ describe('PolicyEngineService — real policy data', () => {
     }
   });
 
+  it('reader may read sessions but not create, update, or transition them', async () => {
+    const engine = await loadedEngine();
+    expect(await engine.grants('reader', 'session:read')).toBe(true);
+    expect(await engine.grants('reader', 'session:create')).toBe(false);
+    expect(await engine.grants('reader', 'session:update')).toBe(false);
+    expect(await engine.grants('reader', 'session:transition')).toBe(false);
+  });
+
+  it('contributor (which facilitator collapses onto) may create, update, and transition sessions', async () => {
+    const engine = await loadedEngine();
+    expect(await engine.grants('contributor', 'session:read')).toBe(true);
+    expect(await engine.grants('contributor', 'session:create')).toBe(true);
+    expect(await engine.grants('contributor', 'session:update')).toBe(true);
+    expect(await engine.grants('contributor', 'session:transition')).toBe(true);
+  });
+
+  it('reviewer may read sessions but not manage them', async () => {
+    const engine = await loadedEngine();
+    expect(await engine.grants('reviewer', 'session:read')).toBe(true);
+    expect(await engine.grants('reviewer', 'session:create')).toBe(false);
+  });
+
+  it('admin holds every session action', async () => {
+    const engine = await loadedEngine();
+    for (const action of [
+      'session:read',
+      'session:create',
+      'session:update',
+      'session:transition',
+    ] as const) {
+      expect(await engine.grants('admin', action)).toBe(true);
+    }
+  });
+
   it('ATTACK — an unknown tier grants nothing, not even the actions every real tier holds', async () => {
     const engine = await loadedEngine();
     expect(await engine.grants('superuser', 'organisation:read')).toBe(false);

@@ -23,16 +23,35 @@
 # capability to either close or explicitly re-defer. It is re-deferred here,
 # on purpose: nothing in the accepted domain model says who may create an
 # organisation from nothing, and this PR does not invent an answer.
+#
+# session:* (BUILD_ROADMAP.md Milestone 2, Co-design Session Management):
+# 'facilitator' and 'contributor' both collapse onto the 'contributor' tier
+# (role-resolution.ts's ROLE_TO_TIER), so granting session management to
+# 'contributor' here means a plain record-contributor WitnessRole can also
+# create and manage sessions in their scope, not only a 'facilitator' one —
+# a deliberate simplification, not an oversight. Splitting facilitator into
+# its own tier would need a fifth Casbin tier and its own ROLE_TO_TIER entry;
+# the smaller change for this milestone is accepting that imprecision and
+# recording it here. There is also no per-session "only the assigned
+# facilitator may manage this specific session" check — any contributor- or
+# admin-tier holder in the session's organisation or workspace may manage
+# ANY session there, not only ones assigned to them. Both gaps are named as
+# known limitations in this milestone's PR, not hidden.
 p, reader, record:read
 p, reader, organisation:read
 p, reader, workspace:read
 p, reader, role:read
+p, reader, session:read
 
 p, contributor, record:read
 p, contributor, record:create
 p, contributor, organisation:read
 p, contributor, workspace:read
 p, contributor, role:read
+p, contributor, session:read
+p, contributor, session:create
+p, contributor, session:update
+p, contributor, session:transition
 
 p, reviewer, record:read
 p, reviewer, record:create
@@ -40,6 +59,7 @@ p, reviewer, record:review
 p, reviewer, organisation:read
 p, reviewer, workspace:read
 p, reviewer, role:read
+p, reviewer, session:read
 
 p, admin, record:read
 p, admin, record:create
@@ -60,3 +80,7 @@ p, admin, role:read
 p, admin, role_assignment:read
 p, admin, role_assignment:write
 p, admin, role_assignment:delete
+p, admin, session:read
+p, admin, session:create
+p, admin, session:update
+p, admin, session:transition

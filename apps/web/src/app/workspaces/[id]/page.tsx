@@ -200,20 +200,28 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
       {error !== null && <ErrorNotice message={error} />}
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{workspace.name}</h1>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          {organisation === null ? (
-            'Organisation: unknown'
-          ) : (
-            <>
-              Organisation:{' '}
-              <Link href={`/organisations/${organisation.id}`} className="underline">
-                {organisation.name}
-              </Link>
-            </>
-          )}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{workspace.name}</h1>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+            {organisation === null ? (
+              'Organisation: unknown'
+            ) : (
+              <>
+                Organisation:{' '}
+                <Link href={`/organisations/${organisation.id}`} className="underline">
+                  {organisation.name}
+                </Link>
+              </>
+            )}
+          </p>
+        </div>
+        <Link
+          href={`/workspaces/${id}/sessions`}
+          className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
+        >
+          Co-design sessions →
+        </Link>
       </div>
 
       <section aria-labelledby="add-member-heading">
