@@ -88,6 +88,117 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 
 ## What changed recently
 
+### 2026-08-03 — Authentication Hardening delivered, PR open
+
+- **Continuous Product Delivery mode**: verified before starting — PR #22 (Authentication,
+  Milestone 1.3) merged to `main`, no overlapping open PR. Scope: address the legitimate
+  unresolved CodeRabbit review findings from PR #22, attempt real Keycloak verification, and leave
+  the authentication boundary ready for Authorisation hardening — explicitly not that next
+  capability itself.
+- **Current-user error mapping corrected.** `GET /api/v1/me` previously collapsed every failure
+  into `UNAUTHENTICATED`; a suspended or deactivated account with a still-technically-valid session
+  token was silently served its full `CurrentUserView` — a real gap, not merely a UX one. Now
+  distinguishes `UNAUTHENTICATED` (no/unknown session), `SESSION_EXPIRED`, `ACCOUNT_SUSPENDED` /
+  `ACCOUNT_DEACTIVATED` (403 — the account, not the session, is the problem), and `UNKNOWN_ACCOUNT`
+  (defensive). The frontend (`apps/web/src/lib/auth.tsx`) only discards the stored session token
+  for the first two — a transient server failure or an account-state denial no longer forces an
+  unnecessary full OIDC round trip, and the Shell now renders a distinct message for each case.
+  Verified against a real database: suspending an already-signed-in account now correctly denies
+  `/me` with `ACCOUNT_SUSPENDED` instead of serving the view.
+- **Login-state consumption is now atomic.** The previous `findUnique` then separate `delete`
+  left a real window where two concurrent callbacks carrying the same `state` could both read the
+  row before either deleted it. Replaced with a single atomic `delete` — the delete itself is the
+  claim; a losing concurrent caller or a replay gets Prisma's "record not found," identical to
+  "never existed." A new concurrency test proves exactly one of two simultaneous callbacks for the
+  same state succeeds.
+- **`AuthLoginAttempt` no longer grows without bound.** `startLogin` (unauthenticated,
+  `GET /api/v1/auth/login`) now opportunistically purges expired rows on every call — no external
+  scheduler required for basic operation. Verified against a real database: an expired attempt
+  inserted directly is gone after the next sign-in start; active attempts are preserved.
+- **OIDC discovery hardened**: a 5-second timeout (`AbortSignal.timeout`) on both the discovery and
+  token-exchange fetches (previously unbounded — a stalled Keycloak could hold every sign-in
+  request open indefinitely); concurrent discovery requests on a cold adapter now share one
+  in-flight fetch instead of each issuing their own; the discovery document's required fields are
+  validated before use rather than assumed; a failed discovery is not cached, so the next call
+  retries; a successful discovery is now re-fetched after one hour rather than cached forever.
+  None of this weakens verification — a failed or incomplete discovery still fails closed.
+- **OIDC configuration values are now trimmed** (`oidcIssuer`, `oidcClientId`, `oidcClientSecret`,
+  `jwtAudience`) before being stored — previously only `webOrigin` and `oidcRedirectUri` were,
+  meaning trailing whitespace in an operator's `.env` value would have silently broken the
+  discovery-document fetch and every ID-token audience check.
+- **A development-only open redirect closed.** `dev-idp/authorize`'s `redirect_uri` query parameter
+  is now validated against the configured callback URI before use — the route is
+  development-profile-only, so the blast radius was always a local dev machine, but the file's own
+  header comment promised no caller-supplied redirect target, and this was the one exception.
+- **N+1 query removed** from `SessionAuthenticator.effectiveRoleGrantTiers` — `AuthorizationGuard`
+  calls this on every guarded request, so a user with N role assignments previously cost N
+  sequential membership lookups before any handler ran. Now two batched `findMany` calls regardless
+  of assignment count, with a regression test asserting exactly one query per scope type for three
+  assignments across three organisations.
+- **Three attack tests in the development identity-provider double's suite were passing for the
+  wrong reason** — each verified a token signed by a *different* key, so `jwtVerify` rejected on
+  signature before the issuer/audience/expiry claim under test was ever evaluated; if the adapter
+  had dropped those checks entirely, the tests would still have passed. `DevelopmentIdentityProviderAdapter`
+  now accepts an optional shared key pair (test-only — production code never supplies one), and the
+  three tests were rewritten to share a key pair and assert on the specific `jose` claim-validation
+  error code (`ERR_JWT_CLAIM_VALIDATION_FAILED` / `ERR_JWT_EXPIRED`) rather than any throw.
+- **Real Keycloak was not verified** — no container runtime is available in this sandbox (unchanged
+  from PR #22; confirmed again, not assumed). Added
+  [`docs/engineering/KEYCLOAK_INTEGRATION_VERIFICATION.md`](docs/engineering/KEYCLOAK_INTEGRATION_VERIFICATION.md),
+  a step-by-step procedure (exact commands, exact checks) to run once Docker is available, and
+  `infrastructure/docker/init/keycloak/witness-realm.json`, a reproducible realm-import file (realm
+  `witness`, public PKCE client `witness-api`, two test users) for the `keycloak` compose service's
+  existing `--import-realm` — declarative configuration, not yet imported into a running instance,
+  stated as such in both the file's own status line and this entry. **This remains a pilot-blocking
+  gate**, unchanged from before this PR.
+- **Development identity boundary re-reviewed, no gaps found.** `DevelopmentAuthorizationAdapter`
+  and `DevelopmentIdentityProviderAdapter` both still throw at construction outside the development
+  profile; `SessionBackedAuthorizationAdapter`'s dev-header fallback returns `null` unconditionally
+  outside development (now covered by a dedicated test,
+  `session-backed.adapter.test.ts`); `AuthorizationGuard` tries a real session before the dev
+  header (now covered by `authorization.guard.test.ts`, including a forged-admin-header-alongside-
+  a-real-session case). Added a development-profile-only notice on `/signin` naming the local
+  identity double explicitly, so the bypass is visible at the point someone is about to use it, not
+  only on the dashboard's health panel.
+- **TD-002 and TD-003 reassessed**, as instructed, for whether Authentication makes either directly
+  exploitable. Neither is newly exploitable by this PR specifically — TD-003
+  (`docs/engineering/TECH_DEBT.md`) already accounted for `AuthenticationService` reusing the
+  unfixed `resolveActor` helper when Milestone 1.3 landed; its risk-scope description there was
+  corrected in this PR (see below), but the underlying exposure and its 2026-11-03 deadline, tied to
+  Milestone 1.4 or any external pilot, are unchanged.
+- **Documentation corrections**: `docs/engineering/TECH_DEBT.md`'s TD-003 entry had a stale
+  `2026-10-03` review date surviving alongside a corrected `2026-11-03` one, and its "examined at
+  the trigger" note incorrectly claimed the collision risk was narrower after Authentication landed
+  — `resolveActor` matches only on `(displayName, kind)`, never on `IdentityLink.providerSubject`,
+  so two unrelated identities sharing a display name remain exactly as exposed as before; both
+  fixed. `docs/MVP_CHECKLIST.md`'s pilot-blocking gate description overclaimed request-time
+  workspace authorization when the actual evidence was membership-based visibility; reworded.
+  `docs/engineering/DEVELOPER_ONBOARDING.md`'s invited-user bootstrap step named an admin action
+  a real signed-in session cannot perform (session principals never carry the global admin grant);
+  corrected to name the dev-header path explicitly.
+- **Tests**: 145 API-gateway tests (up from 109 at PR #22's merge) — new coverage for atomic state
+  consumption under concurrency, login-attempt retention and cleanup, OIDC discovery timeout/cache/
+  dedup/validation (`keycloak-oidc.adapter.test.ts`, new), current-user error mapping
+  (`authentication.controller.test.ts`, new), session precedence over the dev header
+  (`authorization.guard.test.ts`, new), development-bypass containment for the session-backed
+  adapter (`session-backed.adapter.test.ts`, new), the N+1 regression, and trimmed/empty-after-trim
+  OIDC configuration (config package, 25 tests, up from 21). All pre-existing tests preserved and
+  passing; `test:invariants` 20/20 and `test:adversarial` 30/30 unchanged.
+- **The pre-existing `Documentation` CI failure is now fixed, narrowly.**
+  `governance/PRODUCT_CONSTITUTION.md` has carried no Owner/Status header since before PR #17,
+  recorded each time as a known, deliberately-unfixed gap "this branch has no authority to
+  decide" (STATUS.md's PR #20 entry). Per this task's explicit narrow permission, added
+  `PRODUCT_CONSTITUTION.md` to `scripts/ci/check-doc-headers.sh`'s existing foundational-document
+  exemption list (alongside `README.md`, `LICENSE`, `CODE_OF_CONDUCT.md`) — the same treatment
+  those documents already get, not an invented Owner/Status header for a constitution that has
+  neither by design.
+- **Known limitations, stated plainly**: live Keycloak sign-in remains unverified — a pilot-blocking
+  gate, see `KEYCLOAK_INTEGRATION_VERIFICATION.md`. No centralised Casbin policy-engine enforcement
+  (Authorisation hardening, still the next capability). TD-002/TD-003 remain open on their existing
+  schedules, both due 2026-11-03. Rate-limiting the unauthenticated `GET /api/v1/auth/login`
+  endpoint (named alongside the login-attempt-purge finding in the PR #22 review) was not added —
+  out of scope for this pass; the purge itself bounds table growth independent of a rate limit.
+
 ### 2026-08-03 — Authentication (BUILD_ROADMAP.md Milestone 1.3) delivered, PR open
 
 - **Continuous Product Delivery mode**: verified before starting — `main` at the merged Roles and

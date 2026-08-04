@@ -78,4 +78,29 @@ describe('SessionService', () => {
     // Revoking again (already-signed-out) must not throw.
     await expect(service.revoke(token)).resolves.not.toThrow();
   });
+
+  describe('resolveSession — distinguishing "never signed in" from "session expired"', () => {
+    it('reports valid with the user id for a live session', async () => {
+      const { prisma } = fakePrisma();
+      const service = new SessionService(prisma);
+      const { token } = await service.issue('user-1', 60);
+
+      expect(await service.resolveSession(token)).toEqual({ status: 'valid', userId: 'user-1' });
+    });
+
+    it('reports not_found for a token that was never issued', async () => {
+      const { prisma } = fakePrisma();
+      const service = new SessionService(prisma);
+
+      expect(await service.resolveSession('never-issued')).toEqual({ status: 'not_found' });
+    });
+
+    it('reports expired — not not_found — for a token whose session has lapsed', async () => {
+      const { prisma } = fakePrisma();
+      const service = new SessionService(prisma);
+      const { token } = await service.issue('user-1', -1);
+
+      expect(await service.resolveSession(token)).toEqual({ status: 'expired' });
+    });
+  });
 });

@@ -3,7 +3,7 @@
 # See docs/engineering/DOCUMENTATION_STRATEGY.md.
 set -euo pipefail
 
-exempt='README.md|CHANGELOG.md|LICENSE|CODE_OF_CONDUCT.md|_template.md|ADR-TEMPLATE.md'
+exempt='README.md|CHANGELOG.md|LICENSE|CODE_OF_CONDUCT.md|_template.md|ADR-TEMPLATE.md|PRODUCT_CONSTITUTION.md'
 missing=0
 
 for file in $(find docs architecture -name '*.md' 2>/dev/null | grep -Ev "$exempt" || true); do

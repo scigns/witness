@@ -14,15 +14,34 @@ import { SessionAuthenticator } from './session-authenticator.js';
 
 const USER_1 = 'user-1';
 const ORG_1 = 'org-1';
+const ORG_2 = 'org-2';
+const ORG_3 = 'org-3';
 const WORKSPACE_1 = 'workspace-1';
 
 function fakePrisma(options: {
   accountState?: string;
   roleAssignments?: { role: string; organisationId: string | null; workspaceId: string | null }[];
+  organisationMemberships?: { organisationId: string; state: string }[];
+  workspaceMemberships?: { workspaceId: string; state: string }[];
+  /** Shorthand for the common single-organisation case. */
   organisationMembershipState?: string | null;
+  /** Shorthand for the common single-workspace case. */
   workspaceMembershipState?: string | null;
 }) {
   const sessions: Record<string, unknown>[] = [];
+  const calls = { organisationFindMany: 0, workspaceFindMany: 0 };
+
+  const organisationMemberships =
+    options.organisationMemberships ??
+    (options.organisationMembershipState !== undefined &&
+    options.organisationMembershipState !== null
+      ? [{ organisationId: ORG_1, state: options.organisationMembershipState }]
+      : []);
+  const workspaceMemberships =
+    options.workspaceMemberships ??
+    (options.workspaceMembershipState !== undefined && options.workspaceMembershipState !== null
+      ? [{ workspaceId: WORKSPACE_1, state: options.workspaceMembershipState }]
+      : []);
 
   const prisma = {
     authSession: {
@@ -52,21 +71,28 @@ function fakePrisma(options: {
       },
     },
     organisationMembership: {
-      findUnique: async () =>
-        options.organisationMembershipState === undefined ||
-        options.organisationMembershipState === null
-          ? null
-          : { state: options.organisationMembershipState },
+      findMany: async ({
+        where,
+      }: {
+        where: { userId: string; organisationId: { in: string[] } };
+      }) => {
+        calls.organisationFindMany += 1;
+        if (where.userId !== USER_1) return [];
+        return organisationMemberships.filter((m) =>
+          where.organisationId.in.includes(m.organisationId),
+        );
+      },
     },
     workspaceMembership: {
-      findUnique: async () =>
-        options.workspaceMembershipState === undefined || options.workspaceMembershipState === null
-          ? null
-          : { state: options.workspaceMembershipState },
+      findMany: async ({ where }: { where: { userId: string; workspaceId: { in: string[] } } }) => {
+        calls.workspaceFindMany += 1;
+        if (where.userId !== USER_1) return [];
+        return workspaceMemberships.filter((m) => where.workspaceId.in.includes(m.workspaceId));
+      },
     },
   };
 
-  return { prisma: prisma as unknown as PrismaService };
+  return { prisma: prisma as unknown as PrismaService, calls };
 }
 
 async function issueAndAuthenticate(
@@ -153,6 +179,31 @@ describe('SessionAuthenticator', () => {
     });
     const principal = await issueAndAuthenticate(prisma, (t) => `Bearer ${t}`);
     expect(principal?.roles).toEqual([]);
+  });
+
+  it('batches membership lookups into one query per scope type, regardless of assignment count', async () => {
+    const { prisma, calls } = fakePrisma({
+      roleAssignments: [
+        { role: 'contributor', organisationId: ORG_1, workspaceId: null },
+        { role: 'reviewer', organisationId: ORG_2, workspaceId: null },
+        { role: 'reader', organisationId: ORG_3, workspaceId: null },
+      ],
+      organisationMemberships: [
+        { organisationId: ORG_1, state: 'active' },
+        { organisationId: ORG_2, state: 'active' },
+        { organisationId: ORG_3, state: 'active' },
+      ],
+    });
+
+    const principal = await issueAndAuthenticate(prisma, (t) => `Bearer ${t}`);
+
+    expect(new Set(principal?.roles)).toEqual(new Set(['contributor', 'reviewer', 'reader']));
+    // One batched findMany covering all three organisations, not three —
+    // the N+1 this test guards against.
+    expect(calls.organisationFindMany).toBe(1);
+    // No workspace-scoped assignments at all: the workspace query is never
+    // issued rather than issued once for an empty id list.
+    expect(calls.workspaceFindMany).toBe(0);
   });
 
   it('facilitator and participant flatten onto the same tiers as contributor and reader', async () => {

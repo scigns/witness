@@ -33,7 +33,7 @@ const ROLES: ReadonlyArray<ActingUser['role']> = ['reader', 'contributor', 'revi
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, setUser } = useSession();
-  const { status, currentUser, signOut } = useAuth();
+  const { status, currentUser, errorMessage, signOut } = useAuth();
 
   return (
     <div className="min-h-dvh flex flex-col">
@@ -91,7 +91,12 @@ export function Shell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <AuthStatusBadge status={status} currentUser={currentUser} signOut={signOut} />
+          <AuthStatusBadge
+            status={status}
+            currentUser={currentUser}
+            errorMessage={errorMessage}
+            signOut={signOut}
+          />
         </div>
 
         <div className="border-t border-[var(--color-line)] bg-[var(--color-paper)]">
@@ -146,14 +151,41 @@ export function Shell({ children }: { children: ReactNode }) {
 function AuthStatusBadge({
   status,
   currentUser,
+  errorMessage,
   signOut,
 }: {
   status: AuthStatus;
   currentUser: CurrentUserView | null;
+  errorMessage: string | null;
   signOut: () => void;
 }) {
   if (status === 'loading') {
     return <span className="text-sm text-[var(--color-ink-muted)]">Checking sign-in…</span>;
+  }
+
+  if (status === 'suspended' || status === 'deactivated') {
+    return (
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-red-700 dark:text-red-400">
+          Account {status === 'suspended' ? 'suspended' : 'deactivated'} — contact an administrator.
+        </span>
+        <button
+          type="button"
+          onClick={signOut}
+          className="rounded px-2 py-1 text-[var(--color-ink-muted)] underline hover:text-[var(--color-ink)]"
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <span className="text-sm text-[var(--color-ink-muted)]" title={errorMessage ?? undefined}>
+        Could not verify sign-in — retrying…
+      </span>
+    );
   }
 
   if (status === 'unauthenticated' || currentUser === null) {

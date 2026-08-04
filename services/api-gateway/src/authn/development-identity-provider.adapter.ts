@@ -58,7 +58,22 @@ export class DevelopmentIdentityProviderAdapter extends IdentityProviderPort {
   readonly issuer: string;
   private readonly audience: string;
 
-  constructor(profile: string, apiOrigin: string, audience: string) {
+  /**
+   * `keyPair` exists for tests only. Production code always omits it, so a
+   * fresh key is generated per instance — the whole point of the double is
+   * that it holds a key nothing else has. Tests that need to prove
+   * `verifyIdToken` actually checks issuer, audience, or expiry (rather than
+   * failing on signature mismatch before those checks ever run) construct
+   * two adapters that *share* a key pair, so a token signed by one verifies
+   * its signature successfully against the other and the claim under test
+   * is what fails.
+   */
+  constructor(
+    profile: string,
+    apiOrigin: string,
+    audience: string,
+    keyPair?: { publicKey: CryptoKey; privateKey: CryptoKey },
+  ) {
     super();
 
     if (profile !== 'development') {
@@ -71,7 +86,7 @@ export class DevelopmentIdentityProviderAdapter extends IdentityProviderPort {
 
     this.issuer = `${apiOrigin}/api/v1/auth/dev-idp`;
     this.audience = audience.trim() !== '' ? audience : 'witness-api';
-    this.keysReady = generateKeyPair('RS256');
+    this.keysReady = keyPair !== undefined ? Promise.resolve(keyPair) : generateKeyPair('RS256');
 
     this.logger.warn(
       'Using the DEVELOPMENT identity provider double. Tokens are signed locally and prove ' +

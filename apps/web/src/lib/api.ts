@@ -296,17 +296,38 @@ export const authApi = {
   loginUrl: (): string => `${BASE_URL}/api/v1/auth/login`,
 
   me: async (sessionToken: string): Promise<CurrentUserView> => {
-    const response = await fetch(`${BASE_URL}/api/v1/me`, {
-      headers: { Authorization: `Bearer ${sessionToken}` },
-      cache: 'no-store',
-    });
+    let response: Response;
+
+    try {
+      response = await fetch(`${BASE_URL}/api/v1/me`, {
+        headers: { Authorization: `Bearer ${sessionToken}` },
+        cache: 'no-store',
+      });
+    } catch {
+      // A network failure is not a judgement about the session — it is a
+      // reason to try again, not a reason to sign the user out.
+      throw new ApiError(`Cannot reach the Witness API at ${BASE_URL}.`, 0, 'API_UNREACHABLE');
+    }
 
     if (!response.ok) {
-      throw new ApiError(
-        `Session is not valid (HTTP ${response.status}).`,
-        response.status,
-        'UNAUTHENTICATED',
-      );
+      // The server distinguishes *why* — no session, expired session,
+      // suspended/deactivated account, an orphaned session — with a distinct
+      // `error.code`. Trust that code rather than re-deriving a coarser one
+      // from the HTTP status, so a 403 (suspended) doesn't collapse into the
+      // same bucket as a 401 (never signed in) and a transient 5xx doesn't
+      // read as either.
+      let code = 'SESSION_CHECK_FAILED';
+      let message = `Could not verify the session (HTTP ${response.status}).`;
+
+      try {
+        const body = (await response.json()) as { error?: { code?: string; message?: string } };
+        code = body.error?.code ?? code;
+        message = body.error?.message ?? message;
+      } catch {
+        // Response was not JSON. Keep the status-derived message.
+      }
+
+      throw new ApiError(message, response.status, code);
     }
 
     return (await response.json()) as CurrentUserView;

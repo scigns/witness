@@ -1,10 +1,10 @@
 /**
  * Role → permitted actions, shared by `DevelopmentAuthorizationAdapter` (the
- * unverified dev-header path) and `SessionAuthorizationAdapter` (the real,
- * session-backed path introduced in Milestone 1.3). One table, so the two
- * paths cannot grant different things for the same role name — see
- * `session.adapter.ts` for how a signed-in principal's roles are computed
- * before reaching this table.
+ * unverified dev-header path) and `SessionBackedAuthorizationAdapter` (the
+ * real, session-backed path introduced in Milestone 1.3). One table, so the
+ * two paths cannot grant different things for the same role name — see
+ * `session-authenticator.ts` for how a signed-in principal's roles are
+ * computed before reaching this table.
  */
 
 import type { Action, AuthorizationDecision, Principal } from './authorization.port.js';
@@ -36,7 +36,7 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
   // decides otherwise.
   //
   // A signed-in session principal (Milestone 1.3) NEVER carries 'admin' in
-  // `roles` — see `session.adapter.ts` — so every action listed only here is,
+  // `roles` — see `session-authenticator.ts` — so every action listed only here is,
   // for now, unreachable via real authentication. That is a deliberate,
   // fail-closed gap: Authorisation hardening (the next capability) must
   // define how a real identity legitimately becomes a platform

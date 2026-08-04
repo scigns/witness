@@ -150,10 +150,12 @@ than mocked away.
    (`dev@example.com`) — unless that identity is separately linked or invited to a Witness account
    (see below), you will see `/auth/error?reason=unknown_identity`. This is correct: Witness never
    auto-creates an unrestricted account for an unrecognised sign-in.
-3. To sign in as a specific invited user during development, an administrator first creates that
-   user (`/users/new`, `POST /api/v1/users`) with the matching email, leaving it in the `invited`
-   state. Signing in with that email activates the account and links the identity — Witness never
-   auto-creates the user itself, only the link and the activation.
+3. To sign in as a specific invited user during development, first create that user through the
+   **"Acting as"** dev-header path — set it to any name with the `admin` role, then visit
+   `/users/new` (`POST /api/v1/users` is admin-only, and a real signed-in session never carries the
+   global admin grant; see the boundary explained below step 5) — with the matching email, leaving
+   it in the `invited` state. Signing in with that email activates the account and links the
+   identity — Witness never auto-creates the user itself, only the link and the activation.
 4. Once signed in, the header reads **Signed in as `<name>`**, and the dashboard's **Your access**
    section lists only the organisations and workspaces that account actually belongs to.
 5. **Sign out** revokes the session server-side immediately — a captured token cannot be reused

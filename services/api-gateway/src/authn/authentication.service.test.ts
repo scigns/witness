@@ -5,6 +5,7 @@
  * Prisma double.
  */
 
+import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../infrastructure/prisma.service.js';
@@ -70,15 +71,29 @@ function fakePrisma() {
         authLoginAttempts.push({ ...data });
         return { ...data };
       },
-      findUnique: async ({ where }: { where: { state: string } }) => {
-        const row = authLoginAttempts.find((a) => a['state'] === where.state);
-        return row === undefined ? null : { ...row };
-      },
+      // Real Prisma throws PrismaClientKnownRequestError(P2025) — "record to
+      // delete does not exist" — when the where-clause matches nothing.
+      // AuthenticationService's atomic-consume `.catch()` specifically
+      // checks for that error shape, so the fake must throw the same shape
+      // to exercise the real code path rather than a stand-in.
       delete: async ({ where }: { where: { state: string } }) => {
         const index = authLoginAttempts.findIndex((a) => a['state'] === where.state);
-        if (index === -1) throw new Error('not found');
+        if (index === -1) {
+          throw new Prisma.PrismaClientKnownRequestError('Record to delete does not exist.', {
+            code: 'P2025',
+            clientVersion: '5.22.0',
+          });
+        }
         const [removed] = authLoginAttempts.splice(index, 1);
         return removed;
+      },
+      deleteMany: async ({ where }: { where: { expiresAt: { lt: Date } } }) => {
+        const before = authLoginAttempts.length;
+        for (let i = authLoginAttempts.length - 1; i >= 0; i -= 1) {
+          const expiresAt = authLoginAttempts[i]!['expiresAt'] as Date;
+          if (expiresAt.getTime() < where.expiresAt.lt.getTime()) authLoginAttempts.splice(i, 1);
+        }
+        return { count: before - authLoginAttempts.length };
       },
     },
     identityLink: {
@@ -376,17 +391,120 @@ describe('AuthenticationService — sign-in and user mapping', () => {
 
     // No memberships wired into this fake — asserts the shape degrades to empty lists cleanly.
     const current = await service.getCurrentUser(INVITED_USER);
-    expect(current?.organisations).toEqual([]);
-    expect(current?.workspaces).toEqual([]);
-    expect(current?.email).toBe('invited@example.com');
+    if (current.status !== 'ok') throw new Error(`expected 'ok', got '${current.status}'`);
+    expect(current.view.organisations).toEqual([]);
+    expect(current.view.workspaces).toEqual([]);
+    expect(current.view.email).toBe('invited@example.com');
   });
 
-  it('getCurrentUser returns null for an unknown user id', async () => {
+  it('getCurrentUser reports not_found for an unknown user id', async () => {
     const { prisma } = fakePrisma();
     const idp = new StubIdentityProvider();
     const sessions = new SessionService(prisma);
     const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
 
-    expect(await service.getCurrentUser('nonexistent')).toBeNull();
+    expect(await service.getCurrentUser('nonexistent')).toEqual({ status: 'not_found' });
+  });
+
+  it('getCurrentUser reports suspended for a suspended account, without leaking membership data', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    expect(await service.getCurrentUser(SUSPENDED_USER)).toEqual({ status: 'suspended' });
+  });
+});
+
+describe('AuthenticationService — atomic single-use state consumption', () => {
+  it('exactly one of two concurrent callbacks carrying the same state succeeds', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await primeLoginAttempt(prisma, 'shared-state');
+
+    const results = await Promise.allSettled([
+      service.handleCallback('code-1', 'shared-state'),
+      service.handleCallback('code-1', 'shared-state'),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r) => r.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({
+      reason: 'invalid_callback',
+    });
+  });
+});
+
+describe('AuthenticationService — login-attempt retention', () => {
+  it('starting a new sign-in purges expired login attempts', async () => {
+    const { prisma, authLoginAttempts } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await prisma.authLoginAttempt.create({
+      data: {
+        state: 'long-expired',
+        nonce: 'n',
+        codeVerifier: 'v',
+        redirectUri: REDIRECT_URI,
+        expiresAt: new Date(Date.now() - 3_600_000),
+      },
+    });
+
+    await service.startLogin();
+
+    expect(authLoginAttempts.some((a) => a['state'] === 'long-expired')).toBe(false);
+  });
+
+  it('starting a new sign-in preserves other still-active login attempts', async () => {
+    const { prisma, authLoginAttempts } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await primeLoginAttempt(prisma, 'still-active');
+    await service.startLogin();
+
+    expect(authLoginAttempts.some((a) => a['state'] === 'still-active')).toBe(true);
+  });
+
+  it('purging expired attempts removes exactly the expired rows, not more', async () => {
+    const { prisma, authLoginAttempts } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await prisma.authLoginAttempt.create({
+      data: {
+        state: 'expired-1',
+        nonce: 'n',
+        codeVerifier: 'v',
+        redirectUri: REDIRECT_URI,
+        expiresAt: new Date(Date.now() - 1_000),
+      },
+    });
+    await prisma.authLoginAttempt.create({
+      data: {
+        state: 'expired-2',
+        nonce: 'n',
+        codeVerifier: 'v',
+        redirectUri: REDIRECT_URI,
+        expiresAt: new Date(Date.now() - 1_000),
+      },
+    });
+    await primeLoginAttempt(prisma, 'active-1');
+
+    await service.startLogin();
+
+    const remainingStates = authLoginAttempts.map((a) => a['state']);
+    expect(remainingStates).not.toContain('expired-1');
+    expect(remainingStates).not.toContain('expired-2');
+    expect(remainingStates).toContain('active-1');
   });
 });

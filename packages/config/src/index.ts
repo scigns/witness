@@ -232,10 +232,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
       providerConfigured &&
       value.ALLOW_EXTERNAL_MODEL_EGRESS,
     externalModelProvider: value.EXTERNAL_MODEL_PROVIDER,
-    oidcIssuer: value.OIDC_ISSUER,
-    oidcClientId: value.KEYCLOAK_CLIENT_ID,
-    oidcClientSecret: value.KEYCLOAK_CLIENT_SECRET,
-    jwtAudience: value.JWT_AUDIENCE,
+    oidcIssuer: value.OIDC_ISSUER.trim(),
+    oidcClientId: value.KEYCLOAK_CLIENT_ID.trim(),
+    oidcClientSecret: value.KEYCLOAK_CLIENT_SECRET.trim(),
+    jwtAudience: value.JWT_AUDIENCE.trim(),
     oidcRedirectUri:
       value.WITNESS_OIDC_REDIRECT_URI.trim() !== ''
         ? value.WITNESS_OIDC_REDIRECT_URI.trim()
