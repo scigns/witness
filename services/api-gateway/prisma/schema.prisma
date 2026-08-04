@@ -28,8 +28,9 @@ model Actor {
   displayName String   @map("display_name") @db.VarChar(200)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  capturedRecords Record[]     @relation("CapturedBy")
+  capturedRecords Record[]       @relation("CapturedBy")
   auditEvents     AuditEvent[]
+  evidenceLinks   EvidenceLink[] @relation("EvidenceLinkCreatedBy")
 
   @@index([kind])
   @@map("actor")
@@ -101,6 +102,8 @@ model Organisation {
   consentTemplates             ConsentTemplate[]
   sessionConsentConfigurations SessionConsentConfiguration[]
   participantConsentRecords    ParticipantConsentRecord[]
+  evidence                     Evidence[]
+  evidenceLinks                EvidenceLink[]
 
   @@map("organisation")
 }
@@ -128,6 +131,8 @@ model Workspace {
   consentTemplates             ConsentTemplate[]
   sessionConsentConfigurations SessionConsentConfiguration[]
   participantConsentRecords    ParticipantConsentRecord[]
+  evidence                     Evidence[]
+  evidenceLinks                EvidenceLink[]
 
   @@index([organisationId])
   @@map("workspace")
@@ -388,6 +393,8 @@ model CoDesignSession {
   participants              SessionParticipant[]
   consentConfiguration      SessionConsentConfiguration?
   participantConsentRecords ParticipantConsentRecord[]
+  evidence                  Evidence[]
+  evidenceLinks             EvidenceLink[]
 
   @@index([organisationId])
   @@index([workspaceId, status])
@@ -450,6 +457,7 @@ model SessionParticipant {
   version Int @default(1)
 
   consentRecords ParticipantConsentRecord[]
+  evidence       Evidence[]
 
   @@index([sessionId])
   @@index([workspaceId])
@@ -632,6 +640,138 @@ model ParticipantConsentRecord {
   @@index([workspaceId])
   @@index([consentTemplateId])
   @@map("participant_consent_record")
+}
+
+/// A single structured piece of evidence captured during an open co-design
+/// session (BUILD_ROADMAP.md Milestone 5, Structured Live Evidence Capture).
+/// See `packages/domain/src/evidence.ts`'s file header for the full design
+/// reasoning — this model exists to store, not to decide.
+///
+/// `evidenceType` is `VARCHAR`, not an enum: `EVIDENCE_TYPES` in the domain
+/// is a suggested vocabulary, not a closed gate, the same convention
+/// `session_participant.participant_type` already established.
+///
+/// `reviewStatus` stores the full seven-state vocabulary from the start
+/// (`draft`/`submitted`/`under_review`/`needs_clarification`/`validated`/
+/// `rejected`/`withdrawn`) even though Milestone 5's domain layer only
+/// transitions between three of them — the column must not need a migration
+/// when Milestone 6 adds the rest.
+///
+/// `sourceParticipantId` is nullable and deliberately has no CHECK tying it
+/// to `attributionMode` — the domain's `assertAttributionCompatibility`
+/// enforces that relationship, and Postgres CHECK constraints cannot express
+/// "this column is null if and only if that column is one of these values"
+/// without a trigger, which would duplicate logic across two layers for a
+/// rule the domain layer already owns exclusively per ADR-0003.
+///
+/// `consentBasis` and `tags` are `String[]`, not JSONB: both are flat lists
+/// of short strings the application reads and writes whole, never queried by
+/// element from SQL, so a native array column is the simpler fit — unlike
+/// `ConsentTemplate.categories`, which is a list of *objects*.
+///
+/// `withdrawalReason` is restricted, the same convention every other
+/// restricted-field column in this schema follows: the API layer only
+/// includes it in a response for a caller holding `evidence:manage_restricted`.
+model Evidence {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  evidenceType String @map("evidence_type") @db.VarChar(100)
+  title        String @db.VarChar(300)
+  content      String @db.Text
+  language     String? @db.VarChar(50)
+
+  capturedAt            DateTime @map("captured_at") @db.Timestamptz(6)
+  sessionOffsetSeconds  Int?     @map("session_offset_seconds")
+
+  sourceParticipantId String?             @map("source_participant_id") @db.Uuid
+  sourceParticipant   SessionParticipant? @relation(fields: [sourceParticipantId], references: [id], onDelete: SetNull)
+
+  attributionMode    String @map("attribution_mode") @db.VarChar(32)
+  identityVisibility String @map("identity_visibility") @db.VarChar(32)
+
+  /// Consent categories checked and allowed at capture time — a snapshot,
+  /// not a live reference. See `packages/domain/src/evidence.ts`'s file
+  /// header for why.
+  consentBasis String[] @default([]) @map("consent_basis")
+
+  reviewStatus       String @default("draft") @map("review_status") @db.VarChar(24)
+  verificationStatus String @default("unverified") @map("verification_status") @db.VarChar(16)
+
+  tags String[] @default([])
+
+  supersededByEvidenceId String?    @map("superseded_by_evidence_id") @db.Uuid
+  supersededBy           Evidence?  @relation("EvidenceSupersession", fields: [supersededByEvidenceId], references: [id], onDelete: SetNull)
+  supersedes              Evidence[] @relation("EvidenceSupersession")
+
+  withdrawnAt      DateTime? @map("withdrawn_at") @db.Timestamptz(6)
+  /// Restricted — see the model doc comment above.
+  withdrawalReason String?   @map("withdrawal_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every mutation.
+  version Int @default(1)
+
+  linksFrom EvidenceLink[] @relation("EvidenceLinkFrom")
+  linksTo   EvidenceLink[] @relation("EvidenceLinkTo")
+
+  @@index([sessionId])
+  @@index([workspaceId])
+  @@index([sourceParticipantId])
+  @@index([sessionId, reviewStatus])
+  @@map("evidence")
+}
+
+/// A typed relationship between two pieces of `Evidence` within the same
+/// session (BUILD_ROADMAP.md Milestone 5). See
+/// `packages/domain/src/evidence-link.ts`'s file header for why this is a
+/// genuine delete rather than a withdrawal, unlike `Evidence` itself.
+///
+/// The unique constraint on `(fromEvidenceId, toEvidenceId, linkType)` is
+/// the database's own backstop against the same relationship being recorded
+/// twice — the domain layer cannot check this itself (ADR-0003; it would
+/// need a database read), so `EvidenceLinkService` checks it first and this
+/// constraint is the last line of defence if that check is ever bypassed.
+model EvidenceLink {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  linkType String @map("link_type") @db.VarChar(24)
+
+  fromEvidenceId String   @map("from_evidence_id") @db.Uuid
+  fromEvidence   Evidence @relation("EvidenceLinkFrom", fields: [fromEvidenceId], references: [id], onDelete: Cascade)
+
+  toEvidenceId String   @map("to_evidence_id") @db.Uuid
+  toEvidence   Evidence @relation("EvidenceLinkTo", fields: [toEvidenceId], references: [id], onDelete: Cascade)
+
+  note String? @db.Text
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdById String   @map("created_by_id") @db.Uuid
+  createdBy   Actor    @relation("EvidenceLinkCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([fromEvidenceId, toEvidenceId, linkType])
+  @@index([sessionId])
+  @@index([toEvidenceId])
+  @@map("evidence_link")
 }
 
 /// Append-only, hash-chained audit trail (roadmap 3.7).

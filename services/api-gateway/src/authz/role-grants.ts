@@ -26,6 +26,8 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'consent_template:read',
     'session_consent:read',
     'participant_consent:read',
+    'evidence:read',
+    'evidence_link:read',
   ],
   // `session:update`/`session:transition` are workspace-wide, not
   // per-session: any contributor in a workspace's scope may rename, close,
@@ -58,6 +60,14 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
   // `consent_template:read` stays broad, like `role:read`/`session:read` —
   // understanding what a template asks for is useful to anyone who might
   // configure or capture consent against it.
+  //
+  // `evidence:*`/`evidence_link:*` (BUILD_ROADMAP.md Milestone 5, Structured
+  // Live Evidence Capture) follow the exact same precedent again: any
+  // contributor in scope may capture, edit, submit, or withdraw evidence and
+  // link it to other evidence, no per-session "assigned facilitator"
+  // ownership check. `evidence:manage_restricted` (withdrawal reasons,
+  // consent-basis provenance) is granted at this same tier, mirroring
+  // `participant:manage_restricted`/`participant_consent:manage_restricted`.
   contributor: [
     'record:read',
     'record:create',
@@ -78,6 +88,13 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'participant_consent:read',
     'participant_consent:manage',
     'participant_consent:manage_restricted',
+    'evidence:read',
+    'evidence:create',
+    'evidence:update',
+    'evidence:transition',
+    'evidence:manage_restricted',
+    'evidence_link:read',
+    'evidence_link:manage',
   ],
   reviewer: [
     'record:read',
@@ -91,6 +108,8 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'consent_template:read',
     'session_consent:read',
     'participant_consent:read',
+    'evidence:read',
+    'evidence_link:read',
   ],
   // Least privilege (Constitution, Authority and Access): organisation and
   // workspace creation are the privileged actions in this slice, so they are the
@@ -142,6 +161,13 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'participant_consent:read',
     'participant_consent:manage',
     'participant_consent:manage_restricted',
+    'evidence:read',
+    'evidence:create',
+    'evidence:update',
+    'evidence:transition',
+    'evidence:manage_restricted',
+    'evidence_link:read',
+    'evidence_link:manage',
   ],
 });
 

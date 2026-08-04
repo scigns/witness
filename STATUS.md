@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-08-04 (Milestone 4)
+**Last updated:** 2026-08-04 (Milestone 5)
 **Updated by:** CTO
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -61,11 +61,11 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 | Governance | `governance` | Governance Lead | 🟡 | Consent framework drafted; Indigenous protocols need external review |
 | Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun; Casbin-based, organisation/workspace-scoped authorisation shipped (ADR-0007); real identity is Phase 2 |
 | Infrastructure | `infrastructure` | Infrastructure Lead | 🟡 | Compose stack running; observability overlay added, wiring pending |
-| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2) and Participant Management (Milestone 3) shipped; Consent Management (Milestone 4) implemented in this PR, not yet merged |
+| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2), Participant Management (Milestone 3) and Consent Management (Milestone 4) shipped; Structured Live Evidence Capture (Milestone 5) implemented in this PR, not yet merged |
 | Knowledge graph | `knowledge-graph` | Knowledge Graph Lead | 🟡 | Ontology v0.1 in design |
 | AI platform | `ai-platform` | AI Lead | ⚪ | Awaiting Phase 5; model policy drafted |
-| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2) and participant (Milestone 3) screens shipped; consent management (Milestone 4) screens implemented in this PR, not yet merged; design system awaits Phase 6 |
-| Testing | `testing` | QA Lead | 🟡 | 553 tests across all packages (295 API-gateway, 221 domain); invariant and adversarial suites live |
+| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2), participant (Milestone 3) and consent management (Milestone 4) screens shipped; evidence capture (Milestone 5) screens implemented in this PR, not yet merged; design system awaits Phase 6 |
+| Testing | `testing` | QA Lead | 🟡 | 624 tests across all packages (321 API-gateway, 266 domain); invariant and adversarial suites live |
 | Release | `release` | Release Manager | 🟢 | Strategy and versioning defined |
 
 ---
@@ -88,6 +88,75 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-04 — Structured Live Evidence Capture delivered (BUILD_ROADMAP.md Milestone 5), PR open
+
+- **Fourth capability in the "WITNESS — COMPLETE THE REMAINING HUMAN-LED MVP" sequence.** With
+  Consent Management merged (PR #28), authorised facilitators, note-takers and configured
+  participants can now capture structured evidence — observations, quotes, ideas, concerns, needs,
+  barriers, and fourteen other suggested types — during an open co-design session. This is
+  human-led capture only: no transcription, no summarisation, no semantic search, no generative AI.
+  Those are explicit non-goals for this milestone, not gaps.
+- **Two domain aggregates** (`packages/domain/src`): `Evidence` (structured content plus the
+  privacy-critical `attributionMode` — `attributed`/`pseudonymous`/`anonymous`/
+  `facilitator_observation`/`institutional_source`/`unattributed` — and a `consentBasis` snapshot of
+  which consent categories were checked and allowed at capture time) and `EvidenceLink` (typed
+  relationships — `supports`/`contradicts`/`clarifies`/`duplicates`/`follows_from`/`related_to` —
+  between two pieces of evidence in the same session; the one aggregate in this milestone with a
+  genuine delete, since a mistaken link is noise, not history, unlike evidence content itself).
+  `Evidence` stores the full seven-state review vocabulary from the start
+  (`draft`/`submitted`/`under_review`/`needs_clarification`/`validated`/`rejected`/`withdrawn`) but
+  this milestone's mutators only reach three of them — `under_review`/`needs_clarification`/
+  `validated`/`rejected` are unreachable from this module by construction, not by a runtime guard,
+  the same "declare the vocabulary, withhold the mutator" pattern Milestone 4 used for
+  `ConsentTemplate` immutability.
+- **First real consumer of `ConsentPolicyService`.** Every participant-backed capture calls the
+  existing consent decision boundary (built, but unused, in Milestone 4) rather than duplicating its
+  logic: `mayParticipate` gates every participant-backed capture, and quotation evidence
+  additionally needs `mayAttributeQuotation`/`mayQuoteAnonymously` depending on attribution mode. A
+  refused or missing consent answer fails closed with `403 CONSENT_NOT_GRANTED` before the domain
+  layer is ever called — a consent failure is a request that should never have reached the domain,
+  not a stored invariant violation.
+- **Attribution compatibility is enforced twice, deliberately.** The domain layer
+  (`assertAttributionCompatibility`) enforces everything knowable without a database read: a
+  sourceless mode can never carry a participant reference and vice versa, an anonymous participant's
+  evidence can only be anonymous, a pseudonymous participant's evidence can never be attributed to
+  their real identity, and a `facilitator_note` can never be participant-backed at all. The service
+  layer's consent check above is the other half — neither substitutes for the other.
+- **Session lifecycle rules**: capture requires the session to be `open`; submitting a draft is
+  permitted while `open` or `closed` (a facilitator routinely files the last drafts after the room
+  empties); withdrawal is permitted in every status except `archived`. Withdrawal is a controlled
+  retraction, never destructive deletion — the row and its history remain, mirroring
+  `ParticipantConsentRecord`'s own withdrawal asymmetry, including the deliberate absence of a
+  restore function.
+- **Privacy projection**: `sourceParticipantId` is present on the wire only when `attributionMode` is
+  `attributed` — structurally absent, not merely redacted, for `pseudonymous`/`anonymous` evidence,
+  the same "absent means absent" convention every prior milestone's restricted fields use.
+  `consentBasis` and `withdrawalReason` require `evidence:manage_restricted`.
+- **Authorisation reuses the existing Casbin scope-tier boundary**: `evidence:*`/`evidence_link:*`
+  follow `session:*`/`participant_consent:*` exactly (contributor/admin write access, reader through
+  admin can read, no per-session ownership check) — reviewer also gets read access, ahead of
+  Milestone 6 (Evidence Review and Validation) needing it.
+- **API**: `evidence` (capture/list/get/history/update-draft/submit/withdraw, session-scoped) and
+  nested evidence links (list/create/remove), with duplicate-link rejection checked in the service
+  layer (a database read the domain layer may not perform) and backed by a database unique
+  constraint as the last line of defence.
+- **Frontend**: a session evidence feed at `/workspaces/:id/sessions/:sessionId/evidence` with an
+  inline quick-capture form (type, attribution, source participant when applicable, title, content)
+  built for capture-while-facilitating rather than a long form; an evidence detail page with full
+  draft editing, submit/withdraw controls, related-evidence linking, and history — linked from the
+  session detail page alongside Participants and Consent.
+- **Known limitations, named rather than hidden:** no live Postgres or Docker was available in this
+  sandbox, so the migration is hand-authored SQL (validated via `prisma validate`/`generate`, not
+  applied against a live database) and the full workflow could not be walked through in a browser —
+  same constraint every prior milestone was built under. Evidence Review (validating, disputing, or
+  moving evidence through `under_review`/`needs_clarification`) does not exist yet — Milestone 6.
+  There is no per-session "assigned facilitator" ownership check, the same named gap every prior
+  milestone carries.
+- **Verification:** `pnpm verify` (format, lint, typecheck, 624 tests across all packages — 266
+  domain (up from 221), 321 API-gateway (up from 295), 12 contracts, 25 config — build) all green.
+  `scripts/ci/check-domain-purity.sh` and `docs:lint` pass. No live Postgres/browser in this
+  sandbox — manual verification is reproducible steps only, not an executed walkthrough.
 
 ### 2026-08-04 — Consent Management delivered (BUILD_ROADMAP.md Milestone 4), PR open
 

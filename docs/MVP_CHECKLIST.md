@@ -283,11 +283,12 @@ next-action prompt.
 
 Pilot-blocking gate
 
-A facilitator can prepare a real session without an external setup spreadsheet — NOT READY.
-Session creation and lifecycle management (Milestone 2), participant management (Milestone 3), and
-consent management (Milestone 4) are all READY (above, Milestone 4 via a PR not yet merged), but
-"prepare a real session" in the pilot sense also needs structured evidence capture (Milestone 5) —
-this gate is not met until it lands.
+A facilitator can prepare a real session without an external setup spreadsheet — PARTIALLY READY.
+Session creation and lifecycle management (Milestone 2), participant management (Milestone 3),
+consent management (Milestone 4), and structured evidence capture (Milestone 5) are all now
+implemented (Milestones 4 and 5 via PRs not yet merged). This gate is not fully met until both PRs
+merge and the flow is walked through end to end against a live Postgres and browser, which this
+sandbox does not have.
 
 C.1 Participant Privacy (Milestone 3)
 
@@ -372,14 +373,16 @@ Withdrawal is visible to authorised users — READY (Consent Management PR, not 
 `withdrawnAt` is visible on the record to any `participant_consent:read` holder; the withdrawal
 *reason* is additionally restricted to `participant_consent:manage_restricted`.
 
-Processing cannot silently exceed recorded consent — READY, as a decision boundary (Consent
-Management PR, not yet merged), NOT YET WIRED to an actual processing capability. `ConsentPolicyService`
+Processing cannot silently exceed recorded consent — READY, and now wired to an actual capability
+(Structured Evidence Capture, Milestone 5, PR not yet merged). `ConsentPolicyService`
 (`services/api-gateway/src/consent/consent-policy.service.ts`) answers each processing question
 (`mayRecordAudio`, `mayProcessWithAi`, `mayPublish`, ...) fail-closed — missing, expired, withdrawn
-or superseded-without-replacement consent all deny by construction — but no capability yet calls
-it, because Structured Evidence Capture (Milestone 5), the first thing that would, does not exist.
-This item is the decision boundary a future capability cannot bypass without deliberately not
-calling it, not yet a proven end-to-end guarantee.
+or superseded-without-replacement consent all deny by construction — and `EvidenceService`
+(`services/api-gateway/src/evidence/evidence.service.ts`) now calls `mayParticipate` (every
+participant-backed capture) and `mayAttributeQuotation`/`mayQuoteAnonymously` (quotation evidence)
+before any evidence is captured, refusing with `403 CONSENT_NOT_GRANTED` rather than duplicating
+the decision logic. This is proven in the domain and service test suites, not yet through a live
+end-to-end walkthrough (no Postgres/browser in this sandbox — see Section E below).
 
 Consent changes are auditable — READY (Consent Management PR, not yet merged).
 `consent_template.created`/`.version_created`/`.activated`/`.retired`,
@@ -400,13 +403,22 @@ screen before the category form.
 
 Pilot-blocking gate
 
-Every contribution processed by Witness is covered by valid consent — NOT READY. The decision
-boundary exists and fails closed (above), but nothing calls it yet — Structured Evidence Capture
-(Milestone 5), the capability that would actually process a contribution, has not been built. This
-gate is not met until Milestone 5 exists and demonstrably calls `ConsentPolicyService` before
-recording or using anything a participant said.
+Every contribution processed by Witness is covered by valid consent — PARTIALLY READY. Structured
+Evidence Capture (Milestone 5, PR not yet merged) now exists and demonstrably calls
+`ConsentPolicyService` before capturing or editing any participant-backed evidence (test coverage:
+`services/api-gateway/src/evidence/evidence.service.test.ts`, including fail-closed cases for
+missing consent and refused quotation categories). This gate is not fully met until the PR merges
+and the flow is walked through end to end against a live Postgres and browser, which this sandbox
+does not have.
 
 E. Evidence Capture
+
+*Note: this section describes the future audio/document upload and browser-recording capability
+(post-MVP build order: Media Upload, then AI Transcription). Milestone 5 (Structured Live Evidence
+Capture, delivered above) is a distinct, human-led, text-based capability — a facilitator typing a
+structured observation, quote, or note during a session — and deliberately does not do
+transcription, recording, or file upload. None of the items below are met by Milestone 5; they
+remain unchecked until the Media Upload capability is built.*
 
 Upload
 

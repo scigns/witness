@@ -548,6 +548,116 @@ export type WithdrawParticipantConsentRequest = z.infer<
   typeof withdrawParticipantConsentRequestSchema
 >;
 
+// ─── Evidence capture (BUILD_ROADMAP.md Milestone 5) ───────────────────────────
+
+/**
+ * The evidence types a facilitator can pick from. NOT a closed enum — see
+ * `EVIDENCE_TYPES`'s doc comment in `packages/domain/src/evidence.ts` for
+ * why request schemas below accept any non-empty string, not
+ * `z.enum(SUGGESTED_EVIDENCE_TYPES)`.
+ */
+export const SUGGESTED_EVIDENCE_TYPES = [
+  'observation',
+  'quote',
+  'idea',
+  'concern',
+  'need',
+  'barrier',
+  'opportunity',
+  'risk',
+  'question',
+  'disagreement',
+  'consensus',
+  'decision_candidate',
+  'commitment_candidate',
+  'action_candidate',
+  'recommendation',
+  'facilitator_note',
+  'document_reference',
+  'link',
+  'other',
+] as const;
+
+export const EVIDENCE_REVIEW_STATUSES = [
+  'draft',
+  'submitted',
+  'under_review',
+  'needs_clarification',
+  'validated',
+  'rejected',
+  'withdrawn',
+] as const;
+export type EvidenceReviewStatus = (typeof EVIDENCE_REVIEW_STATUSES)[number];
+
+export const EVIDENCE_VERIFICATION_STATUSES = ['unverified', 'verified', 'disputed'] as const;
+export type EvidenceVerificationStatus = (typeof EVIDENCE_VERIFICATION_STATUSES)[number];
+
+export const EVIDENCE_ATTRIBUTION_MODES = [
+  'attributed',
+  'pseudonymous',
+  'anonymous',
+  'facilitator_observation',
+  'institutional_source',
+  'unattributed',
+] as const;
+export type EvidenceAttributionMode = (typeof EVIDENCE_ATTRIBUTION_MODES)[number];
+
+export const EVIDENCE_LINK_TYPES = [
+  'supports',
+  'contradicts',
+  'clarifies',
+  'duplicates',
+  'follows_from',
+  'related_to',
+] as const;
+export type EvidenceLinkType = (typeof EVIDENCE_LINK_TYPES)[number];
+
+export const captureEvidenceRequestSchema = z.object({
+  evidenceType: z.string().trim().min(1, 'An evidence type is required').max(100),
+  title: z.string().trim().min(1, 'A title is required').max(300),
+  content: z.string().trim().min(1, 'Content is required').max(20000),
+  language: z.string().trim().max(50).optional(),
+  sessionOffsetSeconds: z.number().int().min(0).optional(),
+  sourceParticipantId: z.string().uuid().optional(),
+  attributionMode: z.enum(EVIDENCE_ATTRIBUTION_MODES),
+  identityVisibility: z.enum(PARTICIPANT_IDENTITY_VISIBILITIES).optional(),
+  tags: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
+  /** `true` for the quick-capture path — submits immediately rather than saving a draft. */
+  submitImmediately: z.boolean().optional(),
+});
+export type CaptureEvidenceRequest = z.infer<typeof captureEvidenceRequestSchema>;
+
+export const updateEvidenceDraftRequestSchema = z.object({
+  evidenceType: z.string().trim().min(1).max(100).optional(),
+  title: z.string().trim().min(1).max(300).optional(),
+  content: z.string().trim().min(1).max(20000).optional(),
+  language: z.string().trim().max(50).nullable().optional(),
+  sessionOffsetSeconds: z.number().int().min(0).nullable().optional(),
+  sourceParticipantId: z.string().uuid().nullable().optional(),
+  attributionMode: z.enum(EVIDENCE_ATTRIBUTION_MODES).optional(),
+  identityVisibility: z.enum(PARTICIPANT_IDENTITY_VISIBILITIES).optional(),
+  tags: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
+  expectedVersion: z.number().int().positive(),
+});
+export type UpdateEvidenceDraftRequest = z.infer<typeof updateEvidenceDraftRequestSchema>;
+
+export const evidenceTransitionRequestSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('submit'), expectedVersion: z.number().int().positive() }),
+  z.object({
+    action: z.literal('withdraw'),
+    reason: z.string().trim().max(2000).optional(),
+    expectedVersion: z.number().int().positive(),
+  }),
+]);
+export type EvidenceTransitionRequest = z.infer<typeof evidenceTransitionRequestSchema>;
+
+export const createEvidenceLinkRequestSchema = z.object({
+  linkType: z.enum(EVIDENCE_LINK_TYPES),
+  toEvidenceId: z.string().uuid('A valid evidence id is required'),
+  note: z.string().trim().max(1000).optional(),
+});
+export type CreateEvidenceLinkRequest = z.infer<typeof createEvidenceLinkRequestSchema>;
+
 // ─── Responses ───────────────────────────────────────────────────────────────
 
 export interface ActorView {
@@ -908,6 +1018,65 @@ export interface ConsentFacilitatorDashboardView {
   sessionId: string;
   configuration: SessionConsentConfigurationView | null;
   participants: ConsentDashboardParticipantView[];
+}
+
+/**
+ * Privacy-safe general view. `sourceParticipantId` is present only when
+ * `attributionMode` is `attributed` — for every other mode it is
+ * structurally absent, not merely redacted, the same "absent means absent"
+ * convention `SessionParticipantSummary`/`ParticipantConsentRecordSummary`
+ * established. `withdrawalReason` and `consentBasis` are restricted; see
+ * `EvidenceDetail` below.
+ */
+export interface EvidenceSummary {
+  id: string;
+  sessionId: string;
+  evidenceType: string;
+  title: string;
+  attributionMode: EvidenceAttributionMode;
+  identityVisibility: ParticipantIdentityVisibility;
+  reviewStatus: EvidenceReviewStatus;
+  verificationStatus: EvidenceVerificationStatus;
+  tags: string[];
+  capturedAt: string;
+  updatedAt: string;
+  withdrawn: boolean;
+  /** Present only when `attributionMode` is `attributed`. */
+  sourceParticipantId?: string;
+}
+
+export interface EvidenceDetail extends EvidenceSummary {
+  organisationId: string;
+  workspaceId: string;
+  content: string;
+  language: string | null;
+  sessionOffsetSeconds: number | null;
+  supersededByEvidenceId: string | null;
+  withdrawnAt: string | null;
+  createdAt: string;
+  /** Optimistic-concurrency counter — send back as `expectedVersion` on the next write. */
+  version: number;
+  /** Server-computed, so a client never has to reimplement the lifecycle state machine. */
+  permittedActions: EvidenceTransitionRequest['action'][];
+  canEdit: boolean;
+  /**
+   * The consent categories checked and allowed at capture time. Present
+   * only for a caller holding `evidence:manage_restricted`.
+   */
+  consentBasis?: string[];
+  /** Present only for a caller holding `evidence:manage_restricted`. */
+  withdrawalReason?: string | null;
+}
+
+export interface EvidenceLinkView {
+  id: string;
+  sessionId: string;
+  linkType: EvidenceLinkType;
+  fromEvidenceId: string;
+  toEvidenceId: string;
+  note: string | null;
+  createdAt: string;
+  createdBy: ActorView;
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────────

@@ -33,6 +33,8 @@ export type SessionParticipantId = Branded<string, 'SessionParticipantId'>;
 export type ConsentTemplateId = Branded<string, 'ConsentTemplateId'>;
 export type SessionConsentConfigurationId = Branded<string, 'SessionConsentConfigurationId'>;
 export type ParticipantConsentRecordId = Branded<string, 'ParticipantConsentRecordId'>;
+export type EvidenceId = Branded<string, 'EvidenceId'>;
+export type EvidenceLinkId = Branded<string, 'EvidenceLinkId'>;
 
 /**
  * UUID v4/v7 shape. We accept both: v7 is time-ordered, which matters for the
@@ -124,4 +126,14 @@ export function toSessionConsentConfigurationId(value: string): SessionConsentCo
 export function toParticipantConsentRecordId(value: string): ParticipantConsentRecordId {
   assertUuid(value, 'ParticipantConsentRecordId');
   return value as ParticipantConsentRecordId;
+}
+
+export function toEvidenceId(value: string): EvidenceId {
+  assertUuid(value, 'EvidenceId');
+  return value as EvidenceId;
+}
+
+export function toEvidenceLinkId(value: string): EvidenceLinkId {
+  assertUuid(value, 'EvidenceLinkId');
+  return value as EvidenceLinkId;
 }

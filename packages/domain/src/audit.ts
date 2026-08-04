@@ -68,6 +68,13 @@ export const AUDIT_ACTIONS = [
   'participant_consent_record.captured',
   'participant_consent_record.superseded',
   'participant_consent_record.withdrawn',
+  'evidence.captured',
+  'evidence.quick_captured',
+  'evidence.updated',
+  'evidence.submitted',
+  'evidence.withdrawn',
+  'evidence_link.created',
+  'evidence_link.removed',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -92,6 +99,8 @@ export const AUDIT_SUBJECT_TYPES = [
   'consent_template',
   'session_consent_configuration',
   'participant_consent_record',
+  'evidence',
+  'evidence_link',
 ] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 

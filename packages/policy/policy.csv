@@ -65,6 +65,19 @@
 # scope may end up bound to, the same "administrative by definition"
 # reasoning as membership and role-assignment management above.
 # `consent_template:read` stays broad, like `role:read`/`session:read`.
+#
+# evidence:*/evidence_link:* (BUILD_ROADMAP.md Milestone 5, Structured Live
+# Evidence Capture): follows session:*/participant:*/session_consent:*
+# exactly — contributor and admin tiers may capture, edit, submit, withdraw
+# and link evidence, no per-session ownership check.
+# `evidence:manage_restricted` (withdrawal reasons, consent-basis
+# provenance) is granted at the same tier as `evidence:create`/`update`,
+# mirroring `participant:manage_restricted`. `evidence:read`/
+# `evidence_link:read` are granted to reviewer as well as
+# reader/contributor/admin — Milestone 6 (Evidence Review and Validation)
+# needs the reviewer tier to already be able to see evidence; Milestone 5
+# itself grants that tier no write actions, since it has nothing for a
+# reviewer to do yet.
 p, reader, record:read
 p, reader, organisation:read
 p, reader, workspace:read
@@ -74,6 +87,8 @@ p, reader, participant:read
 p, reader, consent_template:read
 p, reader, session_consent:read
 p, reader, participant_consent:read
+p, reader, evidence:read
+p, reader, evidence_link:read
 
 p, contributor, record:read
 p, contributor, record:create
@@ -94,6 +109,13 @@ p, contributor, session_consent:manage
 p, contributor, participant_consent:read
 p, contributor, participant_consent:manage
 p, contributor, participant_consent:manage_restricted
+p, contributor, evidence:read
+p, contributor, evidence:create
+p, contributor, evidence:update
+p, contributor, evidence:transition
+p, contributor, evidence:manage_restricted
+p, contributor, evidence_link:read
+p, contributor, evidence_link:manage
 
 p, reviewer, record:read
 p, reviewer, record:create
@@ -106,6 +128,8 @@ p, reviewer, participant:read
 p, reviewer, consent_template:read
 p, reviewer, session_consent:read
 p, reviewer, participant_consent:read
+p, reviewer, evidence:read
+p, reviewer, evidence_link:read
 
 p, admin, record:read
 p, admin, record:create
@@ -141,3 +165,10 @@ p, admin, session_consent:manage
 p, admin, participant_consent:read
 p, admin, participant_consent:manage
 p, admin, participant_consent:manage_restricted
+p, admin, evidence:read
+p, admin, evidence:create
+p, admin, evidence:update
+p, admin, evidence:transition
+p, admin, evidence:manage_restricted
+p, admin, evidence_link:read
+p, admin, evidence_link:manage
