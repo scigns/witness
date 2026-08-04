@@ -163,6 +163,7 @@ export default function SessionDetailPage({
 
   const submitSchedule = async () => {
     if (session === null || startAt === '') return;
+    if (endAt !== '' && endAt <= startAt) return;
     const ok = await runMutation(() =>
       api.transitionSession(
         workspaceId,
@@ -171,6 +172,11 @@ export default function SessionDetailPage({
           action: 'schedule',
           startAt: new Date(startAt).toISOString(),
           endAt: endAt === '' ? undefined : new Date(endAt).toISOString(),
+          // The IANA zone the facilitator is scheduling in — recorded
+          // explicitly rather than left implicit, so a session run in a
+          // community with a different zone displays the intended time for
+          // everyone, not just whoever's browser happened to submit this form.
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           expectedVersion: session.version,
         },
         user,
@@ -228,7 +234,11 @@ export default function SessionDetailPage({
   }
 
   const canSchedule = session.permittedTransitions.includes('scheduled');
-  const canOpen = session.permittedTransitions.includes('open');
+  // A closed session also lists 'open' among its permitted transitions (the
+  // reopen edge), but that path requires a stated reason — only the Reopen
+  // control below may use it. The plain Open button must not appear for a
+  // closed session, or it would let a facilitator bypass that requirement.
+  const canOpen = session.status !== 'closed' && session.permittedTransitions.includes('open');
   const canClose = session.permittedTransitions.includes('closed');
   const canArchive = session.permittedTransitions.includes('archived');
   const canReopen = session.status === 'closed' && session.permittedTransitions.includes('open');
@@ -440,11 +450,16 @@ export default function SessionDetailPage({
                 </div>
                 <Button
                   variant="primary"
-                  disabled={busy || startAt === ''}
+                  disabled={busy || startAt === '' || (endAt !== '' && endAt <= startAt)}
                   onClick={() => void submitSchedule()}
                 >
                   Confirm schedule
                 </Button>
+                {endAt !== '' && endAt <= startAt && (
+                  <p className="text-sm text-amber-700 dark:text-amber-400" role="alert">
+                    The end time must be after the start time.
+                  </p>
+                )}
               </div>
             )}
 

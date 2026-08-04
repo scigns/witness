@@ -262,6 +262,28 @@ describe('lifecycle transitions', () => {
     expect(() => archiveSession(draftSession(), HUMAN, NOW)).toThrow(/to 'archived'/i);
   });
 
+  it("ATTACK — rejects opening a closed session through openSession — that path must go through reopenSession's human-actor and stated-reason guard", () => {
+    const open = openSession(draftSession(), HUMAN, NOW).session;
+    const closed = closeSession(open, HUMAN, NOW).session;
+    expect(() => openSession(closed, HUMAN, NOW)).toThrow(/from 'closed'/i);
+  });
+
+  it('ATTACK — rejects reopening a session that was never closed', () => {
+    expect(() => reopenSession(draftSession(), HUMAN, 'Reason.', NOW)).toThrow(
+      /reopen a session from 'draft'/i,
+    );
+
+    const scheduled = scheduleSession(
+      draftSession(),
+      HUMAN,
+      { startAt: new Date('2026-04-01T09:00:00Z'), endAt: null, timezone: null },
+      NOW,
+    ).session;
+    expect(() => reopenSession(scheduled, HUMAN, 'Reason.', NOW)).toThrow(
+      /reopen a session from 'scheduled'/i,
+    );
+  });
+
   it('reopens a closed session with a stated reason, clearing closedAt', () => {
     const open = openSession(draftSession(), HUMAN, NOW).session;
     const closed = closeSession(open, HUMAN, NOW).session;

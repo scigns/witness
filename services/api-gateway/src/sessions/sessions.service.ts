@@ -27,6 +27,7 @@ import {
   canCaptureEvidence,
   changeSessionFacilitator,
   closeSession,
+  isInGoodStanding,
   openSession,
   permittedSessionTransitions,
   reopenSession,
@@ -41,6 +42,7 @@ import {
   type Actor,
   type CoDesignSession,
   type CoDesignSessionOutcome,
+  type MembershipState,
   type SessionDeliveryMode,
   type SessionParticipantVisibility,
 } from '@witness/domain';
@@ -58,14 +60,14 @@ import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import type { Principal } from '../authz/authorization.port.js';
 
-const LIFECYCLE_ACTIONS = new Set([
+const LIFECYCLE_ACTIONS = [
   'co_design_session.created',
   'co_design_session.scheduled',
   'co_design_session.opened',
   'co_design_session.closed',
   'co_design_session.reopened',
   'co_design_session.archived',
-]);
+] as const;
 
 @Injectable()
 export class SessionsService {
@@ -94,24 +96,26 @@ export class SessionsService {
     await this.requireSessionRow(workspaceId, sessionId);
 
     const events = await this.prisma.auditEvent.findMany({
-      where: { subjectType: 'co_design_session', subjectId: sessionId },
+      where: {
+        subjectType: 'co_design_session',
+        subjectId: sessionId,
+        action: { in: [...LIFECYCLE_ACTIONS] },
+      },
       orderBy: { occurredAt: 'asc' },
       include: { actor: true },
     });
 
-    return events
-      .filter((event) => LIFECYCLE_ACTIONS.has(event.action))
-      .map((event) => ({
-        id: event.id,
-        action: event.action,
-        actor: {
-          id: event.actor.id,
-          kind: event.actor.kind as SessionLifecycleEventView['actor']['kind'],
-          displayName: event.actor.displayName,
-        },
-        occurredAt: event.occurredAt.toISOString(),
-        metadata: (event.metadata ?? {}) as Record<string, string>,
-      }));
+    return events.map((event) => ({
+      id: event.id,
+      action: event.action,
+      actor: {
+        id: event.actor.id,
+        kind: event.actor.kind as SessionLifecycleEventView['actor']['kind'],
+        displayName: event.actor.displayName,
+      },
+      occurredAt: event.occurredAt.toISOString(),
+      metadata: (event.metadata ?? {}) as Record<string, string>,
+    }));
   }
 
   // ─── Writes ───────────────────────────────────────────────────────────────
@@ -122,7 +126,7 @@ export class SessionsService {
     principal: Principal,
   ): Promise<CoDesignSessionDetail> {
     const workspace = await this.requireWorkspace(workspaceId);
-    await this.requireUser(request.primaryFacilitatorId);
+    await this.requireFacilitator(workspace.organisationId, request.primaryFacilitatorId);
 
     const actor = await resolveActor(this.prisma, principal);
     const now = new Date();
@@ -159,10 +163,11 @@ export class SessionsService {
    * operations (`updateSessionDetails`/`changeSessionFacilitator`), each
    * emitting its own audit event — never merged into one, so the audit
    * trail always names exactly what happened. When a request carries both,
-   * they are applied as two sequential, independently version-checked
-   * writes: the second uses the version the first one just produced, so a
-   * client sending both in one call sees the same atomicity guarantee as
-   * sending either alone.
+   * both domain calls run first (so a `DomainError` from either reaches the
+   * client with nothing persisted), and both writes plus both audit events
+   * commit inside the single transaction `applyOutcomes` opens — a second
+   * writer's concurrent change can only ever reject the whole request, never
+   * leave one half durable and the other rejected.
    */
   async update(
     workspaceId: string,
@@ -197,16 +202,15 @@ export class SessionsService {
     }
 
     if (hasFacilitatorChange) {
-      await this.requireUser(request.primaryFacilitatorId!);
+      await this.requireFacilitator(session.organisationId, request.primaryFacilitatorId!);
     }
 
-    let expectedVersion = request.expectedVersion;
+    const outcomes: CoDesignSessionOutcome[] = [];
 
     if (hasDetailChanges) {
       const outcome = updateSessionDetails(session, actor, detailPatch, now);
-      await this.applyOutcome(sessionId, expectedVersion, outcome, now);
+      outcomes.push(outcome);
       session = outcome.session;
-      expectedVersion = outcome.session.version;
     }
 
     if (hasFacilitatorChange) {
@@ -216,8 +220,10 @@ export class SessionsService {
         toUserId(request.primaryFacilitatorId!),
         now,
       );
-      await this.applyOutcome(sessionId, expectedVersion, outcome, now);
+      outcomes.push(outcome);
     }
+
+    await this.applyOutcomes(sessionId, request.expectedVersion, outcomes, now);
 
     return this.get(workspaceId, sessionId);
   }
@@ -235,7 +241,7 @@ export class SessionsService {
 
     const outcome = this.applyTransition(current, action, actor, now);
 
-    await this.applyOutcome(sessionId, action.expectedVersion, outcome, now);
+    await this.applyOutcomes(sessionId, action.expectedVersion, [outcome], now);
 
     return this.get(workspaceId, sessionId);
   }
@@ -270,42 +276,59 @@ export class SessionsService {
         return reopenSession(session, actor, action.reason, at);
       case 'archive':
         return archiveSession(session, actor, at);
+      default: {
+        // Exhaustiveness guard: a new SessionTransitionRequest variant that
+        // forgets a case here fails to compile, rather than silently falling
+        // through to whatever `applyOutcomes` does with `undefined`.
+        const unreachable: never = action;
+        throw new Error(`Unhandled session transition: ${JSON.stringify(unreachable)}`);
+      }
     }
   }
 
   /**
-   * Write a domain outcome back, conditioned on the version the client last
-   * saw. `updateMany`'s `WHERE` clause is the entire concurrency check: it
-   * is the row's version *as the client believes it to be*
-   * (`expectedVersion`), not the version this method just read — matching
-   * zero rows means someone else's write landed since the client's last
-   * read, and the whole transaction (including the audit event) rolls back
-   * rather than recording a change that was rejected.
+   * Write one or more domain outcomes back in a single transaction,
+   * conditioned on the version the client last saw. `updateMany`'s `WHERE`
+   * clause is the entire concurrency check for the first write: it is the
+   * row's version *as the client believes it to be* (`expectedVersion`), not
+   * the version this method just read — matching zero rows means someone
+   * else's write landed since the client's last read. Each subsequent
+   * outcome in the list chains onto the version the previous one produced,
+   * so a caller combining several domain operations into one request (e.g.
+   * `update`'s detail-and-facilitator case) gets one all-or-nothing write:
+   * a conflict on any outcome rolls back every write and every audit event
+   * in the whole call, never leaving an earlier one durable and a later one
+   * rejected.
    */
-  private async applyOutcome(
+  private async applyOutcomes(
     sessionId: string,
-    expectedVersion: number,
-    outcome: CoDesignSessionOutcome,
+    firstExpectedVersion: number,
+    outcomes: readonly CoDesignSessionOutcome[],
     at: Date,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      const result = await tx.coDesignSession.updateMany({
-        where: { id: sessionId, version: expectedVersion },
-        data: toUpdateRow(outcome.session),
-      });
+      let expectedVersion = firstExpectedVersion;
 
-      if (result.count === 0) {
-        throw new ConflictException({
-          error: {
-            code: 'STALE_VERSION',
-            message:
-              'This session was changed by someone else since you last loaded it. ' +
-              'Reload and try again.',
-          },
+      for (const outcome of outcomes) {
+        const result = await tx.coDesignSession.updateMany({
+          where: { id: sessionId, version: expectedVersion },
+          data: toUpdateRow(outcome.session),
         });
-      }
 
-      await appendAuditEvent(tx, 'co_design_session', sessionId, outcome.event, at);
+        if (result.count === 0) {
+          throw new ConflictException({
+            error: {
+              code: 'STALE_VERSION',
+              message:
+                'This session was changed by someone else since you last loaded it. ' +
+                'Reload and try again.',
+            },
+          });
+        }
+
+        await appendAuditEvent(tx, 'co_design_session', sessionId, outcome.event, at);
+        expectedVersion = outcome.session.version;
+      }
     });
   }
 
@@ -326,16 +349,30 @@ export class SessionsService {
     return workspace;
   }
 
-  private async requireUser(userId: string): Promise<{ id: string }> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  /**
+   * A session's facilitator must be a member in good standing of the
+   * session's own organisation — not merely any registered user. Checking
+   * only that the user id exists (as a plain `user.findUnique` would) lets a
+   * caller name someone from a completely unrelated organisation as the
+   * facilitator of a session they have no relationship to; scoping the
+   * lookup to `OrganisationMembership` closes that.
+   */
+  private async requireFacilitator(organisationId: string, userId: string): Promise<void> {
+    const membership = await this.prisma.organisationMembership.findUnique({
+      where: { organisationId_userId: { organisationId, userId } },
+      select: { state: true },
+    });
 
-    if (user === null) {
+    if (membership === null || !isInGoodStanding(membership.state as MembershipState)) {
       throw new NotFoundException({
-        error: { code: 'USER_NOT_FOUND', message: `No user with id '${userId}'.` },
+        error: {
+          code: 'FACILITATOR_NOT_ELIGIBLE',
+          message:
+            `User '${userId}' is not a member in good standing of organisation ` +
+            `'${organisationId}', and cannot be the primary facilitator of a session there.`,
+        },
       });
     }
-
-    return user;
   }
 
   private async requireSessionRow(workspaceId: string, sessionId: string): Promise<SessionRow> {

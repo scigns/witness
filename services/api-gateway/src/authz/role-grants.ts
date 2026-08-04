@@ -17,6 +17,11 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
   // membership and role-*assignment* management, which stay admin-only
   // below for the same "administrative by definition" reasoning as ever.
   reader: ['record:read', 'organisation:read', 'workspace:read', 'role:read', 'session:read'],
+  // `session:update`/`session:transition` are workspace-wide, not
+  // per-session: any contributor in a workspace's scope may rename, close,
+  // reopen, or archive any session there, not only ones they facilitate.
+  // There is no "assigned facilitator" ownership check in Milestone 2 — see
+  // packages/policy/policy.csv's header comment for the full reasoning.
   contributor: [
     'record:read',
     'record:create',

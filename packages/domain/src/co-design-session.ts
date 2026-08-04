@@ -512,13 +512,20 @@ export function unscheduleSession(
   };
 }
 
-/** Open a session for live facilitation. Permitted from `draft` or `scheduled`. */
+/**
+ * Open a session for live facilitation. Permitted from `draft` or
+ * `scheduled` only — checked explicitly rather than via
+ * `canTransitionSession(status, 'open')`, because that shared table also
+ * carries the `closed -> open` edge for `reopenSession` below. Delegating
+ * here would let a closed session skip `reopenSession`'s human-actor and
+ * stated-reason guard simply by calling this function instead.
+ */
 export function openSession(
   session: CoDesignSession,
   actor: Actor,
   at: Date,
 ): CoDesignSessionOutcome {
-  if (!canTransitionSession(session.status, 'open')) {
+  if (session.status !== 'draft' && session.status !== 'scheduled') {
     throw new InvariantViolation(
       `Cannot move a session from '${session.status}' to 'open'.`,
       'INVALID_SESSION_TRANSITION',
@@ -578,7 +585,9 @@ export function closeSession(
  * Reopen a closed session. Requires a human actor and a stated reason —
  * this reverses "the workshop is over," which is an institutional decision
  * exactly like `reopenRecord`'s reversal of a review decision, and gets the
- * same guardrail.
+ * same guardrail. Checks `session.status === 'closed'` explicitly rather
+ * than the shared `canTransitionSession` table — see `openSession`'s
+ * comment for why the two guards must not share that check.
  */
 export function reopenSession(
   session: CoDesignSession,
@@ -590,7 +599,7 @@ export function reopenSession(
     throw new HumanConfirmationRequired(actor.kind);
   }
 
-  if (!canTransitionSession(session.status, 'open')) {
+  if (session.status !== 'closed') {
     throw new InvariantViolation(
       `Cannot reopen a session from '${session.status}'.`,
       'INVALID_SESSION_TRANSITION',

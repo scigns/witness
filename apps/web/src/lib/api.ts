@@ -295,7 +295,7 @@ export const api = {
     user: ActingUser,
   ): Promise<{ sessions: CoDesignSessionSummary[] }> =>
     request<{ sessions: CoDesignSessionSummary[] }>(
-      `/api/v1/workspaces/${workspaceId}/sessions`,
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions`,
       user,
     ),
 
@@ -304,17 +304,21 @@ export const api = {
     sessionId: string,
     user: ActingUser,
   ): Promise<CoDesignSessionDetail> =>
-    request<CoDesignSessionDetail>(`/api/v1/workspaces/${workspaceId}/sessions/${sessionId}`, user),
+    request<CoDesignSessionDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}`,
+      user,
+    ),
 
   createSession: (
     workspaceId: string,
     body: CreateCoDesignSessionRequest,
     user: ActingUser,
   ): Promise<CoDesignSessionDetail> =>
-    request<CoDesignSessionDetail>(`/api/v1/workspaces/${workspaceId}/sessions`, user, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+    request<CoDesignSessionDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
 
   updateSession: (
     workspaceId: string,
@@ -323,7 +327,7 @@ export const api = {
     user: ActingUser,
   ): Promise<CoDesignSessionDetail> =>
     request<CoDesignSessionDetail>(
-      `/api/v1/workspaces/${workspaceId}/sessions/${sessionId}`,
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}`,
       user,
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
@@ -331,13 +335,13 @@ export const api = {
   transitionSession: (
     workspaceId: string,
     sessionId: string,
-    action: SessionTransitionRequest,
+    body: SessionTransitionRequest,
     user: ActingUser,
   ): Promise<CoDesignSessionDetail> =>
     request<CoDesignSessionDetail>(
-      `/api/v1/workspaces/${workspaceId}/sessions/${sessionId}/transition`,
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/transition`,
       user,
-      { method: 'POST', body: JSON.stringify(action) },
+      { method: 'POST', body: JSON.stringify(body) },
     ),
 
   getSessionHistory: (
@@ -346,7 +350,7 @@ export const api = {
     user: ActingUser,
   ): Promise<{ events: SessionLifecycleEventView[] }> =>
     request<{ events: SessionLifecycleEventView[] }>(
-      `/api/v1/workspaces/${workspaceId}/sessions/${sessionId}/history`,
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/history`,
       user,
     ),
 };

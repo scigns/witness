@@ -3,13 +3,15 @@
 /**
  * Create a co-design session (BUILD_ROADMAP.md Milestone 2).
  *
- * The facilitator picker is restricted to this workspace's members —
- * convenience only, the same reasoning `WorkspacePage`'s eligible-member
- * filter uses: the API would refuse a facilitator id from outside the
- * workspace regardless of what this dropdown offers, because
- * `SessionsService.create` validates the user exists but does not (yet)
- * require workspace membership — a known limitation named in this
- * milestone's PR, not hidden by only showing members here.
+ * The facilitator picker is restricted to workspace members whose
+ * membership is in good standing (`invited`/`active`) — the same
+ * `GOOD_STANDING` filter `WorkspacePage` applies to its own member
+ * dropdown. This is a display convenience, not the enforcement point:
+ * `SessionsService` independently requires the chosen facilitator to be a
+ * member in good standing of the session's *organisation* (not
+ * specifically this workspace) before accepting the request, so a stale or
+ * manipulated selection here can never grant anything the server would
+ * refuse.
  */
 
 import { useRouter } from 'next/navigation';
@@ -17,6 +19,7 @@ import { use, useEffect, useState, type FormEvent } from 'react';
 
 import {
   SUGGESTED_SESSION_TYPES,
+  type MembershipState,
   type SessionDeliveryMode,
   type WorkspaceMembershipView,
 } from '@witness/contracts';
@@ -24,6 +27,8 @@ import {
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { Button, Card, ErrorNotice } from '@/components/ui';
+
+const GOOD_STANDING: ReadonlySet<MembershipState> = new Set<MembershipState>(['invited', 'active']);
 
 const DELIVERY_MODE_LABELS: Record<SessionDeliveryMode, string> = {
   in_person: 'In person',
@@ -76,8 +81,9 @@ export default function NewSessionPage({ params }: { params: Promise<{ id: strin
       try {
         const result = await api.listWorkspaceMemberships(workspaceId, user);
         if (cancelled) return;
-        setMembers(result.memberships);
-        setPrimaryFacilitatorId((current) => current || (result.memberships[0]?.userId ?? ''));
+        const eligible = result.memberships.filter((member) => GOOD_STANDING.has(member.state));
+        setMembers(eligible);
+        setPrimaryFacilitatorId((current) => current || (eligible[0]?.userId ?? ''));
       } catch (caught) {
         if (cancelled) return;
         setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');

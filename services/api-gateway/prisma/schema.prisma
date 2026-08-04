@@ -363,7 +363,7 @@ model CoDesignSession {
 
   status String @db.VarChar(16)
 
-  supportedLanguages        String[] @map("supported_languages")
+  supportedLanguages        String[] @default([]) @map("supported_languages")
   culturalProtocolNotes     String?  @map("cultural_protocol_notes") @db.Text
   participantVisibility     String   @map("participant_visibility") @db.VarChar(32)
   consentConfigurationState String   @default("not_configured") @map("consent_configuration_state") @db.VarChar(24)

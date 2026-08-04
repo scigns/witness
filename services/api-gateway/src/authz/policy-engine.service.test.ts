@@ -71,6 +71,8 @@ describe('PolicyEngineService — real policy data', () => {
     const engine = await loadedEngine();
     expect(await engine.grants('reviewer', 'session:read')).toBe(true);
     expect(await engine.grants('reviewer', 'session:create')).toBe(false);
+    expect(await engine.grants('reviewer', 'session:update')).toBe(false);
+    expect(await engine.grants('reviewer', 'session:transition')).toBe(false);
   });
 
   it('admin holds every session action', async () => {

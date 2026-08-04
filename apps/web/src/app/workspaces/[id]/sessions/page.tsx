@@ -85,7 +85,7 @@ export default function WorkspaceSessionsPage({ params }: { params: Promise<{ id
         </Link>
       </div>
 
-      {sessions.length === 0 ? (
+      {error !== null ? null : sessions.length === 0 ? (
         <Card>
           <p className="text-sm text-[var(--color-ink-muted)]">
             No sessions yet. Create one to start preparing a co-design workshop.

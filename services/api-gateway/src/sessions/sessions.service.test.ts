@@ -35,7 +35,10 @@ function fakePrisma() {
     { id: WORKSPACE_1, organisationId: ORG_1 },
     { id: WORKSPACE_2, organisationId: ORG_1 },
   ];
-  const users: Record<string, unknown>[] = [{ id: USER_1 }, { id: USER_2 }];
+  const organisationMemberships: Record<string, unknown>[] = [
+    { organisationId: ORG_1, userId: USER_1, state: 'active' },
+    { organisationId: ORG_1, userId: USER_2, state: 'active' },
+  ];
   const sessions: Record<string, unknown>[] = [];
   const actors: Record<string, unknown>[] = [];
   const auditEvents: Record<string, unknown>[] = [];
@@ -47,9 +50,17 @@ function fakePrisma() {
         return row === undefined ? null : { ...row };
       },
     },
-    user: {
-      findUnique: async ({ where }: { where: { id: string } }) => {
-        const row = users.find((u) => u['id'] === where.id);
+    organisationMembership: {
+      findUnique: async ({
+        where,
+      }: {
+        where: { organisationId_userId: { organisationId: string; userId: string } };
+      }) => {
+        const row = organisationMemberships.find(
+          (m) =>
+            m['organisationId'] === where.organisationId_userId.organisationId &&
+            m['userId'] === where.organisationId_userId.userId,
+        );
         return row === undefined ? null : { ...row };
       },
     },
@@ -96,10 +107,17 @@ function fakePrisma() {
         );
         return matching.at(-1) ?? null;
       },
-      findMany: async ({ where }: { where: { subjectType: string; subjectId: string } }) =>
+      findMany: async ({
+        where,
+      }: {
+        where: { subjectType: string; subjectId: string; action?: { in: readonly string[] } };
+      }) =>
         auditEvents
           .filter(
-            (e) => e['subjectType'] === where.subjectType && e['subjectId'] === where.subjectId,
+            (e) =>
+              e['subjectType'] === where.subjectType &&
+              e['subjectId'] === where.subjectId &&
+              (where.action === undefined || where.action.in.includes(e['action'] as string)),
           )
           .map((e) => ({ ...e, actor: actors.find((a) => a['id'] === e['actorId']) })),
       create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -107,7 +125,27 @@ function fakePrisma() {
         return { ...data };
       },
     },
-    $transaction: async <T>(fn: (tx: typeof prisma) => Promise<T>) => fn(prisma),
+    // Snapshot-and-restore gives the double the one transaction property the
+    // service actually depends on: a throwing callback leaves no trace. Real
+    // Prisma rolls back on a thrown error; a double that just calls `fn`
+    // straight through would let every "rejected write" test pass for the
+    // wrong reason, since nothing was ever committed to roll back.
+    $transaction: async <T>(fn: (tx: typeof prisma) => Promise<T>): Promise<T> => {
+      const snapshot = {
+        sessions: sessions.map((s) => ({ ...s })),
+        actors: actors.map((a) => ({ ...a })),
+        auditEvents: auditEvents.map((e) => ({ ...e })),
+      };
+
+      try {
+        return await fn(prisma);
+      } catch (error) {
+        sessions.splice(0, sessions.length, ...snapshot.sessions);
+        actors.splice(0, actors.length, ...snapshot.actors);
+        auditEvents.splice(0, auditEvents.length, ...snapshot.auditEvents);
+        throw error;
+      }
+    },
   };
 
   return { prisma: prisma as unknown as PrismaService, sessions, auditEvents };
@@ -318,6 +356,16 @@ describe('SessionsService lifecycle transitions', () => {
         FACILITATOR,
       ),
     ).rejects.toThrow(DomainError);
+
+    for (const action of ['open', 'close', 'reopen', 'archive'] as const) {
+      const body =
+        action === 'reopen'
+          ? { action, reason: 'Reason.', expectedVersion: archived.version }
+          : { action, expectedVersion: archived.version };
+      await expect(service.transition(WORKSPACE_1, created.id, body, FACILITATOR)).rejects.toThrow(
+        DomainError,
+      );
+    }
   });
 });
 
@@ -374,6 +422,41 @@ describe('SessionsService optimistic concurrency', () => {
     expect(updated.title).toBe('Renamed');
     expect(updated.primaryFacilitatorId).toBe(USER_2);
     expect(updated.version).toBe(created.version + 2);
+  });
+
+  it('ATTACK — a combined detail-and-facilitator update is all-or-nothing: a conflict on the second write leaves the first write unpersisted too', async () => {
+    const { prisma } = fakePrisma();
+    const service = new SessionsService(prisma);
+    const created = await service.create(WORKSPACE_1, createRequest(), FACILITATOR);
+
+    // Force only the *second* internal write (the facilitator change) to
+    // report a version conflict, simulating another writer landing between
+    // the two chained writes inside the same transaction.
+    let calls = 0;
+    const realUpdateMany = prisma.coDesignSession.updateMany.bind(prisma.coDesignSession);
+    prisma.coDesignSession.updateMany = (async (args: Parameters<typeof realUpdateMany>[0]) => {
+      calls += 1;
+      if (calls === 2) return { count: 0 };
+      return realUpdateMany(args);
+    }) as typeof realUpdateMany;
+
+    await expect(
+      service.update(
+        WORKSPACE_1,
+        created.id,
+        {
+          title: 'Should not stick',
+          primaryFacilitatorId: USER_2,
+          expectedVersion: created.version,
+        },
+        FACILITATOR,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    const reloaded = await service.get(WORKSPACE_1, created.id);
+    expect(reloaded.title).toBe(created.title);
+    expect(reloaded.primaryFacilitatorId).toBe(created.primaryFacilitatorId);
+    expect(reloaded.version).toBe(created.version);
   });
 
   it('rejects an update with no fields changed', async () => {

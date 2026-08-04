@@ -14,6 +14,11 @@
  * bundled under one `POST :sessionId/transition` endpoint behind a single
  * `session:transition` permission — the same shape `RecordsController`
  * uses for `record:review`'s submit/confirm/correct/reject/reopen family.
+ *
+ * Every `workspaceId`/`sessionId` path parameter goes through
+ * `ParseUUIDPipe`, so a malformed id is a 400 here rather than an
+ * unhandled 500 from Prisma rejecting a non-UUID value against a
+ * `@db.Uuid` column.
  */
 
 import {
@@ -23,6 +28,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Req,
@@ -54,7 +60,7 @@ export class SessionsController {
   @Get()
   @Requires('session:read')
   async list(
-    @Param('workspaceId') workspaceId: string,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
   ): Promise<{ sessions: CoDesignSessionSummary[] }> {
     return { sessions: await this.sessions.list(workspaceId) };
   }
@@ -62,8 +68,8 @@ export class SessionsController {
   @Get(':sessionId')
   @Requires('session:read')
   async get(
-    @Param('workspaceId') workspaceId: string,
-    @Param('sessionId') sessionId: string,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
   ): Promise<CoDesignSessionDetail> {
     return this.sessions.get(workspaceId, sessionId);
   }
@@ -71,8 +77,8 @@ export class SessionsController {
   @Get(':sessionId/history')
   @Requires('session:read')
   async history(
-    @Param('workspaceId') workspaceId: string,
-    @Param('sessionId') sessionId: string,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
   ): Promise<{ events: SessionLifecycleEventView[] }> {
     return { events: await this.sessions.history(workspaceId, sessionId) };
   }
@@ -80,7 +86,7 @@ export class SessionsController {
   @Post()
   @Requires('session:create')
   async create(
-    @Param('workspaceId') workspaceId: string,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Body() body: unknown,
     @Req() request: RequestWithPrincipal,
   ): Promise<CoDesignSessionDetail> {
@@ -104,8 +110,8 @@ export class SessionsController {
   @Patch(':sessionId')
   @Requires('session:update')
   async update(
-    @Param('workspaceId') workspaceId: string,
-    @Param('sessionId') sessionId: string,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @Body() body: unknown,
     @Req() request: RequestWithPrincipal,
   ): Promise<CoDesignSessionDetail> {
@@ -130,8 +136,8 @@ export class SessionsController {
   @HttpCode(200)
   @Requires('session:transition')
   async transition(
-    @Param('workspaceId') workspaceId: string,
-    @Param('sessionId') sessionId: string,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @Body() body: unknown,
     @Req() request: RequestWithPrincipal,
   ): Promise<CoDesignSessionDetail> {

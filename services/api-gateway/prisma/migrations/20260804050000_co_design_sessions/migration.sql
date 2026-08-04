@@ -14,7 +14,7 @@ CREATE TABLE "co_design_session" (
     "timezone" VARCHAR(64),
     "primary_facilitator_id" UUID NOT NULL,
     "status" VARCHAR(16) NOT NULL,
-    "supported_languages" TEXT[],
+    "supported_languages" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     "cultural_protocol_notes" TEXT,
     "participant_visibility" VARCHAR(32) NOT NULL,
     "consent_configuration_state" VARCHAR(24) NOT NULL DEFAULT 'not_configured',

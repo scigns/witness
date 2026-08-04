@@ -211,7 +211,7 @@ export const sessionTransitionRequestSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('close'), expectedVersion: z.number().int().positive() }),
   z.object({
     action: z.literal('reopen'),
-    reason: z.string().trim().min(1, 'A reason is required'),
+    reason: z.string().trim().min(1, 'A reason is required').max(2000),
     expectedVersion: z.number().int().positive(),
   }),
   z.object({ action: z.literal('archive'), expectedVersion: z.number().int().positive() }),

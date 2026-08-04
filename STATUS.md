@@ -110,9 +110,10 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   `consentConfigurationState` IS stored (`not_configured` at creation) because Milestone 4 (Consent)
   will need to set it independently of lifecycle status, but gets no mutator of its own yet — a
   named, deliberate gap, not an oversight.
-- **Optimistic concurrency, new to this codebase.** Every session mutation carries a client-supplied
-  `expectedVersion`; the persistence-layer write is a single conditional `updateMany({ where: { id,
-  version: expectedVersion } })`, and zero rows matched is a `409 STALE_VERSION` — the entire
+- **Optimistic concurrency, new to this codebase.** Every update and transition of an existing
+  session carries a client-supplied `expectedVersion`; the persistence-layer write is a single
+  conditional `updateMany({ where: { id, version: expectedVersion } })`, and zero rows matched is a
+  `409 STALE_VERSION` — the entire
   transaction, including the audit event, rolls back rather than silently overwriting a change the
   client never saw. `sessions.service.test.ts` verifies the case that actually matters: a client
   acting on a version it read *before* someone else's write landed is rejected identically whether
