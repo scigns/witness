@@ -59,7 +59,14 @@ export type Action =
   | 'session_consent:manage'
   | 'participant_consent:read'
   | 'participant_consent:manage'
-  | 'participant_consent:manage_restricted';
+  | 'participant_consent:manage_restricted'
+  | 'evidence:read'
+  | 'evidence:create'
+  | 'evidence:update'
+  | 'evidence:transition'
+  | 'evidence:manage_restricted'
+  | 'evidence_link:read'
+  | 'evidence_link:manage';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;

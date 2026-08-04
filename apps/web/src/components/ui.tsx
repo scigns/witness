@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 
 import type {
+  EvidenceReviewStatus,
   MembershipState,
   ParticipantAttendanceStatus,
   ParticipantInvitationStatus,
@@ -181,6 +182,42 @@ export function ParticipantAttendanceBadge({ status }: { status: ParticipantAtte
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${ATTENDANCE_STATUS_CLASSES[status]}`}
     >
       {ATTENDANCE_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+/**
+ * Only the three states Milestone 5 can actually produce
+ * (`draft`/`submitted`/`withdrawn`) get a distinct look here — the four
+ * Milestone 6 review states exist in the type but render with a neutral
+ * fallback, since no evidence in this milestone can ever reach them.
+ */
+const EVIDENCE_REVIEW_STATUS_LABELS: Record<EvidenceReviewStatus, string> = {
+  draft: 'Draft',
+  submitted: 'Submitted',
+  under_review: 'Under review',
+  needs_clarification: 'Needs clarification',
+  validated: 'Validated',
+  rejected: 'Rejected',
+  withdrawn: 'Withdrawn',
+};
+
+const EVIDENCE_REVIEW_STATUS_CLASSES: Record<EvidenceReviewStatus, string> = {
+  draft: 'border-current text-[var(--color-ink-muted)]',
+  submitted: 'border-amber-600 text-amber-700 dark:text-amber-400',
+  under_review: 'border-amber-600 text-amber-700 dark:text-amber-400',
+  needs_clarification: 'border-amber-600 text-amber-700 dark:text-amber-400',
+  validated: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  rejected: 'border-red-700 text-red-700 dark:text-red-400',
+  withdrawn: 'border-current text-[var(--color-ink-muted)] line-through',
+};
+
+export function EvidenceReviewStatusBadge({ status }: { status: EvidenceReviewStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${EVIDENCE_REVIEW_STATUS_CLASSES[status]}`}
+    >
+      {EVIDENCE_REVIEW_STATUS_LABELS[status]}
     </span>
   );
 }

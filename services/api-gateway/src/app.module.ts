@@ -27,6 +27,9 @@ import { SessionBackedAuthorizationAdapter } from './authz/session-backed.adapte
 import { ConsentPolicyService } from './consent/consent-policy.service.js';
 import { ConsentTemplatesController } from './consent-templates/consent-templates.controller.js';
 import { ConsentTemplatesService } from './consent-templates/consent-templates.service.js';
+import { EvidenceController } from './evidence/evidence.controller.js';
+import { EvidenceLinkService } from './evidence/evidence-link.service.js';
+import { EvidenceService } from './evidence/evidence.service.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
 import { OrganisationMembershipsController } from './organisation-memberships/organisation-memberships.controller.js';
@@ -73,6 +76,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     ConsentTemplatesController,
     SessionConsentConfigurationController,
     ParticipantConsentRecordsController,
+    EvidenceController,
     AuthenticationController,
     CurrentUserController,
   ],
@@ -92,6 +96,8 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     ConsentPolicyService,
     SessionConsentConfigurationService,
     ParticipantConsentRecordsService,
+    EvidenceService,
+    EvidenceLinkService,
     SessionService,
     RoleResolutionService,
     PolicyEngineService,

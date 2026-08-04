@@ -21,14 +21,20 @@ import type {
   ConsentTemplateAction,
   ConsentTemplateDetail,
   ConsentTemplateSummary,
+  CaptureEvidenceRequest,
   CreateCoDesignSessionRequest,
   CreateConsentTemplateRequest,
   CreateConsentTemplateVersionRequest,
+  CreateEvidenceLinkRequest,
   CreateOrganisationRequest,
   CreateRecordRequest,
   CreateUserRequest,
   CreateWorkspaceRequest,
   CurrentUserView,
+  EvidenceDetail,
+  EvidenceLinkView,
+  EvidenceSummary,
+  EvidenceTransitionRequest,
   HealthResponse,
   MembershipAction,
   OrganisationMembershipView,
@@ -47,6 +53,7 @@ import type {
   SessionParticipantTransitionRequest,
   SessionTransitionRequest,
   UpdateCoDesignSessionRequest,
+  UpdateEvidenceDraftRequest,
   UpdateParticipantNotesRequest,
   UpdateSessionParticipantRequest,
   UserSummary,
@@ -632,6 +639,121 @@ export const api = {
       `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}/consent/withdraw`,
       user,
       { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  listEvidence: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+    filter?: { reviewStatus?: string; evidenceType?: string },
+  ): Promise<{ evidence: EvidenceSummary[] }> => {
+    const query = new URLSearchParams();
+    if (filter?.reviewStatus !== undefined) query.set('reviewStatus', filter.reviewStatus);
+    if (filter?.evidenceType !== undefined) query.set('evidenceType', filter.evidenceType);
+    const queryString = query.toString();
+    return request<{ evidence: EvidenceSummary[] }>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence${queryString === '' ? '' : `?${queryString}`}`,
+      user,
+    );
+  },
+
+  getEvidence: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    user: ActingUser,
+  ): Promise<EvidenceDetail> =>
+    request<EvidenceDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}`,
+      user,
+    ),
+
+  getEvidenceHistory: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    user: ActingUser,
+  ): Promise<{
+    events: { id: string; action: string; occurredAt: string; metadata: Record<string, string> }[];
+  }> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/history`,
+      user,
+    ),
+
+  captureEvidence: (
+    workspaceId: string,
+    sessionId: string,
+    body: CaptureEvidenceRequest,
+    user: ActingUser,
+  ): Promise<EvidenceDetail> =>
+    request<EvidenceDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateEvidenceDraft: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    body: UpdateEvidenceDraftRequest,
+    user: ActingUser,
+  ): Promise<EvidenceDetail> =>
+    request<EvidenceDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  transitionEvidence: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    body: EvidenceTransitionRequest,
+    user: ActingUser,
+  ): Promise<EvidenceDetail> =>
+    request<EvidenceDetail>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/transition`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  listEvidenceLinks: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    user: ActingUser,
+  ): Promise<{ links: EvidenceLinkView[] }> =>
+    request<{ links: EvidenceLinkView[] }>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/links`,
+      user,
+    ),
+
+  createEvidenceLink: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    body: CreateEvidenceLinkRequest,
+    user: ActingUser,
+  ): Promise<EvidenceLinkView> =>
+    request<EvidenceLinkView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/links`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  removeEvidenceLink: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    linkId: string,
+    user: ActingUser,
+  ): Promise<void> =>
+    request<void>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/links/${encodeURIComponent(linkId)}`,
+      user,
+      { method: 'DELETE' },
     ),
 };
 
