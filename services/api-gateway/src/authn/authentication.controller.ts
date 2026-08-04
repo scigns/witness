@@ -17,6 +17,7 @@
 import {
   BadRequestException,
   Controller,
+  ForbiddenException,
   Get,
   Inject,
   Post,
@@ -118,6 +119,21 @@ export class AuthenticationController {
       });
     }
 
+    // This file's own header promises every redirect target is the fixed
+    // web origin or a fixed path under it — never caller-supplied. Without
+    // this check, `redirect_uri` here would be the one exception: a crafted
+    // link could send a developer following it to an arbitrary origin. The
+    // route is development-profile-only, so the blast radius is a local
+    // dev machine, but the promise should hold without a footnote.
+    if (redirectUri !== this.config.oidcRedirectUri) {
+      throw new BadRequestException({
+        error: {
+          code: 'MALFORMED_REQUEST',
+          message: 'redirect_uri does not match the configured callback URI.',
+        },
+      });
+    }
+
     // No real consent screen: a query-param-selectable test identity, with a
     // clearly-fake default. This is the one place this file trusts caller
     // input outright — acceptable only because the whole class this belongs
@@ -154,25 +170,53 @@ export class CurrentUserController {
   @Get()
   async me(@Req() request: Request): Promise<CurrentUserView> {
     const token = bearerToken(request);
-    const userId = token === null ? null : await this.sessions.resolveUserId(token);
-
-    if (userId === null) {
+    if (token === null) {
       throw new UnauthorizedException({
         error: { code: 'UNAUTHENTICATED', message: 'No valid session. Sign in first.' },
       });
     }
 
-    const currentUser = await this.authentication.getCurrentUser(userId);
-    if (currentUser === null) {
+    const session = await this.sessions.resolveSession(token);
+    if (session.status === 'not_found') {
       throw new UnauthorizedException({
-        error: {
-          code: 'UNAUTHENTICATED',
-          message: 'This session no longer maps to a valid account.',
-        },
+        error: { code: 'UNAUTHENTICATED', message: 'No valid session. Sign in first.' },
+      });
+    }
+    if (session.status === 'expired') {
+      throw new UnauthorizedException({
+        error: { code: 'SESSION_EXPIRED', message: 'Your session has expired. Sign in again.' },
       });
     }
 
-    return currentUser;
+    const currentUser = await this.authentication.getCurrentUser(session.userId);
+    switch (currentUser.status) {
+      case 'ok':
+        return currentUser.view;
+      case 'not_found':
+        // The session token was valid, but its account no longer is —
+        // defensive only: `AuthSession.user` has `onDelete: Restrict`, so a
+        // User row referenced by a live session cannot normally be deleted.
+        throw new UnauthorizedException({
+          error: {
+            code: 'UNKNOWN_ACCOUNT',
+            message: 'This session no longer maps to a valid account.',
+          },
+        });
+      case 'suspended':
+        throw new ForbiddenException({
+          error: {
+            code: 'ACCOUNT_SUSPENDED',
+            message: 'This account has been suspended. Contact an administrator.',
+          },
+        });
+      case 'deactivated':
+        throw new ForbiddenException({
+          error: {
+            code: 'ACCOUNT_DEACTIVATED',
+            message: 'This account has been deactivated. Contact an administrator.',
+          },
+        });
+    }
   }
 }
 

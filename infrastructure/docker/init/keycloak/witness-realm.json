@@ -1,0 +1,58 @@
+{
+  "realm": "witness",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "clients": [
+    {
+      "clientId": "witness-api",
+      "name": "Witness API",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:3001/api/v1/auth/callback"],
+      "webOrigins": ["http://localhost:3000"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "witness-dev-tester",
+      "email": "roletest@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Dev",
+      "lastName": "Tester",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "change-me-in-every-environment",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "witness-dev-unknown",
+      "email": "unregistered@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Unregistered",
+      "lastName": "Person",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "change-me-in-every-environment",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

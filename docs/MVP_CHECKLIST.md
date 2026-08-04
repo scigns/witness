@@ -162,13 +162,15 @@ without a domain or API change.
 
 Pilot-blocking gate
 
-A real user can sign in and access only an authorised workspace — READY (Authentication PR, not
-yet merged). Verified manually end-to-end through a real browser: signed-in `GET /api/v1/me` (and
-the dashboard's "Your access" section that renders it) lists only the organisations and workspaces
-the signed-in user actually belongs to, never the full catalog — confirmed against a user with a
-narrower membership set than the database's full contents. **Caveat, stated plainly:** this gate is
-about *visibility*, not full request-time enforcement — see Known limitations below for the
-authorisation-hardening gap this PR deliberately does not close.
+A real user can sign in and see only the organisations and workspaces they actually belong to —
+READY (Authentication PR, not yet merged). Verified manually end-to-end through a real browser:
+signed-in `GET /api/v1/me` (and the dashboard's "Your access" section that renders it) lists only
+the organisations and workspaces the signed-in user actually belongs to, never the full catalog —
+confirmed against a user with a narrower membership set than the database's full contents. **This
+is membership-based *visibility*, not request-time *authorization*** — workspace and organisation
+APIs do not yet enforce the session principal's scope on every action, only `GET /api/v1/me` and
+what it renders. Full request-time enforcement is Authorisation hardening's job (the next
+capability); see Known limitations below.
 
 **Mark these DONE only after the Authentication PR merges to `main` and the workflow is
 re-verified on the deployable version** — this checklist is a binary release gate, not a

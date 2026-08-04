@@ -91,6 +91,16 @@ export class SessionAuthenticator {
     };
   }
 
+  /**
+   * `AuthorizationGuard` calls `authenticate` on every guarded request, so
+   * this is on the hot path. Re-verifying each assignment's backing
+   * membership one query at a time — as an earlier version of this method
+   * did — costs one sequential round trip to PostgreSQL per role
+   * assignment a user holds, before any handler runs. Collecting the
+   * distinct organisation/workspace ids up front and resolving standing
+   * with two batched `findMany` calls keeps the cost constant in the
+   * number of *distinct scopes queried*, not the number of assignments.
+   */
   private async effectiveRoleGrantTiers(userId: string): Promise<string[]> {
     const assignments = await this.prisma.roleAssignment.findMany({
       where: { userId },
@@ -99,17 +109,52 @@ export class SessionAuthenticator {
 
     if (assignments.length === 0) return [];
 
+    const organisationIds = [
+      ...new Set(
+        assignments.map((a) => a.organisationId).filter((id): id is string => id !== null),
+      ),
+    ];
+    const workspaceIds = [
+      ...new Set(assignments.map((a) => a.workspaceId).filter((id): id is string => id !== null)),
+    ];
+
     // Re-verify the membership backing each assignment is still in good
     // standing — a role assignment survives a later membership suspension
     // as a *record*, but must not go on granting access once the
     // membership it depends on has lapsed.
+    const [organisationMemberships, workspaceMemberships] = await Promise.all([
+      organisationIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.organisationMembership.findMany({
+            where: { userId, organisationId: { in: organisationIds } },
+            select: { organisationId: true, state: true },
+          }),
+      workspaceIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.workspaceMembership.findMany({
+            where: { userId, workspaceId: { in: workspaceIds } },
+            select: { workspaceId: true, state: true },
+          }),
+    ]);
+
+    const goodOrganisations = new Set(
+      organisationMemberships
+        .filter((m) => isInGoodStanding(m.state as MembershipState))
+        .map((m) => m.organisationId),
+    );
+    const goodWorkspaces = new Set(
+      workspaceMemberships
+        .filter((m) => isInGoodStanding(m.state as MembershipState))
+        .map((m) => m.workspaceId),
+    );
+
     const tiers = new Set<string>();
 
     for (const assignment of assignments) {
       const inGoodStanding =
         assignment.organisationId !== null
-          ? await this.organisationMembershipInGoodStanding(userId, assignment.organisationId)
-          : await this.workspaceMembershipInGoodStanding(userId, assignment.workspaceId!);
+          ? goodOrganisations.has(assignment.organisationId)
+          : assignment.workspaceId !== null && goodWorkspaces.has(assignment.workspaceId);
 
       if (!inGoodStanding) continue;
 
@@ -118,27 +163,5 @@ export class SessionAuthenticator {
     }
 
     return [...tiers];
-  }
-
-  private async organisationMembershipInGoodStanding(
-    userId: string,
-    organisationId: string,
-  ): Promise<boolean> {
-    const membership = await this.prisma.organisationMembership.findUnique({
-      where: { organisationId_userId: { organisationId, userId } },
-      select: { state: true },
-    });
-    return membership !== null && isInGoodStanding(membership.state as MembershipState);
-  }
-
-  private async workspaceMembershipInGoodStanding(
-    userId: string,
-    workspaceId: string,
-  ): Promise<boolean> {
-    const membership = await this.prisma.workspaceMembership.findUnique({
-      where: { workspaceId_userId: { workspaceId, userId } },
-      select: { state: true },
-    });
-    return membership !== null && isInGoodStanding(membership.state as MembershipState);
   }
 }

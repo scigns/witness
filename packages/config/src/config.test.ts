@@ -145,6 +145,54 @@ describe('OIDC identity provider (ADR-0007)', () => {
     });
     expect(config.oidcRedirectUri).toBe('https://witness.gov.example/api/v1/auth/callback');
   });
+
+  it('trims whitespace from OIDC configuration values before storing them', () => {
+    const config = loadConfig({
+      ...oidcBase,
+      WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+      OIDC_ISSUER: '  https://keycloak.example.org/realms/witness  ',
+      KEYCLOAK_CLIENT_ID: '  witness-api  ',
+      KEYCLOAK_CLIENT_SECRET: '  a-secret  ',
+      JWT_AUDIENCE: '  witness-api  ',
+    });
+    // Untrimmed, these would break `.well-known/openid-configuration` fetches
+    // (built from oidcIssuer) and every ID-token audience check (jwtAudience) —
+    // see the KeycloakOidcAdapter and health.controller.ts call sites.
+    expect(config.oidcIssuer).toBe('https://keycloak.example.org/realms/witness');
+    expect(config.oidcClientId).toBe('witness-api');
+    expect(config.oidcClientSecret).toBe('a-secret');
+    expect(config.jwtAudience).toBe('witness-api');
+  });
+
+  it('rejects OIDC_ISSUER that is whitespace-only outside development', () => {
+    expect(() =>
+      loadConfig({
+        ...oidcBase,
+        WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+        OIDC_ISSUER: '   ',
+      }),
+    ).toThrow(/requires OIDC_ISSUER/i);
+  });
+
+  it('rejects KEYCLOAK_CLIENT_ID that is whitespace-only outside development', () => {
+    expect(() =>
+      loadConfig({
+        ...oidcBase,
+        WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+        KEYCLOAK_CLIENT_ID: '   ',
+      }),
+    ).toThrow(/requires KEYCLOAK_CLIENT_ID/i);
+  });
+
+  it('rejects JWT_AUDIENCE that is whitespace-only outside development', () => {
+    expect(() =>
+      loadConfig({
+        ...oidcBase,
+        WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+        JWT_AUDIENCE: '   ',
+      }),
+    ).toThrow(/requires JWT_AUDIENCE/i);
+  });
 });
 
 describe('development profile (ADR-0013)', () => {

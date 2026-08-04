@@ -11,6 +11,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
 import {
@@ -81,6 +82,15 @@ export class AuthenticationService {
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = codeChallengeFor(codeVerifier);
 
+    // Opportunistic cleanup: `GET /api/v1/auth/login` is unauthenticated, so
+    // this table would otherwise grow without bound from abandoned attempts
+    // (nobody ever completed the callback) as well as merely-expired ones.
+    // A dedicated scheduled job is documented for production (see
+    // docs/engineering/DEVELOPER_ONBOARDING.md) — this keeps the table
+    // bounded even without one, at the cost of one small indexed delete per
+    // sign-in start.
+    await this.prisma.authLoginAttempt.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+
     await this.prisma.authLoginAttempt.create({
       data: {
         state,
@@ -106,13 +116,21 @@ export class AuthenticationService {
       throw new AuthenticationDeniedError('Missing code or state.', 'invalid_callback');
     }
 
-    const attempt = await this.prisma.authLoginAttempt.findUnique({ where: { state } });
-
-    // Single-use: deleted the moment it is read, whether or not the rest of
-    // this method succeeds. A replayed callback finds nothing.
-    if (attempt !== null) {
-      await this.prisma.authLoginAttempt.delete({ where: { state } });
-    }
+    // Single-use, consumed atomically: the DELETE *is* the claim. `findUnique`
+    // followed by a separate `delete` would let two concurrent callbacks
+    // carrying the same `state` both read the row before either deleted it,
+    // and both would then proceed to code exchange. Only the caller whose
+    // DELETE actually removes a row may continue — a losing concurrent
+    // caller, or a replay after the row is already gone, gets Prisma's
+    // "record not found" (P2025), which reads identically to "never existed".
+    const attempt = await this.prisma.authLoginAttempt
+      .delete({ where: { state } })
+      .catch((error: unknown) => {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+          return null;
+        }
+        throw error;
+      });
 
     if (attempt === null || attempt.expiresAt.getTime() < Date.now()) {
       throw new AuthenticationDeniedError(
@@ -302,10 +320,20 @@ export class AuthenticationService {
    * The signed-in user's own identity plus only what they actually have
    * access to — organisations and workspaces they hold a membership in
    * good standing for, never the full catalog.
+   *
+   * A *session token* can outlive the account it belongs to becoming
+   * suspended or deactivated after sign-in — `SessionService` only checks
+   * token validity and expiry, not account state. Distinguishing that case
+   * here (rather than silently returning the view, or collapsing it into
+   * the same "not signed in" response as a missing session) is what lets
+   * `CurrentUserController` tell a suspended user something true instead of
+   * a generic "sign in again".
    */
-  async getCurrentUser(userId: string): Promise<CurrentUserView | null> {
+  async getCurrentUser(userId: string): Promise<CurrentUserResult> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (user === null) return null;
+    if (user === null) return { status: 'not_found' };
+    if (user.accountState === 'suspended') return { status: 'suspended' };
+    if (user.accountState === 'deactivated') return { status: 'deactivated' };
 
     const [organisationMemberships, workspaceMemberships] = await Promise.all([
       this.prisma.organisationMembership.findMany({
@@ -319,25 +347,35 @@ export class AuthenticationService {
     ]);
 
     return {
-      id: user.id,
-      displayName: user.displayName,
-      email: user.email,
-      accountState: user.accountState as AccountState,
-      organisations: organisationMemberships
-        .filter((m) => isInGoodStanding(m.state as MembershipState))
-        .map((m) => ({
-          id: m.organisation.id,
-          name: m.organisation.name,
-          createdAt: m.organisation.createdAt.toISOString(),
-        })),
-      workspaces: workspaceMemberships
-        .filter((m) => isInGoodStanding(m.state as MembershipState))
-        .map((m) => ({
-          id: m.workspace.id,
-          name: m.workspace.name,
-          organisationId: m.workspace.organisationId,
-          createdAt: m.workspace.createdAt.toISOString(),
-        })),
+      status: 'ok',
+      view: {
+        id: user.id,
+        displayName: user.displayName,
+        email: user.email,
+        accountState: user.accountState as AccountState,
+        organisations: organisationMemberships
+          .filter((m) => isInGoodStanding(m.state as MembershipState))
+          .map((m) => ({
+            id: m.organisation.id,
+            name: m.organisation.name,
+            createdAt: m.organisation.createdAt.toISOString(),
+          })),
+        workspaces: workspaceMemberships
+          .filter((m) => isInGoodStanding(m.state as MembershipState))
+          .map((m) => ({
+            id: m.workspace.id,
+            name: m.workspace.name,
+            organisationId: m.workspace.organisationId,
+            createdAt: m.workspace.createdAt.toISOString(),
+          })),
+      },
     };
   }
 }
+
+/** Discriminated so `CurrentUserController` can map each case to a distinct, honest response. */
+export type CurrentUserResult =
+  | { readonly status: 'ok'; readonly view: CurrentUserView }
+  | { readonly status: 'not_found' }
+  | { readonly status: 'suspended' }
+  | { readonly status: 'deactivated' };

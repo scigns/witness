@@ -104,48 +104,73 @@ describe('the authorization-code-with-PKCE flow, end to end, against real signed
   });
 
   it('ATTACK — rejects a token with the wrong issuer', async () => {
-    const idp = adapter();
-    const { nonce } = await completeSignIn(idp);
-
-    // Force a mismatched issuer by verifying against a differently-issued
-    // instance's token — same underlying jose issuer check KeycloakOidcAdapter uses.
+    // Both adapters share a key pair, so the signature verifies — only the
+    // issuer claim can fail. Without the shared key, `jwtVerify` rejects on
+    // signature before ever reaching the issuer check, and this test would
+    // pass for the wrong reason (as it previously did).
+    const keyPair = await generateKeyPair('RS256');
+    const idp = new DevelopmentIdentityProviderAdapter(
+      'development',
+      API_ORIGIN,
+      AUDIENCE,
+      keyPair,
+    );
     const otherIdp = new DevelopmentIdentityProviderAdapter(
       'development',
       'http://localhost:9999',
       AUDIENCE,
+      keyPair,
     );
+
+    const { nonce } = await completeSignIn(idp);
     const { idToken } = await completeSignIn(otherIdp, { subject: 'x' });
 
-    await expect(idp.verifyIdToken(idToken, nonce)).rejects.toThrow();
+    await expect(idp.verifyIdToken(idToken, nonce)).rejects.toMatchObject({
+      code: 'ERR_JWT_CLAIM_VALIDATION_FAILED',
+      claim: 'iss',
+    });
   });
 
   it('ATTACK — rejects a token with the wrong audience', async () => {
-    const idp = new DevelopmentIdentityProviderAdapter('development', API_ORIGIN, 'witness-api');
+    // Same reasoning as the issuer test — a shared key pair means only the
+    // audience claim can be the reason `jwtVerify` rejects.
+    const keyPair = await generateKeyPair('RS256');
+    const idp = new DevelopmentIdentityProviderAdapter(
+      'development',
+      API_ORIGIN,
+      'witness-api',
+      keyPair,
+    );
     const otherAudienceIdp = new DevelopmentIdentityProviderAdapter(
       'development',
       API_ORIGIN,
       'some-other-client',
+      keyPair,
     );
 
-    // Both adapters share the issuer host but sign for different audiences —
-    // verifying wrongAudience's token against `idp`'s expected audience must fail.
     const { idToken, nonce } = await completeSignIn(otherAudienceIdp);
-    await expect(idp.verifyIdToken(idToken, nonce)).rejects.toThrow();
+    await expect(idp.verifyIdToken(idToken, nonce)).rejects.toMatchObject({
+      code: 'ERR_JWT_CLAIM_VALIDATION_FAILED',
+      claim: 'aud',
+    });
   });
 
   it('ATTACK — rejects an expired token', async () => {
-    const idp = adapter();
+    // Signed with the exact key pair `idp` verifies against, so the
+    // signature is valid — only the (already-past) expiration claim can be
+    // the reason verification fails. `exchangeCode` always mints a 5-minute
+    // token, so there is no way to reach an expired token through the
+    // adapter's own public surface; minting one directly with the shared
+    // key via jose is the only way to test this claim specifically.
+    const keyPair = await generateKeyPair('RS256');
+    const idp = new DevelopmentIdentityProviderAdapter(
+      'development',
+      API_ORIGIN,
+      AUDIENCE,
+      keyPair,
+    );
     const nonce = generateNonce();
-    // Bypass registerAuthorizationAttempt to control expiry directly — the
-    // private key is only reachable through the adapter's own signing path,
-    // so we sign an already-expired token via the same mechanism exchangeCode
-    // would use, by constructing a second short-lived adapter instance is not
-    // possible (keys are private); instead assert real expiry by waiting past
-    // a token minted with an already-past expiration time is not achievable
-    // without internal access, so this test uses jose directly against the
-    // adapter's own verification contract via a forged (differently-keyed)
-    // expired token, which must fail for the same "cannot verify" reason.
-    const { privateKey } = await generateKeyPair('RS256');
+
     const expired = await new SignJWT({ nonce, email: 'x@example.com', email_verified: true })
       .setProtectedHeader({ alg: 'RS256' })
       .setSubject('x')
@@ -153,9 +178,11 @@ describe('the authorization-code-with-PKCE flow, end to end, against real signed
       .setAudience(AUDIENCE)
       .setIssuedAt(Math.floor(Date.now() / 1000) - 3600)
       .setExpirationTime(Math.floor(Date.now() / 1000) - 1800)
-      .sign(privateKey);
+      .sign(keyPair.privateKey);
 
-    await expect(idp.verifyIdToken(expired, nonce)).rejects.toThrow();
+    await expect(idp.verifyIdToken(expired, nonce)).rejects.toMatchObject({
+      code: 'ERR_JWT_EXPIRED',
+    });
   });
 
   it('ATTACK — rejects a token whose nonce does not match the sign-in attempt', async () => {

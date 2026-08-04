@@ -9,14 +9,15 @@
  * provider has authenticated the person.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-import { authApi } from '@/lib/api';
+import { api, authApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { Card } from '@/components/ui';
 
 export default function SignInPage() {
   const { status, currentUser } = useAuth();
+  const [developmentProfile, setDevelopmentProfile] = useState(false);
 
   useEffect(() => {
     if (status === 'authenticated' && currentUser !== null) {
@@ -24,9 +25,28 @@ export default function SignInPage() {
     }
   }, [status, currentUser]);
 
+  useEffect(() => {
+    // Best-effort — a failed health check here just means the notice below
+    // doesn't render, never that sign-in is blocked.
+    api
+      .health()
+      .then((health) => setDevelopmentProfile(health.profile === 'development'))
+      .catch(() => undefined);
+  }, []);
+
   return (
     <div className="mx-auto max-w-md space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+      {developmentProfile && (
+        <div
+          role="status"
+          className="rounded border border-[var(--color-line)] bg-[var(--color-accent-soft)] px-3 py-2 text-sm"
+        >
+          <strong>Development identity provider active.</strong> This instance signs you in against
+          a local, unverified test identity — not a real Keycloak. Never exposed outside the
+          development profile.
+        </div>
+      )}
       <Card className="space-y-4">
         <p className="text-sm text-[var(--color-ink-muted)]">
           Sign in with your organisation&apos;s identity provider. Witness never sees or stores your

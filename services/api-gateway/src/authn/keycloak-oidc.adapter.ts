@@ -29,12 +29,36 @@ interface DiscoveryDocument {
   readonly jwks_uri: string;
 }
 
+const DISCOVERY_REQUIRED_FIELDS = ['authorization_endpoint', 'token_endpoint', 'jwks_uri'] as const;
+
+/**
+ * Node's global `fetch` applies no default timeout. `discover()` and
+ * `exchangeCode()` both run on the request path for every sign-in, so a
+ * Keycloak that accepts the TCP connection and then stalls would otherwise
+ * hold those requests open indefinitely rather than failing fast.
+ */
+const OIDC_HTTP_TIMEOUT_MS = 5_000;
+
+/**
+ * How long a successful discovery document is trusted before the next call
+ * re-fetches it. Keycloak's own discovery document is effectively static
+ * per realm, so this is not about picking up frequent changes — it is
+ * bounded refresh so a realm reconfiguration (a rotated endpoint, a moved
+ * JWKS URI) is eventually picked up by a long-running process without a
+ * restart, rather than being cached forever.
+ */
+const DISCOVERY_CACHE_TTL_MS = 60 * 60_000;
+
 @Injectable()
 export class KeycloakOidcAdapter extends IdentityProviderPort {
   readonly provider = 'keycloak';
 
   private readonly logger = new Logger(KeycloakOidcAdapter.name);
-  private discovery: DiscoveryDocument | null = null;
+  // Cache the in-flight *promise*, not the resolved value — assigning only
+  // after the fetch resolves would let every concurrent sign-in on a cold
+  // adapter issue its own duplicate discovery request.
+  private discovery: Promise<DiscoveryDocument> | null = null;
+  private discoveryExpiresAt = 0;
   private jwks: JWTVerifyGetKey | null = null;
 
   constructor(
@@ -61,17 +85,43 @@ export class KeycloakOidcAdapter extends IdentityProviderPort {
   }
 
   private async discover(): Promise<DiscoveryDocument> {
-    if (this.discovery !== null) return this.discovery;
-
-    const response = await fetch(`${this.issuer}/.well-known/openid-configuration`);
-    if (!response.ok) {
-      throw new Error(
-        `Could not fetch the OIDC discovery document from '${this.issuer}' ` +
-          `(HTTP ${response.status}). Is the identity provider reachable and is OIDC_ISSUER correct?`,
-      );
+    if (this.discovery !== null && Date.now() < this.discoveryExpiresAt) {
+      return this.discovery;
     }
 
-    this.discovery = (await response.json()) as DiscoveryDocument;
+    this.discoveryExpiresAt = Date.now() + DISCOVERY_CACHE_TTL_MS;
+    this.discovery = (async () => {
+      const response = await fetch(`${this.issuer}/.well-known/openid-configuration`, {
+        signal: AbortSignal.timeout(OIDC_HTTP_TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        throw new Error(
+          `Could not fetch the OIDC discovery document from '${this.issuer}' ` +
+            `(HTTP ${response.status}). Is the identity provider reachable and is OIDC_ISSUER correct?`,
+        );
+      }
+
+      const document = (await response.json()) as Partial<DiscoveryDocument>;
+      for (const field of DISCOVERY_REQUIRED_FIELDS) {
+        if (typeof document[field] !== 'string' || document[field].trim() === '') {
+          throw new Error(
+            `OIDC discovery document from '${this.issuer}' is missing required field '${field}'.`,
+          );
+        }
+      }
+
+      return document as DiscoveryDocument;
+    })().catch((error: unknown) => {
+      // Do not cache a failed discovery — the next call must retry rather
+      // than being stuck reusing a rejected promise forever. This never
+      // weakens verification: a failed discovery means `getJwks()` and
+      // `buildAuthorizationRequest()` fail closed (they throw, sign-in
+      // does not proceed), never that issuer/audience/signature/JWKS
+      // checks are skipped.
+      this.discovery = null;
+      throw error;
+    });
+
     return this.discovery;
   }
 
@@ -126,6 +176,7 @@ export class KeycloakOidcAdapter extends IdentityProviderPort {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
+      signal: AbortSignal.timeout(OIDC_HTTP_TIMEOUT_MS),
     });
 
     if (!response.ok) {
