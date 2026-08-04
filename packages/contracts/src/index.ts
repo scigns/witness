@@ -218,6 +218,157 @@ export const sessionTransitionRequestSchema = z.discriminatedUnion('action', [
 ]);
 export type SessionTransitionRequest = z.infer<typeof sessionTransitionRequestSchema>;
 
+// ─── Session participants (BUILD_ROADMAP.md Milestone 3) ──────────────────────
+
+export const PARTICIPANT_IDENTITY_MODES = ['named', 'pseudonymous', 'anonymous'] as const;
+export type ParticipantIdentityMode = (typeof PARTICIPANT_IDENTITY_MODES)[number];
+
+export const PARTICIPANT_IDENTITY_VISIBILITIES = [
+  'visible_to_all_participants',
+  'facilitators_only',
+] as const;
+export type ParticipantIdentityVisibility = (typeof PARTICIPANT_IDENTITY_VISIBILITIES)[number];
+
+export const PARTICIPATION_MODES = [
+  'in_person',
+  'online',
+  'hybrid',
+  'asynchronous',
+  'proxy',
+  'other',
+] as const;
+export type ParticipationMode = (typeof PARTICIPATION_MODES)[number];
+
+export const PARTICIPANT_INVITATION_STATUSES = [
+  'not_invited',
+  'invited',
+  'accepted',
+  'declined',
+  'cancelled',
+] as const;
+export type ParticipantInvitationStatus = (typeof PARTICIPANT_INVITATION_STATUSES)[number];
+
+export const PARTICIPANT_ATTENDANCE_STATUSES = [
+  'expected',
+  'present',
+  'absent',
+  'partially_attended',
+  'withdrawn',
+] as const;
+export type ParticipantAttendanceStatus = (typeof PARTICIPANT_ATTENDANCE_STATUSES)[number];
+
+export const PARTICIPANT_CONSENT_STATUS_SUMMARIES = ['not_configured'] as const;
+export type ParticipantConsentStatusSummary = (typeof PARTICIPANT_CONSENT_STATUS_SUMMARIES)[number];
+
+/**
+ * A suggested starting point for the frontend's participant-type picker —
+ * NOT a closed enum, same reasoning as `SUGGESTED_SESSION_TYPES`. Never
+ * confuse this with a `WitnessRole` (`role.ts`): "interpreter" is a role a
+ * person plays in a specific session, not a system authorisation grant.
+ */
+export const SUGGESTED_PARTICIPANT_TYPES = [
+  'facilitator',
+  'participant',
+  'community_representative',
+  'government_representative',
+  'civil_society_representative',
+  'researcher',
+  'subject_matter_expert',
+  'interpreter',
+  'observer',
+  'note_taker',
+  'other',
+] as const;
+
+export const addSessionParticipantRequestSchema = z.object({
+  linkedUserId: z.string().uuid().optional(),
+  displayName: z.string().trim().min(1).max(200).optional(),
+  preferredName: z.string().trim().max(200).optional(),
+  pronouns: z.string().trim().max(50).optional(),
+  affiliation: z.string().trim().max(300).optional(),
+  participantType: z.string().trim().min(1, 'A participant type is required').max(100),
+  participationMode: z.enum(PARTICIPATION_MODES),
+  identityMode: z.enum(PARTICIPANT_IDENTITY_MODES),
+  identityVisibility: z.enum(PARTICIPANT_IDENTITY_VISIBILITIES).optional(),
+  languagePreference: z.string().trim().max(50).optional(),
+  accessibilityRequirements: z.string().trim().max(2000).optional(),
+});
+export type AddSessionParticipantRequest = z.infer<typeof addSessionParticipantRequestSchema>;
+
+export const updateSessionParticipantRequestSchema = z.object({
+  displayName: z.string().trim().min(1).max(200).optional(),
+  preferredName: z.string().trim().max(200).nullable().optional(),
+  pronouns: z.string().trim().max(50).nullable().optional(),
+  affiliation: z.string().trim().max(300).nullable().optional(),
+  participantType: z.string().trim().min(1).max(100).optional(),
+  participationMode: z.enum(PARTICIPATION_MODES).optional(),
+  languagePreference: z.string().trim().max(50).nullable().optional(),
+  accessibilityRequirements: z.string().trim().max(2000).nullable().optional(),
+  expectedVersion: z.number().int().positive(),
+});
+export type UpdateSessionParticipantRequest = z.infer<typeof updateSessionParticipantRequestSchema>;
+
+/**
+ * Restricted — a caller needs `participant:manage_restricted`, not merely
+ * `participant:update`, to reach this. Separate schema/endpoint from the
+ * general update above so that permission is enforced independently, not
+ * bundled into an action a lower-privileged caller might also send.
+ */
+export const updateParticipantNotesRequestSchema = z.object({
+  facilitatorNotes: z.string().trim().max(5000).nullable(),
+  expectedVersion: z.number().int().positive(),
+});
+export type UpdateParticipantNotesRequest = z.infer<typeof updateParticipantNotesRequestSchema>;
+
+/**
+ * Mirrors `sessionTransitionRequestSchema`: every state change that is not a
+ * free-form field edit is a named action here, one endpoint, so the
+ * lifecycle rules live in one place instead of being reimplemented per
+ * route. `link_user`/`unlink_user` are bundled in even though they are not
+ * strictly a state machine, for the same "one small transition surface"
+ * reasoning.
+ */
+export const sessionParticipantTransitionRequestSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('invite'), expectedVersion: z.number().int().positive() }),
+  z.object({
+    action: z.literal('accept_invitation'),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({
+    action: z.literal('decline_invitation'),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({
+    action: z.literal('cancel_invitation'),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({
+    action: z.literal('record_attendance'),
+    status: z.enum(PARTICIPANT_ATTENDANCE_STATUSES),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({
+    action: z.literal('change_identity_visibility'),
+    identityVisibility: z.enum(PARTICIPANT_IDENTITY_VISIBILITIES),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({
+    action: z.literal('link_user'),
+    linkedUserId: z.string().uuid('A valid user id is required'),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({ action: z.literal('unlink_user'), expectedVersion: z.number().int().positive() }),
+  z.object({
+    action: z.literal('withdraw'),
+    reason: z.string().trim().max(2000).optional(),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({ action: z.literal('restore'), expectedVersion: z.number().int().positive() }),
+]);
+export type SessionParticipantTransitionRequest = z.infer<
+  typeof sessionParticipantTransitionRequestSchema
+>;
+
 // ─── Responses ───────────────────────────────────────────────────────────────
 
 export interface ActorView {
@@ -416,6 +567,57 @@ export interface SessionLifecycleEventView {
   actor: ActorView;
   occurredAt: string;
   metadata: Record<string, string>;
+}
+
+/**
+ * Privacy-safe by construction: this shape has no `linkedUserId` and no
+ * `facilitatorNotes` field at all — not merely `null` when hidden, but
+ * structurally absent, so a server-side mistake cannot leak either through
+ * this type. `displayName`/`preferredName`/`pronouns`/`affiliation` carry
+ * whatever value the server decided the caller may see — already redacted
+ * to a generic placeholder server-side when `identityVisibility` is
+ * `facilitators_only` and the caller does not hold
+ * `participant:manage_restricted` (`participants.service.ts`).
+ */
+export interface SessionParticipantSummary {
+  id: string;
+  sessionId: string;
+  displayName: string;
+  preferredName: string | null;
+  pronouns: string | null;
+  affiliation: string | null;
+  participantType: string;
+  participationMode: ParticipationMode;
+  identityMode: ParticipantIdentityMode;
+  identityVisibility: ParticipantIdentityVisibility;
+  invitationStatus: ParticipantInvitationStatus;
+  attendanceStatus: ParticipantAttendanceStatus;
+  consentStatusSummary: ParticipantConsentStatusSummary;
+  withdrawn: boolean;
+  updatedAt: string;
+}
+
+export interface SessionParticipantDetail extends SessionParticipantSummary {
+  organisationId: string;
+  workspaceId: string;
+  languagePreference: string | null;
+  accessibilityRequirements: string | null;
+  createdAt: string;
+  withdrawnAt: string | null;
+  /** Optimistic-concurrency counter — send back as `expectedVersion` on the next write. */
+  version: number;
+  permittedInvitationTransitions: ParticipantInvitationStatus[];
+  permittedAttendanceTransitions: ParticipantAttendanceStatus[];
+  /**
+   * Present only for a caller holding `participant:manage_restricted`, or
+   * when `identityMode` is `named` (a registered named participant's link
+   * to their own account is not restricted information). Absent — not
+   * `null` — for every other caller, so its absence from the wire response
+   * is visible in a network inspector, not just in application logic.
+   */
+  linkedUserId?: string | null;
+  /** Present only for a caller holding `participant:manage_restricted`. */
+  facilitatorNotes?: string | null;
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────────

@@ -13,6 +13,8 @@ import { useState, type ReactNode } from 'react';
 
 import type {
   MembershipState,
+  ParticipantAttendanceStatus,
+  ParticipantInvitationStatus,
   ReviewState,
   RoleAssignmentView,
   RoleDefinition,
@@ -126,6 +128,58 @@ export function SessionStatusBadge({ status }: { status: SessionStatus }) {
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${SESSION_STATUS_CLASSES[status]}`}
     >
       {SESSION_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+const INVITATION_STATUS_LABELS: Record<ParticipantInvitationStatus, string> = {
+  not_invited: 'Not invited',
+  invited: 'Invited',
+  accepted: 'Accepted',
+  declined: 'Declined',
+  cancelled: 'Cancelled',
+};
+
+const INVITATION_STATUS_CLASSES: Record<ParticipantInvitationStatus, string> = {
+  not_invited: 'border-current text-[var(--color-ink-muted)]',
+  invited: 'border-amber-600 text-amber-700 dark:text-amber-400',
+  accepted: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  declined: 'border-red-700 text-red-700 dark:text-red-400',
+  cancelled: 'border-current text-[var(--color-ink-muted)]',
+};
+
+export function ParticipantInvitationBadge({ status }: { status: ParticipantInvitationStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${INVITATION_STATUS_CLASSES[status]}`}
+    >
+      {INVITATION_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+const ATTENDANCE_STATUS_LABELS: Record<ParticipantAttendanceStatus, string> = {
+  expected: 'Expected',
+  present: 'Present',
+  absent: 'Absent',
+  partially_attended: 'Partially attended',
+  withdrawn: 'Withdrawn',
+};
+
+const ATTENDANCE_STATUS_CLASSES: Record<ParticipantAttendanceStatus, string> = {
+  expected: 'border-current text-[var(--color-ink-muted)]',
+  present: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  absent: 'border-red-700 text-red-700 dark:text-red-400',
+  partially_attended: 'border-amber-600 text-amber-700 dark:text-amber-400',
+  withdrawn: 'border-current text-[var(--color-ink-muted)]',
+};
+
+export function ParticipantAttendanceBadge({ status }: { status: ParticipantAttendanceStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${ATTENDANCE_STATUS_CLASSES[status]}`}
+    >
+      {ATTENDANCE_STATUS_LABELS[status]}
     </span>
   );
 }

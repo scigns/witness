@@ -32,6 +32,8 @@ import { OrganisationRoleAssignmentsController } from './organisation-role-assig
 import { OrganisationRoleAssignmentsService } from './organisation-role-assignments/organisation-role-assignments.service.js';
 import { OrganisationsController } from './organisations/organisations.controller.js';
 import { OrganisationsService } from './organisations/organisations.service.js';
+import { ParticipantsController } from './participants/participants.controller.js';
+import { ParticipantsService } from './participants/participants.service.js';
 import { RecordsController } from './records/records.controller.js';
 import { RecordsService } from './records/records.service.js';
 import { RolesController } from './roles/roles.controller.js';
@@ -60,6 +62,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     OrganisationRoleAssignmentsController,
     WorkspaceRoleAssignmentsController,
     SessionsController,
+    ParticipantsController,
     AuthenticationController,
     CurrentUserController,
   ],
@@ -74,6 +77,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     OrganisationRoleAssignmentsService,
     WorkspaceRoleAssignmentsService,
     SessionsService,
+    ParticipantsService,
     SessionService,
     RoleResolutionService,
     PolicyEngineService,

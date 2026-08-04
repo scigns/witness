@@ -48,7 +48,11 @@ export type Action =
   | 'session:read'
   | 'session:create'
   | 'session:update'
-  | 'session:transition';
+  | 'session:transition'
+  | 'participant:read'
+  | 'participant:create'
+  | 'participant:update'
+  | 'participant:manage_restricted';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;

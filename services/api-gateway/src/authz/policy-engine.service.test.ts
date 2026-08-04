@@ -87,6 +87,42 @@ describe('PolicyEngineService — real policy data', () => {
     }
   });
 
+  it('reader may read participants but not create, update, or manage restricted fields', async () => {
+    const engine = await loadedEngine();
+    expect(await engine.grants('reader', 'participant:read')).toBe(true);
+    expect(await engine.grants('reader', 'participant:create')).toBe(false);
+    expect(await engine.grants('reader', 'participant:update')).toBe(false);
+    expect(await engine.grants('reader', 'participant:manage_restricted')).toBe(false);
+  });
+
+  it('contributor may create, update, and manage restricted participant fields', async () => {
+    const engine = await loadedEngine();
+    expect(await engine.grants('contributor', 'participant:read')).toBe(true);
+    expect(await engine.grants('contributor', 'participant:create')).toBe(true);
+    expect(await engine.grants('contributor', 'participant:update')).toBe(true);
+    expect(await engine.grants('contributor', 'participant:manage_restricted')).toBe(true);
+  });
+
+  it('reviewer may read participants but not manage them', async () => {
+    const engine = await loadedEngine();
+    expect(await engine.grants('reviewer', 'participant:read')).toBe(true);
+    expect(await engine.grants('reviewer', 'participant:create')).toBe(false);
+    expect(await engine.grants('reviewer', 'participant:update')).toBe(false);
+    expect(await engine.grants('reviewer', 'participant:manage_restricted')).toBe(false);
+  });
+
+  it('admin holds every participant action', async () => {
+    const engine = await loadedEngine();
+    for (const action of [
+      'participant:read',
+      'participant:create',
+      'participant:update',
+      'participant:manage_restricted',
+    ] as const) {
+      expect(await engine.grants('admin', action)).toBe(true);
+    }
+  });
+
   it('ATTACK — an unknown tier grants nothing, not even the actions every real tier holds', async () => {
     const engine = await loadedEngine();
     expect(await engine.grants('superuser', 'organisation:read')).toBe(false);

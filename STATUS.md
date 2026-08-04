@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-08-04 (Milestone 2)
+**Last updated:** 2026-08-04 (Milestone 3)
 **Updated by:** CTO
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -60,11 +60,11 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 | Governance | `governance` | Governance Lead | 🟡 | Consent framework drafted; Indigenous protocols need external review |
 | Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun; Casbin-based, organisation/workspace-scoped authorisation shipped (ADR-0007); real identity is Phase 2 |
 | Infrastructure | `infrastructure` | Infrastructure Lead | 🟡 | Compose stack running; observability overlay added, wiring pending |
-| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle shipped (Milestone 2) |
+| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2) and Participant Management (Milestone 3) shipped |
 | Knowledge graph | `knowledge-graph` | Knowledge Graph Lead | 🟡 | Ontology v0.1 in design |
 | AI platform | `ai-platform` | AI Lead | ⚪ | Awaiting Phase 5; model policy drafted |
-| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session screens added (Milestone 2); design system awaits Phase 6 |
-| Testing | `testing` | QA Lead | 🟡 | 331 tests across all packages (200 API-gateway); invariant and adversarial suites live |
+| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2) and participant (Milestone 3) screens added; design system awaits Phase 6 |
+| Testing | `testing` | QA Lead | 🟡 | 409 tests across all packages (235 API-gateway); invariant and adversarial suites live |
 | Release | `release` | Release Manager | 🟢 | Strategy and versioning defined |
 
 ---
@@ -87,6 +87,74 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-04 — Participant Management delivered (BUILD_ROADMAP.md Milestone 3), PR open
+
+- **Second capability in the "WITNESS — CO-DESIGN MVP BUILD COMPLETION" sequence.** With Co-design
+  Session Management merged (PR #26), an authorised facilitator can now add and manage participants
+  within a session: named, pseudonymous, anonymous, registered, and non-registered participation are
+  all first-class, and a participant is never required to hold a Witness user account.
+- **`SessionParticipant` domain aggregate** (`packages/domain/src/session-participant.ts`): identity
+  is modelled on two independent axes — `identityMode` (`named`/`pseudonymous`/`anonymous`) and
+  registration (`linkedUserId`, optional and orthogonal to identity mode, so a registered user can
+  still participate pseudonymously and a non-registered person can still be named). `addParticipant`
+  enforces anonymity by construction: an `anonymous` participant's `displayName` is forced to a fixed
+  generic label and every other identifying field (`preferredName`/`pronouns`/`affiliation`) is
+  cleared regardless of what the caller passed, and `linkedUserId` is rejected outright for that
+  mode — "anonymous participation must not create fake personal details" is a domain invariant, not
+  a UI convention. `participantType` is a free-form, organisation-supplied string, the same
+  `sessionType` reasoning as Milestone 2: "interpreter" and "community representative" are not a
+  closed set, and are explicitly not a system authorisation role (`role.ts`'s own doc comment).
+  `consentStatusSummary` mirrors `CoDesignSession.consentConfigurationState`'s precedent — stored,
+  defaulted to `not_configured`, no mutator until Milestone 4 (Consent) exists to set it.
+- **Server-side privacy enforcement, not UI hiding.** `ParticipantsService` makes an imperative,
+  in-service Casbin decision (`participant:manage_restricted`) — new to this codebase, because a
+  single `GET` can legitimately return two different bodies for two different callers (a reader sees
+  a redacted participant, a contributor sees the full record), which a route-level `@Requires(...)`
+  boolean gate cannot express. `SessionParticipantSummary` has no `linkedUserId`/`facilitatorNotes`
+  field at all — not merely `null` when hidden, but structurally absent from the list projection, so
+  a server-side mistake cannot leak either through that type. `SessionParticipantDetail` includes
+  both only when permitted (`linkedUserId` additionally for any `named` participant, whose account
+  link is not restricted information); a `pseudonymous` participant's `linkedUserId` is retained
+  internally but never returned by an ordinary read. The redacted export endpoint
+  (`GET .../participants/export`) always applies the unprivileged redaction, regardless of the
+  caller's own tier — an export artifact leaves the application's trusted context, so it never
+  reflects the exporter's elevated view.
+- **Session-lifecycle-gated participant changes.** Adding a participant or making an ordinary detail
+  change is permitted in `draft`/`scheduled`/`open` (a facilitator registering a walk-in participant
+  during a live session is a realistic need the milestone's floor rules do not forbid) and rejected
+  in `closed`/`archived`. Attendance recording is permitted in `scheduled`/`open`/`closed` (marking
+  final attendance after a session wraps up is routine) and rejected in `draft`/`archived`.
+  Withdrawal/restoration is permitted in every status except `archived` — honouring a withdrawal
+  request should not have to wait for the session to reopen.
+- **Optimistic concurrency**, same conditional-`updateMany`-plus-audit-in-one-transaction pattern
+  Milestone 2 established: every update/transition carries `expectedVersion`, and a stale write is a
+  `409 STALE_VERSION` with nothing persisted.
+- **Authorisation reuses the existing Casbin scope-tier boundary exactly.** Four new actions
+  (`participant:read`/`create`/`update`/`manage_restricted`) at the same reader/contributor/
+  reviewer/admin tiers `session:*` already uses — no new mechanism, no per-session or
+  per-participant ownership check (same named gap Milestone 2 documented for sessions, extended
+  here: any contributor/admin in a workspace's scope may manage any participant there).
+  `packages/policy/policy.csv`'s header comment records the reasoning.
+- **Frontend**: participant list (privacy-safe by construction — nothing to redact client-side
+  because the server never sends restricted fields to an unprivileged caller), add-participant flow
+  with independent registered/non-registered and named/pseudonymous/anonymous controls, participant
+  detail with invitation/attendance/identity-visibility controls, a restricted facilitator-notes
+  editor that renders only when the loaded record actually carries the `facilitatorNotes` key,
+  withdrawal/restoration, redacted JSON export, and history — all under
+  `/workspaces/:id/sessions/:sessionId/participants`.
+- **Known limitations, named rather than hidden:** no per-session/per-participant ownership check
+  (see above); no self-service view for a participant who is also a signed-in registered user to see
+  only their own record (`participant:manage_restricted`/`participant:read` are workspace-scoped
+  tiers, not row-level ownership — the same limitation Milestone 2 accepted for sessions); export
+  format is JSON only (CSV/other formats deferred); no live Postgres or Docker was available in this
+  sandbox, so the migration is hand-authored SQL (validated via `prisma validate`/`generate`, not
+  applied against a live database) and the full workflow could not be walked through in a browser —
+  same constraint every prior milestone was built under.
+- **Verification:** `pnpm verify` (format, lint, typecheck, 409 tests across all packages — 137
+  domain, 12 contracts, 25 config, 235 API-gateway — build) all green. `pnpm test:invariants`
+  (20/20) and `pnpm test:adversarial` (30/30) unchanged, still green. `scripts/ci/check-domain-purity.sh`
+  passes.
 
 ### 2026-08-04 — Co-design Session Management delivered (BUILD_ROADMAP.md Milestone 2), PR open
 

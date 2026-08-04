@@ -93,10 +93,11 @@ model Organisation {
   name      String   @db.VarChar(200)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  workspaces       Workspace[]
-  memberships      OrganisationMembership[]
-  roleAssignments  RoleAssignment[]
-  coDesignSessions CoDesignSession[]
+  workspaces          Workspace[]
+  memberships         OrganisationMembership[]
+  roleAssignments     RoleAssignment[]
+  coDesignSessions    CoDesignSession[]
+  sessionParticipants SessionParticipant[]
 
   @@map("organisation")
 }
@@ -117,9 +118,10 @@ model Workspace {
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  memberships      WorkspaceMembership[]
-  roleAssignments  RoleAssignment[]
-  coDesignSessions CoDesignSession[]
+  memberships         WorkspaceMembership[]
+  roleAssignments     RoleAssignment[]
+  coDesignSessions    CoDesignSession[]
+  sessionParticipants SessionParticipant[]
 
   @@index([organisationId])
   @@map("workspace")
@@ -141,12 +143,13 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organisationMemberships OrganisationMembership[]
-  workspaceMemberships    WorkspaceMembership[]
-  roleAssignments         RoleAssignment[]
-  identityLinks           IdentityLink[]
-  authSessions            AuthSession[]
-  facilitatedSessions     CoDesignSession[]
+  organisationMemberships   OrganisationMembership[]
+  workspaceMemberships      WorkspaceMembership[]
+  roleAssignments           RoleAssignment[]
+  identityLinks             IdentityLink[]
+  authSessions              AuthSession[]
+  facilitatedSessions       CoDesignSession[]
+  linkedSessionParticipants SessionParticipant[]
 
   @@index([accountState])
   @@map("witness_user")
@@ -376,10 +379,66 @@ model CoDesignSession {
 
   version Int @default(1)
 
+  participants SessionParticipant[]
+
   @@index([organisationId])
   @@index([workspaceId, status])
   @@index([primaryFacilitatorId])
   @@map("co_design_session")
+}
+
+/// Who is part of a co-design session (BUILD_ROADMAP.md Milestone 3,
+/// Participant Management). `linkedUserId` is nullable and independent of
+/// `identityMode` — a participant is never required to hold a Witness user
+/// account, and a registered user may still participate pseudonymously.
+///
+/// `facilitatorNotes` is restricted: the API layer only ever includes it in
+/// a response for a caller holding `participant:manage_restricted`.
+model SessionParticipant {
+  id             String       @id @db.Uuid
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  linkedUserId String? @map("linked_user_id") @db.Uuid
+  linkedUser   User?   @relation(fields: [linkedUserId], references: [id], onDelete: SetNull)
+
+  displayName   String  @map("display_name") @db.VarChar(200)
+  preferredName String? @map("preferred_name") @db.VarChar(200)
+  pronouns      String? @db.VarChar(50)
+  affiliation   String? @db.VarChar(300)
+
+  participantType    String @map("participant_type") @db.VarChar(100)
+  participationMode  String @map("participation_mode") @db.VarChar(24)
+  identityMode       String @map("identity_mode") @db.VarChar(24)
+  identityVisibility String @map("identity_visibility") @db.VarChar(32)
+
+  languagePreference        String? @map("language_preference") @db.VarChar(50)
+  accessibilityRequirements String? @map("accessibility_requirements") @db.Text
+
+  invitationStatus String @map("invitation_status") @db.VarChar(16)
+  attendanceStatus String @map("attendance_status") @db.VarChar(20)
+
+  consentStatusSummary String @default("not_configured") @map("consent_status_summary") @db.VarChar(24)
+
+  /// Restricted — see model doc comment above.
+  facilitatorNotes String? @map("facilitator_notes") @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  withdrawnAt DateTime? @map("withdrawn_at") @db.Timestamptz(6)
+
+  version Int @default(1)
+
+  @@index([sessionId])
+  @@index([workspaceId])
+  @@index([linkedUserId])
+  @@map("session_participant")
 }
 
 /// Append-only, hash-chained audit trail (roadmap 3.7).

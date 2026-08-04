@@ -276,11 +276,16 @@ export default function SessionDetailPage({
             {session.sessionType} · {session.deliveryMode.replace('_', ' ')}
           </p>
         </div>
-        {!isArchived && (
-          <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>
-            {editing ? 'Cancel edit' : 'Edit details'}
-          </Button>
-        )}
+        <div className="flex gap-2">
+          <Link href={`/workspaces/${workspaceId}/sessions/${sessionId}/participants`}>
+            <Button variant="secondary">Participants →</Button>
+          </Link>
+          {!isArchived && (
+            <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>
+              {editing ? 'Cancel edit' : 'Edit details'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {isArchived && (
