@@ -5,7 +5,6 @@
  * Prisma double.
  */
 
-import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../infrastructure/prisma.service.js';
@@ -71,18 +70,16 @@ function fakePrisma() {
         authLoginAttempts.push({ ...data });
         return { ...data };
       },
-      // Real Prisma throws PrismaClientKnownRequestError(P2025) — "record to
-      // delete does not exist" — when the where-clause matches nothing.
-      // AuthenticationService's atomic-consume `.catch()` specifically
-      // checks for that error shape, so the fake must throw the same shape
-      // to exercise the real code path rather than a stand-in.
+      // Real Prisma throws PrismaClientKnownRequestError(code: 'P2025') —
+      // "record to delete does not exist" — when the where-clause matches
+      // nothing. AuthenticationService's atomic-consume `.catch()` duck-types
+      // on `error.code === 'P2025'` (deliberately not importing the real
+      // Prisma error class — see that file's own comment), so the fake only
+      // needs to match that shape, not the real class.
       delete: async ({ where }: { where: { state: string } }) => {
         const index = authLoginAttempts.findIndex((a) => a['state'] === where.state);
         if (index === -1) {
-          throw new Prisma.PrismaClientKnownRequestError('Record to delete does not exist.', {
-            code: 'P2025',
-            clientVersion: '5.22.0',
-          });
+          throw Object.assign(new Error('Record to delete does not exist.'), { code: 'P2025' });
         }
         const [removed] = authLoginAttempts.splice(index, 1);
         return removed;

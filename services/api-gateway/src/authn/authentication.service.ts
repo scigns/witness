@@ -11,7 +11,6 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
 import {
@@ -55,6 +54,26 @@ export class AuthenticationDeniedError extends Error {
 }
 
 const LOGIN_ATTEMPT_TTL_MINUTES = 10;
+
+/**
+ * Duck-typed check for Prisma's `PrismaClientKnownRequestError` with code
+ * `P2025` ("record to delete/update does not exist"), deliberately without
+ * importing `Prisma` from `@prisma/client` as a runtime value. That import
+ * only resolves once `prisma generate` has produced the generated client on
+ * disk — true for every build, but not guaranteed before this package's own
+ * unit tests run (they exercise this service against a hand-rolled fake
+ * Prisma, never a real `PrismaClient`), so requiring it here would make
+ * `handleCallback` untestable without a generation step tests have no other
+ * reason to depend on.
+ */
+function isRecordNotFoundError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code: unknown }).code === 'P2025'
+  );
+}
 
 /** The "who signed this action" principal used for the system-attributed steps of sign-in itself. */
 const SIGN_IN_SYSTEM_PRINCIPAL: Principal = {
@@ -126,9 +145,7 @@ export class AuthenticationService {
     const attempt = await this.prisma.authLoginAttempt
       .delete({ where: { state } })
       .catch((error: unknown) => {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-          return null;
-        }
+        if (isRecordNotFoundError(error)) return null;
         throw error;
       });
 
