@@ -27,6 +27,7 @@ import {
   Button,
   Card,
   ErrorNotice,
+  LinkButton,
   MembershipStateBadge,
   RoleAssignmentControl,
 } from '@/components/ui';
@@ -174,7 +175,10 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
 
       {error !== null && <ErrorNotice message={error} />}
 
-      <h1 className="text-2xl font-semibold tracking-tight">{organisation.name}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">{organisation.name}</h1>
+        <LinkButton href={`/organisations/${id}/consent-templates`}>Consent templates →</LinkButton>
+      </div>
 
       <section aria-labelledby="add-member-heading">
         <h2 id="add-member-heading" className="mb-3 text-lg font-semibold">

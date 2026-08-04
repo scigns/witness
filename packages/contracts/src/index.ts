@@ -257,7 +257,24 @@ export const PARTICIPANT_ATTENDANCE_STATUSES = [
 ] as const;
 export type ParticipantAttendanceStatus = (typeof PARTICIPANT_ATTENDANCE_STATUSES)[number];
 
-export const PARTICIPANT_CONSENT_STATUS_SUMMARIES = ['not_configured'] as const;
+/**
+ * A participant's consent status at a glance — the states a record can be
+ * in (`PARTICIPANT_CONSENT_RECORD_STATUSES` below) plus two states that
+ * describe the *absence* of one: `not_configured` (the session has no
+ * consent configuration yet) and `not_requested` (configured, but nothing
+ * has been captured for this participant). Deliberately excludes
+ * `superseded` — a superseded record is never the participant's *current*
+ * position, only a step in its history, so it never appears as a summary.
+ */
+export const PARTICIPANT_CONSENT_STATUS_SUMMARIES = [
+  'not_configured',
+  'not_requested',
+  'granted',
+  'partially_granted',
+  'refused',
+  'withdrawn',
+  'expired',
+] as const;
 export type ParticipantConsentStatusSummary = (typeof PARTICIPANT_CONSENT_STATUS_SUMMARIES)[number];
 
 /**
@@ -367,6 +384,168 @@ export const sessionParticipantTransitionRequestSchema = z.discriminatedUnion('a
 ]);
 export type SessionParticipantTransitionRequest = z.infer<
   typeof sessionParticipantTransitionRequestSchema
+>;
+
+// ─── Consent management (BUILD_ROADMAP.md Milestone 4) ────────────────────────
+
+/**
+ * The categories `ConsentPolicyService` (services/api-gateway) knows how to
+ * answer structured questions about. NOT a closed enum — a template's
+ * `categories` list may declare organisation-defined categories beyond
+ * these, same reasoning as `SUGGESTED_SESSION_TYPES` — so request schemas
+ * below accept any non-empty category string, not `z.enum(WELL_KNOWN_CONSENT_CATEGORIES)`.
+ */
+export const WELL_KNOWN_CONSENT_CATEGORIES = [
+  'participation',
+  'audio_recording',
+  'video_recording',
+  'photography',
+  'transcription',
+  'ai_processing',
+  'attributed_quotation',
+  'anonymous_quotation',
+  'internal_use',
+  'external_reporting',
+  'publication',
+  'research_use',
+  'future_reuse',
+  'knowledge_graph_inclusion',
+  'follow_up_contact',
+] as const;
+
+export const CONSENT_TEMPLATE_STATUSES = ['draft', 'active', 'retired'] as const;
+export type ConsentTemplateStatus = (typeof CONSENT_TEMPLATE_STATUSES)[number];
+
+/**
+ * The `SessionConsentConfiguration` aggregate's own status — deliberately
+ * named "STATUSES"/"Status" rather than "STATES"/"State" to keep it
+ * distinct from `SESSION_CONSENT_CONFIGURATION_STATES`/
+ * `SessionConsentConfigurationState` above, which describes a *session's*
+ * `consentConfigurationState` field (`not_configured`/`configured`), not
+ * this aggregate's own lifecycle. The same naming split exists in
+ * `packages/domain/src/session-consent-configuration.ts`.
+ */
+export const SESSION_CONSENT_CONFIGURATION_STATUSES = ['draft', 'active', 'retired'] as const;
+export type SessionConsentConfigurationStatus =
+  (typeof SESSION_CONSENT_CONFIGURATION_STATUSES)[number];
+
+export const PARTICIPANT_CONSENT_RECORD_STATUSES = [
+  'granted',
+  'partially_granted',
+  'refused',
+  'withdrawn',
+  'expired',
+  'superseded',
+] as const;
+export type ParticipantConsentRecordStatus = (typeof PARTICIPANT_CONSENT_RECORD_STATUSES)[number];
+
+const consentTemplateCategoryRequestSchema = z.object({
+  category: z.string().trim().min(1, 'A category name is required').max(100),
+  required: z.boolean(),
+});
+
+export const createConsentTemplateRequestSchema = z.object({
+  name: z.string().trim().min(1, 'A name is required').max(200),
+  purpose: z.string().trim().min(1, 'A purpose is required').max(2000),
+  description: z.string().trim().max(5000).optional(),
+  plainLanguageSummary: z.string().trim().min(1, 'A plain-language summary is required').max(5000),
+  supportedLanguages: z
+    .array(z.string().trim().min(1).max(50))
+    .min(1, 'At least one supported language is required')
+    .max(20),
+  categories: z
+    .array(consentTemplateCategoryRequestSchema)
+    .min(1, 'At least one category is required')
+    .max(40),
+  workspaceId: z.string().uuid().optional(),
+  validFrom: z.string().datetime({ offset: true }).optional(),
+  validUntil: z.string().datetime({ offset: true }).optional(),
+});
+export type CreateConsentTemplateRequest = z.infer<typeof createConsentTemplateRequestSchema>;
+
+/**
+ * Every field is optional and, when omitted, the new version inherits the
+ * previous version's value (`createNewTemplateVersion` in the domain
+ * layer) — `organisationId`/`workspaceId` are never included here because
+ * they cannot change between versions of the same family.
+ */
+export const createConsentTemplateVersionRequestSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  purpose: z.string().trim().min(1).max(2000).optional(),
+  description: z.string().trim().max(5000).nullable().optional(),
+  plainLanguageSummary: z.string().trim().min(1).max(5000).optional(),
+  supportedLanguages: z.array(z.string().trim().min(1).max(50)).min(1).max(20).optional(),
+  categories: z.array(consentTemplateCategoryRequestSchema).min(1).max(40).optional(),
+  validFrom: z.string().datetime({ offset: true }).nullable().optional(),
+  validUntil: z.string().datetime({ offset: true }).nullable().optional(),
+});
+export type CreateConsentTemplateVersionRequest = z.infer<
+  typeof createConsentTemplateVersionRequestSchema
+>;
+
+/**
+ * Mirrors `membershipActionSchema`: a named lifecycle transition rather than
+ * a raw target status. `expectedRevision` — not `expectedVersion` — backs
+ * optimistic concurrency here, because `ConsentTemplate.revision` (not
+ * `.version`, which is the template's own content-version number) is the
+ * field this action bumps; see the domain layer's doc comment on why the
+ * two are named differently.
+ */
+export const consentTemplateActionSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('activate'), expectedRevision: z.number().int().positive() }),
+  z.object({ action: z.literal('retire'), expectedRevision: z.number().int().positive() }),
+]);
+export type ConsentTemplateAction = z.infer<typeof consentTemplateActionSchema>;
+
+export const configureSessionConsentRequestSchema = z.object({
+  consentTemplateId: z.string().uuid('A valid consent template id is required'),
+  requiredCategories: z
+    .array(z.string().trim().min(1).max(100))
+    .min(1, 'At least one required category is needed'),
+  optionalCategories: z.array(z.string().trim().min(1).max(100)).optional(),
+  facilitatorInstructions: z.string().trim().max(5000).optional(),
+  participantIntroduction: z.string().trim().max(5000).optional(),
+  effectiveDate: z.string().datetime({ offset: true }).optional(),
+});
+export type ConfigureSessionConsentRequest = z.infer<typeof configureSessionConsentRequestSchema>;
+
+export const reconfigureSessionConsentRequestSchema = configureSessionConsentRequestSchema.extend({
+  expectedVersion: z.number().int().positive(),
+});
+export type ReconfigureSessionConsentRequest = z.infer<
+  typeof reconfigureSessionConsentRequestSchema
+>;
+
+const consentCategoryDecisionRequestSchema = z.object({
+  category: z.string().trim().min(1, 'A category name is required').max(100),
+  granted: z.boolean(),
+});
+
+/**
+ * Captures a participant's consent — used both for a first-time capture and,
+ * with a different endpoint, to amend an existing record (the domain layer's
+ * `supersedeConsentRecord` + fresh `captureParticipantConsent` pair share
+ * this same input shape, so one schema serves both).
+ */
+export const captureParticipantConsentRequestSchema = z.object({
+  categoryDecisions: z
+    .array(consentCategoryDecisionRequestSchema)
+    .min(1, 'At least one category decision is required'),
+  captureMethod: z.string().trim().min(1, 'A capture method is required').max(100),
+  language: z.string().trim().max(50).optional(),
+  expiresAt: z.string().datetime({ offset: true }).optional(),
+  acknowledgementReference: z.string().trim().max(300).optional(),
+});
+export type CaptureParticipantConsentRequest = z.infer<
+  typeof captureParticipantConsentRequestSchema
+>;
+
+export const withdrawParticipantConsentRequestSchema = z.object({
+  reason: z.string().trim().max(2000).optional(),
+  expectedVersion: z.number().int().positive(),
+});
+export type WithdrawParticipantConsentRequest = z.infer<
+  typeof withdrawParticipantConsentRequestSchema
 >;
 
 // ─── Responses ───────────────────────────────────────────────────────────────
@@ -618,6 +797,117 @@ export interface SessionParticipantDetail extends SessionParticipantSummary {
   linkedUserId?: string | null;
   /** Present only for a caller holding `participant:manage_restricted`. */
   facilitatorNotes?: string | null;
+}
+
+export interface ConsentTemplateCategoryView {
+  category: string;
+  required: boolean;
+}
+
+export interface ConsentTemplateSummary {
+  id: string;
+  familyId: string;
+  organisationId: string;
+  workspaceId: string | null;
+  name: string;
+  version: number;
+  status: ConsentTemplateStatus;
+  updatedAt: string;
+}
+
+export interface ConsentTemplateDetail extends ConsentTemplateSummary {
+  purpose: string;
+  description: string | null;
+  plainLanguageSummary: string;
+  supportedLanguages: string[];
+  categories: ConsentTemplateCategoryView[];
+  validFrom: string | null;
+  validUntil: string | null;
+  createdAt: string;
+  /** Optimistic-concurrency counter — send back as `expectedRevision` on the next lifecycle action. */
+  revision: number;
+  /** Server-computed, so a client never has to reimplement the lifecycle state machine. */
+  permittedActions: ConsentTemplateAction['action'][];
+}
+
+export interface SessionConsentConfigurationView {
+  id: string;
+  organisationId: string;
+  workspaceId: string;
+  sessionId: string;
+  consentTemplateId: string;
+  templateVersion: number;
+  requiredCategories: string[];
+  optionalCategories: string[];
+  facilitatorInstructions: string | null;
+  participantIntroduction: string | null;
+  effectiveDate: string;
+  status: SessionConsentConfigurationStatus;
+  createdAt: string;
+  updatedAt: string;
+  /** Optimistic-concurrency counter — send back as `expectedVersion` on reconfigure. */
+  version: number;
+}
+
+export interface ConsentCategoryDecisionView {
+  category: string;
+  granted: boolean;
+}
+
+/**
+ * Privacy-safe general view — no `categoryDecisions`, no `withdrawalReason`.
+ * A caller without `participant_consent:manage_restricted` only ever
+ * receives this shape; the detail extension below is structurally absent
+ * from the response, not merely redacted, the same convention
+ * `SessionParticipantSummary` established.
+ */
+export interface ParticipantConsentRecordSummary {
+  id: string;
+  sessionId: string;
+  participantId: string;
+  consentTemplateId: string;
+  templateVersion: number;
+  status: ParticipantConsentRecordStatus;
+  capturedAt: string;
+  updatedAt: string;
+}
+
+export interface ParticipantConsentRecordDetail extends ParticipantConsentRecordSummary {
+  organisationId: string;
+  workspaceId: string;
+  captureMethod: string;
+  language: string | null;
+  expiresAt: string | null;
+  amendsRecordId: string | null;
+  supersededByRecordId: string | null;
+  withdrawnAt: string | null;
+  acknowledgementReference: string | null;
+  /** Optimistic-concurrency counter — send back as `expectedVersion` on withdraw. */
+  version: number;
+  /**
+   * The category-by-category grant/refusal breakdown — "detailed category
+   * decisions require explicit permission" (BUILD_ROADMAP.md Milestone 4).
+   * Present only for a caller holding `participant_consent:manage_restricted`;
+   * omitted, not `null`, for every other caller, the same convention
+   * `withdrawalReason` and `SessionParticipantDetail.facilitatorNotes` use.
+   */
+  categoryDecisions?: ConsentCategoryDecisionView[];
+  /** Present only for a caller holding `participant_consent:manage_restricted`. */
+  withdrawalReason?: string | null;
+}
+
+export interface ConsentDashboardParticipantView {
+  participantId: string;
+  displayName: string;
+  status: ParticipantConsentStatusSummary;
+  updatedAt: string | null;
+}
+
+/** The view backing the facilitator dashboard's per-session consent overview. */
+export interface ConsentFacilitatorDashboardView {
+  sessionId: string;
+  configuration: SessionConsentConfigurationView | null;
+  participants: ConsentDashboardParticipantView[];
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────────

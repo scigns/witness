@@ -24,6 +24,9 @@ import { PolicyEnforcementService } from './authz/policy-enforcement.service.js'
 import { RoleResolutionService } from './authz/role-resolution.service.js';
 import { SessionAuthenticator } from './authz/session-authenticator.js';
 import { SessionBackedAuthorizationAdapter } from './authz/session-backed.adapter.js';
+import { ConsentPolicyService } from './consent/consent-policy.service.js';
+import { ConsentTemplatesController } from './consent-templates/consent-templates.controller.js';
+import { ConsentTemplatesService } from './consent-templates/consent-templates.service.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
 import { OrganisationMembershipsController } from './organisation-memberships/organisation-memberships.controller.js';
@@ -32,11 +35,15 @@ import { OrganisationRoleAssignmentsController } from './organisation-role-assig
 import { OrganisationRoleAssignmentsService } from './organisation-role-assignments/organisation-role-assignments.service.js';
 import { OrganisationsController } from './organisations/organisations.controller.js';
 import { OrganisationsService } from './organisations/organisations.service.js';
+import { ParticipantConsentRecordsController } from './participant-consent-records/participant-consent-records.controller.js';
+import { ParticipantConsentRecordsService } from './participant-consent-records/participant-consent-records.service.js';
 import { ParticipantsController } from './participants/participants.controller.js';
 import { ParticipantsService } from './participants/participants.service.js';
 import { RecordsController } from './records/records.controller.js';
 import { RecordsService } from './records/records.service.js';
 import { RolesController } from './roles/roles.controller.js';
+import { SessionConsentConfigurationController } from './session-consent-configuration/session-consent-configuration.controller.js';
+import { SessionConsentConfigurationService } from './session-consent-configuration/session-consent-configuration.service.js';
 import { SessionsController } from './sessions/sessions.controller.js';
 import { SessionsService } from './sessions/sessions.service.js';
 import { WITNESS_CONFIG } from './tokens.js';
@@ -63,6 +70,9 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     WorkspaceRoleAssignmentsController,
     SessionsController,
     ParticipantsController,
+    ConsentTemplatesController,
+    SessionConsentConfigurationController,
+    ParticipantConsentRecordsController,
     AuthenticationController,
     CurrentUserController,
   ],
@@ -78,6 +88,10 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     WorkspaceRoleAssignmentsService,
     SessionsService,
     ParticipantsService,
+    ConsentTemplatesService,
+    ConsentPolicyService,
+    SessionConsentConfigurationService,
+    ParticipantConsentRecordsService,
     SessionService,
     RoleResolutionService,
     PolicyEngineService,

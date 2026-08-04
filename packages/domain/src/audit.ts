@@ -59,6 +59,15 @@ export const AUDIT_ACTIONS = [
   'session_participant.notes_changed',
   'session_participant.withdrawn',
   'session_participant.restored',
+  'consent_template.created',
+  'consent_template.version_created',
+  'consent_template.activated',
+  'consent_template.retired',
+  'session_consent_configuration.created',
+  'session_consent_configuration.updated',
+  'participant_consent_record.captured',
+  'participant_consent_record.superseded',
+  'participant_consent_record.withdrawn',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -80,6 +89,9 @@ export const AUDIT_SUBJECT_TYPES = [
   'identity_link',
   'co_design_session',
   'session_participant',
+  'consent_template',
+  'session_consent_configuration',
+  'participant_consent_record',
 ] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 

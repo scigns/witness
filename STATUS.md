@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-08-04 (Milestone 3)
+**Last updated:** 2026-08-04 (Milestone 4)
 **Updated by:** CTO
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -17,10 +17,11 @@ capture a record, store it, display it, show its provenance, let a human accept 
 a hash-chained audit trail and a real authorisation boundary.
 
 **The pipeline is still deliberately unbuilt.** No AI extraction, no transcription, no knowledge
-graph, no consent service, no Keycloak. Consent, provenance and tenancy are cross-cutting
-invariants; any assertion written before they are enforceable is permanently untrustworthy. The
-running instance lists every missing capability at `/ready` and renders it on the dashboard, so the
-gap is visible rather than inferred.
+graph, no Keycloak. Consent and provenance are enforced for co-design sessions as of Milestone 4
+(below); tenancy remains a cross-cutting invariant enforced only at the organisation/workspace
+scoping layer. Any assertion written before a capability is enforceable is permanently
+untrustworthy. The running instance lists every missing capability at `/ready` and renders it on
+the dashboard, so the gap is visible rather than inferred.
 
 **Overall health:** 🟢 On track
 **Biggest current risk:** R-01 — ontology design becoming an unbounded research project. Mitigation
@@ -60,11 +61,11 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 | Governance | `governance` | Governance Lead | 🟡 | Consent framework drafted; Indigenous protocols need external review |
 | Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun; Casbin-based, organisation/workspace-scoped authorisation shipped (ADR-0007); real identity is Phase 2 |
 | Infrastructure | `infrastructure` | Infrastructure Lead | 🟡 | Compose stack running; observability overlay added, wiring pending |
-| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2) shipped; Participant Management (Milestone 3) implemented in this PR, not yet merged |
+| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2) and Participant Management (Milestone 3) shipped; Consent Management (Milestone 4) implemented in this PR, not yet merged |
 | Knowledge graph | `knowledge-graph` | Knowledge Graph Lead | 🟡 | Ontology v0.1 in design |
 | AI platform | `ai-platform` | AI Lead | ⚪ | Awaiting Phase 5; model policy drafted |
-| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2) screens shipped; participant (Milestone 3) screens implemented in this PR, not yet merged; design system awaits Phase 6 |
-| Testing | `testing` | QA Lead | 🟡 | 409 tests across all packages (235 API-gateway); invariant and adversarial suites live |
+| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2) and participant (Milestone 3) screens shipped; consent management (Milestone 4) screens implemented in this PR, not yet merged; design system awaits Phase 6 |
+| Testing | `testing` | QA Lead | 🟡 | 553 tests across all packages (295 API-gateway, 221 domain); invariant and adversarial suites live |
 | Release | `release` | Release Manager | 🟢 | Strategy and versioning defined |
 
 ---
@@ -87,6 +88,76 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-04 — Consent Management delivered (BUILD_ROADMAP.md Milestone 4), PR open
+
+- **Third capability in the "WITNESS — COMPLETE THE REMAINING HUMAN-LED MVP" sequence.** With
+  Participant Management merged (PR #27), consent is now first-class, specific, versioned,
+  revocable and enforceable — never one generic checkbox. Consent to participate is modelled and
+  enforced separately from consent to be audio/video-recorded, photographed, transcribed,
+  AI-processed, attributed-quoted, anonymously quoted, used internally, reported externally,
+  published, used for research, reused in future, included in a knowledge graph, or followed up
+  with — fifteen well-known categories plus organisation-defined ones, none of which weaken the
+  well-known set.
+- **Three domain aggregates** (`packages/domain/src`): `ConsentTemplate` (structurally versioned —
+  each row IS one immutable version, grouped by a shared `familyId`; there is no "edit template"
+  function anywhere, so immutability is enforced by the absence of a mutator that could violate it,
+  not a runtime guard), `SessionConsentConfiguration` (which template version a session uses and
+  which of its categories are required/optional for that session — reconfigurable in place while
+  `draft`/`scheduled`, frozen once `open`), and `ParticipantConsentRecord` (one participant's
+  category-level decisions; consent is never overwritten — amending it is two coordinated writes,
+  `supersedeConsentRecord` on the old record plus a fresh `captureParticipantConsent` for the new
+  one, applied atomically by the service layer; there is deliberately no "restore" after
+  withdrawal, since re-granting after withdrawing is itself a fact the audit trail must preserve as
+  a distinct event, not an undo).
+- **One reusable, fail-closed decision boundary** (`consent-decision.ts`, pure domain logic, wrapped
+  for real use by `services/api-gateway/src/consent/consent-policy.service.ts`): every category
+  question except `mayParticipate` itself first checks `mayParticipate` and refuses immediately if
+  that is not granted — participation is the gate every other category decision is conditioned on.
+  Missing, expired, withdrawn, or superseded-without-replacement consent all fail closed by
+  construction, not by a caller remembering to check. This service is built as the boundary
+  Milestone 5 (Structured Evidence Capture) will call before recording or using anything a
+  participant said — it is not wired into evidence capture yet, since that capability does not
+  exist.
+- **Privacy**: general participant/session views expose only a consent *status summary*
+  (`not_configured`/`not_requested`/`granted`/`partially_granted`/`refused`/`withdrawn`/`expired`);
+  the category-by-category breakdown and withdrawal reason require
+  `participant_consent:manage_restricted` and are structurally absent — not merely `null` — from
+  the wire response otherwise, the same convention Milestone 3 established for
+  `facilitatorNotes`/`linkedUserId`.
+- **Authorisation reuses the existing Casbin scope-tier boundary.** `session_consent:*` and
+  `participant_consent:*` follow `session:*`/`participant:*` exactly (contributor/admin, no
+  per-session ownership check); `consent_template:manage` is admin-only, since a template is an
+  organisation-wide governance artifact every session in scope may end up bound to — the same
+  "administrative by definition" reasoning membership and role-assignment management already use.
+  Consent capture is facilitator-mediated throughout, not participant self-service — the same
+  limitation Milestone 3 already named (most participants cannot sign in to Witness at all).
+- **API**: `consent-templates` (create/list/get/versions/create-version/activate/retire, org-scoped),
+  `session-consent-configuration` (configure/reconfigure/get, session-scoped, atomically marking the
+  session's own `consentConfigurationState` on first configuration), and
+  `participant-consent-records` (capture/amend/withdraw/get-active/history, plus a facilitator
+  dashboard summarising every participant's status for one session).
+- **Frontend**: consent template list/create/detail-with-version-history/new-version pages under
+  `/organisations/:id/consent-templates`; session consent configuration (configure/reconfigure) and
+  a facilitator dashboard under `/workspaces/:id/sessions/:sessionId/consent-{configuration,dashboard}`;
+  participant consent capture/amend/withdraw/history under
+  `/workspaces/:id/sessions/:sessionId/participants/:participantId/consent` — linked from the
+  session, participant, and organisation detail pages.
+- **Known limitations, named rather than hidden:** `ConsentPolicyService` is built but not yet called
+  by anything (Milestone 5 does not exist yet) — it is verified in isolation, not through an
+  end-to-end evidence-capture flow. No participant self-service consent portal (mirrors Milestone
+  3's own limitation). No per-session template-ownership check (same named gap as sessions/
+  participants). No live Postgres or Docker was available in this sandbox, so the migration is
+  hand-authored SQL (validated via `prisma validate`/`generate`, not applied against a live
+  database) and the full workflow could not be walked through in a browser — same constraint every
+  prior milestone was built under.
+- **Verification:** `pnpm verify` (format, lint, typecheck, 553 tests across all packages — 221
+  domain (up from 141), 295 API-gateway (up from 240), 12 contracts, 25 config — build) all green.
+  `pnpm test:invariants` (20/20) and `pnpm test:adversarial` (30/30) unchanged, still green.
+  `scripts/ci/check-domain-purity.sh`, `docs:lint`, `docs:links`, `check-adrs.sh`,
+  `check-codeowners-coverage.sh`, `scan-secrets.sh` and `check-licenses.sh` all pass.
+  `verify-no-egress.sh`'s runtime check needs Docker, unavailable in this sandbox — reported
+  unverified, not claimed passed.
 
 ### 2026-08-04 — Participant Management delivered (BUILD_ROADMAP.md Milestone 3), PR open
 

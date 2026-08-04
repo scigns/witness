@@ -49,12 +49,31 @@
 # that needs a genuinely separate "may see restricted participant data"
 # grant, distinct from "may manage participants at all", can split it onto
 # its own tier without this file's shape changing.
+#
+# consent_template:*/session_consent:*/participant_consent:* (BUILD_ROADMAP.md
+# Milestone 4, Consent Management): `session_consent:*` and
+# `participant_consent:*` follow `session:*`/`participant:*` exactly — same
+# contributor/admin tier, no per-session ownership check, and
+# `participant_consent:manage_restricted` (withdrawal reasons, detailed
+# category-decision views) granted at the same tier as
+# `participant_consent:manage` itself, mirroring
+# `participant:manage_restricted`. Consent capture is facilitator-mediated
+# (Milestone 3 already established most participants cannot sign in to
+# Witness at all), so there is no separate participant-facing grant.
+# `consent_template:manage` is admin-only — a template is an
+# organisation-wide (or workspace-wide) governance artifact every session in
+# scope may end up bound to, the same "administrative by definition"
+# reasoning as membership and role-assignment management above.
+# `consent_template:read` stays broad, like `role:read`/`session:read`.
 p, reader, record:read
 p, reader, organisation:read
 p, reader, workspace:read
 p, reader, role:read
 p, reader, session:read
 p, reader, participant:read
+p, reader, consent_template:read
+p, reader, session_consent:read
+p, reader, participant_consent:read
 
 p, contributor, record:read
 p, contributor, record:create
@@ -69,6 +88,12 @@ p, contributor, participant:read
 p, contributor, participant:create
 p, contributor, participant:update
 p, contributor, participant:manage_restricted
+p, contributor, consent_template:read
+p, contributor, session_consent:read
+p, contributor, session_consent:manage
+p, contributor, participant_consent:read
+p, contributor, participant_consent:manage
+p, contributor, participant_consent:manage_restricted
 
 p, reviewer, record:read
 p, reviewer, record:create
@@ -78,6 +103,9 @@ p, reviewer, workspace:read
 p, reviewer, role:read
 p, reviewer, session:read
 p, reviewer, participant:read
+p, reviewer, consent_template:read
+p, reviewer, session_consent:read
+p, reviewer, participant_consent:read
 
 p, admin, record:read
 p, admin, record:create
@@ -106,3 +134,10 @@ p, admin, participant:read
 p, admin, participant:create
 p, admin, participant:update
 p, admin, participant:manage_restricted
+p, admin, consent_template:read
+p, admin, consent_template:manage
+p, admin, session_consent:read
+p, admin, session_consent:manage
+p, admin, participant_consent:read
+p, admin, participant_consent:manage
+p, admin, participant_consent:manage_restricted

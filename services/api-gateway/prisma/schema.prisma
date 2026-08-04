@@ -93,11 +93,14 @@ model Organisation {
   name      String   @db.VarChar(200)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  workspaces          Workspace[]
-  memberships         OrganisationMembership[]
-  roleAssignments     RoleAssignment[]
-  coDesignSessions    CoDesignSession[]
-  sessionParticipants SessionParticipant[]
+  workspaces                   Workspace[]
+  memberships                  OrganisationMembership[]
+  roleAssignments              RoleAssignment[]
+  coDesignSessions             CoDesignSession[]
+  sessionParticipants          SessionParticipant[]
+  consentTemplates             ConsentTemplate[]
+  sessionConsentConfigurations SessionConsentConfiguration[]
+  participantConsentRecords    ParticipantConsentRecord[]
 
   @@map("organisation")
 }
@@ -118,10 +121,13 @@ model Workspace {
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  memberships         WorkspaceMembership[]
-  roleAssignments     RoleAssignment[]
-  coDesignSessions    CoDesignSession[]
-  sessionParticipants SessionParticipant[]
+  memberships                  WorkspaceMembership[]
+  roleAssignments              RoleAssignment[]
+  coDesignSessions             CoDesignSession[]
+  sessionParticipants          SessionParticipant[]
+  consentTemplates             ConsentTemplate[]
+  sessionConsentConfigurations SessionConsentConfiguration[]
+  participantConsentRecords    ParticipantConsentRecord[]
 
   @@index([organisationId])
   @@map("workspace")
@@ -379,7 +385,9 @@ model CoDesignSession {
 
   version Int @default(1)
 
-  participants SessionParticipant[]
+  participants              SessionParticipant[]
+  consentConfiguration      SessionConsentConfiguration?
+  participantConsentRecords ParticipantConsentRecord[]
 
   @@index([organisationId])
   @@index([workspaceId, status])
@@ -441,10 +449,189 @@ model SessionParticipant {
 
   version Int @default(1)
 
+  consentRecords ParticipantConsentRecord[]
+
   @@index([sessionId])
   @@index([workspaceId])
   @@index([linkedUserId])
   @@map("session_participant")
+}
+
+/// A versioned, organisation-defined consent statement (BUILD_ROADMAP.md
+/// Milestone 4, Consent Management). Each row IS one immutable version —
+/// there is no update path in the application (`packages/domain/src/consent-template.ts`
+/// has no "edit template" function), so "template versions must be
+/// immutable once used by a session" is enforced structurally rather than by
+/// a runtime guard.
+///
+/// `familyId` groups every version of "the same template" conceptually.
+/// It is a plain string, not a foreign key to anything, because a family is
+/// not itself a row — it is a shared label `createNewTemplateVersion`
+/// copies onto each new row. The `(family_id, version)` unique constraint is
+/// the database's own backstop against two rows ever claiming the same
+/// version number within a family, mirroring the "last line of defence"
+/// role other CHECK/UNIQUE constraints play elsewhere in this schema.
+///
+/// `categories` is stored as JSONB — an ordered list of
+/// `{ category, required }` objects — because Postgres has no native array-
+/// of-object column type and the set is read as a whole by the domain layer,
+/// never queried by individual category from SQL.
+model ConsentTemplate {
+  id       String @id @db.Uuid
+  familyId String @map("family_id") @db.VarChar(64)
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String?    @map("workspace_id") @db.Uuid
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  name        String  @db.VarChar(200)
+  purpose     String  @db.Text
+  description String? @db.Text
+
+  version Int
+  status  String @db.VarChar(16)
+
+  plainLanguageSummary String   @map("plain_language_summary") @db.Text
+  supportedLanguages   String[] @default([]) @map("supported_languages")
+
+  /// `ConsentTemplateCategory[]` — see the model doc comment above.
+  categories Json
+
+  validFrom  DateTime? @map("valid_from") @db.Timestamptz(6)
+  validUntil DateTime? @map("valid_until") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every status transition.
+  revision Int @default(1)
+
+  sessionConsentConfigurations SessionConsentConfiguration[]
+  participantConsentRecords    ParticipantConsentRecord[]
+
+  @@unique([familyId, version])
+  @@index([organisationId])
+  @@index([workspaceId])
+  @@map("consent_template")
+}
+
+/// Which `ConsentTemplate` version a session uses, and which of that
+/// template's categories are required or optional for this specific session
+/// (BUILD_ROADMAP.md Milestone 4). A session has at most one configuration
+/// at a time — `session_id` is unique, and reconfiguring updates the row in
+/// place with optimistic concurrency, rather than versioning the
+/// configuration itself the way `ConsentTemplate` is versioned.
+model SessionConsentConfiguration {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @unique @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  consentTemplateId String          @map("consent_template_id") @db.Uuid
+  consentTemplate   ConsentTemplate @relation(fields: [consentTemplateId], references: [id], onDelete: Restrict)
+  templateVersion   Int             @map("template_version")
+
+  requiredCategories String[] @map("required_categories")
+  optionalCategories String[] @default([]) @map("optional_categories")
+
+  facilitatorInstructions String? @map("facilitator_instructions") @db.Text
+  participantIntroduction String? @map("participant_introduction") @db.Text
+
+  effectiveDate DateTime @map("effective_date") @db.Timestamptz(6)
+  status        String   @db.VarChar(16)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every reconfiguration.
+  version Int @default(1)
+
+  @@index([organisationId])
+  @@index([workspaceId])
+  @@index([consentTemplateId])
+  @@map("session_consent_configuration")
+}
+
+/// One participant's category-level consent decisions, captured against a
+/// specific, immutable `ConsentTemplate` version (BUILD_ROADMAP.md
+/// Milestone 4). Consent decisions are never overwritten — there is no
+/// "edit consent record" function in the domain layer; amending a
+/// participant's consent is two coordinated writes the service layer
+/// performs together: the old record is marked `superseded_by_record_id`,
+/// and a fresh record is captured with `amends_record_id` pointing back at
+/// it. Both `amends_record_id` and `superseded_by_record_id` are therefore
+/// self-referencing foreign keys, given distinct relation names because
+/// Prisma requires one name per self-relation on the same model.
+///
+/// `withdrawal_reason` is restricted — the API layer only includes it in a
+/// response for a caller holding `participant_consent:manage_restricted`,
+/// the same convention `session_participant.facilitator_notes` already
+/// established.
+///
+/// `category_decisions` is stored as JSONB for the same reason
+/// `ConsentTemplate.categories` is: an ordered list of
+/// `{ category, granted }` objects, read as a whole by the domain layer.
+model ParticipantConsentRecord {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  participantId String             @map("participant_id") @db.Uuid
+  participant   SessionParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  consentTemplateId String          @map("consent_template_id") @db.Uuid
+  consentTemplate   ConsentTemplate @relation(fields: [consentTemplateId], references: [id], onDelete: Restrict)
+  templateVersion   Int             @map("template_version")
+
+  /// `ConsentCategoryDecision[]` — see the model doc comment above.
+  categoryDecisions Json @map("category_decisions")
+
+  captureMethod String  @map("capture_method") @db.VarChar(100)
+  language      String? @db.VarChar(50)
+
+  capturedAt DateTime  @map("captured_at") @db.Timestamptz(6)
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
+
+  amendsRecordId String?                    @map("amends_record_id") @db.Uuid
+  amendsRecord   ParticipantConsentRecord?  @relation("ConsentRecordAmendment", fields: [amendsRecordId], references: [id], onDelete: SetNull)
+  amendedBy      ParticipantConsentRecord[] @relation("ConsentRecordAmendment")
+
+  supersededByRecordId String?                    @map("superseded_by_record_id") @db.Uuid
+  supersededBy         ParticipantConsentRecord?  @relation("ConsentRecordSupersession", fields: [supersededByRecordId], references: [id], onDelete: SetNull)
+  supersedes           ParticipantConsentRecord[] @relation("ConsentRecordSupersession")
+
+  withdrawnAt      DateTime? @map("withdrawn_at") @db.Timestamptz(6)
+  /// Restricted — see the model doc comment above.
+  withdrawalReason String?   @map("withdrawal_reason") @db.Text
+
+  acknowledgementReference String? @map("acknowledgement_reference") @db.VarChar(300)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on withdrawal or superseding.
+  version Int @default(1)
+
+  @@index([sessionId])
+  @@index([participantId])
+  @@index([workspaceId])
+  @@index([consentTemplateId])
+  @@map("participant_consent_record")
 }
 
 /// Append-only, hash-chained audit trail (roadmap 3.7).
