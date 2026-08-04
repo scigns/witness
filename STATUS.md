@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-08-03
+**Last updated:** 2026-08-04
 **Updated by:** CTO
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -58,13 +58,13 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 | Product | `product` | Product Director | 🟡 | Personas and core journeys defined; PRDs pending |
 | UX design | `ux-design` | UX Lead | ⚪ | Blocked on Phase 1 journeys |
 | Governance | `governance` | Governance Lead | 🟡 | Consent framework drafted; Indigenous protocols need external review |
-| Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun; authorisation boundary shipped, real identity is Phase 2 |
+| Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun; Casbin-based, organisation/workspace-scoped authorisation shipped (ADR-0007); real identity is Phase 2 |
 | Infrastructure | `infrastructure` | Infrastructure Lead | 🟡 | Compose stack running; observability overlay added, wiring pending |
 | Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0 |
 | Knowledge graph | `knowledge-graph` | Knowledge Graph Lead | 🟡 | Ontology v0.1 in design |
 | AI platform | `ai-platform` | AI Lead | ⚪ | Awaiting Phase 5; model policy drafted |
 | Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; design system awaits Phase 6 |
-| Testing | `testing` | QA Lead | 🟡 | 110 tests; invariant and adversarial suites live |
+| Testing | `testing` | QA Lead | 🟡 | 276 tests across all packages (177 API-gateway); invariant and adversarial suites live |
 | Release | `release` | Release Manager | 🟢 | Strategy and versioning defined |
 
 ---
@@ -87,6 +87,84 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-04 — Authorisation Hardening delivered (BUILD_ROADMAP.md Milestone 1.4), PR open
+
+- **Continuous Product Delivery mode**: verified before starting — PR #24 (CI regression hotfix,
+  discovered while confirming PR #23 was actually green on `main`) merged; `main`'s CI green.
+  Branched `feat/authz/authorisation-hardening` from `fix/auth/ci-regression`'s tip rather than a
+  stale `main` — one clean, CI-green commit ahead of `main` at branch time, disclosed here rather
+  than silently deviating from "branch from main."
+- **Casbin is now a genuine policy decision point (ADR-0007), not a second framework bolted beside
+  the existing role-grants table.** `packages/policy/model.conf` and `packages/policy/policy.csv`
+  are the single, versioned source of truth for what a request-time grant tier (`reader` /
+  `contributor` / `reviewer` / `admin`) may do — ported 1:1 from the pre-existing `role-grants.ts`
+  table, which now exists only as the deprecated fallback for the unverified development header.
+  `PolicyEngineService` loads them once via a real Casbin `Enforcer`; `PolicyEngineService.test.ts`
+  runs against that real, on-disk policy data rather than a fake — and caught a real bug doing so
+  (Casbin's CSV adapter only skips `#`-prefixed comment lines, not `;`-prefixed ones; the policy
+  file's original header used `;` and every enforcement call silently failed to load).
+- **The organisation/workspace scoping gap left open since Authentication (Milestone 1.3) is
+  closed.** `RoleResolutionService` now answers two distinct questions from the same
+  `RoleAssignment` rows: `globalGrantTiers` (unscoped actions — `record:*`, `user:*`, `role:read` —
+  `admin` excluded, unchanged from Milestone 1.3) and `scopedGrantTiers` (a specific organisation or
+  workspace — `admin` included, only within that exact scope, and only when the backing
+  `OrganisationMembership`/`WorkspaceMembership` is in good standing; a workspace scope also honours
+  an assignment on the workspace's *parent* organisation). The workspace/organisation split is a
+  compile-time guarantee, not a runtime convention: `scopedGrantTiers`'s scope parameter type
+  excludes `'global'` entirely, so `admin` cannot leak into an unscoped decision by a later edit
+  forgetting a branch.
+- **`AuthorizationGuard` now resolves a request's organisation/workspace scope and calls the new
+  `PolicyEnforcementService.decide(principal, action, scope)`** instead of
+  `AuthorizationPort.decide()` directly. Scope comes from the route's `organisationId`/`workspaceId`
+  path parameter when present, else a creation body's `organisationId` (`workspace:create`), else
+  the global scope. The unverified `X-Witness-Dev-User` path is untouched: a principal whose
+  `subject` does not start with `user:` falls straight through to the pre-existing, unscoped
+  `AuthorizationPort.decide()` — scoping is a property of real, session-backed identity, and there
+  is no membership set to scope a header nobody has verified to.
+- **`GET /api/v1/organisations` and `GET /api/v1/workspaces` are no longer full-catalog reads for a
+  real session.** Both previously returned every row regardless of caller — authorised per-record
+  by nothing, since neither route resolved a scope. `OrganisationsService.list` now filters to
+  organisations the caller has a membership row in; `WorkspacesService.list` filters to workspaces
+  the caller is a member of directly, or that sit under an organisation the caller is a member of
+  (mirroring the `RoleResolutionService` cascade). The unverified dev-header path keeps seeing
+  everything, exactly as before.
+- **`GET /api/v1/me` now reports the role held in each organisation and workspace**, not just which
+  ones the caller belongs to. `CurrentUserView`'s `organisations`/`workspaces` entries gained a
+  `role: WitnessRole | null` field (`null` is a distinct, honest state — a membership predating its
+  role assignment, per Milestone 1.2's "role assignment never happens implicitly" — not an error).
+  The dashboard's existing "Your access" section now renders a role badge (or "No role assigned
+  yet") next to each organisation and workspace. This is a display convenience only; the server
+  re-derives the same answer independently via `PolicyEnforcementService` on every request, so a
+  stale or manipulated client value can never grant anything.
+- **Known limitation, stated plainly and deliberately not fixed this milestone**: the existing
+  organisation/workspace/membership CRUD pages (`/organisations/[id]`, `/workspaces/[id]`, and
+  their member-management flows) still call the API through the unverified dev-header path, not a
+  real session — migrating them was judged out of scope for an authorisation-hardening milestone
+  and would have doubled its surface area. The dashboard's "Your access" section is an additive
+  extension for real sessions; the management UI itself remains dev-header-only until a later
+  milestone migrates it.
+- **`record:*` and `user:*` actions remain unscoped, on purpose.** `Record`/`Source` carry no
+  `organisationId`/`workspaceId` foreign key in the Prisma schema, and `User` is not
+  organisation-scoped — inventing a scoping model for either was out of scope ("speculative
+  infrastructure" this milestone does not need to build). `organisation:create`/`user:create` stay
+  admin-only in the *global* tier resolution, which never includes `admin` for a real session — the
+  same fail-closed boundary Milestone 1.3 documented and explicitly re-deferred, not resolved, here.
+- **Tests**: 177 API-gateway tests (up from 153 at PR #24's merge) — new coverage for
+  `RoleResolutionService.scopedGrantTiers` (organisation scope, workspace scope, the parent-org
+  cascade, and five adversarial cases: cross-organisation leakage, cross-workspace leakage, a role
+  assignment with no backing membership, a suspended membership, a nonexistent workspace),
+  `PolicyEngineService` against the real on-disk policy data, `PolicyEnforcementService.decide`
+  (grant/deny composition, the dev-header fallback, and fail-closed behaviour when role resolution
+  or the policy engine itself throws), and list-visibility scoping for both
+  `OrganisationsService.list` and `WorkspacesService.list`. All pre-existing tests preserved and
+  passing; `test:invariants` 20/20 and `test:adversarial` 30/30 unchanged. Full `pnpm verify`
+  (format, lint, typecheck, test, build) green.
+- **Not done this milestone, named rather than left implicit**: the milestone's full "current-context
+  panel" UI (hide/disable actions, distinct states for forbidden-org/forbidden-workspace/
+  insufficient-permission beyond what the additive dashboard extension above covers) was scoped down
+  given the CRUD-page dev-header limitation above — there is little value in building rich
+  forbidden-state UI for pages that do not yet authenticate the user they would be describing.
 
 ### 2026-08-03 — Authentication Hardening delivered, PR open
 

@@ -26,6 +26,7 @@ import {
   type IdentityLink,
   type MembershipState,
   type User,
+  type WitnessRole,
 } from '@witness/domain';
 import type { CurrentUserView } from '@witness/contracts';
 
@@ -352,7 +353,7 @@ export class AuthenticationService {
     if (user.accountState === 'suspended') return { status: 'suspended' };
     if (user.accountState === 'deactivated') return { status: 'deactivated' };
 
-    const [organisationMemberships, workspaceMemberships] = await Promise.all([
+    const [organisationMemberships, workspaceMemberships, roleAssignments] = await Promise.all([
       this.prisma.organisationMembership.findMany({
         where: { userId },
         include: { organisation: true },
@@ -361,7 +362,25 @@ export class AuthenticationService {
         where: { userId },
         include: { workspace: true },
       }),
+      // One role per (user, organisation) and one per (user, workspace) —
+      // the `RoleAssignment` domain invariant guarantees at most one row
+      // each, so a plain map (not a multi-value structure) is enough.
+      this.prisma.roleAssignment.findMany({
+        where: { userId },
+        select: { role: true, organisationId: true, workspaceId: true },
+      }),
     ]);
+
+    const roleByOrganisation = new Map(
+      roleAssignments
+        .filter((a) => a.organisationId !== null)
+        .map((a) => [a.organisationId as string, a.role as WitnessRole]),
+    );
+    const roleByWorkspace = new Map(
+      roleAssignments
+        .filter((a) => a.workspaceId !== null)
+        .map((a) => [a.workspaceId as string, a.role as WitnessRole]),
+    );
 
     return {
       status: 'ok',
@@ -376,6 +395,7 @@ export class AuthenticationService {
             id: m.organisation.id,
             name: m.organisation.name,
             createdAt: m.organisation.createdAt.toISOString(),
+            role: roleByOrganisation.get(m.organisation.id) ?? null,
           })),
         workspaces: workspaceMemberships
           .filter((m) => isInGoodStanding(m.state as MembershipState))
@@ -384,6 +404,7 @@ export class AuthenticationService {
             name: m.workspace.name,
             organisationId: m.workspace.organisationId,
             createdAt: m.workspace.createdAt.toISOString(),
+            role: roleByWorkspace.get(m.workspace.id) ?? null,
           })),
       },
     };

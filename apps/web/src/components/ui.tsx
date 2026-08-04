@@ -16,6 +16,7 @@ import type {
   ReviewState,
   RoleAssignmentView,
   RoleDefinition,
+  WitnessRole,
 } from '@witness/contracts';
 
 const STATE_LABELS: Record<ReviewState, string> = {
@@ -74,6 +75,30 @@ export function MembershipStateBadge({ state }: { state: MembershipState }) {
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${MEMBERSHIP_STATE_CLASSES[state]}`}
     >
       {MEMBERSHIP_STATE_LABELS[state]}
+    </span>
+  );
+}
+
+/**
+ * The role a signed-in user holds in one organisation or workspace — display
+ * only, never itself an authorisation decision (the server re-derives the
+ * same answer independently on every request; see `PolicyEnforcementService`).
+ * `null` means the membership exists but carries no role assignment yet
+ * (Milestone 1.2: role assignment never happens implicitly), which is a
+ * distinct, honest state from "no access" and must not be hidden.
+ */
+export function RoleBadge({ role }: { role: WitnessRole | null }) {
+  if (role === null) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-current px-2 py-0.5 text-xs font-medium text-[var(--color-ink-muted)]">
+        No role assigned yet
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-accent)] px-2 py-0.5 text-xs font-medium text-[var(--color-accent)]">
+      {role.charAt(0).toUpperCase() + role.slice(1)}
     </span>
   );
 }

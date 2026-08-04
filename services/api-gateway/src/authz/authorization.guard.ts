@@ -18,6 +18,8 @@ import {
 import { Reflector } from '@nestjs/core';
 
 import { AuthorizationPort, type Action, type Principal } from './authorization.port.js';
+import { PolicyEnforcementService } from './policy-enforcement.service.js';
+import type { ResourceScope } from './role-resolution.service.js';
 import { SessionAuthenticator } from './session-authenticator.js';
 
 export const REQUIRED_ACTION = 'witness:required-action';
@@ -27,7 +29,31 @@ export const Requires = (action: Action) => SetMetadata(REQUIRED_ACTION, action)
 
 export interface RequestWithPrincipal {
   headers: Record<string, string | string[] | undefined>;
+  params: Record<string, string | undefined>;
+  body?: Record<string, unknown>;
   principal?: Principal;
+}
+
+/**
+ * Which organisation or workspace does this request concern? Route params
+ * win when present (reading/acting on an existing organisation or
+ * workspace); otherwise a workspace-creation body carries the parent
+ * `organisationId` that the new workspace will belong to. Anything else
+ * (record:*, user:*, role:read, organisation:create) has no scope to
+ * resolve and falls through to the global tier set.
+ */
+function resolveScope(request: RequestWithPrincipal): ResourceScope {
+  if (typeof request.params['organisationId'] === 'string') {
+    return { type: 'organisation', organisationId: request.params['organisationId'] };
+  }
+  if (typeof request.params['workspaceId'] === 'string') {
+    return { type: 'workspace', workspaceId: request.params['workspaceId'] };
+  }
+  const bodyOrganisationId = request.body?.['organisationId'];
+  if (typeof bodyOrganisationId === 'string') {
+    return { type: 'organisation', organisationId: bodyOrganisationId };
+  }
+  return { type: 'global' };
 }
 
 @Injectable()
@@ -38,6 +64,7 @@ export class AuthorizationGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly authorization: AuthorizationPort,
     private readonly sessionAuthenticator: SessionAuthenticator,
+    private readonly policyEnforcement: PolicyEnforcementService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -87,7 +114,8 @@ export class AuthorizationGuard implements CanActivate {
       });
     }
 
-    const decision = await this.authorization.decide(principal, required);
+    const scope = resolveScope(request);
+    const decision = await this.policyEnforcement.decide(principal, required, scope);
 
     if (!decision.allowed) {
       this.logger.warn(`Denied ${principal.subject} → ${required}: ${decision.reason}`);

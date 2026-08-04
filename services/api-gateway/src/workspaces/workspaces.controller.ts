@@ -23,8 +23,8 @@ export class WorkspacesController {
 
   @Get()
   @Requires('workspace:read')
-  async list(): Promise<{ workspaces: WorkspaceSummary[] }> {
-    return { workspaces: await this.workspaces.list() };
+  async list(@Req() request: RequestWithPrincipal): Promise<{ workspaces: WorkspaceSummary[] }> {
+    return { workspaces: await this.workspaces.list(request.principal!) };
   }
 
   @Post()

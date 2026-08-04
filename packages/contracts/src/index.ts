@@ -231,6 +231,24 @@ export interface RoleAssignmentView {
 }
 
 /**
+ * An organisation or workspace the signed-in user belongs to, together with
+ * the role they hold there — `null` when their membership carries no role
+ * assignment yet (Milestone 1.2: role assignment never happens implicitly,
+ * so a membership predates its role assignment more often than not). This
+ * is a display convenience for the current-context UI (Milestone 1.4,
+ * Authorisation hardening); it is never itself an authorisation decision —
+ * the server-side `PolicyEnforcementService` re-derives the same answer
+ * independently on every request.
+ */
+export interface CurrentUserOrganisationView extends OrganisationSummary {
+  role: WitnessRole | null;
+}
+
+export interface CurrentUserWorkspaceView extends WorkspaceSummary {
+  role: WitnessRole | null;
+}
+
+/**
  * The signed-in user, as returned by `GET /api/v1/me`. Only organisations and
  * workspaces the user actually belongs to are listed — never the full
  * catalog — so a client that renders this response directly cannot
@@ -241,8 +259,8 @@ export interface CurrentUserView {
   displayName: string;
   email: string;
   accountState: AccountState;
-  organisations: OrganisationSummary[];
-  workspaces: WorkspaceSummary[];
+  organisations: CurrentUserOrganisationView[];
+  workspaces: CurrentUserWorkspaceView[];
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────────

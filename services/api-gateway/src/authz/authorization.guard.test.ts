@@ -10,12 +10,20 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { AuthorizationPort, Principal } from './authorization.port.js';
 import { AuthorizationGuard } from './authorization.guard.js';
+import type { PolicyEnforcementService } from './policy-enforcement.service.js';
 import type { SessionAuthenticator } from './session-authenticator.js';
 
 type RequestWithPrincipal = {
   headers: Record<string, string | undefined>;
+  params: Record<string, string | undefined>;
   principal?: Principal;
 };
+
+function fakePolicyEnforcement() {
+  return {
+    decide: vi.fn().mockResolvedValue({ allowed: true, reason: 'ok' }),
+  } as unknown as PolicyEnforcementService;
+}
 
 function fakeReflector(action: string | undefined) {
   return { getAllAndOverride: vi.fn().mockReturnValue(action) } as never;
@@ -41,7 +49,6 @@ describe('AuthorizationGuard — session precedence over the development header'
       authenticate: vi.fn().mockResolvedValue(sessionPrincipal),
     } as unknown as SessionAuthenticator;
 
-    const decide = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok' });
     const authorization = {
       // If the guard ever asks the dev-header path for a principal despite a
       // session already resolving, this attacker-controlled role must not
@@ -52,13 +59,14 @@ describe('AuthorizationGuard — session precedence over the development header'
         kind: 'human',
         roles: ['admin'],
       }),
-      decide,
     } as unknown as AuthorizationPort;
+    const policyEnforcement = fakePolicyEnforcement();
 
     const guard = new AuthorizationGuard(
       fakeReflector('record:read'),
       authorization,
       sessionAuthenticator,
+      policyEnforcement,
     );
 
     const request: RequestWithPrincipal = {
@@ -66,11 +74,14 @@ describe('AuthorizationGuard — session precedence over the development header'
         authorization: 'Bearer real-session-token',
         'x-witness-dev-user': 'Forged Admin|admin',
       },
+      params: {},
     };
 
     await guard.canActivate(fakeContext(request));
 
-    expect(decide).toHaveBeenCalledWith(sessionPrincipal, 'record:read');
+    expect(policyEnforcement.decide).toHaveBeenCalledWith(sessionPrincipal, 'record:read', {
+      type: 'global',
+    });
     expect(request.principal).toEqual(sessionPrincipal);
   });
 
@@ -85,23 +96,28 @@ describe('AuthorizationGuard — session precedence over the development header'
       kind: 'human',
       roles: ['reader'],
     };
-    const decide = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok' });
     const authorization = {
       authenticate: vi.fn().mockResolvedValue(devPrincipal),
-      decide,
     } as unknown as AuthorizationPort;
+    const policyEnforcement = fakePolicyEnforcement();
 
     const guard = new AuthorizationGuard(
       fakeReflector('record:read'),
       authorization,
       sessionAuthenticator,
+      policyEnforcement,
     );
 
-    const request: RequestWithPrincipal = { headers: { 'x-witness-dev-user': 'Local Dev|reader' } };
+    const request: RequestWithPrincipal = {
+      headers: { 'x-witness-dev-user': 'Local Dev|reader' },
+      params: {},
+    };
 
     await guard.canActivate(fakeContext(request));
 
-    expect(decide).toHaveBeenCalledWith(devPrincipal, 'record:read');
+    expect(policyEnforcement.decide).toHaveBeenCalledWith(devPrincipal, 'record:read', {
+      type: 'global',
+    });
     expect(request.principal).toEqual(devPrincipal);
   });
 });

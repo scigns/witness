@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../infrastructure/prisma.service.js';
 import { SessionService } from '../authn/session.service.js';
+import { RoleResolutionService } from './role-resolution.service.js';
 import { SessionAuthenticator } from './session-authenticator.js';
 
 const USER_1 = 'user-1';
@@ -101,7 +102,11 @@ async function issueAndAuthenticate(
 ) {
   const sessions = new SessionService(prisma);
   const { token } = await sessions.issue(USER_1, 60);
-  const authenticator = new SessionAuthenticator(prisma, sessions);
+  const authenticator = new SessionAuthenticator(
+    prisma,
+    sessions,
+    new RoleResolutionService(prisma),
+  );
   return authenticator.authenticate(header(token));
 }
 
@@ -121,7 +126,11 @@ describe('SessionAuthenticator', () => {
   it('returns null for an unknown session token', async () => {
     const { prisma } = fakePrisma({});
     const sessions = new SessionService(prisma);
-    const authenticator = new SessionAuthenticator(prisma, sessions);
+    const authenticator = new SessionAuthenticator(
+      prisma,
+      sessions,
+      new RoleResolutionService(prisma),
+    );
     expect(await authenticator.authenticate('Bearer never-issued')).toBeNull();
   });
 

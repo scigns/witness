@@ -63,6 +63,9 @@ function fakePrisma() {
   const actors: Record<string, unknown>[] = [];
   const auditEvents: Record<string, unknown>[] = [];
   const authSessions: Record<string, unknown>[] = [];
+  const organisationMemberships: Record<string, unknown>[] = [];
+  const workspaceMemberships: Record<string, unknown>[] = [];
+  const roleAssignments: Record<string, unknown>[] = [];
 
   const prisma = {
     authLoginAttempt: {
@@ -175,10 +178,16 @@ function fakePrisma() {
       },
     },
     organisationMembership: {
-      findMany: async () => [],
+      findMany: async ({ where }: { where: { userId: string } }) =>
+        organisationMemberships.filter((m) => m['userId'] === where.userId),
     },
     workspaceMembership: {
-      findMany: async () => [],
+      findMany: async ({ where }: { where: { userId: string } }) =>
+        workspaceMemberships.filter((m) => m['userId'] === where.userId),
+    },
+    roleAssignment: {
+      findMany: async ({ where }: { where: { userId: string } }) =>
+        roleAssignments.filter((a) => a['userId'] === where.userId),
     },
     $transaction: async <T>(fn: (tx: typeof prisma) => Promise<T>) => fn(prisma),
   };
@@ -190,6 +199,9 @@ function fakePrisma() {
     users,
     auditEvents,
     authSessions,
+    organisationMemberships,
+    workspaceMemberships,
+    roleAssignments,
   };
 }
 
@@ -392,6 +404,46 @@ describe('AuthenticationService — sign-in and user mapping', () => {
     expect(current.view.organisations).toEqual([]);
     expect(current.view.workspaces).toEqual([]);
     expect(current.view.email).toBe('invited@example.com');
+  });
+
+  it('getCurrentUser reports the role held in each organisation and workspace, and null where none is assigned yet', async () => {
+    const { prisma, organisationMemberships, workspaceMemberships, roleAssignments } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    organisationMemberships.push({
+      userId: INVITED_USER,
+      state: 'active',
+      organisation: { id: 'org-1', name: 'Org One', createdAt: new Date() },
+    });
+    workspaceMemberships.push({
+      userId: INVITED_USER,
+      state: 'active',
+      workspace: {
+        id: 'workspace-1',
+        name: 'Workspace One',
+        organisationId: 'org-1',
+        createdAt: new Date(),
+      },
+    });
+    // A role assignment for the organisation only — the workspace membership
+    // predates its role assignment, exactly as Milestone 1.2 allows.
+    roleAssignments.push({
+      userId: INVITED_USER,
+      role: 'admin',
+      organisationId: 'org-1',
+      workspaceId: null,
+    });
+
+    const current = await service.getCurrentUser(INVITED_USER);
+    if (current.status !== 'ok') throw new Error(`expected 'ok', got '${current.status}'`);
+    expect(current.view.organisations).toEqual([
+      expect.objectContaining({ id: 'org-1', role: 'admin' }),
+    ]);
+    expect(current.view.workspaces).toEqual([
+      expect.objectContaining({ id: 'workspace-1', role: null }),
+    ]);
   });
 
   it('getCurrentUser reports not_found for an unknown user id', async () => {

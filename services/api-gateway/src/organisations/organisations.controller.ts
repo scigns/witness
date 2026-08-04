@@ -23,8 +23,10 @@ export class OrganisationsController {
 
   @Get()
   @Requires('organisation:read')
-  async list(): Promise<{ organisations: OrganisationSummary[] }> {
-    return { organisations: await this.organisations.list() };
+  async list(
+    @Req() request: RequestWithPrincipal,
+  ): Promise<{ organisations: OrganisationSummary[] }> {
+    return { organisations: await this.organisations.list(request.principal!) };
   }
 
   @Post()

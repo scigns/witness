@@ -16,7 +16,7 @@ import type { HealthResponse, RecordSummary } from '@witness/contracts';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
-import { Card, ErrorNotice, StateBadge } from '@/components/ui';
+import { Card, ErrorNotice, RoleBadge, StateBadge } from '@/components/ui';
 
 export default function DashboardPage() {
   const { user, ready } = useSession();
@@ -88,12 +88,13 @@ export default function DashboardPage() {
                   No organisation memberships.
                 </p>
               ) : (
-                <ul className="space-y-1 text-sm">
+                <ul className="space-y-2 text-sm">
                   {currentUser.organisations.map((org) => (
-                    <li key={org.id}>
+                    <li key={org.id} className="flex flex-wrap items-center justify-between gap-2">
                       <Link href={`/organisations/${org.id}`} className="hover:underline">
                         {org.name}
                       </Link>
+                      <RoleBadge role={org.role} />
                     </li>
                   ))}
                 </ul>
@@ -104,12 +105,16 @@ export default function DashboardPage() {
               {currentUser.workspaces.length === 0 ? (
                 <p className="text-sm text-[var(--color-ink-muted)]">No workspace memberships.</p>
               ) : (
-                <ul className="space-y-1 text-sm">
+                <ul className="space-y-2 text-sm">
                   {currentUser.workspaces.map((workspace) => (
-                    <li key={workspace.id}>
+                    <li
+                      key={workspace.id}
+                      className="flex flex-wrap items-center justify-between gap-2"
+                    >
                       <Link href={`/workspaces/${workspace.id}`} className="hover:underline">
                         {workspace.name}
                       </Link>
+                      <RoleBadge role={workspace.role} />
                     </li>
                   ))}
                 </ul>

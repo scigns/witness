@@ -29,8 +29,19 @@ import type { Principal } from '../authz/authorization.port.js';
 export class OrganisationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(): Promise<OrganisationSummary[]> {
+  /**
+   * A real, verified session only sees organisations it has a membership
+   * row in — otherwise the list itself is a cross-organisation information
+   * leak, independent of what any single record's authorisation check would
+   * allow. The unverified `X-Witness-Dev-User` path is untouched (returns
+   * everything, as it always has): scoping is a property of real identity,
+   * and there is no membership set to scope a header nobody has verified to.
+   */
+  async list(principal: Principal): Promise<OrganisationSummary[]> {
+    const memberOrganisationIds = await this.memberOrganisationIds(principal);
+
     const rows = await this.prisma.organisation.findMany({
+      where: memberOrganisationIds === null ? {} : { id: { in: memberOrganisationIds } },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
@@ -40,6 +51,18 @@ export class OrganisationsService {
       name: row.name,
       createdAt: row.createdAt.toISOString(),
     }));
+  }
+
+  /** `null` means "unscoped — return everything" (the dev-header path). */
+  private async memberOrganisationIds(principal: Principal): Promise<string[] | null> {
+    if (!principal.subject.startsWith('user:')) return null;
+
+    const userId = principal.subject.slice('user:'.length);
+    const memberships = await this.prisma.organisationMembership.findMany({
+      where: { userId },
+      select: { organisationId: true },
+    });
+    return memberships.map((m) => m.organisationId);
   }
 
   async create(name: string, principal: Principal): Promise<OrganisationSummary> {
