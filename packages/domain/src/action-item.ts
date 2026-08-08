@@ -497,6 +497,11 @@ export function cancelActionItem(
   };
 }
 
+/** Whether this action's details can still be edited. */
+export function canEditActionItem(actionItem: ActionItem, sessionStatus: SessionStatus): boolean {
+  return sessionStatus !== 'archived' && !TERMINAL_STATUSES.has(actionItem.status);
+}
+
 /** Whether this action is still live work. */
 export function isOpenActionItem(actionItem: ActionItem): boolean {
   return !TERMINAL_STATUSES.has(actionItem.status);
