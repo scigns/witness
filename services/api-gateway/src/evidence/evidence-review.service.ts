@@ -100,6 +100,21 @@ import { toDetail, toDomainEvidence, type EvidenceRow } from './evidence.service
 
 const SESSION_SUBJECT_PREFIX = 'user:';
 
+/**
+ * Prisma's unique-constraint error, recognised structurally rather than by
+ * `instanceof Prisma.PrismaClientKnownRequestError` — the service tests run
+ * against an in-memory double that never constructs a real Prisma error, and
+ * a check the tests cannot exercise is a check nobody has verified.
+ */
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code: unknown }).code === 'P2002'
+  );
+}
+
 @Injectable()
 export class EvidenceReviewService {
   constructor(
@@ -159,10 +174,29 @@ export class EvidenceReviewService {
       at: now,
     });
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.reviewAssignment.create({ data: toAssignmentCreateRow(outcome.assignment, actor) });
-      await appendAuditEvent(tx, 'review_assignment', outcome.assignment.id, outcome.event, now);
-    });
+    // The check above runs outside this transaction, so two concurrent
+    // assigns can both pass it. The partial unique index is what actually
+    // holds the "one active reviewer" line; translating its violation into
+    // the same 409 keeps the race indistinguishable from the ordinary
+    // already-assigned case rather than surfacing a 500.
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.reviewAssignment.create({
+          data: toAssignmentCreateRow(outcome.assignment, actor),
+        });
+        await appendAuditEvent(tx, 'review_assignment', outcome.assignment.id, outcome.event, now);
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        throw new ConflictException({
+          error: {
+            code: 'REVIEW_ALREADY_ASSIGNED',
+            message: 'This evidence already has an active reviewer. Reassign it instead.',
+          },
+        });
+      }
+      throw error;
+    }
 
     return toAssignmentView(await this.requireAssignmentRowWithActor(outcome.assignment.id));
   }
@@ -302,10 +336,18 @@ export class EvidenceReviewService {
       await appendAuditEvent(tx, 'evidence', evidenceId, outcome.event, now);
 
       if (assignmentOutcome !== null && assignmentRow !== null) {
-        await tx.reviewAssignment.updateMany({
+        const assignmentResult = await tx.reviewAssignment.updateMany({
           where: { id: assignmentRow.id, version: assignmentRow.version },
           data: toAssignmentUpdateRow(assignmentOutcome.assignment),
         });
+        if (assignmentResult.count === 0) {
+          throw new ConflictException({
+            error: {
+              code: 'STALE_VERSION',
+              message: 'This assignment was changed by someone else since you last loaded it.',
+            },
+          });
+        }
         await appendAuditEvent(
           tx,
           'review_assignment',
@@ -529,6 +571,12 @@ export class EvidenceReviewService {
       clarificationId,
     );
     const clarification = toDomainClarification(row);
+
+    // Withdrawing does not move the evidence, but retracting another
+    // reviewer's question is still theirs to do — same ownership check as the
+    // rest of the clarification workflow.
+    await this.requireAssignedReviewer(evidenceId, principal);
+
     const actor = await resolveActor(this.prisma, principal);
     const now = new Date();
 
@@ -561,6 +609,13 @@ export class EvidenceReviewService {
     );
     const clarification = toDomainClarification(clarificationRow);
     const status = session.status as SessionStatus;
+
+    // Closing drives the evidence back out of `needs_clarification`, so it is
+    // a review-lifecycle transition and carries the same ownership check
+    // `requestClarification` applies to the transition into that state.
+    // Without this, any `evidence_review:clarify` holder in the workspace
+    // could resume another reviewer's evidence.
+    await this.requireAssignedReviewer(evidenceId, principal);
 
     const actor = await resolveActor(this.prisma, principal);
     const now = new Date();

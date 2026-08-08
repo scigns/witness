@@ -110,6 +110,12 @@ describe('respondToClarification', () => {
     ).toThrow(/open clarification can be answered/i);
   });
 
+  it('ATTACK — rejects an over-length response', () => {
+    expect(() =>
+      respondToClarification(openClarification(), RESPONDER, 'x'.repeat(4001), LATER),
+    ).toThrow(/4000 characters or fewer/i);
+  });
+
   it('ATTACK — rejects an empty response', () => {
     expect(() => respondToClarification(openClarification(), RESPONDER, '   ', LATER)).toThrow(
       /must not be empty/i,
@@ -128,6 +134,11 @@ describe('withdrawClarification', () => {
     expect(clarification.status).toBe('withdrawn');
     expect(clarification.closeReason).toBe('Resolved by other means.');
     expect(event.action).toBe('clarification.withdrawn');
+  });
+
+  it('stores a blank withdrawal reason as null rather than an empty string', () => {
+    const { clarification } = withdrawClarification(openClarification(), REVIEWER, '   ', LATER);
+    expect(clarification.closeReason).toBeNull();
   });
 
   it('ATTACK — rejects withdrawing an answered clarification', () => {

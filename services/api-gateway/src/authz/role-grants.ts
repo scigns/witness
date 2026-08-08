@@ -114,6 +114,18 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
   // clarification or correct evidence too, not only the assigned reviewer.
   // `evidence_review:manage_restricted` is admin-only, mirroring
   // `evidence:manage_restricted`'s own restricted-field precedent.
+  //
+  // Named consequence, accepted rather than overlooked: because `reviewer`
+  // holds `assign`/`reassign`, a reviewer can assign themselves to any
+  // evidence in the workspace and then validate it. The per-evidence
+  // ownership check in `EvidenceReviewService` therefore prevents one
+  // reviewer acting on *another's* assignment; it is not a segregation of
+  // duties between assigning and deciding. That is deliberate for the MVP —
+  // a reviewer picking up unassigned evidence is the normal workflow, and
+  // there is no second reviewer tier to assign on their behalf. Every
+  // assignment and decision is audited with its actor, so self-assignment is
+  // visible after the fact. Splitting assignment onto an admin-only tier is
+  // the change to make if an institution needs enforced separation.
   reviewer: [
     'record:read',
     'record:create',

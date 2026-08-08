@@ -399,6 +399,55 @@ describe('EvidenceReviewService.reassign', () => {
   });
 });
 
+describe('EvidenceReviewService.cancelAssignment', () => {
+  it('cancels an active assignment, leaving the evidence with no active reviewer', async () => {
+    const { evidenceService, reviewService } = services();
+    const evidence = await submittedEvidence(evidenceService);
+    const assignment = await reviewService.assign(
+      WORKSPACE_1,
+      SESSION_1,
+      evidence.id,
+      { reviewerUserId: REVIEWER_USER_1 },
+      FACILITATOR,
+    );
+
+    await reviewService.cancelAssignment(
+      WORKSPACE_1,
+      SESSION_1,
+      evidence.id,
+      assignment.id,
+      { reason: 'Reviewer unavailable.' },
+      FACILITATOR,
+    );
+
+    expect(await reviewService.getActiveAssignment(WORKSPACE_1, SESSION_1, evidence.id)).toBeNull();
+  });
+
+  it('ATTACK — an assignment from another evidence is not found (IDOR)', async () => {
+    const { evidenceService, reviewService } = services();
+    const evidenceA = await submittedEvidence(evidenceService);
+    const evidenceB = await submittedEvidence(evidenceService);
+    const assignment = await reviewService.assign(
+      WORKSPACE_1,
+      SESSION_1,
+      evidenceA.id,
+      { reviewerUserId: REVIEWER_USER_1 },
+      FACILITATOR,
+    );
+
+    await expect(
+      reviewService.cancelAssignment(
+        WORKSPACE_1,
+        SESSION_1,
+        evidenceB.id,
+        assignment.id,
+        {},
+        FACILITATOR,
+      ),
+    ).rejects.toThrow(NotFoundException);
+  });
+});
+
 describe('EvidenceReviewService.reviewAction', () => {
   it('begins review, validates evidence, and completes the assignment', async () => {
     const { evidenceService, reviewService } = services();
@@ -786,6 +835,92 @@ describe('EvidenceReviewService clarifications', () => {
         REVIEWER_1,
       ),
     ).rejects.toThrow(/answered clarification can be closed/i);
+  });
+
+  it("ATTACK — a non-assigned reviewer cannot close another reviewer's clarification", async () => {
+    const { evidenceService, reviewService } = services();
+    const evidence = await submittedEvidence(evidenceService);
+    await reviewService.assign(
+      WORKSPACE_1,
+      SESSION_1,
+      evidence.id,
+      { reviewerUserId: REVIEWER_USER_1 },
+      FACILITATOR,
+    );
+    await reviewService.reviewAction(
+      WORKSPACE_1,
+      SESSION_1,
+      evidence.id,
+      { action: 'begin_review', expectedVersion: evidence.version },
+      REVIEWER_1,
+    );
+    const clarification = await reviewService.requestClarification(
+      WORKSPACE_1,
+      SESSION_1,
+      evidence.id,
+      { question: 'Which participant raised this?' },
+      REVIEWER_1,
+    );
+    await reviewService.respondToClarification(
+      WORKSPACE_1,
+      SESSION_1,
+      evidence.id,
+      clarification.id,
+      { response: 'Two attendees.' },
+      FACILITATOR,
+    );
+
+    // Closing resumes the evidence into `under_review`, so it is a review
+    // transition and must be the assigned reviewer's to make.
+    await expect(
+      reviewService.closeClarification(
+        WORKSPACE_1,
+        SESSION_1,
+        evidence.id,
+        clarification.id,
+        REVIEWER_2,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+
+    const detail = await evidenceService.get(WORKSPACE_1, SESSION_1, evidence.id, FACILITATOR);
+    expect(detail.reviewStatus).toBe('needs_clarification');
+  });
+
+  it("ATTACK — a non-assigned reviewer cannot withdraw another reviewer's clarification", async () => {
+    const { evidenceService, reviewService } = services();
+    const evidence = await submittedEvidence(evidenceService);
+    await reviewService.assign(
+      WORKSPACE_1,
+      SESSION_1,
+      evidence.id,
+      { reviewerUserId: REVIEWER_USER_1 },
+      FACILITATOR,
+    );
+    await reviewService.reviewAction(
+      WORKSPACE_1,
+      SESSION_1,
+      evidence.id,
+      { action: 'begin_review', expectedVersion: evidence.version },
+      REVIEWER_1,
+    );
+    const clarification = await reviewService.requestClarification(
+      WORKSPACE_1,
+      SESSION_1,
+      evidence.id,
+      { question: 'Which participant raised this?' },
+      REVIEWER_1,
+    );
+
+    await expect(
+      reviewService.withdrawClarification(
+        WORKSPACE_1,
+        SESSION_1,
+        evidence.id,
+        clarification.id,
+        {},
+        REVIEWER_2,
+      ),
+    ).rejects.toThrow(ForbiddenException);
   });
 
   it('ATTACK — clarification from another evidence is not found (IDOR)', async () => {

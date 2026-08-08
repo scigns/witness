@@ -1126,6 +1126,11 @@ export function canBeginReview(evidence: Evidence, sessionStatus: SessionStatus)
   return sessionStatus !== 'archived' && evidence.reviewStatus === 'submitted';
 }
 
+/** Whether review can resume after a clarification is resolved. */
+export function canResumeReview(evidence: Evidence, sessionStatus: SessionStatus): boolean {
+  return sessionStatus !== 'archived' && evidence.reviewStatus === 'needs_clarification';
+}
+
 /** Whether a reviewer may validate or reject this evidence right now. */
 export function canDecideEvidence(evidence: Evidence, sessionStatus: SessionStatus): boolean {
   return sessionStatus !== 'archived' && evidence.reviewStatus === 'under_review';

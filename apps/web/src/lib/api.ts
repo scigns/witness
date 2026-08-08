@@ -815,9 +815,9 @@ export const api = {
     user: ActingUser,
   ): Promise<void> =>
     request<void>(
-      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/assignment/${encodeURIComponent(assignmentId)}`,
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/assignment/${encodeURIComponent(assignmentId)}/cancel`,
       user,
-      { method: 'DELETE', body: JSON.stringify(body) },
+      { method: 'POST', body: JSON.stringify(body) },
     ),
 
   reviewAction: (

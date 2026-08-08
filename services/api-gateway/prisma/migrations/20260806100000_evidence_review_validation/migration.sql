@@ -65,6 +65,11 @@ CREATE INDEX "review_assignment_reviewer_user_id_idx" ON "review_assignment"("re
 -- session_participant_session_id_linked_user_id_key.
 CREATE UNIQUE INDEX "review_assignment_one_active_per_evidence_key" ON "review_assignment"("evidence_id") WHERE "status" IN ('assigned', 'in_progress');
 
+-- CreateIndex: the referencing side of the self-reference gets no index
+-- automatically, and the SET NULL applied when a prior assignment is deleted
+-- would otherwise scan the table.
+CREATE INDEX "review_assignment_reassigned_from_id_idx" ON "review_assignment"("reassigned_from_id");
+
 -- CreateIndex
 CREATE INDEX "clarification_session_id_idx" ON "clarification"("session_id");
 
@@ -108,7 +113,7 @@ ALTER TABLE "clarification" ADD CONSTRAINT "clarification_session_id_fkey" FOREI
 ALTER TABLE "clarification" ADD CONSTRAINT "clarification_evidence_id_fkey" FOREIGN KEY ("evidence_id") REFERENCES "evidence"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "clarification" ADD CONSTRAINT "clarification_review_assignment_id_fkey" FOREIGN KEY ("review_assignment_id") REFERENCES "review_assignment"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "clarification" ADD CONSTRAINT "clarification_review_assignment_id_fkey" FOREIGN KEY ("review_assignment_id") REFERENCES "review_assignment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "clarification" ADD CONSTRAINT "clarification_requested_by_id_fkey" FOREIGN KEY ("requested_by_id") REFERENCES "actor"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
