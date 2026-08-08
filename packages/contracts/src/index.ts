@@ -765,6 +765,199 @@ export const withdrawClarificationRequestSchema = z.object({
 });
 export type WithdrawClarificationRequest = z.infer<typeof withdrawClarificationRequestSchema>;
 
+// ─── Decisions, commitments and actions (BUILD_ROADMAP.md Milestone 7) ────────
+
+export const DECISION_STATUSES = ['proposed', 'confirmed', 'superseded', 'reversed'] as const;
+export type DecisionStatus = (typeof DECISION_STATUSES)[number];
+
+export const COMMITMENT_STATUSES = [
+  'proposed',
+  'active',
+  'fulfilled',
+  'withdrawn',
+  'superseded',
+] as const;
+export type CommitmentStatus = (typeof COMMITMENT_STATUSES)[number];
+
+export const ACTION_ITEM_STATUSES = [
+  'open',
+  'in_progress',
+  'blocked',
+  'completed',
+  'cancelled',
+] as const;
+export type ActionItemStatus = (typeof ACTION_ITEM_STATUSES)[number];
+
+export const ACTION_ITEM_PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const;
+export type ActionItemPriority = (typeof ACTION_ITEM_PRIORITIES)[number];
+
+export const OUTCOME_TYPES = ['decision', 'commitment', 'action_item'] as const;
+export type OutcomeType = (typeof OUTCOME_TYPES)[number];
+
+/**
+ * How an outcome is justified. There are exactly two admissible bases — see
+ * `packages/domain/src/outcome-support.ts`'s file header for why, and why
+ * `institutional_synthesis` is required to state a rationale rather than
+ * being a way to record an outcome with nothing behind it.
+ */
+export const OUTCOME_SUPPORT_BASES = ['validated_evidence', 'institutional_synthesis'] as const;
+export type OutcomeSupportBasis = (typeof OUTCOME_SUPPORT_BASES)[number];
+
+export const proposeDecisionRequestSchema = z.object({
+  title: z.string().trim().min(1, 'A title is required').max(300),
+  statement: z.string().trim().min(1, 'A decision statement is required').max(5000),
+});
+export type ProposeDecisionRequest = z.infer<typeof proposeDecisionRequestSchema>;
+
+export const updateDecisionRequestSchema = z.object({
+  title: z.string().trim().min(1).max(300).optional(),
+  statement: z.string().trim().min(1).max(5000).optional(),
+  expectedVersion: z.number().int().positive(),
+});
+export type UpdateDecisionRequest = z.infer<typeof updateDecisionRequestSchema>;
+
+/**
+ * There is no `propose` action here — proposing creates the decision, so it
+ * is a `POST` to the collection rather than a transition. `supersede`
+ * requires the id of the replacement: "superseded by nothing" is how a
+ * decision quietly disappears from the record.
+ */
+export const decisionTransitionRequestSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('confirm'), expectedVersion: z.number().int().positive() }),
+  z.object({
+    action: z.literal('supersede'),
+    supersededByDecisionId: z.string().uuid('A valid replacement decision id is required'),
+    reason: z.string().trim().max(2000).optional(),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({
+    action: z.literal('reverse'),
+    reason: z.string().trim().min(1, 'A reversal reason is required').max(2000),
+    expectedVersion: z.number().int().positive(),
+  }),
+]);
+export type DecisionTransitionRequest = z.infer<typeof decisionTransitionRequestSchema>;
+
+/**
+ * `ownerDescription` is required and `ownerUserId` is not: the owner of a
+ * commitment is frequently a team or an agency rather than a Witness account
+ * holder. See `packages/domain/src/commitment.ts`'s file header, including
+ * why a session *participant* is never recorded as the owner.
+ */
+export const proposeCommitmentRequestSchema = z.object({
+  title: z.string().trim().min(1, 'A title is required').max(300),
+  description: z.string().trim().min(1, 'A description is required').max(5000),
+  ownerDescription: z.string().trim().min(1, 'An owner is required').max(300),
+  ownerUserId: z.string().uuid().optional(),
+  dueDate: z.string().datetime({ offset: true }).optional(),
+});
+export type ProposeCommitmentRequest = z.infer<typeof proposeCommitmentRequestSchema>;
+
+export const updateCommitmentRequestSchema = z.object({
+  title: z.string().trim().min(1).max(300).optional(),
+  description: z.string().trim().min(1).max(5000).optional(),
+  ownerDescription: z.string().trim().min(1).max(300).optional(),
+  ownerUserId: z.string().uuid().nullable().optional(),
+  dueDate: z.string().datetime({ offset: true }).nullable().optional(),
+  expectedVersion: z.number().int().positive(),
+});
+export type UpdateCommitmentRequest = z.infer<typeof updateCommitmentRequestSchema>;
+
+export const commitmentTransitionRequestSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('activate'), expectedVersion: z.number().int().positive() }),
+  z.object({
+    action: z.literal('fulfil'),
+    note: z.string().trim().max(2000).optional(),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({
+    action: z.literal('withdraw'),
+    reason: z.string().trim().min(1, 'A withdrawal reason is required').max(2000),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({
+    action: z.literal('supersede'),
+    supersededByCommitmentId: z.string().uuid('A valid replacement commitment id is required'),
+    reason: z.string().trim().max(2000).optional(),
+    expectedVersion: z.number().int().positive(),
+  }),
+]);
+export type CommitmentTransitionRequest = z.infer<typeof commitmentTransitionRequestSchema>;
+
+export const createActionItemRequestSchema = z.object({
+  title: z.string().trim().min(1, 'A title is required').max(300),
+  description: z.string().trim().min(1, 'A description is required').max(5000),
+  ownerDescription: z.string().trim().min(1, 'An owner is required').max(300),
+  ownerUserId: z.string().uuid().optional(),
+  priority: z.enum(ACTION_ITEM_PRIORITIES).optional(),
+  dueDate: z.string().datetime({ offset: true }).optional(),
+});
+export type CreateActionItemRequest = z.infer<typeof createActionItemRequestSchema>;
+
+export const updateActionItemRequestSchema = z.object({
+  title: z.string().trim().min(1).max(300).optional(),
+  description: z.string().trim().min(1).max(5000).optional(),
+  ownerDescription: z.string().trim().min(1).max(300).optional(),
+  ownerUserId: z.string().uuid().nullable().optional(),
+  priority: z.enum(ACTION_ITEM_PRIORITIES).optional(),
+  dueDate: z.string().datetime({ offset: true }).nullable().optional(),
+  expectedVersion: z.number().int().positive(),
+});
+export type UpdateActionItemRequest = z.infer<typeof updateActionItemRequestSchema>;
+
+/**
+ * `record_progress` deliberately does not change state — it is available
+ * while an action is `in_progress` *or* `blocked`, because a blocked action
+ * can still have its situation updated and requiring an unblock first would
+ * lose the note. The server rejects a progress update carrying neither a
+ * percentage nor a note.
+ */
+export const actionItemTransitionRequestSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('start'), expectedVersion: z.number().int().positive() }),
+  z.object({
+    action: z.literal('record_progress'),
+    percentComplete: z.number().int().min(0).max(100).optional(),
+    note: z.string().trim().max(2000).optional(),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({
+    action: z.literal('block'),
+    reason: z.string().trim().min(1, 'A blocking reason is required').max(2000),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({ action: z.literal('unblock'), expectedVersion: z.number().int().positive() }),
+  z.object({
+    action: z.literal('complete'),
+    note: z.string().trim().max(2000).optional(),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({
+    action: z.literal('cancel'),
+    reason: z.string().trim().min(1, 'A cancellation reason is required').max(2000),
+    expectedVersion: z.number().int().positive(),
+  }),
+]);
+export type ActionItemTransitionRequest = z.infer<typeof actionItemTransitionRequestSchema>;
+
+/**
+ * Attach a basis to an outcome. Discriminated on `basis` so the rationale
+ * is structurally required for institutional synthesis rather than checked
+ * after the fact — an outcome with neither evidence nor stated reasoning is
+ * indistinguishable from one somebody made up.
+ */
+export const recordOutcomeSupportRequestSchema = z.discriminatedUnion('basis', [
+  z.object({
+    basis: z.literal('validated_evidence'),
+    evidenceId: z.string().uuid('A valid evidence id is required'),
+    note: z.string().trim().max(2000).optional(),
+  }),
+  z.object({
+    basis: z.literal('institutional_synthesis'),
+    rationale: z.string().trim().min(1, 'A rationale is required').max(4000),
+  }),
+]);
+export type RecordOutcomeSupportRequest = z.infer<typeof recordOutcomeSupportRequestSchema>;
+
 // ─── Responses ───────────────────────────────────────────────────────────────
 
 export interface ActorView {
@@ -1234,6 +1427,135 @@ export interface ClarificationView {
   status: ClarificationStatus;
   closeReason: string | null;
   version: number;
+}
+
+/**
+ * What an outcome rests on. The evidence fields are frozen at link time —
+ * `evidenceVersion` is the version that was validated, not the evidence's
+ * current version, so a later correction cannot silently change what the
+ * outcome was justified by.
+ */
+export interface OutcomeSupportView {
+  id: string;
+  outcomeType: OutcomeType;
+  outcomeId: string;
+  basis: OutcomeSupportBasis;
+  /** Present only for `validated_evidence`. */
+  evidenceId: string | null;
+  evidenceVersion: number | null;
+  evidenceVerificationStatus: EvidenceVerificationStatus | null;
+  /** The evidence's title at read time, for display; absent if unreadable. */
+  evidenceTitle?: string;
+  /** Required for `institutional_synthesis`. */
+  rationale: string | null;
+  note: string | null;
+  recordedBy: ActorView;
+  recordedAt: string;
+}
+
+export interface DecisionSummary {
+  id: string;
+  sessionId: string;
+  title: string;
+  status: DecisionStatus;
+  proposedAt: string;
+  confirmedAt: string | null;
+  supportCount: number;
+  updatedAt: string;
+}
+
+export interface DecisionDetail extends DecisionSummary {
+  organisationId: string;
+  workspaceId: string;
+  statement: string;
+  proposedBy: ActorView;
+  confirmedBy: ActorView | null;
+  supersededByDecisionId: string | null;
+  supersededAt: string | null;
+  reversedAt: string | null;
+  closeReason: string | null;
+  createdAt: string;
+  /** Optimistic-concurrency counter — send back as `expectedVersion` on the next write. */
+  version: number;
+  /**
+   * Server-computed, so a client never reimplements the lifecycle state
+   * machine. State-derived only: it does not encode whether the caller holds
+   * the authorisation the API will then require.
+   */
+  permittedActions: DecisionTransitionRequest['action'][];
+  canEdit: boolean;
+  supports: OutcomeSupportView[];
+}
+
+/**
+ * `ownerDescription` is plain language and always present; `ownerUserId` is
+ * a Witness user account and often absent. Neither is ever a session
+ * participant — see `packages/domain/src/commitment.ts`.
+ */
+export interface CommitmentSummary {
+  id: string;
+  sessionId: string;
+  title: string;
+  status: CommitmentStatus;
+  ownerDescription: string;
+  ownerUserId: string | null;
+  dueDate: string | null;
+  overdue: boolean;
+  supportCount: number;
+  updatedAt: string;
+}
+
+export interface CommitmentDetail extends CommitmentSummary {
+  organisationId: string;
+  workspaceId: string;
+  description: string;
+  proposedBy: ActorView;
+  proposedAt: string;
+  activatedBy: ActorView | null;
+  activatedAt: string | null;
+  fulfilledAt: string | null;
+  fulfilmentNote: string | null;
+  supersededByCommitmentId: string | null;
+  closedAt: string | null;
+  closeReason: string | null;
+  createdAt: string;
+  version: number;
+  permittedActions: CommitmentTransitionRequest['action'][];
+  canEdit: boolean;
+  supports: OutcomeSupportView[];
+}
+
+export interface ActionItemSummary {
+  id: string;
+  sessionId: string;
+  title: string;
+  status: ActionItemStatus;
+  priority: ActionItemPriority;
+  ownerDescription: string;
+  ownerUserId: string | null;
+  dueDate: string | null;
+  overdue: boolean;
+  percentComplete: number;
+  supportCount: number;
+  updatedAt: string;
+}
+
+export interface ActionItemDetail extends ActionItemSummary {
+  organisationId: string;
+  workspaceId: string;
+  description: string;
+  progressNote: string | null;
+  blockedReason: string | null;
+  createdBy: ActorView;
+  startedAt: string | null;
+  completedAt: string | null;
+  closedAt: string | null;
+  closeReason: string | null;
+  createdAt: string;
+  version: number;
+  permittedActions: ActionItemTransitionRequest['action'][];
+  canEdit: boolean;
+  supports: OutcomeSupportView[];
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────────

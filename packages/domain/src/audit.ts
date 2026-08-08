@@ -89,6 +89,28 @@ export const AUDIT_ACTIONS = [
   'clarification.responded',
   'clarification.withdrawn',
   'clarification.closed',
+  'decision.proposed',
+  'decision.updated',
+  'decision.confirmed',
+  'decision.superseded',
+  'decision.reversed',
+  'commitment.proposed',
+  'commitment.updated',
+  'commitment.activated',
+  'commitment.fulfilled',
+  'commitment.withdrawn',
+  'commitment.superseded',
+  'action_item.created',
+  'action_item.updated',
+  'action_item.started',
+  'action_item.progress_recorded',
+  'action_item.blocked',
+  'action_item.unblocked',
+  'action_item.completed',
+  'action_item.cancelled',
+  'outcome_support.evidence_linked',
+  'outcome_support.synthesis_recorded',
+  'outcome_support.removed',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -117,6 +139,10 @@ export const AUDIT_SUBJECT_TYPES = [
   'evidence_link',
   'review_assignment',
   'clarification',
+  'decision',
+  'commitment',
+  'action_item',
+  'outcome_support',
 ] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 

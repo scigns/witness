@@ -78,7 +78,14 @@ export type Action =
   | 'evidence_review:validate'
   | 'evidence_review:reject'
   | 'evidence_review:view_history'
-  | 'evidence_review:manage_restricted';
+  | 'evidence_review:manage_restricted'
+  | 'outcome:read'
+  | 'outcome:create'
+  | 'outcome:update'
+  | 'outcome:transition'
+  | 'outcome:confirm'
+  | 'outcome:close'
+  | 'outcome:link_support';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;
