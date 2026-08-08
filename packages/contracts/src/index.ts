@@ -1166,9 +1166,12 @@ export interface EvidenceDetail extends EvidenceSummary {
   /** Server-computed, so a client never has to reimplement the lifecycle state machine. */
   permittedActions: EvidenceTransitionRequest['action'][];
   /**
-   * Server-computed review actions available to the current caller —
-   * empty unless the caller holds the active `ReviewAssignment` for this
-   * evidence (or `evidence_review:manage_restricted`).
+   * Server-computed review actions the evidence's own state allows.
+   *
+   * State-derived only: this does NOT encode whether the current caller
+   * holds the active `ReviewAssignment`, so a non-assigned caller may see
+   * an action here that the API then refuses. The server re-checks
+   * ownership on every review write — see `EvidenceReviewService`.
    */
   permittedReviewActions: EvidenceReviewActionRequest['action'][];
   canEdit: boolean;

@@ -17,7 +17,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  Delete,
   Get,
   HttpCode,
   Param,
@@ -41,6 +40,7 @@ import {
   type ReviewAssignmentView,
 } from '@witness/contracts';
 import { DomainError } from '@witness/domain';
+import type { ZodType } from 'zod';
 
 import {
   AuthorizationGuard,
@@ -106,7 +106,10 @@ export class EvidenceReviewController {
     );
   }
 
-  @Delete('review/assignment/:assignmentId')
+  // POST, not DELETE: the cancellation reason travels in the body, and
+  // intermediaries are entitled to drop a body on DELETE — which would lose
+  // the reason silently from the audit event.
+  @Post('review/assignment/:assignmentId/cancel')
   @HttpCode(204)
   @Requires('evidence_review:assign')
   async cancelAssignment(
@@ -278,20 +281,16 @@ export class EvidenceReviewController {
   }
 }
 
-function parseOr<T>(
-  schema: { safeParse: (input: unknown) => { success: boolean; data?: T; error?: unknown } },
-  body: unknown,
-): T {
+function parseOr<T>(schema: ZodType<T>, body: unknown): T {
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    const zodError = parsed.error as { flatten: () => { fieldErrors: Record<string, string[]> } };
     throw new BadRequestException({
       error: {
         code: 'VALIDATION_FAILED',
         message: 'The request body is not valid.',
-        fields: zodError.flatten().fieldErrors,
+        fields: parsed.error.flatten().fieldErrors,
       },
     });
   }
-  return parsed.data as T;
+  return parsed.data;
 }

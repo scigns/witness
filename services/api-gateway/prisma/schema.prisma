@@ -851,6 +851,7 @@ model ReviewAssignment {
   @@index([sessionId])
   @@index([evidenceId])
   @@index([reviewerUserId])
+  @@index([reassignedFromId])
   @@map("review_assignment")
 }
 
@@ -875,7 +876,13 @@ model Clarification {
   evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
 
   reviewAssignmentId String           @map("review_assignment_id") @db.Uuid
-  reviewAssignment   ReviewAssignment @relation(fields: [reviewAssignmentId], references: [id], onDelete: Restrict)
+  /// Cascade, not Restrict: `Clarification.evidence` and
+  /// `ReviewAssignment.evidence` both cascade from `Evidence`, and Postgres
+  /// does not guarantee the order it applies them. A Restrict here could
+  /// abort an `Evidence` delete part-way through its own cascade, depending
+  /// on which side Postgres reached first. A clarification cannot outlive the
+  /// assignment that produced it anyway.
+  reviewAssignment   ReviewAssignment @relation(fields: [reviewAssignmentId], references: [id], onDelete: Cascade)
 
   question String @db.Text
 

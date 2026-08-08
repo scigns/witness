@@ -33,6 +33,7 @@ import {
   canCorrectEvidence,
   canDecideEvidence,
   canEditEvidence,
+  canResumeReview,
   canSubmitEvidence,
   canWithdrawEvidence,
   captureEvidence,
@@ -574,9 +575,7 @@ export function toDetail(
   if (canDecideEvidence(evidence, sessionStatus)) {
     permittedReviewActions.push('validate', 'reject');
   }
-  if (evidence.reviewStatus === 'needs_clarification' && sessionStatus !== 'archived') {
-    permittedReviewActions.push('resume_review');
-  }
+  if (canResumeReview(evidence, sessionStatus)) permittedReviewActions.push('resume_review');
 
   return {
     ...summary,

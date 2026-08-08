@@ -135,11 +135,14 @@ export function assignReviewer(input: AssignReviewerInput): ReviewAssignmentOutc
     event: {
       action: 'review_assignment.assigned',
       actor: input.assignedBy,
-      metadata: {
-        evidenceId: assignment.evidenceId,
-        reviewerUserId: assignment.reviewerUserId,
-        reassignedFromId: assignment.reassignedFromId ?? '',
-      },
+      metadata:
+        assignment.reassignedFromId === null
+          ? { evidenceId: assignment.evidenceId, reviewerUserId: assignment.reviewerUserId }
+          : {
+              evidenceId: assignment.evidenceId,
+              reviewerUserId: assignment.reviewerUserId,
+              reassignedFromId: assignment.reassignedFromId,
+            },
     },
   };
 }

@@ -263,8 +263,9 @@ describe('correctEvidence', () => {
       { correctionType: 'clerical', reason: 'fix', title: 'x' },
       LATER,
     );
-    expect(evidence).not.toHaveProperty('reviewStatusChanged');
     expect(evidence.reviewStatus).toBe('submitted');
+    expect(evidence.verificationStatus).toBe('unverified');
+    expect(evidence.reviewDecisionReason).toBeNull();
   });
 
   it('ATTACK — rejects correcting a draft (must use updateEvidenceDraft instead)', () => {

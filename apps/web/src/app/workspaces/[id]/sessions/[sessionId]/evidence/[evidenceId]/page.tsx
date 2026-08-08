@@ -147,19 +147,20 @@ export default function EvidenceDetailPage({
       // loaded separately and failures here never block the page above —
       // a caller without evidence_review:read still sees the evidence
       // itself, just not the review section.
-      try {
-        const [assignmentResult, clarificationsResult, usersResult] = await Promise.all([
-          api.getReviewAssignment(workspaceId, sessionId, evidenceId, user),
-          api.listClarifications(workspaceId, sessionId, evidenceId, user),
-          api.listUsers(user),
-        ]);
-        if (cancelledRef.current) return;
-        setAssignment(assignmentResult.assignment);
-        setClarifications(clarificationsResult.clarifications);
-        setUsers(usersResult.users);
-      } catch {
-        // Silently unavailable — see comment above.
+      // Settled, not all: a caller who may read the assignment but not the
+      // user list would otherwise lose the assignment too, and the card would
+      // read "No reviewer assigned yet" for evidence that has one.
+      const [assignmentResult, clarificationsResult, usersResult] = await Promise.allSettled([
+        api.getReviewAssignment(workspaceId, sessionId, evidenceId, user),
+        api.listClarifications(workspaceId, sessionId, evidenceId, user),
+        api.listUsers(user),
+      ]);
+      if (cancelledRef.current) return;
+      if (assignmentResult.status === 'fulfilled') setAssignment(assignmentResult.value.assignment);
+      if (clarificationsResult.status === 'fulfilled') {
+        setClarifications(clarificationsResult.value.clarifications);
       }
+      if (usersResult.status === 'fulfilled') setUsers(usersResult.value.users);
     },
     [workspaceId, sessionId, evidenceId, user],
   );
@@ -296,6 +297,19 @@ export default function EvidenceDetailPage({
     }
   };
 
+  /**
+   * Re-read the evidence after a review-adjacent write. Guarded: the mutation
+   * has already succeeded server-side, so a failed refresh is a stale view,
+   * not a failed action, and must not surface as an error or an unhandled
+   * rejection.
+   */
+  const refreshEvidence = async () => {
+    const refreshed = await api
+      .getEvidence(workspaceId, sessionId, evidenceId, user)
+      .catch(() => null);
+    if (refreshed !== null) setEvidence(refreshed);
+  };
+
   const runReviewMutation = async <T,>(operation: () => Promise<T>): Promise<T | null> => {
     setReviewBusy(true);
     setReviewError(null);
@@ -323,6 +337,7 @@ export default function EvidenceDetailPage({
     if (created !== null) {
       setAssignment(created);
       setAssigningReviewerId('');
+      await refreshEvidence();
     }
   };
 
@@ -342,6 +357,7 @@ export default function EvidenceDetailPage({
       setAssignment(created);
       setAssigningReviewerId('');
       setReassigning(false);
+      await refreshEvidence();
     }
   };
 
@@ -430,8 +446,7 @@ export default function EvidenceDetailPage({
       setClarifications((current) => [...current, created]);
       setClarificationQuestion('');
       setClarifying(false);
-      const refreshed = await api.getEvidence(workspaceId, sessionId, evidenceId, user);
-      setEvidence(refreshed);
+      await refreshEvidence();
     }
   };
 
@@ -464,8 +479,7 @@ export default function EvidenceDetailPage({
       setClarifications((current) =>
         current.map((clarification) => (clarification.id === updated.id ? updated : clarification)),
       );
-      const refreshed = await api.getEvidence(workspaceId, sessionId, evidenceId, user);
-      setEvidence(refreshed);
+      await refreshEvidence();
     }
   };
 
