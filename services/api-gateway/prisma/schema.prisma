@@ -28,9 +28,12 @@ model Actor {
   displayName String   @map("display_name") @db.VarChar(200)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  capturedRecords Record[]       @relation("CapturedBy")
-  auditEvents     AuditEvent[]
-  evidenceLinks   EvidenceLink[] @relation("EvidenceLinkCreatedBy")
+  capturedRecords           Record[]           @relation("CapturedBy")
+  auditEvents               AuditEvent[]
+  evidenceLinks             EvidenceLink[]     @relation("EvidenceLinkCreatedBy")
+  reviewAssignmentsAssigned ReviewAssignment[] @relation("ReviewAssignmentAssignedBy")
+  clarificationsRequested   Clarification[]    @relation("ClarificationRequestedBy")
+  clarificationsResponded   Clarification[]    @relation("ClarificationRespondedBy")
 
   @@index([kind])
   @@map("actor")
@@ -104,6 +107,8 @@ model Organisation {
   participantConsentRecords    ParticipantConsentRecord[]
   evidence                     Evidence[]
   evidenceLinks                EvidenceLink[]
+  reviewAssignments            ReviewAssignment[]
+  clarifications               Clarification[]
 
   @@map("organisation")
 }
@@ -133,6 +138,8 @@ model Workspace {
   participantConsentRecords    ParticipantConsentRecord[]
   evidence                     Evidence[]
   evidenceLinks                EvidenceLink[]
+  reviewAssignments            ReviewAssignment[]
+  clarifications               Clarification[]
 
   @@index([organisationId])
   @@map("workspace")
@@ -161,6 +168,7 @@ model User {
   authSessions              AuthSession[]
   facilitatedSessions       CoDesignSession[]
   linkedSessionParticipants SessionParticipant[]
+  reviewAssignments         ReviewAssignment[]       @relation("ReviewAssignmentReviewer")
 
   @@index([accountState])
   @@map("witness_user")
@@ -395,6 +403,8 @@ model CoDesignSession {
   participantConsentRecords ParticipantConsentRecord[]
   evidence                  Evidence[]
   evidenceLinks             EvidenceLink[]
+  reviewAssignments         ReviewAssignment[]
+  clarifications            Clarification[]
 
   @@index([organisationId])
   @@index([workspaceId, status])
@@ -684,13 +694,13 @@ model Evidence {
   sessionId String          @map("session_id") @db.Uuid
   session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  evidenceType String @map("evidence_type") @db.VarChar(100)
-  title        String @db.VarChar(300)
-  content      String @db.Text
+  evidenceType String  @map("evidence_type") @db.VarChar(100)
+  title        String  @db.VarChar(300)
+  content      String  @db.Text
   language     String? @db.VarChar(50)
 
-  capturedAt            DateTime @map("captured_at") @db.Timestamptz(6)
-  sessionOffsetSeconds  Int?     @map("session_offset_seconds")
+  capturedAt           DateTime @map("captured_at") @db.Timestamptz(6)
+  sessionOffsetSeconds Int?     @map("session_offset_seconds")
 
   sourceParticipantId String?             @map("source_participant_id") @db.Uuid
   sourceParticipant   SessionParticipant? @relation(fields: [sourceParticipantId], references: [id], onDelete: SetNull)
@@ -710,11 +720,16 @@ model Evidence {
 
   supersededByEvidenceId String?    @map("superseded_by_evidence_id") @db.Uuid
   supersededBy           Evidence?  @relation("EvidenceSupersession", fields: [supersededByEvidenceId], references: [id], onDelete: SetNull)
-  supersedes              Evidence[] @relation("EvidenceSupersession")
+  supersedes             Evidence[] @relation("EvidenceSupersession")
 
   withdrawnAt      DateTime? @map("withdrawn_at") @db.Timestamptz(6)
   /// Restricted — see the model doc comment above.
   withdrawalReason String?   @map("withdrawal_reason") @db.Text
+
+  /// The reviewer's stated reason for the most recent validate/reject
+  /// decision (BUILD_ROADMAP.md Milestone 6). Null until a decision has
+  /// been made.
+  reviewDecisionReason String? @map("review_decision_reason") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -722,8 +737,10 @@ model Evidence {
   /// Optimistic-concurrency counter; bumped on every mutation.
   version Int @default(1)
 
-  linksFrom EvidenceLink[] @relation("EvidenceLinkFrom")
-  linksTo   EvidenceLink[] @relation("EvidenceLinkTo")
+  linksFrom         EvidenceLink[]     @relation("EvidenceLinkFrom")
+  linksTo           EvidenceLink[]     @relation("EvidenceLinkTo")
+  reviewAssignments ReviewAssignment[]
+  clarifications    Clarification[]
 
   @@index([sessionId])
   @@index([workspaceId])
@@ -772,6 +789,121 @@ model EvidenceLink {
   @@index([sessionId])
   @@index([toEvidenceId])
   @@map("evidence_link")
+}
+
+/// Who is reviewing a specific piece of evidence, and where that review
+/// currently stands (BUILD_ROADMAP.md Milestone 6, Evidence Review and
+/// Validation). See `packages/domain/src/review-assignment.ts`'s file
+/// header for why this is its own aggregate rather than a column on
+/// `Evidence`.
+///
+/// The MVP supports exactly one *active* assignment per evidence at a time.
+/// `EvidenceReviewService` checks this before creating a new assignment,
+/// but it cannot be trusted to be the only enforcement point, so the
+/// partial unique index on `(evidence_id) WHERE status IN ('assigned',
+/// 'in_progress')` — expressible only in migration SQL, not this DSL, same
+/// convention as `session_participant`'s `linked_user_id` partial index —
+/// is the last line of defence.
+model ReviewAssignment {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  evidenceId String   @map("evidence_id") @db.Uuid
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  reviewerUserId String @map("reviewer_user_id") @db.Uuid
+  reviewerUser   User   @relation("ReviewAssignmentReviewer", fields: [reviewerUserId], references: [id], onDelete: Restrict)
+
+  assignedById String @map("assigned_by_id") @db.Uuid
+  assignedBy   Actor  @relation("ReviewAssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
+
+  assignedAt  DateTime  @map("assigned_at") @db.Timestamptz(6)
+  startedAt   DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  status String @db.VarChar(16)
+
+  /// The prior assignment this one replaces, when created by reassignment.
+  /// The prior row itself is never deleted.
+  reassignedFromId String?            @map("reassigned_from_id") @db.Uuid
+  reassignedFrom   ReviewAssignment?  @relation("ReviewAssignmentReassignment", fields: [reassignedFromId], references: [id], onDelete: SetNull)
+  reassignedTo     ReviewAssignment[] @relation("ReviewAssignmentReassignment")
+
+  /// Why this assignment was cancelled or reassigned away from.
+  closeReason String? @map("close_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every mutation.
+  version Int @default(1)
+
+  clarifications Clarification[]
+
+  @@index([sessionId])
+  @@index([evidenceId])
+  @@index([reviewerUserId])
+  @@map("review_assignment")
+}
+
+/// A reviewer's question about a specific piece of evidence, and the answer
+/// (if any) that resolves it (BUILD_ROADMAP.md Milestone 6, Evidence Review
+/// and Validation). See `packages/domain/src/clarification.ts`'s file
+/// header for why this is its own aggregate rather than a comment thread
+/// bolted onto `Evidence`.
+model Clarification {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  evidenceId String   @map("evidence_id") @db.Uuid
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  reviewAssignmentId String           @map("review_assignment_id") @db.Uuid
+  reviewAssignment   ReviewAssignment @relation(fields: [reviewAssignmentId], references: [id], onDelete: Restrict)
+
+  question String @db.Text
+
+  requestedById String   @map("requested_by_id") @db.Uuid
+  requestedBy   Actor    @relation("ClarificationRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  requestedAt   DateTime @map("requested_at") @db.Timestamptz(6)
+
+  response String? @db.Text
+
+  respondedById String?   @map("responded_by_id") @db.Uuid
+  respondedBy   Actor?    @relation("ClarificationRespondedBy", fields: [respondedById], references: [id], onDelete: Restrict)
+  respondedAt   DateTime? @map("responded_at") @db.Timestamptz(6)
+
+  status String @db.VarChar(16)
+
+  /// Why this was withdrawn or closed without an answer, when applicable.
+  closeReason String? @map("close_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every mutation.
+  version Int @default(1)
+
+  @@index([sessionId])
+  @@index([evidenceId])
+  @@index([reviewAssignmentId])
+  @@map("clarification")
 }
 
 /// Append-only, hash-chained audit trail (roadmap 3.7).

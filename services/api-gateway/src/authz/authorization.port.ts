@@ -66,7 +66,19 @@ export type Action =
   | 'evidence:transition'
   | 'evidence:manage_restricted'
   | 'evidence_link:read'
-  | 'evidence_link:manage';
+  | 'evidence_link:manage'
+  | 'evidence_review:list'
+  | 'evidence_review:read'
+  | 'evidence_review:assign'
+  | 'evidence_review:reassign'
+  | 'evidence_review:start'
+  | 'evidence_review:clarify'
+  | 'evidence_review:respond'
+  | 'evidence_review:correct'
+  | 'evidence_review:validate'
+  | 'evidence_review:reject'
+  | 'evidence_review:view_history'
+  | 'evidence_review:manage_restricted';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;

@@ -28,6 +28,8 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'participant_consent:read',
     'evidence:read',
     'evidence_link:read',
+    'evidence_review:list',
+    'evidence_review:read',
   ],
   // `session:update`/`session:transition` are workspace-wide, not
   // per-session: any contributor in a workspace's scope may rename, close,
@@ -95,7 +97,23 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'evidence:manage_restricted',
     'evidence_link:read',
     'evidence_link:manage',
+    'evidence_review:list',
+    'evidence_review:read',
+    'evidence_review:respond',
+    'evidence_review:correct',
   ],
+  // `evidence_review:*` (BUILD_ROADMAP.md Milestone 6, Evidence Review and
+  // Validation) is where `reviewer` first gains write actions of its own —
+  // Milestone 5 granted this tier only `evidence:read`/`evidence_link:read`
+  // because there was nothing yet for a reviewer to do. `assign`/`reassign`
+  // (who reviews what), `start`/`clarify`/`validate`/`reject` (moving the
+  // review state machine) and `view_history` (correction/decision history)
+  // are reviewer-tier actions; `respond` and `correct` are granted to both
+  // reviewer and contributor because a facilitator or the evidence's own
+  // capturer — contributor-tier actors — must be able to answer a
+  // clarification or correct evidence too, not only the assigned reviewer.
+  // `evidence_review:manage_restricted` is admin-only, mirroring
+  // `evidence:manage_restricted`'s own restricted-field precedent.
   reviewer: [
     'record:read',
     'record:create',
@@ -110,6 +128,17 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'participant_consent:read',
     'evidence:read',
     'evidence_link:read',
+    'evidence_review:list',
+    'evidence_review:read',
+    'evidence_review:assign',
+    'evidence_review:reassign',
+    'evidence_review:start',
+    'evidence_review:clarify',
+    'evidence_review:respond',
+    'evidence_review:correct',
+    'evidence_review:validate',
+    'evidence_review:reject',
+    'evidence_review:view_history',
   ],
   // Least privilege (Constitution, Authority and Access): organisation and
   // workspace creation are the privileged actions in this slice, so they are the
@@ -168,6 +197,18 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'evidence:manage_restricted',
     'evidence_link:read',
     'evidence_link:manage',
+    'evidence_review:list',
+    'evidence_review:read',
+    'evidence_review:assign',
+    'evidence_review:reassign',
+    'evidence_review:start',
+    'evidence_review:clarify',
+    'evidence_review:respond',
+    'evidence_review:correct',
+    'evidence_review:validate',
+    'evidence_review:reject',
+    'evidence_review:view_history',
+    'evidence_review:manage_restricted',
   ],
 });
 

@@ -78,6 +78,17 @@
 # needs the reviewer tier to already be able to see evidence; Milestone 5
 # itself grants that tier no write actions, since it has nothing for a
 # reviewer to do yet.
+#
+# evidence_review:* (BUILD_ROADMAP.md Milestone 6, Evidence Review and
+# Validation): this is where `reviewer` first gains write actions — `assign`/
+# `reassign` (who reviews what), `start`/`clarify`/`validate`/`reject`
+# (moving the review state machine) and `view_history` (correction/decision
+# history) are reviewer-tier actions. `respond` and `correct` are granted to
+# both `reviewer` and `contributor`, because a facilitator or the evidence's
+# own capturer — contributor-tier actors — must be able to answer a
+# clarification or correct evidence too, not only the assigned reviewer.
+# `evidence_review:manage_restricted` is admin-only, mirroring
+# `evidence:manage_restricted`'s own restricted-field precedent.
 p, reader, record:read
 p, reader, organisation:read
 p, reader, workspace:read
@@ -89,6 +100,8 @@ p, reader, session_consent:read
 p, reader, participant_consent:read
 p, reader, evidence:read
 p, reader, evidence_link:read
+p, reader, evidence_review:list
+p, reader, evidence_review:read
 
 p, contributor, record:read
 p, contributor, record:create
@@ -116,6 +129,10 @@ p, contributor, evidence:transition
 p, contributor, evidence:manage_restricted
 p, contributor, evidence_link:read
 p, contributor, evidence_link:manage
+p, contributor, evidence_review:list
+p, contributor, evidence_review:read
+p, contributor, evidence_review:respond
+p, contributor, evidence_review:correct
 
 p, reviewer, record:read
 p, reviewer, record:create
@@ -130,6 +147,17 @@ p, reviewer, session_consent:read
 p, reviewer, participant_consent:read
 p, reviewer, evidence:read
 p, reviewer, evidence_link:read
+p, reviewer, evidence_review:list
+p, reviewer, evidence_review:read
+p, reviewer, evidence_review:assign
+p, reviewer, evidence_review:reassign
+p, reviewer, evidence_review:start
+p, reviewer, evidence_review:clarify
+p, reviewer, evidence_review:respond
+p, reviewer, evidence_review:correct
+p, reviewer, evidence_review:validate
+p, reviewer, evidence_review:reject
+p, reviewer, evidence_review:view_history
 
 p, admin, record:read
 p, admin, record:create
@@ -172,3 +200,15 @@ p, admin, evidence:transition
 p, admin, evidence:manage_restricted
 p, admin, evidence_link:read
 p, admin, evidence_link:manage
+p, admin, evidence_review:list
+p, admin, evidence_review:read
+p, admin, evidence_review:assign
+p, admin, evidence_review:reassign
+p, admin, evidence_review:start
+p, admin, evidence_review:clarify
+p, admin, evidence_review:respond
+p, admin, evidence_review:correct
+p, admin, evidence_review:validate
+p, admin, evidence_review:reject
+p, admin, evidence_review:view_history
+p, admin, evidence_review:manage_restricted
