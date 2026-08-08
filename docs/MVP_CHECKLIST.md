@@ -474,49 +474,49 @@ E.1 Evidence Review and Validation (Milestone 6)
 It is distinct from section F's "Human Review", which covers review of AI-generated output and
 remains post-MVP and unchecked.*
 
-Captured evidence does not become validated by default — READY (Evidence Review PR, not yet
+Captured evidence does not become validated by default — READY (Evidence Review, PR #35
 merged). `captureEvidence` starts every record `unverified`, and only `validateEvidence` — reachable
 solely from `under_review` — ever sets `verificationStatus: 'verified'`. Draft→Validated,
 Submitted→Validated, Draft→Under-Review-without-submission and Rejected→Validated are unreachable
 because no function in `packages/domain/src/evidence.ts` accepts those starting states.
 
-A reviewer can be assigned to a specific piece of evidence — READY (Evidence Review PR, not yet
+A reviewer can be assigned to a specific piece of evidence — READY (Evidence Review, PR #35
 merged). `ReviewAssignment` (`packages/domain/src/review-assignment.ts`) is a first-class aggregate;
 `POST .../evidence/:id/review/assignment` creates one, and the MVP allows exactly one *active*
 assignment per evidence — checked in `EvidenceReviewService.assign` and backed by a partial unique
 index (`review_assignment_one_active_per_evidence_key`) as the last line of defence.
 
-Only the assigned reviewer can validate or reject — READY (Evidence Review PR, not yet merged).
+Only the assigned reviewer can validate or reject — READY (Evidence Review, PR #35 merged).
 Two authorisation layers apply: the Casbin `evidence_review:*` action check (does this role hold the
 action in this workspace at all), then `EvidenceReviewService.requireAssignedReviewer` (is this
 principal the reviewer of record for *this* evidence). A role grant alone is not sufficient; test
 coverage in `services/api-gateway/src/evidence/evidence-review.service.test.ts` includes the
 wrong-reviewer and no-assignment cases.
 
-A reviewer can request clarification and receive an answer — READY (Evidence Review PR, not yet
+A reviewer can request clarification and receive an answer — READY (Evidence Review, PR #35
 merged). `Clarification` (`packages/domain/src/clarification.ts`) has its own
 `open → answered → closed` lifecycle plus `withdrawn`; requesting one moves the evidence to
 `needs_clarification` and closing an answered one resumes `under_review` — each pairing is a single
 transaction, so the two aggregates can never disagree.
 
 Evidence can be corrected during review without silently becoming validated — READY (Evidence
-Review PR, not yet merged). `correctEvidence` requires a `correctionType`
+Review, PR #35 merged). `correctEvidence` requires a `correctionType`
 (`clerical`/`participant_clarification`/`facilitator_interpretation`/`substantive`) and a reason,
 applies only to `submitted`/`under_review`/`needs_clarification`, and never writes `reviewStatus` —
 the field is absent from its output overrides, so this is structural, not a runtime guard.
 
-Rejected evidence is distinguishable from withdrawn evidence — READY (Evidence Review PR, not yet
+Rejected evidence is distinguishable from withdrawn evidence — READY (Evidence Review, PR #35
 merged). `rejectEvidence` sets `verificationStatus: 'disputed'` and requires a reason;
 `withdrawEvidence` sets `reviewStatus: 'withdrawn'` and leaves verification `unverified`. Withdrawn
 evidence never reads as verified.
 
-Review events are audited — READY (Evidence Review PR, not yet merged). Ten new audit actions
+Review events are audited — READY (Evidence Review, PR #35 merged). Ten new audit actions
 (`evidence.review_started`, `evidence.needs_clarification`, `evidence.validated`,
 `evidence.rejected`, `evidence.corrected`, `review_assignment.*`, `clarification.*`) append to the
 existing hash-chained `AuditEvent` trail, on the same subject-scoped chains as every prior
 milestone.
 
-Concurrent review decisions cannot both land — READY (Evidence Review PR, not yet merged). Every
+Concurrent review decisions cannot both land — READY (Evidence Review, PR #35 merged). Every
 review write carries `expectedVersion` and commits through a conditional `updateMany`; a stale
 write is a `409 STALE_VERSION` with nothing persisted, including the audit event.
 
@@ -524,9 +524,75 @@ Pilot-blocking gate
 
 Evidence that supports an institutional outcome has been validated by an identified human reviewer,
 with the decision, its reason, and its reviewer preserved in the audit trail — PARTIALLY READY.
-The mechanism exists and is unit- and service-tested (Evidence Review PR, not yet merged). This gate
-is not fully met until the PR merges and the review workflow is walked through end to end against a
-live Postgres and browser, which this sandbox does not have.
+The mechanism exists, is unit- and service-tested, and is now enforced at the point of use by
+Milestone 7 (see E.2). This gate is not fully met until the review workflow is walked through end
+to end against a live Postgres and browser, which this sandbox does not have.
+
+E.2 Decisions, Commitments and Actions (Milestone 7)
+
+A session's decisions are recorded separately from its evidence — READY (Outcomes PR, not yet
+merged). `Decision` (`packages/domain/src/decision.ts`) is its own aggregate with its own
+lifecycle: `proposed → confirmed`, then `superseded` (replaced by a later decision) or `reversed`
+(the institution changed its mind). The two terminal states stay distinct, because collapsing them
+would destroy the only signal that tells an institution its decisions are unstable.
+
+Commitments record who undertook what, by when — READY (Outcomes PR, not yet merged). `Commitment`
+runs `proposed → active → fulfilled`, with `withdrawn` and `superseded` as the other exits.
+Ownership is two-part: `ownerDescription` is required plain language (a team, a service, a named
+post), and `ownerUserId` is optional and must be a member in good standing of the outcome's own
+organisation. A session participant is never recorded as an owner — no field allows it, which is
+what keeps Milestone 4's anonymity guarantees intact here.
+
+Actions can be tracked through to completion — READY (Outcomes PR, not yet merged). `ActionItem`
+runs `open → in_progress → completed`, with `blocked` (reason required) and `cancelled` (reason
+required) alongside, plus a priority and an advisory percentage. Progress can be recorded while an
+action is blocked, because requiring an unblock first would lose the note.
+
+A decision or commitment cannot be made authoritative without a stated basis — READY (Outcomes PR,
+not yet merged). `confirmDecision` and `activateCommitment` call `assertSupported` before they will
+return a confirmed or active aggregate, so "confirmed with nothing behind it" is not representable.
+Exactly two bases are admissible: validated evidence, or an explicitly recorded institutional
+synthesis whose rationale is mandatory.
+
+Only validated evidence can carry an outcome — READY (Outcomes PR, not yet merged).
+`assertEvidenceSupportable` (`packages/domain/src/outcome-support.ts`) refuses evidence that is
+`draft`, `submitted`, `under_review`, `needs_clarification`, `rejected` or `withdrawn` by name
+rather than by a catch-all, refuses evidence whose verification is `disputed`, and refuses evidence
+from another workspace or organisation. Evidence the caller cannot reach at all is refused as
+`EVIDENCE_NOT_FOUND` before the domain is consulted, so an outcome id cannot be used to probe for
+evidence elsewhere.
+
+Traceability survives a later correction — READY (Outcomes PR, not yet merged). The support record
+freezes the evidence id, the *version* that was validated, and the verification status at link
+time. Correcting the evidence afterwards bumps its own version and leaves the support record
+untouched, so "what did we actually rely on" is still answerable.
+
+An outcome cannot quietly lose its basis — READY (Outcomes PR, not yet merged). The support records
+are loaded inside the same transaction that writes a confirmation, so a basis removed concurrently
+is seen; and `OutcomeSupportService.remove` refuses to detach the last basis from an outcome that
+is already authoritative.
+
+Confirming an outcome is a separate permission from proposing one — READY (Outcomes PR, not yet
+merged). `outcome:create`/`update`/`transition`/`link_support` are contributor-tier;
+`outcome:confirm` and `outcome:close` are reviewer-tier, mirroring the split Milestone 6
+established between capturing evidence and validating it.
+
+Outcome history is preserved — READY (Outcomes PR, not yet merged). Twenty-two new audit actions
+across four new subject-scoped hash chains (`decision`, `commitment`, `action_item`,
+`outcome_support`). Nothing in this milestone deletes an outcome; superseding and reversing both
+keep the record and say which happened.
+
+Concurrent outcome writes cannot both land — READY (Outcomes PR, not yet merged). Every write
+carries `expectedVersion` and commits through a conditional `updateMany`; a stale write is a
+`409 STALE_VERSION` with nothing persisted, including the audit event.
+
+Pilot-blocking gate
+
+Every confirmed decision and active commitment in a session can be traced to validated evidence or
+to a recorded institutional synthesis with its rationale — PARTIALLY READY. The mechanism exists
+and is unit- and service-tested (Outcomes PR, not yet merged). This gate is not fully met until the
+workflow is walked through end to end against a live Postgres and browser, which this sandbox does
+not have.
 
 F. AI Processing
 
