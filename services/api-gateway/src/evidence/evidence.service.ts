@@ -29,6 +29,9 @@ import {
 import { randomUUID } from 'node:crypto';
 
 import {
+  canBeginReview,
+  canCorrectEvidence,
+  canDecideEvidence,
   canEditEvidence,
   canSubmitEvidence,
   canWithdrawEvidence,
@@ -52,6 +55,7 @@ import {
 import type {
   CaptureEvidenceRequest,
   EvidenceDetail,
+  EvidenceReviewActionRequest,
   EvidenceReviewStatus,
   EvidenceSummary,
   EvidenceTransitionRequest,
@@ -475,6 +479,7 @@ export function toDomainEvidence(row: EvidenceRow): Evidence {
       row.supersededByEvidenceId !== null ? toEvidenceId(row.supersededByEvidenceId) : null,
     withdrawnAt: row.withdrawnAt,
     withdrawalReason: row.withdrawalReason,
+    reviewDecisionReason: row.reviewDecisionReason,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     version: row.version,
@@ -511,6 +516,7 @@ function toUpdateRow(evidence: Evidence) {
     supersededByEvidenceId: evidence.supersededByEvidenceId,
     withdrawnAt: evidence.withdrawnAt,
     withdrawalReason: evidence.withdrawalReason,
+    reviewDecisionReason: evidence.reviewDecisionReason,
     updatedAt: evidence.updatedAt,
     version: evidence.version,
   };
@@ -544,7 +550,7 @@ function toSummary(row: EvidenceRow): EvidenceSummary {
   };
 }
 
-function toDetail(
+export function toDetail(
   row: EvidenceRow,
   sessionStatus: SessionStatus,
   includeRestricted: boolean,
@@ -555,6 +561,22 @@ function toDetail(
   const permittedActions: EvidenceTransitionRequest['action'][] = [];
   if (canSubmitEvidence(evidence, sessionStatus)) permittedActions.push('submit');
   if (canWithdrawEvidence(evidence, sessionStatus)) permittedActions.push('withdraw');
+
+  /**
+   * State-derived only — same convention `permittedActions` above already
+   * uses. Whether the *current caller specifically* holds the active
+   * `ReviewAssignment` (and so may actually call `begin_review`/`validate`/
+   * `reject`) is `EvidenceReviewService`'s per-request authorisation check,
+   * not something this state machine can know from the evidence row alone.
+   */
+  const permittedReviewActions: EvidenceReviewActionRequest['action'][] = [];
+  if (canBeginReview(evidence, sessionStatus)) permittedReviewActions.push('begin_review');
+  if (canDecideEvidence(evidence, sessionStatus)) {
+    permittedReviewActions.push('validate', 'reject');
+  }
+  if (evidence.reviewStatus === 'needs_clarification' && sessionStatus !== 'archived') {
+    permittedReviewActions.push('resume_review');
+  }
 
   return {
     ...summary,
@@ -568,7 +590,10 @@ function toDetail(
     createdAt: row.createdAt.toISOString(),
     version: row.version,
     permittedActions,
+    permittedReviewActions,
     canEdit: canEditEvidence(evidence, sessionStatus),
+    canCorrect: canCorrectEvidence(evidence, sessionStatus),
+    reviewDecisionReason: row.reviewDecisionReason,
     ...(includeRestricted
       ? { consentBasis: [...row.consentBasis], withdrawalReason: row.withdrawalReason }
       : {}),

@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-08-04 (Milestone 5)
+**Last updated:** 2026-08-06 (Milestone 6)
 **Updated by:** CTO
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -61,11 +61,11 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 | Governance | `governance` | Governance Lead | 🟡 | Consent framework drafted; Indigenous protocols need external review |
 | Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun; Casbin-based, organisation/workspace-scoped authorisation shipped (ADR-0007); real identity is Phase 2 |
 | Infrastructure | `infrastructure` | Infrastructure Lead | 🟡 | Compose stack running; observability overlay added, wiring pending |
-| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2), Participant Management (Milestone 3) and Consent Management (Milestone 4) shipped; Structured Live Evidence Capture (Milestone 5) implemented in this PR, not yet merged |
+| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2), Participant Management (Milestone 3), Consent Management (Milestone 4) and Structured Live Evidence Capture (Milestone 5) shipped; Evidence Review and Validation (Milestone 6) implemented in this PR, not yet merged |
 | Knowledge graph | `knowledge-graph` | Knowledge Graph Lead | 🟡 | Ontology v0.1 in design |
 | AI platform | `ai-platform` | AI Lead | ⚪ | Awaiting Phase 5; model policy drafted |
-| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2), participant (Milestone 3) and consent management (Milestone 4) screens shipped; evidence capture (Milestone 5) screens implemented in this PR, not yet merged; design system awaits Phase 6 |
-| Testing | `testing` | QA Lead | 🟡 | 624 tests across all packages (321 API-gateway, 266 domain); invariant and adversarial suites live |
+| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2), participant (Milestone 3), consent management (Milestone 4) and evidence capture (Milestone 5) screens shipped; evidence review (Milestone 6) screens implemented in this PR, not yet merged; design system awaits Phase 6 |
+| Testing | `testing` | QA Lead | 🟡 | 701 tests across all packages (343 API-gateway, 321 domain); invariant and adversarial suites live |
 | Release | `release` | Release Manager | 🟢 | Strategy and versioning defined |
 
 ---
@@ -88,6 +88,91 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-06 — Evidence Review and Validation delivered (BUILD_ROADMAP.md Milestone 6), PR open
+
+- **Fifth capability in the "WITNESS — COMPLETE THE HUMAN-LED MVP" sequence.** With Structured Live
+  Evidence Capture merged (PR #29), evidence captured during a session now goes through a
+  human-controlled review before it counts as validated institutional knowledge. The distinction
+  this milestone exists to preserve: what a participant said, what a facilitator recorded, what a
+  reviewer validated, rejected, or still needs clarified — none of those collapse into each other.
+- **Extends, does not replace, Milestone 5's `Evidence` aggregate.** `EVIDENCE_REVIEW_STATUSES` and
+  `EVIDENCE_VERIFICATION_STATUSES` already declared their full seven/three-state vocabularies in
+  Milestone 5; this milestone adds the mutators that make `under_review`/`needs_clarification`/
+  `validated`/`rejected` and `verified`/`disputed` reachable — `beginReview`,
+  `markNeedsClarification`, `resumeReviewAfterClarification`, `validateEvidence`, `rejectEvidence`,
+  each gating on one specific starting `reviewStatus` so every explicitly-forbidden transition
+  (Draft→Validated, Submitted→Validated, Draft→Under-Review without submission, Rejected→Validated,
+  Withdrawn→any active review state) is structurally unreachable — no function accepts it as a
+  starting state, not a runtime check preventing it.
+- **Two new domain aggregates** (`packages/domain/src`): `ReviewAssignment` (who is reviewing a
+  piece of evidence and where that review stands — `assigned`/`in_progress`/`completed`/
+  `cancelled`/`reassigned`; the MVP supports exactly one *active* assignment per evidence, enforced
+  by the service layer plus a partial unique database index as the last line of defence, since the
+  domain layer cannot read the database to check it itself) and `Clarification` (a reviewer's
+  question and its answer — `open`/`answered`/`withdrawn`/`closed` — never exposing a restricted
+  participant identity, since it only ever carries `Actor`s, never a `SessionParticipant`).
+  Reassignment and cancellation both close the existing row (`status` changes) rather than deleting
+  it — the same non-destructive-history philosophy every prior aggregate's withdrawal/supersession
+  pattern already established.
+- **Correction is structurally distinct from a review decision.** `correctEvidence` — a clerical
+  fix, an incorporated clarification, a facilitator's interpretive gloss, or a substantive content
+  change, each labelled by `correctionType` and always requiring a `reason` — is permitted only for
+  `submitted`/`under_review`/`needs_clarification` evidence and never writes to `reviewStatus` at
+  all: the field is simply absent from its output-object overrides, so "a correction cannot silently
+  validate evidence" is enforced by the absence of a code path, not a guard. Attribution-changing
+  corrections rerun the same domain-level compatibility check `updateEvidenceDraft` uses; the
+  consent half of that check is the service layer's job, matching every other consent-adjacent
+  mutation in this package.
+- **Verification status is the "claim about truth" axis; review status is the "workflow position"
+  axis — kept genuinely separate.** `validateEvidence` is the only function that ever sets
+  `verificationStatus: 'verified'`; `rejectEvidence` is the only one that ever sets `'disputed'`.
+  Validation reason is optional; rejection reason is required — an unexplained rejection gives
+  whoever captured the evidence nothing to act on.
+- **Two authorisation layers on every review-lifecycle write, not one.** The Casbin scope-tier
+  boundary (new `evidence_review:list/read/assign/reassign/start/clarify/respond/correct/validate/
+  reject/view_history/manage_restricted` actions, `reader`/`contributor`/`reviewer`/`admin` tiers)
+  answers "does this role hold the action at all, in this workspace"; `EvidenceReviewService`
+  additionally checks the caller is the specific reviewer holding the active `ReviewAssignment` for
+  *this* evidence before `begin_review`/`validate`/`reject`/clarification actions succeed — a role
+  grant alone is not enough, since the milestone's authorisation matrix explicitly rejects
+  "validation by an unauthorised reviewer" even when that reviewer's role would otherwise permit the
+  Casbin action generally. A caller holding `evidence_review:manage_restricted` (admin tier)
+  overrides the per-reviewer check, the same "restricted tier can override" precedent
+  `evidence:manage_restricted` already established.
+- **Clarification requests and closures are atomic cross-aggregate transactions.** Requesting a
+  clarification moves `Evidence` to `needs_clarification` and creates the `Clarification` row in one
+  transaction; closing an answered clarification moves `Evidence` back to `under_review` and closes
+  the `Clarification` row in the other — the same `SessionConsentConfigurationService.configure`
+  precedent (new row + related-aggregate-state-update, one transaction) used again here for a second
+  pairing.
+- **API**: nested under the existing `/evidence/:evidenceId` path —
+  `review/assignment` (get/assign/reassign/cancel), `review/actions` (begin_review/resume_review/
+  validate/reject), `review/correction`, and `review/clarifications` (list/request/respond/withdraw/
+  close). `EvidenceDetail` gained `permittedReviewActions` (server-computed, state-derived — the
+  frontend never reimplements the review state machine), `canCorrect`, and `reviewDecisionReason`.
+- **Frontend**: the evidence detail page gained a Review section — reviewer assignment/reassignment,
+  begin/validate/reject controls (rendered only from server-computed `permittedReviewActions`),
+  a correction editor, and a clarification thread (ask/respond/withdraw/close) — all reusing the
+  existing `EvidenceReviewStatusBadge` (already visually distinguishing all seven states since
+  Milestone 5) rather than inventing a second status indicator. The evidence list's status filter
+  gained the four review states the filter previously had no options for.
+- **Known limitations, named rather than hidden:** no live Postgres or Docker was available in this
+  sandbox, so the migration is hand-authored SQL (validated via `prisma validate`/`generate`, not
+  applied against a live database) and the full workflow could not be walked through in a browser —
+  same constraint every prior milestone was built under. There is no per-session "assigned
+  facilitator" ownership check, the same named gap every prior milestone carries. The frontend's
+  review section loads and fails silently on `403` (no `evidence_review:read`) rather than showing a
+  distinct forbidden state for that specific section — a caller without evidence access at all still
+  sees the page's own top-level forbidden state, this only affects the finer-grained case. Decisions,
+  Commitments, and Actions (Milestone 7) and Session Summary, Reporting, and Export (Milestone 8) do
+  not exist yet.
+- **Verification:** `pnpm verify` (format, lint, typecheck, 701 tests across all packages — 321
+  domain (up from 266 — includes new `evidence-review.test.ts`, `review-assignment.test.ts`,
+  `clarification.test.ts`), 343 API-gateway (up from 321 — includes 19 new `EvidenceReviewService`
+  tests), 12 contracts, 25 config — build) all green. `scripts/ci/check-domain-purity.sh` and
+  `docs:lint` pass. No live Postgres/browser in this sandbox — manual verification is reproducible
+  steps only, not an executed walkthrough.
 
 ### 2026-08-04 — Structured Live Evidence Capture delivered (BUILD_ROADMAP.md Milestone 5), PR open
 

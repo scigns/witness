@@ -12,8 +12,11 @@
 import type {
   AddMembershipRequest,
   AddSessionParticipantRequest,
+  AssignReviewerRequest,
   AssignRoleRequest,
+  CancelReviewAssignmentRequest,
   CaptureParticipantConsentRequest,
+  ClarificationView,
   CoDesignSessionDetail,
   CoDesignSessionSummary,
   ConfigureSessionConsentRequest,
@@ -22,6 +25,7 @@ import type {
   ConsentTemplateDetail,
   ConsentTemplateSummary,
   CaptureEvidenceRequest,
+  CorrectEvidenceRequest,
   CreateCoDesignSessionRequest,
   CreateConsentTemplateRequest,
   CreateConsentTemplateVersionRequest,
@@ -33,6 +37,7 @@ import type {
   CurrentUserView,
   EvidenceDetail,
   EvidenceLinkView,
+  EvidenceReviewActionRequest,
   EvidenceSummary,
   EvidenceTransitionRequest,
   HealthResponse,
@@ -40,10 +45,14 @@ import type {
   OrganisationMembershipView,
   OrganisationSummary,
   ParticipantConsentRecordDetail,
+  ReassignReviewerRequest,
   ReconfigureSessionConsentRequest,
   RecordDetail,
   RecordSummary,
+  RequestClarificationRequest,
+  RespondToClarificationRequest,
   ReviewAction,
+  ReviewAssignmentView,
   RoleAssignmentView,
   RoleDefinition,
   SessionConsentConfigurationView,
@@ -57,6 +66,7 @@ import type {
   UpdateParticipantNotesRequest,
   UpdateSessionParticipantRequest,
   UserSummary,
+  WithdrawClarificationRequest,
   WithdrawParticipantConsentRequest,
   WorkspaceMembershipView,
   WorkspaceSummary,
@@ -754,6 +764,151 @@ export const api = {
       `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/links/${encodeURIComponent(linkId)}`,
       user,
       { method: 'DELETE' },
+    ),
+
+  // ─── Evidence review and validation (BUILD_ROADMAP.md Milestone 6) ────────
+
+  getReviewAssignment: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    user: ActingUser,
+  ): Promise<{ assignment: ReviewAssignmentView | null }> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/assignment`,
+      user,
+    ),
+
+  assignReviewer: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    body: AssignReviewerRequest,
+    user: ActingUser,
+  ): Promise<ReviewAssignmentView> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/assignment`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  reassignReviewer: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    assignmentId: string,
+    body: ReassignReviewerRequest,
+    user: ActingUser,
+  ): Promise<ReviewAssignmentView> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/assignment/${encodeURIComponent(assignmentId)}/reassign`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  cancelReviewAssignment: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    assignmentId: string,
+    body: CancelReviewAssignmentRequest,
+    user: ActingUser,
+  ): Promise<void> =>
+    request<void>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/assignment/${encodeURIComponent(assignmentId)}`,
+      user,
+      { method: 'DELETE', body: JSON.stringify(body) },
+    ),
+
+  reviewAction: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    body: EvidenceReviewActionRequest,
+    user: ActingUser,
+  ): Promise<EvidenceDetail> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/actions`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  correctEvidence: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    body: CorrectEvidenceRequest,
+    user: ActingUser,
+  ): Promise<EvidenceDetail> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/correction`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  listClarifications: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    user: ActingUser,
+  ): Promise<{ clarifications: ClarificationView[] }> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/clarifications`,
+      user,
+    ),
+
+  requestClarification: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    body: RequestClarificationRequest,
+    user: ActingUser,
+  ): Promise<ClarificationView> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/clarifications`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  respondToClarification: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    clarificationId: string,
+    body: RespondToClarificationRequest,
+    user: ActingUser,
+  ): Promise<ClarificationView> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/clarifications/${encodeURIComponent(clarificationId)}/respond`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  withdrawClarification: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    clarificationId: string,
+    body: WithdrawClarificationRequest,
+    user: ActingUser,
+  ): Promise<ClarificationView> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/clarifications/${encodeURIComponent(clarificationId)}/withdraw`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  closeClarification: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    clarificationId: string,
+    user: ActingUser,
+  ): Promise<ClarificationView> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/clarifications/${encodeURIComponent(clarificationId)}/close`,
+      user,
+      { method: 'POST' },
     ),
 };
 

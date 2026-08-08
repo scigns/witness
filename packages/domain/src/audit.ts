@@ -73,8 +73,22 @@ export const AUDIT_ACTIONS = [
   'evidence.updated',
   'evidence.submitted',
   'evidence.withdrawn',
+  'evidence.review_started',
+  'evidence.needs_clarification',
+  'evidence.validated',
+  'evidence.rejected',
+  'evidence.corrected',
   'evidence_link.created',
   'evidence_link.removed',
+  'review_assignment.assigned',
+  'review_assignment.started',
+  'review_assignment.completed',
+  'review_assignment.cancelled',
+  'review_assignment.reassigned',
+  'clarification.requested',
+  'clarification.responded',
+  'clarification.withdrawn',
+  'clarification.closed',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -101,6 +115,8 @@ export const AUDIT_SUBJECT_TYPES = [
   'participant_consent_record',
   'evidence',
   'evidence_link',
+  'review_assignment',
+  'clarification',
 ] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 

@@ -62,6 +62,27 @@ const TAG_MAX = 60;
 const TAGS_MAX_COUNT = 20;
 const WITHDRAWAL_REASON_MAX = 2000;
 const CONSENT_BASIS_MAX_COUNT = 20;
+const REVIEW_DECISION_REASON_MAX = 2000;
+const CORRECTION_REASON_MAX = 2000;
+
+/**
+ * How a correction changed evidence content (BUILD_ROADMAP.md Milestone 6,
+ * Evidence Review and Validation). Distinguished so the review history can
+ * show a reader *what kind* of change happened, not just that one did:
+ * `clerical` is a typo or formatting fix; `participant_clarification`
+ * incorporates what the source said in response to a reviewer's question;
+ * `facilitator_interpretation` is the facilitator's own gloss on ambiguous
+ * content; `substantive` is everything else that changes what the evidence
+ * actually claims. None of these ever change `reviewStatus` — a correction
+ * edits content, it does not decide anything.
+ */
+export const EVIDENCE_CORRECTION_TYPES = [
+  'clerical',
+  'participant_clarification',
+  'facilitator_interpretation',
+  'substantive',
+] as const;
+export type EvidenceCorrectionType = (typeof EVIDENCE_CORRECTION_TYPES)[number];
 
 /**
  * The evidence types a facilitator can pick from. Free-form at the database
@@ -203,6 +224,13 @@ export interface Evidence {
   readonly withdrawnAt: Date | null;
   /** Restricted — the API layer only includes this for a caller holding `evidence:manage_restricted`. */
   readonly withdrawalReason: string | null;
+  /**
+   * The reviewer's stated reason for the most recent `validated`/`rejected`
+   * decision (BUILD_ROADMAP.md Milestone 6). `null` until a decision has
+   * been made; a validation may omit a reason, a rejection may not — see
+   * `rejectEvidence`.
+   */
+  readonly reviewDecisionReason: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   /** Optimistic-concurrency counter; bumped on every mutation. */
@@ -498,6 +526,7 @@ export function captureEvidence(
     supersededByEvidenceId: null,
     withdrawnAt: null,
     withdrawalReason: null,
+    reviewDecisionReason: null,
     createdAt: input.at,
     updatedAt: input.at,
     version: 1,
@@ -729,6 +758,387 @@ export function withdrawEvidence(
           : { from: evidence.reviewStatus, reason: next.withdrawalReason },
     },
   };
+}
+
+// ─── Review lifecycle (BUILD_ROADMAP.md Milestone 6, Evidence Review and Validation) ──
+//
+// Reachable transitions from here on: `submitted → under_review`,
+// `under_review → needs_clarification`, `needs_clarification → under_review`,
+// `under_review → validated`, `under_review → rejected`. Every other
+// combination — `draft`/`submitted` straight to `validated`, `draft` straight
+// to `under_review` without submission, `rejected` to `validated`, or any
+// active review state reachable from `withdrawn` — is unreachable because no
+// function here accepts it as a starting state, the same "declare the
+// vocabulary, withhold the mutator" enforcement Milestone 5 itself used for
+// these four states.
+//
+// None of these functions decide *who* may call them — an assigned,
+// authorised reviewer, checked against a `ReviewAssignment` — because that
+// requires a database read (ADR-0003); `EvidenceReviewService` enforces it
+// before calling in, the same domain/service split `assertAttributionCompatibility`
+// and `ConsentPolicyService` already established for capture.
+
+function assertReviewMutable(sessionStatus: SessionStatus): void {
+  if (sessionStatus === 'archived') {
+    throw new InvariantViolation('An archived session is read-only.', 'SESSION_ARCHIVED');
+  }
+}
+
+/**
+ * A reviewer begins reviewing submitted evidence. `submitted → under_review`
+ * only — evidence must have been through `submitEvidence` first; there is no
+ * path from `draft` directly into review.
+ */
+export function beginReview(
+  evidence: Evidence,
+  sessionStatus: SessionStatus,
+  actor: Actor,
+  at: Date,
+): EvidenceOutcome {
+  assertReviewMutable(sessionStatus);
+
+  if (evidence.reviewStatus !== 'submitted') {
+    throw new InvariantViolation(
+      `Only submitted evidence can enter review — this evidence is '${evidence.reviewStatus}'.`,
+      'INVALID_EVIDENCE_TRANSITION',
+    );
+  }
+
+  const next: Evidence = {
+    ...evidence,
+    reviewStatus: 'under_review',
+    updatedAt: at,
+    version: evidence.version + 1,
+  };
+
+  return {
+    evidence: next,
+    event: {
+      action: 'evidence.review_started',
+      actor,
+      metadata: { from: evidence.reviewStatus, to: next.reviewStatus },
+    },
+  };
+}
+
+/**
+ * A reviewer marks evidence as needing clarification from whoever can speak
+ * to it. `under_review → needs_clarification` only. Pairs with
+ * `Clarification`'s own `requestClarification` in the service layer — one
+ * request, two aggregates, one transaction, the same cross-aggregate pattern
+ * `SessionConsentConfigurationService.configure` established in Milestone 4.
+ */
+export function markNeedsClarification(
+  evidence: Evidence,
+  sessionStatus: SessionStatus,
+  actor: Actor,
+  at: Date,
+): EvidenceOutcome {
+  assertReviewMutable(sessionStatus);
+
+  if (evidence.reviewStatus !== 'under_review') {
+    throw new InvariantViolation(
+      `Only evidence under review can need clarification — this evidence is '${evidence.reviewStatus}'.`,
+      'INVALID_EVIDENCE_TRANSITION',
+    );
+  }
+
+  const next: Evidence = {
+    ...evidence,
+    reviewStatus: 'needs_clarification',
+    updatedAt: at,
+    version: evidence.version + 1,
+  };
+
+  return {
+    evidence: next,
+    event: {
+      action: 'evidence.needs_clarification',
+      actor,
+      metadata: { from: evidence.reviewStatus, to: next.reviewStatus },
+    },
+  };
+}
+
+/**
+ * A clarification has been answered; evidence returns to active review.
+ * `needs_clarification → under_review` only.
+ */
+export function resumeReviewAfterClarification(
+  evidence: Evidence,
+  sessionStatus: SessionStatus,
+  actor: Actor,
+  at: Date,
+): EvidenceOutcome {
+  assertReviewMutable(sessionStatus);
+
+  if (evidence.reviewStatus !== 'needs_clarification') {
+    throw new InvariantViolation(
+      `Only evidence awaiting clarification can resume review — this evidence is '${evidence.reviewStatus}'.`,
+      'INVALID_EVIDENCE_TRANSITION',
+    );
+  }
+
+  const next: Evidence = {
+    ...evidence,
+    reviewStatus: 'under_review',
+    updatedAt: at,
+    version: evidence.version + 1,
+  };
+
+  return {
+    evidence: next,
+    event: {
+      action: 'evidence.review_started',
+      actor,
+      metadata: { from: evidence.reviewStatus, to: next.reviewStatus },
+    },
+  };
+}
+
+/**
+ * A reviewer validates evidence as reflecting what actually happened.
+ * `under_review → validated` only — captured evidence must not become
+ * institutional knowledge by skipping review. Sets `verificationStatus` to
+ * `verified`, the one place in this module that leaves `unverified`.
+ */
+export function validateEvidence(
+  evidence: Evidence,
+  sessionStatus: SessionStatus,
+  actor: Actor,
+  reason: string | null,
+  at: Date,
+): EvidenceOutcome {
+  assertReviewMutable(sessionStatus);
+
+  if (evidence.reviewStatus !== 'under_review') {
+    throw new InvariantViolation(
+      `Only evidence under review can be validated — this evidence is '${evidence.reviewStatus}'.`,
+      'INVALID_EVIDENCE_TRANSITION',
+    );
+  }
+
+  const next: Evidence = {
+    ...evidence,
+    reviewStatus: 'validated',
+    verificationStatus: 'verified',
+    reviewDecisionReason: assertOptional(
+      reason,
+      REVIEW_DECISION_REASON_MAX,
+      'REVIEW_DECISION_REASON',
+    ),
+    updatedAt: at,
+    version: evidence.version + 1,
+  };
+
+  return {
+    evidence: next,
+    event: {
+      action: 'evidence.validated',
+      actor,
+      metadata:
+        next.reviewDecisionReason === null
+          ? { from: evidence.reviewStatus }
+          : { from: evidence.reviewStatus, reason: next.reviewDecisionReason },
+    },
+  };
+}
+
+/**
+ * A reviewer rejects evidence. `under_review → rejected` only. Sets
+ * `verificationStatus` to `disputed` — rejected is not the same claim as
+ * withdrawn: withdrawn means the source or facilitator retracted it,
+ * rejected means a reviewer examined it and disputed it. A reason is
+ * required — an unexplained rejection gives whoever captured it nothing to
+ * act on.
+ */
+export function rejectEvidence(
+  evidence: Evidence,
+  sessionStatus: SessionStatus,
+  actor: Actor,
+  reason: string,
+  at: Date,
+): EvidenceOutcome {
+  assertReviewMutable(sessionStatus);
+
+  if (evidence.reviewStatus !== 'under_review') {
+    throw new InvariantViolation(
+      `Only evidence under review can be rejected — this evidence is '${evidence.reviewStatus}'.`,
+      'INVALID_EVIDENCE_TRANSITION',
+    );
+  }
+
+  const next: Evidence = {
+    ...evidence,
+    reviewStatus: 'rejected',
+    verificationStatus: 'disputed',
+    reviewDecisionReason: assertNonEmpty(
+      reason,
+      'rejection reason',
+      REVIEW_DECISION_REASON_MAX,
+      'REJECTION_REASON_REQUIRED',
+    ),
+    updatedAt: at,
+    version: evidence.version + 1,
+  };
+
+  return {
+    evidence: next,
+    event: {
+      action: 'evidence.rejected',
+      actor,
+      metadata: { from: evidence.reviewStatus, reason: next.reviewDecisionReason ?? '' },
+    },
+  };
+}
+
+export interface CorrectEvidenceInput {
+  correctionType: EvidenceCorrectionType;
+  reason: string;
+  evidenceType?: string | undefined;
+  title?: string | undefined;
+  content?: string | undefined;
+  language?: string | null | undefined;
+  sessionOffsetSeconds?: number | null | undefined;
+  sourceParticipantId?: SessionParticipantId | null | undefined;
+  participantIdentityMode?: ParticipantIdentityMode | null | undefined;
+  attributionMode?: EvidenceAttributionMode | undefined;
+  identityVisibility?: ParticipantIdentityVisibility | undefined;
+  tags?: readonly string[] | undefined;
+}
+
+/**
+ * Correct evidence while it is in the review workflow — a clerical fix, an
+ * incorporated clarification, a facilitator's interpretive gloss, or a
+ * substantive content change, distinguished by `correctionType` and always
+ * requiring a `reason`. Permitted only for `submitted`, `under_review` or
+ * `needs_clarification` evidence: a `draft` is corrected via
+ * `updateEvidenceDraft`, and `validated`/`rejected`/`withdrawn` evidence is
+ * a closed record — reopening it is Milestone 6's explicit non-goal here
+ * (a future correction-after-validation capability would need its own
+ * review cycle, not a silent edit).
+ *
+ * Deliberately never changes `reviewStatus` — "correction cannot silently
+ * validate evidence" (BUILD_ROADMAP.md Milestone 6). If attribution-related
+ * fields change, the full compatibility check reruns against the new
+ * combination, exactly as `updateEvidenceDraft` already does; the consent
+ * half of that check is `EvidenceReviewService`'s job, calling
+ * `ConsentPolicyService` before this function, the same split every other
+ * consent-adjacent mutation in this package uses.
+ */
+export function correctEvidence(
+  evidence: Evidence,
+  sessionStatus: SessionStatus,
+  actor: Actor,
+  input: CorrectEvidenceInput,
+  at: Date,
+): EvidenceOutcome {
+  assertReviewMutable(sessionStatus);
+
+  const correctable: readonly EvidenceReviewStatus[] = [
+    'submitted',
+    'under_review',
+    'needs_clarification',
+  ];
+  if (!correctable.includes(evidence.reviewStatus)) {
+    throw new InvariantViolation(
+      `Evidence in review status '${evidence.reviewStatus}' cannot be corrected.`,
+      'EVIDENCE_NOT_CORRECTABLE',
+    );
+  }
+
+  const changedFields = Object.entries(input)
+    .filter(([key, value]) => value !== undefined && key !== 'correctionType' && key !== 'reason')
+    .map(([key]) => key)
+    .filter((key) => key !== 'participantIdentityMode');
+
+  if (changedFields.length === 0) {
+    throw new InvariantViolation('A correction must change at least one field.', 'NO_CHANGES');
+  }
+
+  const evidenceType =
+    input.evidenceType !== undefined
+      ? assertEvidenceType(input.evidenceType)
+      : evidence.evidenceType;
+  const attributionMode = input.attributionMode ?? evidence.attributionMode;
+  const sourceParticipantId =
+    input.sourceParticipantId !== undefined
+      ? input.sourceParticipantId
+      : evidence.sourceParticipantId;
+
+  assertAttributionCompatibility({
+    attributionMode,
+    evidenceType,
+    sourceParticipantId,
+    participantIdentityMode: input.participantIdentityMode ?? null,
+  });
+
+  const reason = assertNonEmpty(
+    input.reason,
+    'correction reason',
+    CORRECTION_REASON_MAX,
+    'CORRECTION_REASON_REQUIRED',
+  );
+
+  const next: Evidence = {
+    ...evidence,
+    evidenceType,
+    title:
+      input.title !== undefined
+        ? assertNonEmpty(input.title, 'title', TITLE_MAX, 'TITLE_REQUIRED')
+        : evidence.title,
+    content:
+      input.content !== undefined
+        ? assertNonEmpty(input.content, 'content', CONTENT_MAX, 'CONTENT_REQUIRED')
+        : evidence.content,
+    language:
+      input.language !== undefined
+        ? assertOptional(input.language, LANGUAGE_MAX, 'LANGUAGE')
+        : evidence.language,
+    sessionOffsetSeconds:
+      input.sessionOffsetSeconds !== undefined
+        ? assertSessionOffset(input.sessionOffsetSeconds)
+        : evidence.sessionOffsetSeconds,
+    sourceParticipantId,
+    attributionMode,
+    identityVisibility: input.identityVisibility ?? evidence.identityVisibility,
+    tags: input.tags !== undefined ? assertTags(input.tags) : evidence.tags,
+    updatedAt: at,
+    version: evidence.version + 1,
+  };
+
+  return {
+    evidence: next,
+    event: {
+      action: 'evidence.corrected',
+      actor,
+      metadata: {
+        correctionType: input.correctionType,
+        reason,
+        changedFields: changedFields.join(','),
+      },
+    },
+  };
+}
+
+/** Whether this evidence can currently be moved into active review. */
+export function canBeginReview(evidence: Evidence, sessionStatus: SessionStatus): boolean {
+  return sessionStatus !== 'archived' && evidence.reviewStatus === 'submitted';
+}
+
+/** Whether a reviewer may validate or reject this evidence right now. */
+export function canDecideEvidence(evidence: Evidence, sessionStatus: SessionStatus): boolean {
+  return sessionStatus !== 'archived' && evidence.reviewStatus === 'under_review';
+}
+
+/** Whether this evidence can be corrected right now. */
+export function canCorrectEvidence(evidence: Evidence, sessionStatus: SessionStatus): boolean {
+  return (
+    sessionStatus !== 'archived' &&
+    (evidence.reviewStatus === 'submitted' ||
+      evidence.reviewStatus === 'under_review' ||
+      evidence.reviewStatus === 'needs_clarification')
+  );
 }
 
 /**

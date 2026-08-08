@@ -285,10 +285,10 @@ Pilot-blocking gate
 
 A facilitator can prepare a real session without an external setup spreadsheet — PARTIALLY READY.
 Session creation and lifecycle management (Milestone 2), participant management (Milestone 3),
-consent management (Milestone 4), and structured evidence capture (Milestone 5) are all now
-implemented (Milestones 4 and 5 via PRs not yet merged). This gate is not fully met until both PRs
-merge and the flow is walked through end to end against a live Postgres and browser, which this
-sandbox does not have.
+consent management (Milestone 4), structured evidence capture (Milestone 5, merged as PR #29) and
+evidence review and validation (Milestone 6, PR not yet merged) are all now implemented. This gate
+is not fully met until the Milestone 6 PR merges and the flow is walked through end to end against
+a live Postgres and browser, which this sandbox does not have.
 
 C.1 Participant Privacy (Milestone 3)
 
@@ -467,6 +467,66 @@ Original evidence remains preserved according to retention policy
 Pilot-blocking gate
 
 A facilitator can capture or upload at least one valid audio recording without losing provenance
+
+E.1 Evidence Review and Validation (Milestone 6)
+
+*Note: this subsection covers human review of human-captured evidence — the Milestone 6 capability.
+It is distinct from section F's "Human Review", which covers review of AI-generated output and
+remains post-MVP and unchecked.*
+
+Captured evidence does not become validated by default — READY (Evidence Review PR, not yet
+merged). `captureEvidence` starts every record `unverified`, and only `validateEvidence` — reachable
+solely from `under_review` — ever sets `verificationStatus: 'verified'`. Draft→Validated,
+Submitted→Validated, Draft→Under-Review-without-submission and Rejected→Validated are unreachable
+because no function in `packages/domain/src/evidence.ts` accepts those starting states.
+
+A reviewer can be assigned to a specific piece of evidence — READY (Evidence Review PR, not yet
+merged). `ReviewAssignment` (`packages/domain/src/review-assignment.ts`) is a first-class aggregate;
+`POST .../evidence/:id/review/assignment` creates one, and the MVP allows exactly one *active*
+assignment per evidence — checked in `EvidenceReviewService.assign` and backed by a partial unique
+index (`review_assignment_one_active_per_evidence_key`) as the last line of defence.
+
+Only the assigned reviewer can validate or reject — READY (Evidence Review PR, not yet merged).
+Two authorisation layers apply: the Casbin `evidence_review:*` action check (does this role hold the
+action in this workspace at all), then `EvidenceReviewService.requireAssignedReviewer` (is this
+principal the reviewer of record for *this* evidence). A role grant alone is not sufficient; test
+coverage in `services/api-gateway/src/evidence/evidence-review.service.test.ts` includes the
+wrong-reviewer and no-assignment cases.
+
+A reviewer can request clarification and receive an answer — READY (Evidence Review PR, not yet
+merged). `Clarification` (`packages/domain/src/clarification.ts`) has its own
+`open → answered → closed` lifecycle plus `withdrawn`; requesting one moves the evidence to
+`needs_clarification` and closing an answered one resumes `under_review` — each pairing is a single
+transaction, so the two aggregates can never disagree.
+
+Evidence can be corrected during review without silently becoming validated — READY (Evidence
+Review PR, not yet merged). `correctEvidence` requires a `correctionType`
+(`clerical`/`participant_clarification`/`facilitator_interpretation`/`substantive`) and a reason,
+applies only to `submitted`/`under_review`/`needs_clarification`, and never writes `reviewStatus` —
+the field is absent from its output overrides, so this is structural, not a runtime guard.
+
+Rejected evidence is distinguishable from withdrawn evidence — READY (Evidence Review PR, not yet
+merged). `rejectEvidence` sets `verificationStatus: 'disputed'` and requires a reason;
+`withdrawEvidence` sets `reviewStatus: 'withdrawn'` and leaves verification `unverified`. Withdrawn
+evidence never reads as verified.
+
+Review events are audited — READY (Evidence Review PR, not yet merged). Ten new audit actions
+(`evidence.review_started`, `evidence.needs_clarification`, `evidence.validated`,
+`evidence.rejected`, `evidence.corrected`, `review_assignment.*`, `clarification.*`) append to the
+existing hash-chained `AuditEvent` trail, on the same subject-scoped chains as every prior
+milestone.
+
+Concurrent review decisions cannot both land — READY (Evidence Review PR, not yet merged). Every
+review write carries `expectedVersion` and commits through a conditional `updateMany`; a stale
+write is a `409 STALE_VERSION` with nothing persisted, including the audit event.
+
+Pilot-blocking gate
+
+Evidence that supports an institutional outcome has been validated by an identified human reviewer,
+with the decision, its reason, and its reviewer preserved in the audit trail — PARTIALLY READY.
+The mechanism exists and is unit- and service-tested (Evidence Review PR, not yet merged). This gate
+is not fully met until the PR merges and the review workflow is walked through end to end against a
+live Postgres and browser, which this sandbox does not have.
 
 F. AI Processing
 

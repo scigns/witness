@@ -379,6 +379,10 @@ export default function SessionEvidencePage({
           <option value="">All</option>
           <option value="draft">Draft</option>
           <option value="submitted">Submitted</option>
+          <option value="under_review">Under review</option>
+          <option value="needs_clarification">Needs clarification</option>
+          <option value="validated">Validated</option>
+          <option value="rejected">Rejected</option>
           <option value="withdrawn">Withdrawn</option>
         </select>
       </div>

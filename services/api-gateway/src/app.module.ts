@@ -29,6 +29,8 @@ import { ConsentTemplatesController } from './consent-templates/consent-template
 import { ConsentTemplatesService } from './consent-templates/consent-templates.service.js';
 import { EvidenceController } from './evidence/evidence.controller.js';
 import { EvidenceLinkService } from './evidence/evidence-link.service.js';
+import { EvidenceReviewController } from './evidence/evidence-review.controller.js';
+import { EvidenceReviewService } from './evidence/evidence-review.service.js';
 import { EvidenceService } from './evidence/evidence.service.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
@@ -77,6 +79,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     SessionConsentConfigurationController,
     ParticipantConsentRecordsController,
     EvidenceController,
+    EvidenceReviewController,
     AuthenticationController,
     CurrentUserController,
   ],
@@ -98,6 +101,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     ParticipantConsentRecordsService,
     EvidenceService,
     EvidenceLinkService,
+    EvidenceReviewService,
     SessionService,
     RoleResolutionService,
     PolicyEngineService,

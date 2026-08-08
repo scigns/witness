@@ -2,27 +2,50 @@
 
 /**
  * Evidence detail — full edit while a draft, submit, withdraw, related-
- * evidence links, and history (BUILD_ROADMAP.md Milestone 5).
+ * evidence links, review lifecycle, clarifications, corrections, and
+ * history (BUILD_ROADMAP.md Milestones 5 and 6).
  *
  * Every mutation sends the evidence's current `version` back as
  * `expectedVersion`, mirroring the session detail page — a `409
  * STALE_VERSION` response is handled as its own state (`staleUpdate`)
  * rather than folded into the generic error banner, because the fix is
  * different: reload, not retry.
+ *
+ * The review section reuses `evidence.permittedReviewActions` and
+ * `evidence.canCorrect` — server-computed, so this page never reimplements
+ * the review-lifecycle state machine or the "are you the assigned
+ * reviewer" check; it only offers the actions the server already says are
+ * possible, and a 403 from actually calling one is shown like any other
+ * error. Nothing here ever displays a restricted participant identity: the
+ * assignment and clarification views only ever carry a Witness user id (the
+ * reviewer) and `ActorView`s (who asked, who answered), never a session
+ * participant's identity.
  */
 
 import Link from 'next/link';
 import { use, useCallback, useEffect, useState } from 'react';
 
 import {
+  EVIDENCE_CORRECTION_TYPES,
   EVIDENCE_LINK_TYPES,
+  type ClarificationView,
+  type EvidenceCorrectionType,
   type EvidenceDetail,
   type EvidenceLinkView,
+  type ReviewAssignmentView,
+  type UserSummary,
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { Button, Card, ErrorNotice, EvidenceReviewStatusBadge } from '@/components/ui';
+
+const CORRECTION_TYPE_LABELS: Record<EvidenceCorrectionType, string> = {
+  clerical: 'Clerical (typo or formatting fix)',
+  participant_clarification: "Incorporates the source's clarification",
+  facilitator_interpretation: "Facilitator's interpretive gloss",
+  substantive: 'Substantive change to what the evidence claims',
+};
 
 const LINK_TYPE_LABELS: Record<(typeof EVIDENCE_LINK_TYPES)[number], string> = {
   supports: 'Supports',
@@ -66,6 +89,29 @@ export default function EvidenceDetailPage({
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
 
+  const [assignment, setAssignment] = useState<ReviewAssignmentView | null>(null);
+  const [clarifications, setClarifications] = useState<ClarificationView[]>([]);
+  const [users, setUsers] = useState<UserSummary[]>([]);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+
+  const [assigningReviewerId, setAssigningReviewerId] = useState('');
+  const [reassigning, setReassigning] = useState(false);
+
+  const [correcting, setCorrecting] = useState(false);
+  const [correctionType, setCorrectionType] = useState<EvidenceCorrectionType>('clerical');
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [correctionTitle, setCorrectionTitle] = useState('');
+  const [correctionContent, setCorrectionContent] = useState('');
+
+  const [decisionReason, setDecisionReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
+
+  const [clarifying, setClarifying] = useState(false);
+  const [clarificationQuestion, setClarificationQuestion] = useState('');
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [responseText, setResponseText] = useState('');
+
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
       try {
@@ -79,6 +125,8 @@ export default function EvidenceDetailPage({
         setEditTitle(evidenceResult.title);
         setEditContent(evidenceResult.content);
         setEditTags(evidenceResult.tags.join(', '));
+        setCorrectionTitle(evidenceResult.title);
+        setCorrectionContent(evidenceResult.content);
         setLinks(linksResult.links);
         setHistory(historyResult.events);
         setError(null);
@@ -90,8 +138,27 @@ export default function EvidenceDetailPage({
         } else {
           setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
         }
+        return;
       } finally {
         if (!cancelledRef.current) setLoading(false);
+      }
+
+      // Review data (assignment, clarifications, the reviewer picker) is
+      // loaded separately and failures here never block the page above —
+      // a caller without evidence_review:read still sees the evidence
+      // itself, just not the review section.
+      try {
+        const [assignmentResult, clarificationsResult, usersResult] = await Promise.all([
+          api.getReviewAssignment(workspaceId, sessionId, evidenceId, user),
+          api.listClarifications(workspaceId, sessionId, evidenceId, user),
+          api.listUsers(user),
+        ]);
+        if (cancelledRef.current) return;
+        setAssignment(assignmentResult.assignment);
+        setClarifications(clarificationsResult.clarifications);
+        setUsers(usersResult.users);
+      } catch {
+        // Silently unavailable — see comment above.
       }
     },
     [workspaceId, sessionId, evidenceId, user],
@@ -226,6 +293,179 @@ export default function EvidenceDetailPage({
       setLinkError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
       setLinkBusy(false);
+    }
+  };
+
+  const runReviewMutation = async <T,>(operation: () => Promise<T>): Promise<T | null> => {
+    setReviewBusy(true);
+    setReviewError(null);
+    try {
+      return await operation();
+    } catch (caught) {
+      setReviewError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+      return null;
+    } finally {
+      setReviewBusy(false);
+    }
+  };
+
+  const assignReviewer = async () => {
+    if (assigningReviewerId === '') return;
+    const created = await runReviewMutation(() =>
+      api.assignReviewer(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        { reviewerUserId: assigningReviewerId },
+        user,
+      ),
+    );
+    if (created !== null) {
+      setAssignment(created);
+      setAssigningReviewerId('');
+    }
+  };
+
+  const reassignReviewer = async () => {
+    if (assignment === null || assigningReviewerId === '') return;
+    const created = await runReviewMutation(() =>
+      api.reassignReviewer(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        assignment.id,
+        { reviewerUserId: assigningReviewerId },
+        user,
+      ),
+    );
+    if (created !== null) {
+      setAssignment(created);
+      setAssigningReviewerId('');
+      setReassigning(false);
+    }
+  };
+
+  const doReviewAction = async (
+    action: 'begin_review' | 'resume_review' | 'validate' | 'reject',
+  ) => {
+    if (evidence === null) return;
+    const updated = await runReviewMutation(() => {
+      if (action === 'validate') {
+        return api.reviewAction(
+          workspaceId,
+          sessionId,
+          evidenceId,
+          {
+            action,
+            reason: decisionReason.trim() === '' ? undefined : decisionReason,
+            expectedVersion: evidence.version,
+          },
+          user,
+        );
+      }
+      if (action === 'reject') {
+        return api.reviewAction(
+          workspaceId,
+          sessionId,
+          evidenceId,
+          { action, reason: decisionReason, expectedVersion: evidence.version },
+          user,
+        );
+      }
+      return api.reviewAction(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        { action, expectedVersion: evidence.version },
+        user,
+      );
+    });
+    if (updated !== null) {
+      setEvidence(updated);
+      setDecisionReason('');
+      setRejecting(false);
+      const refreshedAssignment = await api
+        .getReviewAssignment(workspaceId, sessionId, evidenceId, user)
+        .catch(() => null);
+      if (refreshedAssignment !== null) setAssignment(refreshedAssignment.assignment);
+    }
+  };
+
+  const saveCorrection = async () => {
+    if (evidence === null || correctionReason.trim() === '') return;
+    const updated = await runReviewMutation(() =>
+      api.correctEvidence(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        {
+          correctionType,
+          reason: correctionReason,
+          title: correctionTitle,
+          content: correctionContent,
+          expectedVersion: evidence.version,
+        },
+        user,
+      ),
+    );
+    if (updated !== null) {
+      setEvidence(updated);
+      setCorrecting(false);
+      setCorrectionReason('');
+    }
+  };
+
+  const submitClarification = async () => {
+    if (clarificationQuestion.trim() === '') return;
+    const created = await runReviewMutation(() =>
+      api.requestClarification(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        { question: clarificationQuestion },
+        user,
+      ),
+    );
+    if (created !== null) {
+      setClarifications((current) => [...current, created]);
+      setClarificationQuestion('');
+      setClarifying(false);
+      const refreshed = await api.getEvidence(workspaceId, sessionId, evidenceId, user);
+      setEvidence(refreshed);
+    }
+  };
+
+  const submitResponse = async (clarificationId: string) => {
+    if (responseText.trim() === '') return;
+    const updated = await runReviewMutation(() =>
+      api.respondToClarification(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        clarificationId,
+        { response: responseText },
+        user,
+      ),
+    );
+    if (updated !== null) {
+      setClarifications((current) =>
+        current.map((clarification) => (clarification.id === updated.id ? updated : clarification)),
+      );
+      setRespondingId(null);
+      setResponseText('');
+    }
+  };
+
+  const closeClarification = async (clarificationId: string) => {
+    const updated = await runReviewMutation(() =>
+      api.closeClarification(workspaceId, sessionId, evidenceId, clarificationId, user),
+    );
+    if (updated !== null) {
+      setClarifications((current) =>
+        current.map((clarification) => (clarification.id === updated.id ? updated : clarification)),
+      );
+      const refreshed = await api.getEvidence(workspaceId, sessionId, evidenceId, user);
+      setEvidence(refreshed);
     }
   };
 
@@ -405,6 +645,409 @@ export default function EvidenceDetailPage({
           )}
         </Card>
       )}
+
+      <section aria-labelledby="review-heading" className="space-y-4">
+        <h2 id="review-heading" className="text-lg font-semibold">
+          Review
+        </h2>
+        {reviewError !== null && <ErrorNotice message={reviewError} />}
+
+        <Card className="space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+            Reviewer assignment
+          </h3>
+          {assignment !== null ? (
+            <div className="space-y-2 text-sm">
+              <p>
+                Assigned to{' '}
+                <span className="font-medium">
+                  {users.find((candidate) => candidate.id === assignment.reviewerUserId)
+                    ?.displayName ?? assignment.reviewerUserId}
+                </span>{' '}
+                — status: {assignment.status.replace(/_/g, ' ')}
+              </p>
+              {!reassigning ? (
+                <Button
+                  variant="secondary"
+                  disabled={reviewBusy}
+                  onClick={() => setReassigning(true)}
+                >
+                  Reassign
+                </Button>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    aria-label="New reviewer"
+                    value={assigningReviewerId}
+                    onChange={(event) => setAssigningReviewerId(event.target.value)}
+                    className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm"
+                  >
+                    <option value="">Choose a reviewer…</option>
+                    {users.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.displayName}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="primary"
+                    disabled={reviewBusy || assigningReviewerId === ''}
+                    onClick={() => void reassignReviewer()}
+                  >
+                    Confirm reassignment
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={reviewBusy}
+                    onClick={() => setReassigning(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-[var(--color-ink-muted)]">No reviewer assigned yet.</span>
+              <select
+                aria-label="Assign reviewer"
+                value={assigningReviewerId}
+                onChange={(event) => setAssigningReviewerId(event.target.value)}
+                className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm"
+              >
+                <option value="">Choose a reviewer…</option>
+                {users.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.displayName}
+                  </option>
+                ))}
+              </select>
+              <Button
+                variant="primary"
+                disabled={reviewBusy || assigningReviewerId === ''}
+                onClick={() => void assignReviewer()}
+              >
+                Assign
+              </Button>
+            </div>
+          )}
+        </Card>
+
+        {evidence.permittedReviewActions.length > 0 && (
+          <Card className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+              Review decision
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {evidence.permittedReviewActions.includes('begin_review') && (
+                <Button
+                  variant="primary"
+                  disabled={reviewBusy}
+                  onClick={() => void doReviewAction('begin_review')}
+                >
+                  Begin review
+                </Button>
+              )}
+              {evidence.permittedReviewActions.includes('resume_review') && (
+                <Button
+                  variant="primary"
+                  disabled={reviewBusy}
+                  onClick={() => void doReviewAction('resume_review')}
+                >
+                  Resume review
+                </Button>
+              )}
+              {evidence.permittedReviewActions.includes('validate') && (
+                <Button
+                  variant="primary"
+                  disabled={reviewBusy}
+                  onClick={() => void doReviewAction('validate')}
+                >
+                  Validate
+                </Button>
+              )}
+              {evidence.permittedReviewActions.includes('reject') && !rejecting && (
+                <Button variant="danger" disabled={reviewBusy} onClick={() => setRejecting(true)}>
+                  Reject
+                </Button>
+              )}
+            </div>
+            {evidence.permittedReviewActions.includes('validate') && !rejecting && (
+              <div>
+                <label htmlFor="decisionReason" className="mb-1 block text-sm font-medium">
+                  Reason (optional for validation)
+                </label>
+                <input
+                  id="decisionReason"
+                  value={decisionReason}
+                  onChange={(event) => setDecisionReason(event.target.value)}
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                />
+              </div>
+            )}
+            {rejecting && (
+              <div className="space-y-3 border-t border-[var(--color-line)] pt-4">
+                <label htmlFor="rejectReason" className="mb-1 block text-sm font-medium">
+                  Rejection reason <span aria-hidden="true">*</span>
+                  <span className="sr-only">(required)</span>
+                </label>
+                <input
+                  id="rejectReason"
+                  required
+                  value={decisionReason}
+                  onChange={(event) => setDecisionReason(event.target.value)}
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="danger"
+                    disabled={reviewBusy || decisionReason.trim() === ''}
+                    onClick={() => void doReviewAction('reject')}
+                  >
+                    Confirm rejection
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={reviewBusy}
+                    onClick={() => setRejecting(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+            {evidence.reviewDecisionReason !== null && (
+              <p className="text-sm text-[var(--color-ink-muted)]">
+                Last decision reason: {evidence.reviewDecisionReason}
+              </p>
+            )}
+          </Card>
+        )}
+
+        {evidence.canCorrect && (
+          <Card className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+                Correction
+              </h3>
+              {!correcting && (
+                <Button
+                  variant="secondary"
+                  disabled={reviewBusy}
+                  onClick={() => setCorrecting(true)}
+                >
+                  Correct
+                </Button>
+              )}
+            </div>
+            {correcting && (
+              <div className="space-y-3">
+                <div>
+                  <label htmlFor="correctionType" className="mb-1 block text-sm font-medium">
+                    Correction type
+                  </label>
+                  <select
+                    id="correctionType"
+                    value={correctionType}
+                    onChange={(event) =>
+                      setCorrectionType(event.target.value as EvidenceCorrectionType)
+                    }
+                    className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                  >
+                    {EVIDENCE_CORRECTION_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {CORRECTION_TYPE_LABELS[type]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="correctionTitle" className="mb-1 block text-sm font-medium">
+                    Title
+                  </label>
+                  <input
+                    id="correctionTitle"
+                    maxLength={300}
+                    value={correctionTitle}
+                    onChange={(event) => setCorrectionTitle(event.target.value)}
+                    className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="correctionContent" className="mb-1 block text-sm font-medium">
+                    Content
+                  </label>
+                  <textarea
+                    id="correctionContent"
+                    rows={4}
+                    maxLength={20000}
+                    value={correctionContent}
+                    onChange={(event) => setCorrectionContent(event.target.value)}
+                    className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="correctionReason" className="mb-1 block text-sm font-medium">
+                    Reason <span aria-hidden="true">*</span>
+                    <span className="sr-only">(required)</span>
+                  </label>
+                  <input
+                    id="correctionReason"
+                    required
+                    value={correctionReason}
+                    onChange={(event) => setCorrectionReason(event.target.value)}
+                    className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="primary"
+                    disabled={reviewBusy || correctionReason.trim() === ''}
+                    onClick={() => void saveCorrection()}
+                  >
+                    {reviewBusy ? 'Saving…' : 'Save correction'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={reviewBusy}
+                    onClick={() => setCorrecting(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
+
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+              Clarifications
+            </h3>
+            {evidence.permittedReviewActions.length > 0 && !clarifying && (
+              <Button variant="secondary" disabled={reviewBusy} onClick={() => setClarifying(true)}>
+                Ask a question
+              </Button>
+            )}
+          </div>
+
+          {clarifying && (
+            <div className="space-y-3 border-b border-[var(--color-line)] pb-4">
+              <label htmlFor="clarificationQuestion" className="mb-1 block text-sm font-medium">
+                Question <span aria-hidden="true">*</span>
+                <span className="sr-only">(required)</span>
+              </label>
+              <textarea
+                id="clarificationQuestion"
+                required
+                rows={2}
+                maxLength={2000}
+                value={clarificationQuestion}
+                onChange={(event) => setClarificationQuestion(event.target.value)}
+                className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="primary"
+                  disabled={reviewBusy || clarificationQuestion.trim() === ''}
+                  onClick={() => void submitClarification()}
+                >
+                  Send
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={reviewBusy}
+                  onClick={() => setClarifying(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {clarifications.length === 0 ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">No clarifications yet.</p>
+          ) : (
+            <ul className="space-y-3 text-sm">
+              {clarifications.map((clarification) => (
+                <li
+                  key={clarification.id}
+                  className="space-y-2 border-b border-[var(--color-line)] pb-3 last:border-none last:pb-0"
+                >
+                  <p>
+                    <span className="font-medium">{clarification.requestedBy.displayName}</span>{' '}
+                    asked: {clarification.question}
+                  </p>
+                  <p className="text-xs text-[var(--color-ink-muted)]">
+                    Status: {clarification.status.replace(/_/g, ' ')}
+                  </p>
+                  {clarification.response !== null && (
+                    <p>
+                      <span className="font-medium">{clarification.respondedBy?.displayName}</span>{' '}
+                      answered: {clarification.response}
+                    </p>
+                  )}
+                  {clarification.status === 'open' && respondingId !== clarification.id && (
+                    <Button
+                      variant="secondary"
+                      disabled={reviewBusy}
+                      onClick={() => setRespondingId(clarification.id)}
+                    >
+                      Respond
+                    </Button>
+                  )}
+                  {respondingId === clarification.id && (
+                    <div className="space-y-2">
+                      <label
+                        htmlFor={`response-${clarification.id}`}
+                        className="mb-1 block text-sm font-medium"
+                      >
+                        Response <span aria-hidden="true">*</span>
+                        <span className="sr-only">(required)</span>
+                      </label>
+                      <textarea
+                        id={`response-${clarification.id}`}
+                        required
+                        rows={2}
+                        maxLength={4000}
+                        value={responseText}
+                        onChange={(event) => setResponseText(event.target.value)}
+                        className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          variant="primary"
+                          disabled={reviewBusy || responseText.trim() === ''}
+                          onClick={() => void submitResponse(clarification.id)}
+                        >
+                          Send response
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          disabled={reviewBusy}
+                          onClick={() => setRespondingId(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {clarification.status === 'answered' && (
+                    <Button
+                      variant="primary"
+                      disabled={reviewBusy}
+                      onClick={() => void closeClarification(clarification.id)}
+                    >
+                      Close and resume review
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </section>
 
       <section aria-labelledby="links-heading">
         <h2 id="links-heading" className="mb-3 text-lg font-semibold">

@@ -658,6 +658,113 @@ export const createEvidenceLinkRequestSchema = z.object({
 });
 export type CreateEvidenceLinkRequest = z.infer<typeof createEvidenceLinkRequestSchema>;
 
+// ─── Evidence review and validation (BUILD_ROADMAP.md Milestone 6) ─────────────
+
+export const EVIDENCE_CORRECTION_TYPES = [
+  'clerical',
+  'participant_clarification',
+  'facilitator_interpretation',
+  'substantive',
+] as const;
+export type EvidenceCorrectionType = (typeof EVIDENCE_CORRECTION_TYPES)[number];
+
+export const REVIEW_ASSIGNMENT_STATUSES = [
+  'assigned',
+  'in_progress',
+  'completed',
+  'cancelled',
+  'reassigned',
+] as const;
+export type ReviewAssignmentStatus = (typeof REVIEW_ASSIGNMENT_STATUSES)[number];
+
+export const CLARIFICATION_STATUSES = ['open', 'answered', 'withdrawn', 'closed'] as const;
+export type ClarificationStatus = (typeof CLARIFICATION_STATUSES)[number];
+
+/**
+ * A reviewer moving evidence through the review lifecycle itself — begin,
+ * resume, validate, reject. Kept separate from
+ * `evidenceTransitionRequestSchema` (submit/withdraw) because those are
+ * available to whoever captured the evidence, while these require an
+ * active `ReviewAssignment` — a distinct authorisation boundary the API
+ * layer enforces before this schema is even reached.
+ *
+ * There is no `mark_needs_clarification` action here: that transition is
+ * never taken on its own — it is always paired with opening a
+ * `Clarification` (what is the reviewer asking?), so it is reached through
+ * `POST .../clarifications` (`requestClarificationRequestSchema`) instead,
+ * which moves both aggregates in one transaction. Likewise the common path
+ * back from `needs_clarification` is reached through
+ * `POST .../clarifications/:id/close`, once a clarification has been
+ * answered. `resume_review` remains here only as the escape hatch for the
+ * less common case — the reviewer's question was withdrawn, not answered —
+ * where no `Clarification` closure exists to pair with.
+ */
+export const evidenceReviewActionRequestSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('begin_review'), expectedVersion: z.number().int().positive() }),
+  z.object({
+    action: z.literal('resume_review'),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({
+    action: z.literal('validate'),
+    reason: z.string().trim().max(2000).optional(),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({
+    action: z.literal('reject'),
+    reason: z.string().trim().min(1, 'A rejection reason is required').max(2000),
+    expectedVersion: z.number().int().positive(),
+  }),
+]);
+export type EvidenceReviewActionRequest = z.infer<typeof evidenceReviewActionRequestSchema>;
+
+export const correctEvidenceRequestSchema = z.object({
+  correctionType: z.enum(EVIDENCE_CORRECTION_TYPES),
+  reason: z.string().trim().min(1, 'A correction reason is required').max(2000),
+  evidenceType: z.string().trim().min(1).max(100).optional(),
+  title: z.string().trim().min(1).max(300).optional(),
+  content: z.string().trim().min(1).max(20000).optional(),
+  language: z.string().trim().max(50).nullable().optional(),
+  sessionOffsetSeconds: z.number().int().min(0).nullable().optional(),
+  sourceParticipantId: z.string().uuid().nullable().optional(),
+  attributionMode: z.enum(EVIDENCE_ATTRIBUTION_MODES).optional(),
+  identityVisibility: z.enum(PARTICIPANT_IDENTITY_VISIBILITIES).optional(),
+  tags: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
+  expectedVersion: z.number().int().positive(),
+});
+export type CorrectEvidenceRequest = z.infer<typeof correctEvidenceRequestSchema>;
+
+export const assignReviewerRequestSchema = z.object({
+  reviewerUserId: z.string().uuid('A valid reviewer user id is required'),
+});
+export type AssignReviewerRequest = z.infer<typeof assignReviewerRequestSchema>;
+
+export const reassignReviewerRequestSchema = z.object({
+  reviewerUserId: z.string().uuid('A valid reviewer user id is required'),
+  reason: z.string().trim().max(2000).optional(),
+});
+export type ReassignReviewerRequest = z.infer<typeof reassignReviewerRequestSchema>;
+
+export const cancelReviewAssignmentRequestSchema = z.object({
+  reason: z.string().trim().max(2000).optional(),
+});
+export type CancelReviewAssignmentRequest = z.infer<typeof cancelReviewAssignmentRequestSchema>;
+
+export const requestClarificationRequestSchema = z.object({
+  question: z.string().trim().min(1, 'A question is required').max(2000),
+});
+export type RequestClarificationRequest = z.infer<typeof requestClarificationRequestSchema>;
+
+export const respondToClarificationRequestSchema = z.object({
+  response: z.string().trim().min(1, 'A response is required').max(4000),
+});
+export type RespondToClarificationRequest = z.infer<typeof respondToClarificationRequestSchema>;
+
+export const withdrawClarificationRequestSchema = z.object({
+  reason: z.string().trim().max(2000).optional(),
+});
+export type WithdrawClarificationRequest = z.infer<typeof withdrawClarificationRequestSchema>;
+
 // ─── Responses ───────────────────────────────────────────────────────────────
 
 export interface ActorView {
@@ -1058,7 +1165,14 @@ export interface EvidenceDetail extends EvidenceSummary {
   version: number;
   /** Server-computed, so a client never has to reimplement the lifecycle state machine. */
   permittedActions: EvidenceTransitionRequest['action'][];
+  /**
+   * Server-computed review actions available to the current caller —
+   * empty unless the caller holds the active `ReviewAssignment` for this
+   * evidence (or `evidence_review:manage_restricted`).
+   */
+  permittedReviewActions: EvidenceReviewActionRequest['action'][];
   canEdit: boolean;
+  canCorrect: boolean;
   /**
    * The consent categories checked and allowed at capture time. Present
    * only for a caller holding `evidence:manage_restricted`.
@@ -1066,6 +1180,8 @@ export interface EvidenceDetail extends EvidenceSummary {
   consentBasis?: string[];
   /** Present only for a caller holding `evidence:manage_restricted`. */
   withdrawalReason?: string | null;
+  /** The reviewer's stated reason for the most recent validate/reject decision. */
+  reviewDecisionReason: string | null;
 }
 
 export interface EvidenceLinkView {
@@ -1077,6 +1193,44 @@ export interface EvidenceLinkView {
   note: string | null;
   createdAt: string;
   createdBy: ActorView;
+}
+
+/**
+ * Who is reviewing a piece of evidence, and where that review stands.
+ * Never carries a restricted participant identity — `reviewerUserId` is a
+ * Witness user account (a facilitator/reviewer), not a session participant.
+ */
+export interface ReviewAssignmentView {
+  id: string;
+  evidenceId: string;
+  reviewerUserId: string;
+  assignedBy: ActorView;
+  assignedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  status: ReviewAssignmentStatus;
+  reassignedFromId: string | null;
+  closeReason: string | null;
+  version: number;
+}
+
+/**
+ * A reviewer's question about a piece of evidence and its answer, if any.
+ * `respondedBy` is present only once answered.
+ */
+export interface ClarificationView {
+  id: string;
+  evidenceId: string;
+  reviewAssignmentId: string;
+  question: string;
+  requestedBy: ActorView;
+  requestedAt: string;
+  response: string | null;
+  respondedBy: ActorView | null;
+  respondedAt: string | null;
+  status: ClarificationStatus;
+  closeReason: string | null;
+  version: number;
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────────
