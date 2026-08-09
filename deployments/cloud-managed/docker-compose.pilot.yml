@@ -140,9 +140,15 @@ services:
     profiles: ["direct"]
     image: caddy:2-alpine
     environment:
-      WITNESS_WEB_HOST: ${WITNESS_WEB_HOST:?WITNESS_WEB_HOST must be set}
-      WITNESS_API_HOST: ${WITNESS_API_HOST:?WITNESS_API_HOST must be set}
-      WITNESS_OIDC_HOST: ${WITNESS_OIDC_HOST:?WITNESS_OIDC_HOST must be set}
+      # Defaulted rather than required, because Compose interpolates every
+      # service before it filters by profile: a hard `:?` here aborts
+      # `--profile cloudflare` over three variables Caddy-only variables the
+      # tunnel never uses. Left empty the Caddyfile has no site address and
+      # Caddy refuses to start, so the `direct` profile still fails loudly —
+      # one container at startup instead of the whole file at parse time.
+      WITNESS_WEB_HOST: ${WITNESS_WEB_HOST:-}
+      WITNESS_API_HOST: ${WITNESS_API_HOST:-}
+      WITNESS_OIDC_HOST: ${WITNESS_OIDC_HOST:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
