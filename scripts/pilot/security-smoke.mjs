@@ -17,7 +17,15 @@
  *   WITNESS_PILOT_PASSWORD          shared by the pilot identity-provider users
  *   WITNESS_PILOT_CHROMIUM
  * Optional:
- *   WITNESS_PILOT_INSECURE_TLS=1    accept a private CA (internal pilots)
+ *   WITNESS_PILOT_INSECURE_TLS=1    the deployment uses a private CA. This
+ *                                   relaxes *Chromium's* certificate check
+ *                                   only. Node's own requests keep verifying:
+ *                                   point `NODE_EXTRA_CA_CERTS` at the CA
+ *                                   certificate instead. Turning verification
+ *                                   off wholesale in a script whose job is to
+ *                                   test transport security would be a poor
+ *                                   joke — a man in the middle would pass every
+ *                                   check below.
  *   WITNESS_PILOT_OTHER_ORGANISATION_ID  a second organisation the pilot users
  *                                   do NOT belong to; enables the
  *                                   cross-organisation checks
@@ -83,8 +91,6 @@ function assert(condition, message) {
 }
 
 const main = async () => {
-  if (INSECURE) process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
   const browser = await chromium.launch({
     executablePath: CHROMIUM,
     headless: true,
