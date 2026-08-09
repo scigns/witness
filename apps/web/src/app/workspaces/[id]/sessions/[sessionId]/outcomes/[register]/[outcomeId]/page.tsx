@@ -335,6 +335,32 @@ export default function OutcomeDetailPage({
     return <ErrorNotice message={error ?? 'This outcome could not be loaded.'} />;
   }
 
+  /**
+   * The asterisk and the control have to agree. Every action the server will
+   * reject for a missing reason, a missing replacement, or an empty progress
+   * update is held here rather than sent and bounced.
+   */
+  const canSubmitPending =
+    pendingAction === null
+      ? false
+      : pendingAction === 'supersede'
+        ? replacementId.trim() !== ''
+        : REASON_REQUIRED.has(pendingAction)
+          ? reason.trim() !== ''
+          : pendingAction === 'record_progress'
+            ? percentComplete.trim() !== '' || reason.trim() !== ''
+            : true;
+
+  /**
+   * The server refuses to detach the last basis from an outcome that is
+   * already authoritative. The client can tell without another round trip: an
+   * outcome that can no longer be confirmed or activated already has been, and
+   * one basis is all that is left.
+   */
+  const permitted: readonly string[] = detail.permittedActions;
+  const isAuthoritative = !permitted.includes('confirm') && !permitted.includes('activate');
+  const lastBasisIsLoadBearing = isAuthoritative && detail.supports.length === 1;
+
   const isDecision = 'statement' in detail;
   const isCommitment = 'fulfilmentNote' in detail;
   const isAction = 'percentComplete' in detail;
@@ -538,7 +564,10 @@ export default function OutcomeDetailPage({
                 />
               </div>
 
-              <Button disabled={busy} onClick={() => void runAction(pendingAction)}>
+              <Button
+                disabled={busy || !canSubmitPending}
+                onClick={() => void runAction(pendingAction)}
+              >
                 {busy ? 'Saving…' : `Confirm ${ACTION_LABELS[pendingAction] ?? pendingAction}`}
               </Button>
             </div>
@@ -568,13 +597,30 @@ export default function OutcomeDetailPage({
                 className="flex flex-wrap items-start justify-between gap-3 rounded border border-[var(--color-line)] p-3"
               >
                 <SupportEntry support={support} />
-                <Button
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => void removeSupport(support.id)}
-                >
-                  Remove
-                </Button>
+                <div className="text-right">
+                  <Button
+                    variant="secondary"
+                    disabled={busy || lastBasisIsLoadBearing}
+                    onClick={() => {
+                      // A permanent delete of an audited record, so it asks.
+                      if (
+                        window.confirm(
+                          'Remove this basis? The outcome will no longer cite it, and the record is deleted.',
+                        )
+                      ) {
+                        void removeSupport(support.id);
+                      }
+                    }}
+                  >
+                    Remove
+                  </Button>
+                  {lastBasisIsLoadBearing && (
+                    <p className="mt-1 max-w-[15rem] text-xs text-[var(--color-ink-muted)]">
+                      This is the only basis behind an outcome that is already authoritative. Record
+                      another first, or reverse the outcome.
+                    </p>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

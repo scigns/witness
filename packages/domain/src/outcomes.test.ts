@@ -86,12 +86,12 @@ function validatedEvidence(overrides: Partial<SupportingEvidenceRef> = {}): Supp
   };
 }
 
-function evidenceSupport(): OutcomeSupport {
+function evidenceSupport(outcomeId: string = DECISION_ID): OutcomeSupport {
   return recordEvidenceSupport({
     id: SUPPORT_ID,
     sessionId: SESSION,
     outcomeType: 'decision',
-    outcomeId: DECISION_ID,
+    outcomeId,
     scope: SCOPE,
     evidence: validatedEvidence(),
     recordedBy: HUMAN,
@@ -99,12 +99,12 @@ function evidenceSupport(): OutcomeSupport {
   }).support;
 }
 
-function synthesisSupport(): OutcomeSupport {
+function synthesisSupport(outcomeId: string = DECISION_ID): OutcomeSupport {
   return recordSynthesisSupport({
     id: SUPPORT_ID,
     sessionId: SESSION,
     outcomeType: 'decision',
-    outcomeId: DECISION_ID,
+    outcomeId,
     scope: SCOPE,
     rationale: 'Synthesised across three sessions; no single quote captures it.',
     recordedBy: HUMAN,
@@ -357,9 +357,46 @@ function proposedCommitment(): Commitment {
 }
 
 function activeCommitment(): Commitment {
-  return activateCommitment(proposedCommitment(), 'open', [evidenceSupport()], HUMAN, LATER)
-    .commitment;
+  return activateCommitment(
+    proposedCommitment(),
+    'open',
+    [evidenceSupport(COMMITMENT_ID)],
+    HUMAN,
+    LATER,
+  ).commitment;
 }
+
+describe('Support must belong to the outcome it is claimed to justify', () => {
+  it('refuses to confirm a decision on another outcome’s support', () => {
+    expect(() =>
+      confirmDecision(proposedDecision(), 'open', [evidenceSupport(COMMITMENT_ID)], HUMAN, LATER),
+    ).toThrow(/must rest on validated evidence or a stated institutional synthesis/);
+  });
+
+  it('refuses to activate a commitment on another outcome’s support', () => {
+    expect(() =>
+      activateCommitment(
+        proposedCommitment(),
+        'open',
+        [evidenceSupport(DECISION_ID)],
+        HUMAN,
+        LATER,
+      ),
+    ).toThrow(/must rest on validated evidence or a stated institutional synthesis/);
+  });
+
+  it('accepts a mixed list as long as one record belongs to this outcome', () => {
+    const confirmed = confirmDecision(
+      proposedDecision(),
+      'open',
+      [evidenceSupport(COMMITMENT_ID), synthesisSupport(DECISION_ID)],
+      HUMAN,
+      LATER,
+    );
+
+    expect(confirmed.decision.status).toBe('confirmed');
+  });
+});
 
 describe('Commitment lifecycle', () => {
   it('proposes with a plain-language owner and no user account', () => {

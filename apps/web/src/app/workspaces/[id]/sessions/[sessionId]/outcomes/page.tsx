@@ -100,20 +100,35 @@ export default function SessionOutcomesPage({
       }
       if (actionResult.status === 'fulfilled') setActions(actionResult.value.actions);
 
-      const failure = [sessionResult, decisionResult, commitmentResult, actionResult].find(
-        (result) => result.status === 'rejected',
+      // Only a denial of *every* register means the caller cannot read
+      // outcomes at all; anything narrower keeps the page, so the registers
+      // that did load still render. Collapsing these into one flag would
+      // either replace a working page over a partial denial or, worse, leave
+      // a denied session read showing three registers and no explanation.
+      const registerResults = [decisionResult, commitmentResult, actionResult];
+      const denied = (result: PromiseSettledResult<unknown>): boolean =>
+        result.status === 'rejected' &&
+        result.reason instanceof ApiError &&
+        result.reason.status === 403;
+
+      const deniedEverything = registerResults.every(denied);
+      setForbidden(deniedEverything);
+
+      const unexpected = [sessionResult, ...registerResults].find(
+        (result) => result.status === 'rejected' && !denied(result),
       );
-      if (failure !== undefined && failure.status === 'rejected') {
-        const caught: unknown = failure.reason;
-        if (caught instanceof ApiError && caught.status === 403) {
-          setForbidden(decisionResult.status === 'rejected');
-          setError(null);
-        } else {
-          setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
-        }
+
+      if (deniedEverything) {
+        setError(null);
+      } else if (unexpected !== undefined && unexpected.status === 'rejected') {
+        const caught: unknown = unexpected.reason;
+        setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+      } else if (sessionResult.status === 'rejected') {
+        setError('You do not have permission to view this session.');
+      } else if (registerResults.some(denied)) {
+        setError('Some registers are not visible to you and have been left out.');
       } else {
         setError(null);
-        setForbidden(false);
       }
       setLoading(false);
     },
@@ -232,13 +247,19 @@ export default function SessionOutcomesPage({
         </p>
       </div>
 
-      <div className="flex gap-2 border-b border-[var(--color-line)]" role="tablist">
+      {/*
+        Ordinary buttons rather than an ARIA tablist: a tablist owes the
+        reader `aria-controls`, matching `role="tabpanel"` regions and
+        arrow-key navigation, and a half-built one announces a selected tab
+        with no panel behind it. `aria-pressed` states the same thing
+        accurately with the behaviour these controls actually have.
+      */}
+      <div className="flex gap-2 border-b border-[var(--color-line)]">
         {(Object.keys(REGISTER_LABELS) as Register[]).map((register) => (
           <button
             key={register}
-            role="tab"
             type="button"
-            aria-selected={tab === register}
+            aria-pressed={tab === register}
             onClick={() => {
               setTab(register);
               setCreateError(null);

@@ -239,7 +239,7 @@ export function confirmDecision(
     );
   }
 
-  assertSupported(supports, 'decision');
+  assertSupported(supports, decision.id, 'decision');
 
   const next: Decision = {
     ...decision,

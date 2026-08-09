@@ -35,7 +35,7 @@ import type {
 
 const TITLE_MAX = 300;
 const DESCRIPTION_MAX = 5000;
-const OWNER_MAX = 200;
+const OWNER_MAX = 300;
 const NOTE_MAX = 2000;
 
 export const ACTION_ITEM_STATUSES = [
