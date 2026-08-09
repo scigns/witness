@@ -38,8 +38,14 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-witness}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_INITDB_ARGS: "--data-checksums"
+      # Consumed by postgres-init/01-keycloak-role.sh on first-time init only —
+      # provisions Keycloak's own role and database, separate from Witness's.
+      KEYCLOAK_DB: ${KEYCLOAK_DB:-keycloak}
+      KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER:?KEYCLOAK_DB_USER must be set}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD must be set}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     # No `ports:`. The database is reachable only from this compose network —
     # publishing 5432 to the host is how an internal database becomes an
     # internet-facing one.
@@ -53,7 +59,12 @@ services:
   keycloak:
     <<: *common
     image: quay.io/keycloak/keycloak:26.0
-    command: ["start", "--optimized", "--import-realm"]
+    # `--optimized` skips the build step and trusts options baked into the image
+    # at build time via `kc.sh build`; the stock image ships none, so KC_DB and
+    # KC_HEALTH_ENABLED would be silently ignored (wrong datastore, no health
+    # endpoint). Without it, `start` still runs in production mode — it just
+    # builds first, same as the base compose's `start-dev` does every time.
+    command: ["start", "--import-realm"]
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:-keycloak}

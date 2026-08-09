@@ -41,6 +41,10 @@ secrets/
 kubeconfig
 *.kubeconfig
 
+# Cloudflare — per-deployment, never shared across environments
+deployments/cloud-managed/cloudflared/credentials.json
+deployments/cloud-managed/cloudflare-worker/.wrangler/
+
 # Terraform
 .terraform/
 *.tfstate
