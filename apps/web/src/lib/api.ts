@@ -77,6 +77,15 @@ import type {
   CommitmentSummary,
   CommitmentTransitionRequest,
   CreateActionItemRequest,
+  CreateReportRequest,
+  IncludeReportSourceRequest,
+  RenderedReport,
+  ReportDetail,
+  ReportExportFormat,
+  ReportSourceView,
+  ReportSummary,
+  ReportTransitionRequest,
+  UpdateReportRequest,
   DecisionDetail,
   DecisionSummary,
   DecisionTransitionRequest,
@@ -164,6 +173,10 @@ export type OutcomeRegister = 'decisions' | 'commitments' | 'actions';
 
 function outcomePath(workspaceId: string, sessionId: string, register: OutcomeRegister): string {
   return `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/${register}`;
+}
+
+function reportPath(workspaceId: string, sessionId: string): string {
+  return `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/reports`;
 }
 
 export const api = {
@@ -1180,6 +1193,114 @@ export const api = {
       user,
       { method: 'DELETE' },
     ),
+
+  // ─── Session reporting and export (BUILD_ROADMAP.md Milestone 8) ──────────
+
+  listReports: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<{ reports: ReportSummary[] }> => request(reportPath(workspaceId, sessionId), user),
+
+  getReport: (
+    workspaceId: string,
+    sessionId: string,
+    reportId: string,
+    user: ActingUser,
+  ): Promise<ReportDetail> =>
+    request(`${reportPath(workspaceId, sessionId)}/${encodeURIComponent(reportId)}`, user),
+
+  getRenderedReport: (
+    workspaceId: string,
+    sessionId: string,
+    reportId: string,
+    user: ActingUser,
+  ): Promise<RenderedReport> =>
+    request(`${reportPath(workspaceId, sessionId)}/${encodeURIComponent(reportId)}/rendered`, user),
+
+  getReportHistory: (
+    workspaceId: string,
+    sessionId: string,
+    reportId: string,
+    user: ActingUser,
+  ): Promise<{
+    events: { id: string; action: string; occurredAt: string; metadata: Record<string, string> }[];
+  }> =>
+    request(`${reportPath(workspaceId, sessionId)}/${encodeURIComponent(reportId)}/history`, user),
+
+  createReport: (
+    workspaceId: string,
+    sessionId: string,
+    body: CreateReportRequest,
+    user: ActingUser,
+  ): Promise<ReportDetail> =>
+    request(reportPath(workspaceId, sessionId), user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateReport: (
+    workspaceId: string,
+    sessionId: string,
+    reportId: string,
+    body: UpdateReportRequest,
+    user: ActingUser,
+  ): Promise<ReportDetail> =>
+    request(`${reportPath(workspaceId, sessionId)}/${encodeURIComponent(reportId)}`, user, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  transitionReport: (
+    workspaceId: string,
+    sessionId: string,
+    reportId: string,
+    body: ReportTransitionRequest,
+    user: ActingUser,
+  ): Promise<ReportDetail> =>
+    request(
+      `${reportPath(workspaceId, sessionId)}/${encodeURIComponent(reportId)}/transitions`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  includeReportSource: (
+    workspaceId: string,
+    sessionId: string,
+    reportId: string,
+    body: IncludeReportSourceRequest,
+    user: ActingUser,
+  ): Promise<ReportSourceView> =>
+    request(`${reportPath(workspaceId, sessionId)}/${encodeURIComponent(reportId)}/sources`, user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  excludeReportSource: (
+    workspaceId: string,
+    sessionId: string,
+    reportId: string,
+    sourceId: string,
+    user: ActingUser,
+  ): Promise<void> =>
+    request<void>(
+      `${reportPath(workspaceId, sessionId)}/${encodeURIComponent(reportId)}/sources/${encodeURIComponent(sourceId)}`,
+      user,
+      { method: 'DELETE' },
+    ),
+
+  /**
+   * Where an export is downloaded from. Not a fetch: the browser navigates,
+   * so the server's `Content-Disposition: attachment` decides the filename
+   * and the bytes never pass through client-side JavaScript.
+   */
+  reportExportUrl: (
+    workspaceId: string,
+    sessionId: string,
+    reportId: string,
+    format: ReportExportFormat,
+  ): string =>
+    `${BASE_URL}${reportPath(workspaceId, sessionId)}/${encodeURIComponent(reportId)}/export?format=${format}`,
 };
 
 /**

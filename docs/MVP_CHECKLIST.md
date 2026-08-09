@@ -594,6 +594,76 @@ and is unit- and service-tested (Outcomes PR, not yet merged). This gate is not 
 workflow is walked through end to end against a live Postgres and browser, which this sandbox does
 not have.
 
+E.3 Session Summary, Reporting and Export (Milestone 8)
+
+A session can be turned into a report — READY (Reporting PR, not yet merged). `Report`
+(`packages/domain/src/report.ts`) runs `draft → under_review → approved → published_internally`,
+with `exported` recording that a copy has left. Review can send a report back to draft with a
+required statement of what needs to change, because forcing an approve/reject binary pushes
+reviewers into approving things they doubt.
+
+An approved report is not silently rewritten — READY (Reporting PR, not yet merged). Editing is
+refused on anything but a draft. `reviseApprovedReport` produces a *new* report at the next
+revision, carrying its citations forward and pointing back at what it supersedes; the approved
+revision keeps its status, its approver and its date.
+
+Every material claim is traceable — READY (Reporting PR, not yet merged). `ReportSource`
+(`packages/domain/src/report-source.ts`) records one row per cited record with the *version* it held
+at inclusion. A record that has moved since is flagged as drifted rather than silently swapped for
+its current self.
+
+Draft, rejected and withdrawn evidence cannot be presented as fact — READY (Reporting PR, not yet
+merged). `assertSourceAdmissible` accepts only validated evidence, confirmed or superseded
+decisions, and active or fulfilled commitments; actions are admissible in any state, because an
+honest account includes what an institution stopped. Cross-session, cross-workspace and
+cross-organisation records are refused by name.
+
+Facilitator synthesis is never presented as participant testimony — READY (Reporting PR, not yet
+merged). The narrative sections live on the report rather than among its sources, and every renderer
+labels them as the facilitator's interpretation. `isFacilitatorVoice` names the three sections so no
+template decides for itself.
+
+Consent governs what a report may say — READY (Reporting PR, not yet merged).
+`projectEvidenceForReport` (`packages/domain/src/report-composition.ts`) answers three separate
+questions in order: may this appear (withdrawn or audience-refused consent removes it entirely), may
+it be quoted (refused quotation keeps the finding and withholds the content, structurally absent
+rather than blanked), and whose voice is it (an anonymous participant is never named; attributed
+evidence without attributed-quotation consent falls back to anonymous). A participant-sourced record
+with no resolvable consent answer fails closed.
+
+The participant summary cannot identify anyone — READY (Reporting PR, not yet merged). Counts only,
+never a list. Withdrawn participants remain in the total, because a count that dropped between
+revisions would say who left.
+
+Withdrawal of consent reaches an already-approved report — READY (Reporting PR, not yet merged).
+Consent is evaluated at render time rather than frozen at approval, so the next copy of a published
+report omits a participant who has since withdrawn.
+
+Reports can be exported — READY (Reporting PR, not yet merged). Printable HTML, Markdown, JSON and
+CSV. PDF is deliberately out of scope for the MVP; the HTML export prints. Redaction happens in
+`ReportsService.render` before any format is chosen, so all four serialise the same already-redacted
+document.
+
+Exports are server-authoritative and hostile-input aware — READY (Reporting PR, not yet merged). The
+client never filters; it receives an already-redacted payload. CSV neutralises leading `=`, `+`, `-`
+and `@` so a participant quotation is not executed as a spreadsheet formula, HTML escapes, and every
+export is served as an attachment rather than rendered inline in the application's origin.
+
+Approving a report is a separate permission from writing one — READY (Reporting PR, not yet merged).
+`report:create`/`update`/`submit` are contributor-tier and `report:approve`/`publish` are
+reviewer-tier, with no overlap, so a contributor cannot approve their own report.
+
+Report activity is audited — READY (Reporting PR, not yet merged). Ten new actions across the
+`report` and `report_source` hash chains, including every individual export with its format and its
+actor.
+
+Pilot-blocking gate
+
+An authorised person can produce a privacy-safe, evidence-traceable report of a real session and
+export it — PARTIALLY READY. The mechanism exists and is unit- and service-tested (Reporting PR, not
+yet merged). This gate is not fully met until the workflow is walked through end to end against a
+live Postgres and browser, which this sandbox does not have.
+
 F. AI Processing
 
 Processing Jobs
