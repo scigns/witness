@@ -49,6 +49,8 @@ import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import type { Principal } from '../authz/authorization.port.js';
 
+type PrismaTransaction = Parameters<Parameters<PrismaService['$transaction']>[0]>[0];
+
 export type OutcomeSupportRow = Awaited<
   ReturnType<PrismaService['outcomeSupport']['findUniqueOrThrow']>
 >;
@@ -121,47 +123,50 @@ export class OutcomeSupportService {
     const actor = await resolveActor(this.prisma, principal);
     const now = new Date();
 
-    const outcome = await (async () => {
-      if (request.basis === 'institutional_synthesis') {
-        return recordSynthesisSupport({
-          id: toOutcomeSupportId(randomUUID()),
-          sessionId: toCoDesignSessionId(scope.sessionId),
-          outcomeType,
-          outcomeId,
-          scope: {
-            organisationId: toOrganisationId(scope.organisationId),
-            workspaceId: toWorkspaceId(scope.workspaceId),
-          },
-          rationale: request.rationale,
-          recordedBy: actor,
-          at: now,
-        });
-      }
-
-      const evidence = await this.requireSupportableEvidence(
-        scope.workspaceId,
-        scope.sessionId,
-        request.evidenceId,
-      );
-
-      return recordEvidenceSupport({
-        id: toOutcomeSupportId(randomUUID()),
-        sessionId: toCoDesignSessionId(scope.sessionId),
-        outcomeType,
-        outcomeId,
-        scope: {
-          organisationId: toOrganisationId(scope.organisationId),
-          workspaceId: toWorkspaceId(scope.workspaceId),
-        },
-        evidence,
-        note: request.note,
-        recordedBy: actor,
-        at: now,
-      });
-    })();
+    const supportId = toOutcomeSupportId(randomUUID());
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        // The evidence is resolved *inside* the write transaction. Reading it
+        // beforehand would let a concurrent review action withdraw or reject
+        // the same evidence between the read and the insert, freezing
+        // `validated`/`verified` into a support record for evidence that was
+        // no longer admissible when the row landed.
+        const outcome =
+          request.basis === 'institutional_synthesis'
+            ? recordSynthesisSupport({
+                id: supportId,
+                sessionId: toCoDesignSessionId(scope.sessionId),
+                outcomeType,
+                outcomeId,
+                scope: {
+                  organisationId: toOrganisationId(scope.organisationId),
+                  workspaceId: toWorkspaceId(scope.workspaceId),
+                },
+                rationale: request.rationale,
+                recordedBy: actor,
+                at: now,
+              })
+            : recordEvidenceSupport({
+                id: supportId,
+                sessionId: toCoDesignSessionId(scope.sessionId),
+                outcomeType,
+                outcomeId,
+                scope: {
+                  organisationId: toOrganisationId(scope.organisationId),
+                  workspaceId: toWorkspaceId(scope.workspaceId),
+                },
+                evidence: await requireSupportableEvidence(
+                  tx,
+                  scope.workspaceId,
+                  scope.sessionId,
+                  request.evidenceId,
+                ),
+                note: request.note,
+                recordedBy: actor,
+                at: now,
+              });
+
         await tx.outcomeSupport.create({
           data: {
             id: outcome.support.id,
@@ -202,101 +207,205 @@ export class OutcomeSupportService {
     }
 
     const row = await this.prisma.outcomeSupport.findUniqueOrThrow({
-      where: { id: outcome.support.id },
+      where: { id: supportId },
       include: { evidence: true, recordedBy: true },
     });
     return toSupportView(row);
   }
 
   /**
-   * Detach a basis. `isAuthoritative` says whether the outcome has already
-   * been confirmed/activated — if so, its last support may not be removed,
-   * because that is precisely what its authority rested on.
+   * Detach a basis.
+   *
+   * Everything that decides whether this removal is allowed — the support row
+   * itself, whether the outcome is already authoritative, and how many bases
+   * would be left — is read inside the transaction that deletes, and the
+   * outcome row is claimed by a compare-and-swap on its version first.
+   *
+   * The claim is what makes the count trustworthy. Without it, two concurrent
+   * removals of *different* support records on a confirmed decision both read
+   * `remaining === 2`, both pass the check, and both commit — leaving a
+   * confirmed outcome resting on nothing, which is precisely the state this
+   * milestone exists to make unreachable. With it, the second removal finds
+   * the version moved and is rejected as a stale write, the same optimistic
+   * concurrency every other write in this codebase uses.
    */
   async remove(
     scope: { workspaceId: string; sessionId: string },
     outcomeType: OutcomeType,
     outcomeId: string,
     supportId: string,
-    isAuthoritative: boolean,
     principal: Principal,
   ): Promise<void> {
-    const row = await this.prisma.outcomeSupport.findUnique({ where: { id: supportId } });
+    const actor = await resolveActor(this.prisma, principal);
+    const now = new Date();
 
-    if (
-      row === null ||
-      row.workspaceId !== scope.workspaceId ||
-      row.sessionId !== scope.sessionId ||
-      row.outcomeType !== outcomeType ||
-      row.outcomeId !== outcomeId
-    ) {
-      throw new NotFoundException({
-        error: {
-          code: 'OUTCOME_SUPPORT_NOT_FOUND',
-          message: `No support record '${supportId}' for this outcome.`,
-        },
-      });
-    }
+    await this.prisma.$transaction(async (tx) => {
+      const isAuthoritative = await claimOutcome(tx, outcomeType, outcomeId);
 
-    if (isAuthoritative) {
-      const remaining = await this.prisma.outcomeSupport.count({
-        where: { outcomeType, outcomeId },
-      });
-      if (remaining <= 1) {
-        throw new ConflictException({
+      const row = await tx.outcomeSupport.findUnique({ where: { id: supportId } });
+
+      if (
+        row === null ||
+        row.workspaceId !== scope.workspaceId ||
+        row.sessionId !== scope.sessionId ||
+        row.outcomeType !== outcomeType ||
+        row.outcomeId !== outcomeId
+      ) {
+        throw new NotFoundException({
           error: {
-            code: 'OUTCOME_SUPPORT_REQUIRED',
-            message:
-              'This outcome is already authoritative, so its last remaining basis cannot be removed. Record another basis first, or reverse the outcome.',
+            code: 'OUTCOME_SUPPORT_NOT_FOUND',
+            message: `No support record '${supportId}' for this outcome.`,
           },
         });
       }
-    }
 
-    const actor = await resolveActor(this.prisma, principal);
-    const now = new Date();
-    const event = removeOutcomeSupport(toDomainSupport(row), actor);
+      if (isAuthoritative) {
+        const remaining = await tx.outcomeSupport.count({ where: { outcomeType, outcomeId } });
+        if (remaining <= 1) {
+          throw new ConflictException({
+            error: {
+              code: 'OUTCOME_SUPPORT_REQUIRED',
+              message:
+                'This outcome is already authoritative, so its last remaining basis cannot be removed. Record another basis first, or reverse the outcome.',
+            },
+          });
+        }
+      }
 
-    await this.prisma.$transaction(async (tx) => {
+      const event = removeOutcomeSupport(toDomainSupport(row), actor);
       await tx.outcomeSupport.delete({ where: { id: supportId } });
       await appendAuditEvent(tx, 'outcome_support', supportId, event, now);
     });
   }
+}
 
-  /**
-   * Resolve the evidence a caller wants to rely on, refusing anything
-   * outside this session with `EVIDENCE_NOT_FOUND` — see the file header on
-   * why an out-of-scope id must not be distinguishable from a missing one.
-   *
-   * Admissibility itself (validated, verified, same workspace and
-   * organisation) is left to the domain: this returns the facts, it does not
-   * duplicate the rule.
-   */
-  private async requireSupportableEvidence(
-    workspaceId: string,
-    sessionId: string,
-    evidenceId: string,
-  ): Promise<SupportingEvidenceRef> {
-    const row = await this.prisma.evidence.findUnique({ where: { id: evidenceId } });
+/**
+ * Resolve the evidence a caller wants to rely on, refusing anything outside
+ * this session with `EVIDENCE_NOT_FOUND` — see the file header on why an
+ * out-of-scope id must not be distinguishable from a missing one.
+ *
+ * Takes the transaction client, following `loadSupports` in
+ * `outcomes.service.ts`, so the facts frozen into a support record are read in
+ * the same transaction that writes it.
+ *
+ * Admissibility itself (validated, verified, same workspace and organisation)
+ * is left to the domain: this returns the facts, it does not duplicate the
+ * rule.
+ */
+async function requireSupportableEvidence(
+  tx: PrismaTransaction,
+  workspaceId: string,
+  sessionId: string,
+  evidenceId: string,
+): Promise<SupportingEvidenceRef> {
+  const row = await tx.evidence.findUnique({ where: { id: evidenceId } });
 
-    if (row === null || row.workspaceId !== workspaceId || row.sessionId !== sessionId) {
+  if (row === null || row.workspaceId !== workspaceId || row.sessionId !== sessionId) {
+    throw new NotFoundException({
+      error: {
+        code: 'EVIDENCE_NOT_FOUND',
+        message: `No evidence '${evidenceId}' in session '${sessionId}'.`,
+      },
+    });
+  }
+
+  return {
+    id: toEvidenceId(row.id),
+    organisationId: toOrganisationId(row.organisationId),
+    workspaceId: toWorkspaceId(row.workspaceId),
+    sessionId: toCoDesignSessionId(row.sessionId),
+    reviewStatus: row.reviewStatus as EvidenceReviewStatus,
+    verificationStatus: row.verificationStatus as EvidenceVerificationStatus,
+    version: row.version,
+  };
+}
+
+/**
+ * Claim the outcome for the duration of this transaction and report whether it
+ * is already authoritative, by bumping its optimistic-concurrency version.
+ *
+ * A version bump is the honest record of what happened — the outcome's set of
+ * bases changed — and it is also the serialisation point: two concurrent
+ * removals contend on the same conditional update, so the second is rejected
+ * as stale rather than both proceeding on a count neither of them still holds.
+ *
+ * An action is never authoritative: it carries out a decision rather than
+ * making a claim of its own, so nothing rests on its bases
+ * (`packages/domain/src/action-item.ts`).
+ */
+async function claimOutcome(
+  tx: PrismaTransaction,
+  outcomeType: OutcomeType,
+  outcomeId: string,
+): Promise<boolean> {
+  const claim = async (
+    current: { status: string; version: number } | null,
+    bump: (version: number) => Promise<{ count: number }>,
+    authoritativeStatus: string | null,
+  ): Promise<boolean> => {
+    if (current === null) {
       throw new NotFoundException({
         error: {
-          code: 'EVIDENCE_NOT_FOUND',
-          message: `No evidence '${evidenceId}' in session '${sessionId}'.`,
+          code: 'OUTCOME_NOT_FOUND',
+          message: `No ${outcomeType} '${outcomeId}'.`,
         },
       });
     }
 
-    return {
-      id: toEvidenceId(row.id),
-      organisationId: toOrganisationId(row.organisationId),
-      workspaceId: toWorkspaceId(row.workspaceId),
-      sessionId: toCoDesignSessionId(row.sessionId),
-      reviewStatus: row.reviewStatus as EvidenceReviewStatus,
-      verificationStatus: row.verificationStatus as EvidenceVerificationStatus,
-      version: row.version,
-    };
+    const claimed = await bump(current.version);
+    if (claimed.count === 0) {
+      throw new ConflictException({
+        error: {
+          code: 'STALE_VERSION',
+          message:
+            'This outcome was changed by someone else while this removal was in flight. Reload and try again.',
+        },
+      });
+    }
+
+    return authoritativeStatus !== null && current.status === authoritativeStatus;
+  };
+
+  switch (outcomeType) {
+    case 'decision':
+      return claim(
+        await tx.decision.findUnique({
+          where: { id: outcomeId },
+          select: { status: true, version: true },
+        }),
+        (version) =>
+          tx.decision.updateMany({
+            where: { id: outcomeId, version },
+            data: { version: version + 1 },
+          }),
+        'confirmed',
+      );
+    case 'commitment':
+      return claim(
+        await tx.commitment.findUnique({
+          where: { id: outcomeId },
+          select: { status: true, version: true },
+        }),
+        (version) =>
+          tx.commitment.updateMany({
+            where: { id: outcomeId, version },
+            data: { version: version + 1 },
+          }),
+        'active',
+      );
+    case 'action_item':
+      return claim(
+        await tx.actionItem.findUnique({
+          where: { id: outcomeId },
+          select: { status: true, version: true },
+        }),
+        (version) =>
+          tx.actionItem.updateMany({
+            where: { id: outcomeId, version },
+            data: { version: version + 1 },
+          }),
+        null,
+      );
   }
 }
 
