@@ -40,6 +40,10 @@ model Actor {
   commitmentsActivated      Commitment[]       @relation("CommitmentActivatedBy")
   actionItemsCreated        ActionItem[]       @relation("ActionItemCreatedBy")
   outcomeSupportsRecorded   OutcomeSupport[]   @relation("OutcomeSupportRecordedBy")
+  reportsCreated            Report[]           @relation("ReportCreatedBy")
+  reportsSubmitted          Report[]           @relation("ReportSubmittedBy")
+  reportsApproved           Report[]           @relation("ReportApprovedBy")
+  reportSourcesIncluded     ReportSource[]     @relation("ReportSourceIncludedBy")
 
   @@index([kind])
   @@map("actor")
@@ -119,6 +123,8 @@ model Organisation {
   commitments                  Commitment[]
   actionItems                  ActionItem[]
   outcomeSupports              OutcomeSupport[]
+  reports                      Report[]
+  reportSources                ReportSource[]
 
   @@map("organisation")
 }
@@ -154,6 +160,8 @@ model Workspace {
   commitments                  Commitment[]
   actionItems                  ActionItem[]
   outcomeSupports              OutcomeSupport[]
+  reports                      Report[]
+  reportSources                ReportSource[]
 
   @@index([organisationId])
   @@map("workspace")
@@ -425,6 +433,8 @@ model CoDesignSession {
   commitments               Commitment[]
   actionItems               ActionItem[]
   outcomeSupports           OutcomeSupport[]
+  reports                   Report[]
+  reportSources             ReportSource[]
 
   @@index([organisationId])
   @@index([workspaceId, status])
@@ -1211,4 +1221,139 @@ model OutcomeSupport {
   @@index([sessionId])
   @@index([evidenceId])
   @@map("outcome_support")
+}
+
+/// A session's report (BUILD_ROADMAP.md Milestone 8, Session Summary,
+/// Reporting and Export) — what an institution says about what a session
+/// produced, and the review standing behind it.
+///
+/// The narrative sections here are the author's own words. Everything else a
+/// report presents — evidence, decisions, commitments, actions — is referenced
+/// through `ReportSource` and composed at read time. That is a privacy
+/// decision before an architectural one: copying participant-derived content
+/// into a report row would create a second copy outside the consent and
+/// redaction boundaries Milestones 4 and 5 built, and a later withdrawal of
+/// consent would have to chase it. See
+/// `packages/domain/src/report-composition.ts`.
+///
+/// An approved report is never edited. A revision is a new row at the next
+/// `revision`, pointing back through `supersedes_report_id`, so a reader who
+/// saw an earlier revision can still find exactly what they saw.
+model Report {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  title   String  @db.VarChar(300)
+  purpose String? @db.Text
+
+  /// Which audience this report is written for. Not decoration: it selects
+  /// which consent category every included record must satisfy.
+  audience String @default("internal") @db.VarChar(16)
+
+  status String @default("draft") @db.VarChar(24)
+
+  /// 1 for a session's first report; incremented by each revision.
+  revision Int @default(1)
+
+  /// The approved report this one replaces. `SetNull`, not `Cascade`: losing
+  /// the superseded revision must never take its replacement with it.
+  supersedesReportId String?  @map("supersedes_report_id") @db.Uuid
+  supersedes         Report?  @relation("ReportRevision", fields: [supersedesReportId], references: [id], onDelete: SetNull)
+  supersededBy       Report[] @relation("ReportRevision")
+
+  /// The facilitator's own reading of the session, always presented as
+  /// synthesis rather than as testimony.
+  facilitatorSynthesis String? @map("facilitator_synthesis") @db.Text
+  unresolvedQuestions  String? @map("unresolved_questions") @db.Text
+  recommendations      String? @db.Text
+
+  createdById String @map("created_by_id") @db.Uuid
+  createdBy   Actor  @relation("ReportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  submittedById String?   @map("submitted_by_id") @db.Uuid
+  submittedBy   Actor?    @relation("ReportSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+  submittedAt   DateTime? @map("submitted_at") @db.Timestamptz(6)
+
+  approvedById String?   @map("approved_by_id") @db.Uuid
+  approvedBy   Actor?    @relation("ReportApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  approvedAt   DateTime? @map("approved_at") @db.Timestamptz(6)
+
+  /// Why a reviewer sent this back. Cleared when it is resubmitted.
+  changesRequestedReason String? @map("changes_requested_reason") @db.Text
+
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+
+  /// When a copy first left the system. Later exports do not move it — a
+  /// report is not "more exported" the fifth time, and re-stamping would lose
+  /// the date that matters.
+  firstExportedAt DateTime? @map("first_exported_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every mutation.
+  version Int @default(1)
+
+  sources ReportSource[]
+
+  @@index([sessionId])
+  @@index([workspaceId])
+  @@index([sessionId, status])
+  @@index([supersedesReportId])
+  @@map("report")
+}
+
+/// What a report draws on (BUILD_ROADMAP.md Milestone 8).
+///
+/// One row per record the report references, carrying the record's id and the
+/// *version* it held when it was included — the same freeze `OutcomeSupport`
+/// performs, for the same reason: a reader can tell that the evidence behind
+/// a paragraph has been corrected since the report cited it.
+///
+/// `source_type` + `source_id` is a polymorphic association, the same
+/// trade-off as `AuditEvent` and `OutcomeSupport`: Postgres cannot express
+/// "references exactly one of these four tables", so `ReportsService`
+/// resolves the record before writing, and the `report_id` cascade means a
+/// source row cannot outlive its report.
+model ReportSource {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  reportId String @map("report_id") @db.Uuid
+  report   Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  sourceType String @map("source_type") @db.VarChar(16)
+  sourceId   String @map("source_id") @db.Uuid
+
+  /// The version the record carried at inclusion. Frozen.
+  sourceVersion Int    @map("source_version")
+  /// The record's status at inclusion, frozen for the same reason.
+  sourceStatus  String @map("source_status") @db.VarChar(24)
+
+  includedById String   @map("included_by_id") @db.Uuid
+  includedBy   Actor    @relation("ReportSourceIncludedBy", fields: [includedById], references: [id], onDelete: Restrict)
+  includedAt   DateTime @map("included_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([reportId, sourceType, sourceId])
+  @@index([reportId])
+  @@index([sessionId])
+  @@map("report_source")
 }

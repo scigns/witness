@@ -85,7 +85,14 @@ export type Action =
   | 'outcome:transition'
   | 'outcome:confirm'
   | 'outcome:close'
-  | 'outcome:link_support';
+  | 'outcome:link_support'
+  | 'report:read'
+  | 'report:create'
+  | 'report:update'
+  | 'report:submit'
+  | 'report:approve'
+  | 'report:publish'
+  | 'report:export';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;

@@ -110,6 +110,22 @@
 # `outcome:manage_restricted` — an outcome carries no restricted participant
 # identity, by construction: `owner_description` is plain language and a
 # session participant is never recorded as an owner.
+#
+# report:* (BUILD_ROADMAP.md Milestone 8, Session Summary, Reporting and
+# Export) splits along the same seam as evidence_review:* and outcome:*.
+# `create`/`update`/`submit` are contributor-tier — writing up a session is
+# ordinary facilitation work. `approve` and `publish` are reviewer-tier,
+# because those are the moments an institution takes responsibility for what
+# a report says. The two sets do not overlap, so a contributor cannot approve
+# their own report and a reviewer cannot write the one they approve: that is
+# segregation of duties by grant rather than by a per-report ownership check.
+#
+# `report:read` and `report:export` are granted to reader as well. A published
+# report is meant to be taken away and used; requiring reviewer rights to save
+# a copy of an already-approved document would make the approval gate
+# meaningless while making the product annoying. Export redaction is
+# server-side and scoped to the reader either way — see
+# packages/domain/src/report-composition.ts.
 p, reader, record:read
 p, reader, organisation:read
 p, reader, workspace:read
@@ -124,6 +140,8 @@ p, reader, evidence_link:read
 p, reader, evidence_review:list
 p, reader, evidence_review:read
 p, reader, outcome:read
+p, reader, report:read
+p, reader, report:export
 
 p, contributor, record:read
 p, contributor, record:create
@@ -160,6 +178,11 @@ p, contributor, outcome:create
 p, contributor, outcome:update
 p, contributor, outcome:transition
 p, contributor, outcome:link_support
+p, contributor, report:read
+p, contributor, report:create
+p, contributor, report:update
+p, contributor, report:submit
+p, contributor, report:export
 
 p, reviewer, record:read
 p, reviewer, record:create
@@ -189,6 +212,10 @@ p, reviewer, outcome:read
 p, reviewer, outcome:confirm
 p, reviewer, outcome:close
 p, reviewer, outcome:link_support
+p, reviewer, report:read
+p, reviewer, report:approve
+p, reviewer, report:publish
+p, reviewer, report:export
 
 p, admin, record:read
 p, admin, record:create
@@ -250,3 +277,10 @@ p, admin, outcome:transition
 p, admin, outcome:confirm
 p, admin, outcome:close
 p, admin, outcome:link_support
+p, admin, report:read
+p, admin, report:create
+p, admin, report:update
+p, admin, report:submit
+p, admin, report:approve
+p, admin, report:publish
+p, admin, report:export

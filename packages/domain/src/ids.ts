@@ -41,6 +41,8 @@ export type DecisionId = Branded<string, 'DecisionId'>;
 export type CommitmentId = Branded<string, 'CommitmentId'>;
 export type ActionItemId = Branded<string, 'ActionItemId'>;
 export type OutcomeSupportId = Branded<string, 'OutcomeSupportId'>;
+export type ReportId = Branded<string, 'ReportId'>;
+export type ReportSourceId = Branded<string, 'ReportSourceId'>;
 
 /**
  * UUID v4/v7 shape. We accept both: v7 is time-ordered, which matters for the
@@ -172,4 +174,14 @@ export function toActionItemId(value: string): ActionItemId {
 export function toOutcomeSupportId(value: string): OutcomeSupportId {
   assertUuid(value, 'OutcomeSupportId');
   return value as OutcomeSupportId;
+}
+
+export function toReportId(value: string): ReportId {
+  assertUuid(value, 'ReportId');
+  return value as ReportId;
+}
+
+export function toReportSourceId(value: string): ReportSourceId {
+  assertUuid(value, 'ReportSourceId');
+  return value as ReportSourceId;
 }
