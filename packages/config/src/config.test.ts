@@ -331,3 +331,46 @@ describe('deployed public addresses', () => {
     expect(config.oidcRedirectUri).toBe('http://localhost:3001/api/v1/auth/callback');
   });
 });
+
+describe('web base URL', () => {
+  it('defaults to the root of the web origin', () => {
+    const config = loadConfig({ ...oidcBase, WITNESS_DEPLOYMENT_PROFILE: 'sovereign' });
+    expect(config.webBaseUrl).toBe('https://pilot.example.org/');
+  });
+
+  it('carries a sub-path, with the trailing slash the callback redirect needs', () => {
+    // Without the trailing slash `new URL('auth/callback', base)` replaces the
+    // last segment and the callback lands on somebody else's homepage.
+    const config = loadConfig({
+      ...oidcBase,
+      WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+      WITNESS_WEB_BASE_URL: 'https://pilot.example.org/witness',
+    });
+    expect(config.webBaseUrl).toBe('https://pilot.example.org/witness/');
+    expect(new URL('auth/callback', config.webBaseUrl).toString()).toBe(
+      'https://pilot.example.org/witness/auth/callback',
+    );
+  });
+
+  it('ATTACK — refuses a base URL on a different origin', () => {
+    // The callback redirect carries a live session token in its fragment.
+    // A base URL pointing elsewhere would be an open redirect that hands it over.
+    expect(() =>
+      loadConfig({
+        ...oidcBase,
+        WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+        WITNESS_WEB_BASE_URL: 'https://attacker.example/witness',
+      }),
+    ).toThrow(/different origin/i);
+  });
+
+  it('refuses a base URL that is not a URL at all', () => {
+    expect(() =>
+      loadConfig({
+        ...oidcBase,
+        WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+        WITNESS_WEB_BASE_URL: '/witness',
+      }),
+    ).toThrow(/not a valid absolute URL/i);
+  });
+});

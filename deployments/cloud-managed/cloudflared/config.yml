@@ -1,0 +1,53 @@
+# Cloudflare Tunnel ingress for the Witness internal pilot.
+#
+# One tunnel, three public hostnames, nothing listening on the host. The pilot
+# node needs no inbound firewall rule, no public IP and no certificate: the
+# connector dials out to Cloudflare and Cloudflare terminates TLS.
+#
+# This replaces the Caddy service for the Cloudflare topology — Caddy exists to
+# obtain certificates and terminate TLS, and behind a tunnel there is nothing
+# for it to do that Cloudflare is not already doing.
+#
+# PostgreSQL is deliberately absent. It has no ingress rule and therefore no
+# public hostname; the catch-all below refuses anything not named here, so a
+# hostname added in the dashboard without a matching rule reaches nothing.
+#
+# The tunnel UUID and the credentials file are per-deployment and never
+# committed. `cloudflared tunnel create witness-pilot` writes both.
+
+tunnel: ${CLOUDFLARE_TUNNEL_ID}
+credentials-file: /etc/cloudflared/credentials.json
+
+# Metrics on loopback inside the container, so `cloudflared` has a health
+# endpoint for the compose healthcheck without exposing anything.
+metrics: 127.0.0.1:2000
+
+# Cloudflare already knows the request came over HTTPS; these are the origin
+# hops inside the compose network, which are plaintext by design and never
+# leave the host.
+originRequest:
+  connectTimeout: 30s
+  # The API streams exports; a short idle timeout would truncate a large one.
+  keepAliveTimeout: 90s
+  # Preserve the public Host header so Keycloak's hostname check and the API's
+  # CORS policy see the name the browser actually used.
+  httpHostHeader: ""
+
+ingress:
+  # ── Web application ───────────────────────────────────────────────────────
+  # Reached by browsers only through the `/witness` route on the apex domain;
+  # this hostname is the route's origin, not the address users are given.
+  - hostname: witness-web.pacificdigitalconsultancy.org
+    service: http://web:3000
+
+  # ── API ───────────────────────────────────────────────────────────────────
+  - hostname: witness-api.pacificdigitalconsultancy.org
+    service: http://api:3001
+
+  # ── Identity provider ─────────────────────────────────────────────────────
+  - hostname: witness-id.pacificdigitalconsultancy.org
+    service: http://keycloak:8080
+
+  # Anything else — including a hostname someone points at this tunnel without
+  # adding a rule — gets nothing. Deny by default, here as everywhere else.
+  - service: http_status:404

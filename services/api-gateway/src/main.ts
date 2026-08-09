@@ -78,12 +78,18 @@ async function bootstrap(): Promise<void> {
         : ['Content-Type', 'Authorization'],
   });
 
-  // Behind the pilot's TLS terminator, every connection Express sees arrives
-  // over loopback HTTP. Without this, `req.protocol` reports `http` and
-  // `req.ip` is the proxy — which turns audit and access logs into a record of
-  // the proxy talking to itself.
+  // Behind the pilot's ingress, every connection Express sees arrives over
+  // plaintext HTTP from something on the same machine or the same private
+  // network — a TLS terminator on loopback, or a Cloudflare Tunnel connector
+  // in a neighbouring container. Without this, `req.protocol` reports `http`
+  // and `req.ip` is the proxy, which turns access logs into a record of the
+  // proxy talking to itself.
+  //
+  // `uniquelocal` is the private ranges (10/8, 172.16/12, 192.168/16) — where
+  // a container network lives — and nothing beyond them. A public address is
+  // still never trusted to describe itself.
   if (config.profile !== 'development') {
-    app.set('trust proxy', 'loopback');
+    app.set('trust proxy', 'loopback, uniquelocal');
   }
 
   app.enableShutdownHooks();
@@ -96,6 +102,7 @@ async function bootstrap(): Promise<void> {
   logger.log(`Profile: ${config.profile} · Data residency: ${config.dataResidency}`);
   logger.log(`Listening on http://localhost:${config.apiPort}`);
   logger.log(`Accepting browser requests from ${config.webOrigin}`);
+  logger.log(`Sending signed-in browsers back to ${config.webBaseUrl}`);
 
   if (config.profile === 'development') {
     logger.warn(

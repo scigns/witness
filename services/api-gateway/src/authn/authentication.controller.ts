@@ -59,12 +59,16 @@ export class AuthenticationController {
   ): Promise<void> {
     try {
       const session = await this.authentication.handleCallback(code ?? '', state ?? '');
-      const target = new URL('/auth/callback', this.config.webOrigin);
+      // Relative to the web application's base URL, not the bare origin:
+      // Witness may be served under a path on a domain whose root belongs to
+      // something else, and a signed-in browser must land on Witness. See
+      // `webBaseUrl` in @witness/config for why it always ends in a slash.
+      const target = new URL('auth/callback', this.config.webBaseUrl);
       target.hash = `token=${session.token}`;
       response.redirect(302, target.toString());
     } catch (error) {
       const reason = error instanceof AuthenticationDeniedError ? error.reason : 'invalid_callback';
-      const target = new URL('/auth/error', this.config.webOrigin);
+      const target = new URL('auth/error', this.config.webBaseUrl);
       target.searchParams.set('reason', reason);
       response.redirect(302, target.toString());
     }

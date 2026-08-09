@@ -98,6 +98,9 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       WITNESS_API_PORT: 3001
       WITNESS_WEB_ORIGIN: ${WITNESS_WEB_ORIGIN:?WITNESS_WEB_ORIGIN must be set}
+      # Where a signed-in browser is sent back to. Defaults to the origin's
+      # root; set it when Witness lives under a path.
+      WITNESS_WEB_BASE_URL: ${WITNESS_WEB_BASE_URL:-}
       WITNESS_OIDC_REDIRECT_URI: ${WITNESS_OIDC_REDIRECT_URI:?WITNESS_OIDC_REDIRECT_URI must be set}
       OIDC_ISSUER: ${OIDC_ISSUER:?OIDC_ISSUER must be set}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-witness-api}
@@ -116,14 +119,25 @@ services:
       args:
         NEXT_PUBLIC_WITNESS_API_URL: ${NEXT_PUBLIC_WITNESS_API_URL:?NEXT_PUBLIC_WITNESS_API_URL must be set}
         NEXT_PUBLIC_WITNESS_PROFILE: ${WITNESS_DEPLOYMENT_PROFILE:-sovereign}
+        # Empty for a dedicated hostname; `/witness` when the application is
+        # served under a path on a domain whose root belongs to something else.
+        NEXT_PUBLIC_WITNESS_BASE_PATH: ${NEXT_PUBLIC_WITNESS_BASE_PATH:-}
     depends_on:
       api: { condition: service_started }
 
-  # ── TLS termination ────────────────────────────────────────────────────────
+  # ── TLS termination, direct topology ───────────────────────────────────────
   # Caddy because it obtains and renews certificates itself. The alternative is
   # a cron job nobody notices has stopped until a Monday morning.
+  #
+  # Only for a host that is itself reachable from the internet. Behind a
+  # Cloudflare Tunnel this service must stay down: Cloudflare terminates TLS,
+  # and an ACME challenge cannot reach a host with no inbound ports.
+  #
+  #   docker compose … --profile direct up -d       ← public IP, ports 80/443
+  #   docker compose … --profile cloudflare up -d   ← tunnel, nothing published
   proxy:
     <<: *common
+    profiles: ["direct"]
     image: caddy:2-alpine
     environment:
       WITNESS_WEB_HOST: ${WITNESS_WEB_HOST:?WITNESS_WEB_HOST must be set}
@@ -134,6 +148,27 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     ports: ["80:80", "443:443"]
+    depends_on:
+      web: { condition: service_started }
+      api: { condition: service_started }
+      keycloak: { condition: service_healthy }
+
+  # ── Public ingress, Cloudflare topology ────────────────────────────────────
+  # The connector dials out to Cloudflare; nothing dials in. The host needs no
+  # public IP, no open port and no certificate, and PostgreSQL cannot be
+  # reached from outside this network at all because it has no ingress rule.
+  cloudflared:
+    <<: *common
+    profiles: ["cloudflare"]
+    image: cloudflare/cloudflared:latest
+    command: ["tunnel", "--config", "/etc/cloudflared/config.yml", "run"]
+    environment:
+      CLOUDFLARE_TUNNEL_ID: ${CLOUDFLARE_TUNNEL_ID:?CLOUDFLARE_TUNNEL_ID must be set}
+    volumes:
+      # Rendered from cloudflared/config.yml with the tunnel id substituted —
+      # see docs/operations/PILOT_OPERATIONS.md.
+      - ./cloudflared:/etc/cloudflared:ro
+    # No `ports:`. That is the entire point.
     depends_on:
       web: { condition: service_started }
       api: { condition: service_started }

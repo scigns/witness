@@ -196,3 +196,47 @@ Each needs `WITNESS_PILOT_WEB_URL`, `WITNESS_PILOT_API_URL`,
 `WITNESS_PILOT_USERNAME` / `WITNESS_PILOT_PASSWORD` and a Chromium path. They
 write to the environment they run against — point them at the pilot, never at
 an instance holding real deliberation you cannot afford to add test rows to.
+
+## Cloudflare topology
+
+An alternative to the direct topology above, for a host with no public IP and
+no open ports. Cloudflare terminates TLS and a Cloudflare Tunnel connector
+dials out from the pilot node, so nothing dials in.
+
+```bash
+docker compose -f deployments/cloud-managed/docker-compose.pilot.yml \
+  --profile cloudflare up -d --build
+```
+
+The `proxy` (Caddy) service is not started in this profile and must not be:
+it exists to obtain certificates over ACME, and an ACME challenge cannot reach
+a host with no inbound ports. `--profile direct` is the other way round.
+
+**Three public hostnames, and only three.** The web application, the API and
+Keycloak each get an ingress rule in
+[`cloudflared/config.yml`](../../deployments/cloud-managed/cloudflared/config.yml).
+PostgreSQL gets none, so it has no public hostname at all — and the catch-all
+rule at the bottom refuses anything not explicitly named, so a DNS record
+pointed at the tunnel without a matching rule reaches nothing.
+
+**Serving Witness under a path.** When the application lives at
+`/witness` on a domain whose `/` belongs to another site, three things follow
+and all three are required:
+
+- the frontend is *built* with `NEXT_PUBLIC_WITNESS_BASE_PATH=/witness`, because
+  every asset URL and route carries the prefix and that is decided at build time;
+- the API is given `WITNESS_WEB_BASE_URL` including the path, or the OIDC
+  callback sends signed-in browsers to the other site's root;
+- `WITNESS_WEB_ORIGIN` stays the bare origin. An `Origin` header never has a
+  path, so the CORS policy and Keycloak's web origin are unchanged by any of this.
+
+**The path route.** A Cloudflare Worker
+([`cloudflare-worker/`](../../deployments/cloud-managed/cloudflare-worker/))
+is bound to `pacificdigitalconsultancy.org/witness` and `/witness/*` and
+forwards to the tunnel's web hostname. Worker routes are path-scoped: `/` and
+every other path on the zone continue to reach the existing origin untouched.
+The Worker rewrites nothing, because the application is already built to expect
+the prefix.
+
+**Backups are unchanged.** The tunnel carries no database traffic; run
+`scripts/ops/backup.sh` on the host as before.
