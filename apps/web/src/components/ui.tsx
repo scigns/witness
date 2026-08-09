@@ -13,6 +13,9 @@ import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 
 import type {
+  ActionItemStatus,
+  CommitmentStatus,
+  DecisionStatus,
   EvidenceReviewStatus,
   MembershipState,
   ParticipantAttendanceStatus,
@@ -218,6 +221,116 @@ export function EvidenceReviewStatusBadge({ status }: { status: EvidenceReviewSt
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${EVIDENCE_REVIEW_STATUS_CLASSES[status]}`}
     >
       {EVIDENCE_REVIEW_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+const DECISION_STATUS_LABELS: Record<DecisionStatus, string> = {
+  proposed: 'Proposed',
+  confirmed: 'Confirmed',
+  superseded: 'Superseded',
+  reversed: 'Reversed',
+};
+
+/**
+ * `superseded` and `reversed` look different on purpose. Superseding means
+ * the decision was right and has moved on; reversing means it was wrong. A
+ * reader scanning a register needs to tell those apart at a glance — see
+ * `packages/domain/src/decision.ts`.
+ */
+const DECISION_STATUS_CLASSES: Record<DecisionStatus, string> = {
+  proposed: 'border-amber-600 text-amber-700 dark:text-amber-400',
+  confirmed: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  superseded: 'border-current text-[var(--color-ink-muted)]',
+  reversed: 'border-red-700 text-red-700 dark:text-red-400',
+};
+
+export function DecisionStatusBadge({ status }: { status: DecisionStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${DECISION_STATUS_CLASSES[status]}`}
+    >
+      {DECISION_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+const COMMITMENT_STATUS_LABELS: Record<CommitmentStatus, string> = {
+  proposed: 'Proposed',
+  active: 'Active',
+  fulfilled: 'Fulfilled',
+  withdrawn: 'Withdrawn',
+  superseded: 'Superseded',
+};
+
+const COMMITMENT_STATUS_CLASSES: Record<CommitmentStatus, string> = {
+  proposed: 'border-amber-600 text-amber-700 dark:text-amber-400',
+  active: 'border-sky-700 text-sky-700 dark:text-sky-400',
+  fulfilled: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  withdrawn: 'border-current text-[var(--color-ink-muted)] line-through',
+  superseded: 'border-current text-[var(--color-ink-muted)]',
+};
+
+export function CommitmentStatusBadge({ status }: { status: CommitmentStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${COMMITMENT_STATUS_CLASSES[status]}`}
+    >
+      {COMMITMENT_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+const ACTION_ITEM_STATUS_LABELS: Record<ActionItemStatus, string> = {
+  open: 'Open',
+  in_progress: 'In progress',
+  blocked: 'Blocked',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
+
+const ACTION_ITEM_STATUS_CLASSES: Record<ActionItemStatus, string> = {
+  open: 'border-current text-[var(--color-ink-muted)]',
+  in_progress: 'border-sky-700 text-sky-700 dark:text-sky-400',
+  blocked: 'border-red-700 text-red-700 dark:text-red-400',
+  completed: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  cancelled: 'border-current text-[var(--color-ink-muted)] line-through',
+};
+
+export function ActionItemStatusBadge({ status }: { status: ActionItemStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${ACTION_ITEM_STATUS_CLASSES[status]}`}
+    >
+      {ACTION_ITEM_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+/** Shown next to an overdue commitment or action, never on a closed one. */
+export function OverdueBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-red-700 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+      Overdue
+    </span>
+  );
+}
+
+/**
+ * How many bases an outcome rests on, and whether that is enough for it to
+ * be made authoritative. Zero is stated plainly rather than hidden — an
+ * outcome with nothing behind it is exactly what a reader needs to notice.
+ */
+export function SupportCountBadge({ count }: { count: number }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+        count === 0
+          ? 'border-amber-600 text-amber-700 dark:text-amber-400'
+          : 'border-current text-[var(--color-ink-muted)]'
+      }`}
+    >
+      {count === 0 ? 'No basis recorded' : `${count} ${count === 1 ? 'basis' : 'bases'}`}
     </span>
   );
 }

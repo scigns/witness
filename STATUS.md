@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-08-06 (Milestone 6)
+**Last updated:** 2026-08-08 (Milestone 7)
 **Updated by:** CTO
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -61,11 +61,11 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 | Governance | `governance` | Governance Lead | 🟡 | Consent framework drafted; Indigenous protocols need external review |
 | Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun; Casbin-based, organisation/workspace-scoped authorisation shipped (ADR-0007); real identity is Phase 2 |
 | Infrastructure | `infrastructure` | Infrastructure Lead | 🟡 | Compose stack running; observability overlay added, wiring pending |
-| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2), Participant Management (Milestone 3), Consent Management (Milestone 4) and Structured Live Evidence Capture (Milestone 5) shipped; Evidence Review and Validation (Milestone 6) implemented in this PR, not yet merged |
+| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2), Participant Management (Milestone 3), Consent Management (Milestone 4) and Structured Live Evidence Capture (Milestone 5) and Evidence Review and Validation (Milestone 6) shipped; Decisions, Commitments and Actions (Milestone 7) implemented in this PR, not yet merged |
 | Knowledge graph | `knowledge-graph` | Knowledge Graph Lead | 🟡 | Ontology v0.1 in design |
 | AI platform | `ai-platform` | AI Lead | ⚪ | Awaiting Phase 5; model policy drafted |
-| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2), participant (Milestone 3), consent management (Milestone 4) and evidence capture (Milestone 5) screens shipped; evidence review (Milestone 6) screens implemented in this PR, not yet merged; design system awaits Phase 6 |
-| Testing | `testing` | QA Lead | 🟡 | 701 tests across all packages (343 API-gateway, 321 domain); invariant and adversarial suites live |
+| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2), participant (Milestone 3), consent management (Milestone 4) and evidence capture (Milestone 5) and evidence review (Milestone 6) screens shipped; outcome register and detail screens (Milestone 7) implemented in this PR, not yet merged; design system awaits Phase 6 |
+| Testing | `testing` | QA Lead | 🟡 | 787 tests across all packages (385 API-gateway, 362 domain); invariant and adversarial suites live |
 | Release | `release` | Release Manager | 🟢 | Strategy and versioning defined |
 
 ---
@@ -88,6 +88,78 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-08 — Decisions, Commitments and Actions delivered (BUILD_ROADMAP.md Milestone 7), PR open
+
+- **Sixth capability in the "WITNESS — COMPLETE THE HUMAN-LED MVP" sequence.** Milestone 6 made
+  evidence validated; this milestone is what validation is *for*. A session now produces three
+  registers — decisions, commitments and actions — and each of the first two has to answer "on what
+  basis?" before it counts as institutional record.
+- **`outcome-support.ts` is the load-bearing module.** There are exactly two admissible bases, and
+  the distinction is the point: `validated_evidence` (something a reviewer examined and validated)
+  or `institutional_synthesis` (the institution's own judgement, with a *mandatory* rationale —
+  an outcome with neither evidence nor stated reasoning is indistinguishable from one somebody made
+  up). Everything else is refused by name rather than by a catch-all: evidence that is `draft`,
+  `submitted`, `under_review`, `needs_clarification`, `rejected` or `withdrawn` has not been
+  validated by anyone; evidence marked `disputed` was examined and doubted; cross-workspace and
+  cross-organisation evidence is refused for the same reason `evidence-link.ts` refuses it.
+- **The evidence link freezes what was relied on.** `OutcomeSupport` records the evidence id, the
+  *version* that was validated, and the verification status at link time. A later correction bumps
+  the evidence's own version and leaves the support record alone, so "what did we actually rely on"
+  survives the correction rather than being silently rewritten by it.
+- **"Confirmed with nothing behind it" is not representable.** `confirmDecision` and
+  `activateCommitment` call `assertSupported` before they will return a confirmed aggregate, and the
+  service loads the support records **inside the transaction that writes the confirmation** — an
+  outcome is unauthoritative right up until that moment, so its basis may legitimately be removed
+  concurrently, and a count read earlier would leave a window. `OutcomeSupportService.remove` closes
+  the other side of the same window by refusing to detach the last basis from an outcome that is
+  already authoritative.
+- **Three new domain aggregates** (`packages/domain/src`): `Decision`
+  (`proposed`/`confirmed`/`superseded`/`reversed` — `superseded` and `reversed` stay distinct
+  because superseding means the decision was right and has moved on while reversing means it was
+  wrong, and collapsing them would destroy the only signal telling an institution its decisions are
+  unstable), `Commitment` (`proposed`/`active`/`fulfilled`/`withdrawn`/`superseded`) and
+  `ActionItem` (`open`/`in_progress`/`blocked`/`completed`/`cancelled`, with a priority and an
+  advisory percentage). One mutator per legal transition throughout, the same structural approach
+  Milestones 5 and 6 used.
+- **`ActionItem` deliberately does not require support.** An action is *how* an institution carries
+  out a decision, not an institutional claim in its own right. Requiring a basis for "book the
+  surveyor" would make the requirement ceremonial, and a ceremonial requirement is one people learn
+  to satisfy without meaning it.
+- **Ownership is two-part and never a participant.** `ownerDescription` is required plain language,
+  because the owner of a commitment is usually a team, a service or a named post rather than a
+  Witness account holder; `ownerUserId` is optional and, when given, must be a member in good
+  standing of the outcome's own organisation — the same org-scoped check
+  `SessionsService.requireFacilitator` applies. Recording a session *participant* as an owner would
+  defeat Milestone 4's anonymity guarantees, so no field allows it.
+- **Authorisation reuses Milestone 6's institutional split rather than inventing one.** Seven new
+  `outcome:*` actions: `read`/`create`/`update`/`transition`/`link_support` are contributor-tier
+  (proposing decisions, drafting commitments, running actions through start/progress/block/complete
+  — the ordinary work of writing up what a session produced), while `confirm` (confirming a
+  decision, activating a commitment) and `close` (superseding, reversing, withdrawing) are
+  reviewer-tier, because those are the moments an outcome becomes — or stops being — institutional
+  record. There is no `outcome:manage_restricted`: an outcome carries no restricted participant
+  identity by construction.
+- **Database.** `decision`, `commitment`, `action_item` and `outcome_support` tables with real
+  foreign keys, org/workspace/session scope columns, and CHECK constraints mirroring each domain
+  rule — including that a superseded decision must name its replacement, a reversal must state its
+  reason, a blocked action must say what is blocking it, and each support basis carries its own
+  obligations. A partial unique index stops one outcome counting the same evidence twice; synthesis
+  rows are exempt, since an outcome may rest on more than one line of reasoning. `outcome_support`
+  references evidence with `RESTRICT`, not `CASCADE` — evidence is withdrawn rather than deleted
+  precisely so that what an outcome relied on stays readable.
+- **Frontend.** One outcomes screen carrying all three registers, because they are read as one
+  question, and one detail page serving all three. Lifecycle buttons come from the server's
+  `permittedActions`, so the client never reimplements the state machine. The evidence picker lists
+  only validated evidence: the API refuses the rest by name, but a picker that offers rejected
+  evidence and then fails on submit teaches people the rule is arbitrary rather than meaningful.
+  Support counts appear on every row *including zero* — an outcome resting on nothing is exactly
+  what a reader scanning a register needs to notice.
+- **Audit.** Twenty-two new actions on the existing hash-chained trail, and four new subject types
+  (`decision`, `commitment`, `action_item`, `outcome_support`), each getting its own chain.
+- **Same standing constraint.** The migration is hand-authored and validated with `prisma validate`
+  and `prisma generate` only — no Postgres or Docker in this sandbox, so it has not been applied to
+  a live database, and no browser walkthrough was performed.
 
 ### 2026-08-06 — Evidence Review and Validation delivered (BUILD_ROADMAP.md Milestone 6), PR open
 

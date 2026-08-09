@@ -30,6 +30,7 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'evidence_link:read',
     'evidence_review:list',
     'evidence_review:read',
+    'outcome:read',
   ],
   // `session:update`/`session:transition` are workspace-wide, not
   // per-session: any contributor in a workspace's scope may rename, close,
@@ -101,6 +102,11 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'evidence_review:read',
     'evidence_review:respond',
     'evidence_review:correct',
+    'outcome:read',
+    'outcome:create',
+    'outcome:update',
+    'outcome:transition',
+    'outcome:link_support',
   ],
   // `evidence_review:*` (BUILD_ROADMAP.md Milestone 6, Evidence Review and
   // Validation) is where `reviewer` first gains write actions of its own —
@@ -126,6 +132,19 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
   // assignment and decision is audited with its actor, so self-assignment is
   // visible after the fact. Splitting assignment onto an admin-only tier is
   // the change to make if an institution needs enforced separation.
+  //
+  // `outcome:*` (BUILD_ROADMAP.md Milestone 7, Decisions, Commitments and
+  // Actions) reuses that same split rather than inventing a new one:
+  // contributor proposes decisions, drafts commitments and runs actions
+  // through start/progress/block/complete; reviewer confirms and closes,
+  // because those are the moments an outcome becomes — or stops being —
+  // institutional record. `outcome:link_support` sits on both tiers, since
+  // assembling the basis for a proposal and satisfying yourself before
+  // confirming it are both legitimate, and the domain refuses inadmissible
+  // evidence either way. There is no `outcome:manage_restricted`: an outcome
+  // carries no restricted participant identity by construction — see
+  // packages/domain/src/commitment.ts on why an owner is plain language and
+  // is never a session participant.
   reviewer: [
     'record:read',
     'record:create',
@@ -151,6 +170,10 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'evidence_review:validate',
     'evidence_review:reject',
     'evidence_review:view_history',
+    'outcome:read',
+    'outcome:confirm',
+    'outcome:close',
+    'outcome:link_support',
   ],
   // Least privilege (Constitution, Authority and Access): organisation and
   // workspace creation are the privileged actions in this slice, so they are the
@@ -221,6 +244,13 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'evidence_review:reject',
     'evidence_review:view_history',
     'evidence_review:manage_restricted',
+    'outcome:read',
+    'outcome:create',
+    'outcome:update',
+    'outcome:transition',
+    'outcome:confirm',
+    'outcome:close',
+    'outcome:link_support',
   ],
 });
 

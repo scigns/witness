@@ -34,6 +34,12 @@ model Actor {
   reviewAssignmentsAssigned ReviewAssignment[] @relation("ReviewAssignmentAssignedBy")
   clarificationsRequested   Clarification[]    @relation("ClarificationRequestedBy")
   clarificationsResponded   Clarification[]    @relation("ClarificationRespondedBy")
+  decisionsProposed         Decision[]         @relation("DecisionProposedBy")
+  decisionsConfirmed        Decision[]         @relation("DecisionConfirmedBy")
+  commitmentsProposed       Commitment[]       @relation("CommitmentProposedBy")
+  commitmentsActivated      Commitment[]       @relation("CommitmentActivatedBy")
+  actionItemsCreated        ActionItem[]       @relation("ActionItemCreatedBy")
+  outcomeSupportsRecorded   OutcomeSupport[]   @relation("OutcomeSupportRecordedBy")
 
   @@index([kind])
   @@map("actor")
@@ -109,6 +115,10 @@ model Organisation {
   evidenceLinks                EvidenceLink[]
   reviewAssignments            ReviewAssignment[]
   clarifications               Clarification[]
+  decisions                    Decision[]
+  commitments                  Commitment[]
+  actionItems                  ActionItem[]
+  outcomeSupports              OutcomeSupport[]
 
   @@map("organisation")
 }
@@ -140,6 +150,10 @@ model Workspace {
   evidenceLinks                EvidenceLink[]
   reviewAssignments            ReviewAssignment[]
   clarifications               Clarification[]
+  decisions                    Decision[]
+  commitments                  Commitment[]
+  actionItems                  ActionItem[]
+  outcomeSupports              OutcomeSupport[]
 
   @@index([organisationId])
   @@map("workspace")
@@ -169,6 +183,8 @@ model User {
   facilitatedSessions       CoDesignSession[]
   linkedSessionParticipants SessionParticipant[]
   reviewAssignments         ReviewAssignment[]       @relation("ReviewAssignmentReviewer")
+  ownedCommitments          Commitment[]             @relation("CommitmentOwner")
+  ownedActionItems          ActionItem[]             @relation("ActionItemOwner")
 
   @@index([accountState])
   @@map("witness_user")
@@ -405,6 +421,10 @@ model CoDesignSession {
   evidenceLinks             EvidenceLink[]
   reviewAssignments         ReviewAssignment[]
   clarifications            Clarification[]
+  decisions                 Decision[]
+  commitments               Commitment[]
+  actionItems               ActionItem[]
+  outcomeSupports           OutcomeSupport[]
 
   @@index([organisationId])
   @@index([workspaceId, status])
@@ -741,6 +761,7 @@ model Evidence {
   linksTo           EvidenceLink[]     @relation("EvidenceLinkTo")
   reviewAssignments ReviewAssignment[]
   clarifications    Clarification[]
+  outcomeSupports   OutcomeSupport[]   @relation("OutcomeSupportEvidence")
 
   @@index([sessionId])
   @@index([workspaceId])
@@ -947,4 +968,247 @@ model AuditEvent {
 
   @@index([subjectType, subjectId, occurredAt])
   @@map("audit_event")
+}
+
+/// Something a session decided (BUILD_ROADMAP.md Milestone 7, Decisions,
+/// Commitments and Actions). See `packages/domain/src/decision.ts`'s file
+/// header for why `superseded` and `reversed` are distinct terminal states
+/// and why neither deletes anything.
+///
+/// A decision becomes institutional record only on confirmation, and
+/// confirmation requires at least one `OutcomeSupport` row. That count is a
+/// database read, so the domain cannot perform it (ADR-0003) —
+/// `DecisionService` loads the support rows inside the same transaction and
+/// hands them to `confirmDecision`.
+model Decision {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  title     String @db.VarChar(300)
+  statement String @db.Text
+
+  status String @default("proposed") @db.VarChar(16)
+
+  proposedById String   @map("proposed_by_id") @db.Uuid
+  proposedBy   Actor    @relation("DecisionProposedBy", fields: [proposedById], references: [id], onDelete: Restrict)
+  proposedAt   DateTime @map("proposed_at") @db.Timestamptz(6)
+
+  confirmedById String?   @map("confirmed_by_id") @db.Uuid
+  confirmedBy   Actor?    @relation("DecisionConfirmedBy", fields: [confirmedById], references: [id], onDelete: Restrict)
+  confirmedAt   DateTime? @map("confirmed_at") @db.Timestamptz(6)
+
+  /// The decision that replaced this one. `SetNull` rather than `Cascade`:
+  /// losing the replacement must never take the superseded decision with it.
+  supersededByDecisionId String?    @map("superseded_by_decision_id") @db.Uuid
+  supersededBy           Decision?  @relation("DecisionSupersession", fields: [supersededByDecisionId], references: [id], onDelete: SetNull)
+  supersedes             Decision[] @relation("DecisionSupersession")
+  supersededAt           DateTime?  @map("superseded_at") @db.Timestamptz(6)
+
+  reversedAt DateTime? @map("reversed_at") @db.Timestamptz(6)
+
+  /// Why this was superseded or reversed. Required for a reversal — the
+  /// domain enforces that; the column is nullable because a proposed or
+  /// confirmed decision has no close reason yet.
+  closeReason String? @map("close_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every mutation.
+  version Int @default(1)
+
+  @@index([sessionId])
+  @@index([workspaceId])
+  @@index([sessionId, status])
+  @@index([supersededByDecisionId])
+  @@map("decision")
+}
+
+/// An undertaking somebody gave in a session (BUILD_ROADMAP.md Milestone 7).
+/// See `packages/domain/src/commitment.ts`'s file header for why ownership is
+/// two-part: `ownerDescription` is always present and in plain language,
+/// because the owner is frequently a team or an agency rather than a Witness
+/// account, and because naming a *participant* as owner would defeat the
+/// anonymity guarantees Milestone 4 established.
+model Commitment {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  title       String @db.VarChar(300)
+  description String @db.Text
+
+  status String @default("proposed") @db.VarChar(16)
+
+  ownerDescription String  @map("owner_description") @db.VarChar(300)
+  ownerUserId      String? @map("owner_user_id") @db.Uuid
+  ownerUser        User?   @relation("CommitmentOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  dueDate DateTime? @map("due_date") @db.Timestamptz(6)
+
+  proposedById String   @map("proposed_by_id") @db.Uuid
+  proposedBy   Actor    @relation("CommitmentProposedBy", fields: [proposedById], references: [id], onDelete: Restrict)
+  proposedAt   DateTime @map("proposed_at") @db.Timestamptz(6)
+
+  activatedById String?   @map("activated_by_id") @db.Uuid
+  activatedBy   Actor?    @relation("CommitmentActivatedBy", fields: [activatedById], references: [id], onDelete: Restrict)
+  activatedAt   DateTime? @map("activated_at") @db.Timestamptz(6)
+
+  fulfilledAt    DateTime? @map("fulfilled_at") @db.Timestamptz(6)
+  /// How the commitment was met, recorded at fulfilment rather than inferred.
+  fulfilmentNote String?   @map("fulfilment_note") @db.Text
+
+  supersededByCommitmentId String?      @map("superseded_by_commitment_id") @db.Uuid
+  supersededBy             Commitment?  @relation("CommitmentSupersession", fields: [supersededByCommitmentId], references: [id], onDelete: SetNull)
+  supersedes               Commitment[] @relation("CommitmentSupersession")
+
+  closedAt    DateTime? @map("closed_at") @db.Timestamptz(6)
+  closeReason String?   @map("close_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every mutation.
+  version Int @default(1)
+
+  @@index([sessionId])
+  @@index([workspaceId])
+  @@index([sessionId, status])
+  @@index([ownerUserId])
+  @@index([supersededByCommitmentId])
+  @@map("commitment")
+}
+
+/// A concrete task carrying a decision or commitment into effect
+/// (BUILD_ROADMAP.md Milestone 7). See `packages/domain/src/action-item.ts`'s
+/// file header for why an action deliberately does not require
+/// `OutcomeSupport`: an action is *how* an institution acts on a decision,
+/// not an institutional claim in its own right.
+model ActionItem {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  title       String @db.VarChar(300)
+  description String @db.Text
+
+  status   String @default("open") @db.VarChar(16)
+  priority String @default("medium") @db.VarChar(16)
+
+  /// Same two-part ownership as `Commitment`, for the same reasons.
+  ownerDescription String  @map("owner_description") @db.VarChar(300)
+  ownerUserId      String? @map("owner_user_id") @db.Uuid
+  ownerUser        User?   @relation("ActionItemOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  dueDate DateTime? @map("due_date") @db.Timestamptz(6)
+
+  /// 0–100, advisory. `status` is what actually says whether this is done;
+  /// the range is enforced by a check constraint in the migration as well as
+  /// by the domain.
+  percentComplete Int     @default(0) @map("percent_complete")
+  progressNote    String? @map("progress_note") @db.Text
+  blockedReason   String? @map("blocked_reason") @db.Text
+
+  createdById String @map("created_by_id") @db.Uuid
+  createdBy   Actor  @relation("ActionItemCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  startedAt   DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  closedAt    DateTime? @map("closed_at") @db.Timestamptz(6)
+  closeReason String?   @map("close_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every mutation.
+  version Int @default(1)
+
+  @@index([sessionId])
+  @@index([workspaceId])
+  @@index([sessionId, status])
+  @@index([ownerUserId])
+  @@map("action_item")
+}
+
+/// What an institutional outcome rests on (BUILD_ROADMAP.md Milestone 7). See
+/// `packages/domain/src/outcome-support.ts`'s file header for why there are
+/// exactly two admissible bases and why the evidence link freezes the version
+/// and verification status it saw.
+///
+/// `outcomeType` + `outcomeId` is a polymorphic association, the same shape
+/// and the same trade-off as `AuditEvent.subjectType`/`subjectId`: Postgres
+/// cannot express "references exactly one of these three tables", so the
+/// application layer enforces it — `OutcomeSupportService` resolves the
+/// outcome before writing, and the `sessionId` cascade means support rows
+/// cannot outlive the session their outcome belongs to.
+///
+/// The partial unique index on `(outcome_type, outcome_id, evidence_id)
+/// WHERE evidence_id IS NOT NULL` — expressible only in migration SQL, not
+/// this DSL — stops the same piece of evidence being counted twice for one
+/// outcome. Synthesis rows are deliberately exempt: an outcome may rest on
+/// more than one line of institutional reasoning.
+model OutcomeSupport {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  outcomeType String @map("outcome_type") @db.VarChar(16)
+  outcomeId   String @map("outcome_id") @db.Uuid
+
+  basis String @db.VarChar(32)
+
+  /// Present only for `validated_evidence`. `Restrict`, not `Cascade`:
+  /// evidence is withdrawn rather than deleted precisely so that what an
+  /// outcome relied on stays readable.
+  evidenceId String?   @map("evidence_id") @db.Uuid
+  evidence   Evidence? @relation("OutcomeSupportEvidence", fields: [evidenceId], references: [id], onDelete: Restrict)
+
+  /// The evidence version validated at link time. Frozen — a later
+  /// correction bumps the evidence's own version and leaves this one alone.
+  evidenceVersion            Int?    @map("evidence_version")
+  evidenceVerificationStatus String? @map("evidence_verification_status") @db.VarChar(16)
+
+  /// Required for `institutional_synthesis`; the domain enforces that.
+  rationale String? @db.Text
+  note      String? @db.Text
+
+  recordedById String   @map("recorded_by_id") @db.Uuid
+  recordedBy   Actor    @relation("OutcomeSupportRecordedBy", fields: [recordedById], references: [id], onDelete: Restrict)
+  recordedAt   DateTime @map("recorded_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([outcomeType, outcomeId])
+  @@index([sessionId])
+  @@index([evidenceId])
+  @@map("outcome_support")
 }

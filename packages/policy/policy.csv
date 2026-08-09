@@ -89,6 +89,27 @@
 # clarification or correct evidence too, not only the assigned reviewer.
 # `evidence_review:manage_restricted` is admin-only, mirroring
 # `evidence:manage_restricted`'s own restricted-field precedent.
+#
+# outcome:* (BUILD_ROADMAP.md Milestone 7, Decisions, Commitments and
+# Actions) deliberately mirrors the contributor/reviewer split Milestone 6
+# established for evidence, because it is the same institutional split:
+# `outcome:create`/`outcome:update`/`outcome:transition` (proposing a
+# decision, drafting a commitment, and running an action through
+# start/progress/block/complete) are contributor-tier — this is the ordinary
+# work of writing up what a session produced. `outcome:confirm` (confirming a
+# decision, activating a commitment) and `outcome:close` (superseding or
+# reversing a decision, withdrawing or superseding a commitment) are
+# reviewer-tier, because those are the moments an outcome becomes, or stops
+# being, institutional record.
+#
+# `outcome:link_support` is granted to both tiers, for the same reason
+# `evidence_review:respond` is: a contributor assembling the basis for a
+# proposal and a reviewer satisfying themselves before confirming are both
+# legitimate, and the domain refuses inadmissible evidence either way
+# (packages/domain/src/outcome-support.ts). There is no
+# `outcome:manage_restricted` — an outcome carries no restricted participant
+# identity, by construction: `owner_description` is plain language and a
+# session participant is never recorded as an owner.
 p, reader, record:read
 p, reader, organisation:read
 p, reader, workspace:read
@@ -102,6 +123,7 @@ p, reader, evidence:read
 p, reader, evidence_link:read
 p, reader, evidence_review:list
 p, reader, evidence_review:read
+p, reader, outcome:read
 
 p, contributor, record:read
 p, contributor, record:create
@@ -133,6 +155,11 @@ p, contributor, evidence_review:list
 p, contributor, evidence_review:read
 p, contributor, evidence_review:respond
 p, contributor, evidence_review:correct
+p, contributor, outcome:read
+p, contributor, outcome:create
+p, contributor, outcome:update
+p, contributor, outcome:transition
+p, contributor, outcome:link_support
 
 p, reviewer, record:read
 p, reviewer, record:create
@@ -158,6 +185,10 @@ p, reviewer, evidence_review:correct
 p, reviewer, evidence_review:validate
 p, reviewer, evidence_review:reject
 p, reviewer, evidence_review:view_history
+p, reviewer, outcome:read
+p, reviewer, outcome:confirm
+p, reviewer, outcome:close
+p, reviewer, outcome:link_support
 
 p, admin, record:read
 p, admin, record:create
@@ -212,3 +243,10 @@ p, admin, evidence_review:validate
 p, admin, evidence_review:reject
 p, admin, evidence_review:view_history
 p, admin, evidence_review:manage_restricted
+p, admin, outcome:read
+p, admin, outcome:create
+p, admin, outcome:update
+p, admin, outcome:transition
+p, admin, outcome:confirm
+p, admin, outcome:close
+p, admin, outcome:link_support

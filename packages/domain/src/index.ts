@@ -35,3 +35,7 @@ export * from './evidence.js';
 export * from './evidence-link.js';
 export * from './review-assignment.js';
 export * from './clarification.js';
+export * from './outcome-support.js';
+export * from './decision.js';
+export * from './commitment.js';
+export * from './action-item.js';

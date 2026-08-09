@@ -70,6 +70,23 @@ import type {
   WithdrawParticipantConsentRequest,
   WorkspaceMembershipView,
   WorkspaceSummary,
+  ActionItemDetail,
+  ActionItemSummary,
+  ActionItemTransitionRequest,
+  CommitmentDetail,
+  CommitmentSummary,
+  CommitmentTransitionRequest,
+  CreateActionItemRequest,
+  DecisionDetail,
+  DecisionSummary,
+  DecisionTransitionRequest,
+  OutcomeSupportView,
+  ProposeCommitmentRequest,
+  ProposeDecisionRequest,
+  RecordOutcomeSupportRequest,
+  UpdateActionItemRequest,
+  UpdateCommitmentRequest,
+  UpdateDecisionRequest,
 } from '@witness/contracts';
 
 const BASE_URL = process.env['NEXT_PUBLIC_WITNESS_API_URL'] ?? 'http://localhost:3001';
@@ -137,6 +154,16 @@ async function request<T>(path: string, user: ActingUser | null, init?: RequestI
   }
 
   return (await response.json()) as T;
+}
+
+/**
+ * The three outcome registers share a support sub-resource, so the register
+ * name is part of the path rather than a discriminator in the body.
+ */
+export type OutcomeRegister = 'decisions' | 'commitments' | 'actions';
+
+function outcomePath(workspaceId: string, sessionId: string, register: OutcomeRegister): string {
+  return `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/${register}`;
 }
 
 export const api = {
@@ -909,6 +936,249 @@ export const api = {
       `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/review/clarifications/${encodeURIComponent(clarificationId)}/close`,
       user,
       { method: 'POST' },
+    ),
+
+  // ─── Decisions, commitments and actions (BUILD_ROADMAP.md Milestone 7) ────
+
+  listDecisions: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<{ decisions: DecisionSummary[] }> =>
+    request(outcomePath(workspaceId, sessionId, 'decisions'), user),
+
+  getDecision: (
+    workspaceId: string,
+    sessionId: string,
+    decisionId: string,
+    user: ActingUser,
+  ): Promise<DecisionDetail> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, 'decisions')}/${encodeURIComponent(decisionId)}`,
+      user,
+    ),
+
+  proposeDecision: (
+    workspaceId: string,
+    sessionId: string,
+    body: ProposeDecisionRequest,
+    user: ActingUser,
+  ): Promise<DecisionDetail> =>
+    request(outcomePath(workspaceId, sessionId, 'decisions'), user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateDecision: (
+    workspaceId: string,
+    sessionId: string,
+    decisionId: string,
+    body: UpdateDecisionRequest,
+    user: ActingUser,
+  ): Promise<DecisionDetail> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, 'decisions')}/${encodeURIComponent(decisionId)}`,
+      user,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      },
+    ),
+
+  transitionDecision: (
+    workspaceId: string,
+    sessionId: string,
+    decisionId: string,
+    body: DecisionTransitionRequest,
+    user: ActingUser,
+  ): Promise<DecisionDetail> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, 'decisions')}/${encodeURIComponent(decisionId)}/transitions`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  listCommitments: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<{ commitments: CommitmentSummary[] }> =>
+    request(outcomePath(workspaceId, sessionId, 'commitments'), user),
+
+  getCommitment: (
+    workspaceId: string,
+    sessionId: string,
+    commitmentId: string,
+    user: ActingUser,
+  ): Promise<CommitmentDetail> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, 'commitments')}/${encodeURIComponent(commitmentId)}`,
+      user,
+    ),
+
+  proposeCommitment: (
+    workspaceId: string,
+    sessionId: string,
+    body: ProposeCommitmentRequest,
+    user: ActingUser,
+  ): Promise<CommitmentDetail> =>
+    request(outcomePath(workspaceId, sessionId, 'commitments'), user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateCommitment: (
+    workspaceId: string,
+    sessionId: string,
+    commitmentId: string,
+    body: UpdateCommitmentRequest,
+    user: ActingUser,
+  ): Promise<CommitmentDetail> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, 'commitments')}/${encodeURIComponent(commitmentId)}`,
+      user,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      },
+    ),
+
+  transitionCommitment: (
+    workspaceId: string,
+    sessionId: string,
+    commitmentId: string,
+    body: CommitmentTransitionRequest,
+    user: ActingUser,
+  ): Promise<CommitmentDetail> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, 'commitments')}/${encodeURIComponent(commitmentId)}/transitions`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  listActionItems: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<{ actions: ActionItemSummary[] }> =>
+    request(outcomePath(workspaceId, sessionId, 'actions'), user),
+
+  getActionItem: (
+    workspaceId: string,
+    sessionId: string,
+    actionItemId: string,
+    user: ActingUser,
+  ): Promise<ActionItemDetail> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, 'actions')}/${encodeURIComponent(actionItemId)}`,
+      user,
+    ),
+
+  createActionItem: (
+    workspaceId: string,
+    sessionId: string,
+    body: CreateActionItemRequest,
+    user: ActingUser,
+  ): Promise<ActionItemDetail> =>
+    request(outcomePath(workspaceId, sessionId, 'actions'), user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateActionItem: (
+    workspaceId: string,
+    sessionId: string,
+    actionItemId: string,
+    body: UpdateActionItemRequest,
+    user: ActingUser,
+  ): Promise<ActionItemDetail> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, 'actions')}/${encodeURIComponent(actionItemId)}`,
+      user,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      },
+    ),
+
+  transitionActionItem: (
+    workspaceId: string,
+    sessionId: string,
+    actionItemId: string,
+    body: ActionItemTransitionRequest,
+    user: ActingUser,
+  ): Promise<ActionItemDetail> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, 'actions')}/${encodeURIComponent(actionItemId)}/transitions`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  getDecisionHistory: (
+    workspaceId: string,
+    sessionId: string,
+    decisionId: string,
+    user: ActingUser,
+  ): Promise<{
+    events: { id: string; action: string; occurredAt: string; metadata: Record<string, string> }[];
+  }> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, 'decisions')}/${encodeURIComponent(decisionId)}/history`,
+      user,
+    ),
+
+  getCommitmentHistory: (
+    workspaceId: string,
+    sessionId: string,
+    commitmentId: string,
+    user: ActingUser,
+  ): Promise<{
+    events: { id: string; action: string; occurredAt: string; metadata: Record<string, string> }[];
+  }> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, 'commitments')}/${encodeURIComponent(commitmentId)}/history`,
+      user,
+    ),
+
+  getActionItemHistory: (
+    workspaceId: string,
+    sessionId: string,
+    actionItemId: string,
+    user: ActingUser,
+  ): Promise<{
+    events: { id: string; action: string; occurredAt: string; metadata: Record<string, string> }[];
+  }> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, 'actions')}/${encodeURIComponent(actionItemId)}/history`,
+      user,
+    ),
+
+  recordOutcomeSupport: (
+    workspaceId: string,
+    sessionId: string,
+    register: OutcomeRegister,
+    outcomeId: string,
+    body: RecordOutcomeSupportRequest,
+    user: ActingUser,
+  ): Promise<OutcomeSupportView> =>
+    request(
+      `${outcomePath(workspaceId, sessionId, register)}/${encodeURIComponent(outcomeId)}/support`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  removeOutcomeSupport: (
+    workspaceId: string,
+    sessionId: string,
+    register: OutcomeRegister,
+    outcomeId: string,
+    supportId: string,
+    user: ActingUser,
+  ): Promise<void> =>
+    request<void>(
+      `${outcomePath(workspaceId, sessionId, register)}/${encodeURIComponent(outcomeId)}/support/${encodeURIComponent(supportId)}`,
+      user,
+      { method: 'DELETE' },
     ),
 };
 
