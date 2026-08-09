@@ -54,7 +54,7 @@ export default function SignInPage() {
         </p>
         <a
           href={authApi.loginUrl()}
-          className="inline-flex items-center justify-center rounded bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="inline-flex items-center justify-center rounded bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-accent-contrast)] hover:opacity-90"
         >
           Sign in
         </a>

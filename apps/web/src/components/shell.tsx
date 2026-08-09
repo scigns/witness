@@ -39,7 +39,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="min-h-dvh flex flex-col">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-3 focus:rounded focus:bg-[var(--color-accent)] focus:px-4 focus:py-2 focus:text-white"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-3 focus:rounded focus:bg-[var(--color-accent)] focus:px-4 focus:py-2 focus:text-[var(--color-accent-contrast)]"
       >
         Skip to main content
       </a>
@@ -67,7 +67,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
               <span
                 aria-hidden="true"
-                className="grid h-8 w-8 place-items-center rounded bg-[var(--color-accent)] text-sm font-bold text-white"
+                className="grid h-8 w-8 place-items-center rounded bg-[var(--color-accent)] text-sm font-bold text-[var(--color-accent-contrast)]"
               >
                 W
               </span>

@@ -28,9 +28,11 @@
  * re-run against a live instance is a privilege-escalation tool.
  */
 
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { PrismaClient } from '@prisma/client';
+
+import { firstAuditEventFor } from './operator-audit.js';
 
 const prisma = new PrismaClient();
 
@@ -39,38 +41,6 @@ type RequiredVariable =
   | 'WITNESS_BOOTSTRAP_ORGANISATION_NAME'
   | 'WITNESS_BOOTSTRAP_ADMIN_EMAIL'
   | 'WITNESS_BOOTSTRAP_ADMIN_NAME';
-
-const hash = (input: string): string => createHash('sha256').update(input, 'utf8').digest('hex');
-
-/**
- * Byte-for-byte the canonicalisation in `packages/domain/src/audit.ts` and
- * `prisma/seed.ts`. The bootstrap's rows have to verify under exactly the same
- * chain check as every row written through the API, or the first thing an
- * auditor sees on a new instance is a broken chain.
- */
-const canonicalise = (event: {
-  id: string;
-  subjectType: string;
-  subjectId: string;
-  action: string;
-  actorId: string;
-  occurredAt: Date;
-  previousHash: string | null;
-  metadata: Record<string, string>;
-}): string =>
-  [
-    event.id,
-    event.subjectType,
-    event.subjectId,
-    event.action,
-    event.actorId,
-    event.occurredAt.toISOString(),
-    event.previousHash ?? '',
-    Object.keys(event.metadata)
-      .sort()
-      .map((key) => `${key}=${event.metadata[key] ?? ''}`)
-      .join(','),
-  ].join('|');
 
 function required(name: RequiredVariable): string {
   const value = (process.env[name] ?? '').trim();
@@ -163,17 +133,7 @@ async function main(): Promise<void> {
         metadata: { via: 'bootstrap', role: 'admin' },
       },
     ]) {
-      const id = randomUUID();
-      await tx.auditEvent.create({
-        data: {
-          id,
-          ...event,
-          actorId,
-          occurredAt: now,
-          previousHash: null,
-          hash: hash(canonicalise({ id, ...event, actorId, occurredAt: now, previousHash: null })),
-        },
-      });
+      await tx.auditEvent.create({ data: firstAuditEventFor(event, actorId, now) });
     }
   });
 

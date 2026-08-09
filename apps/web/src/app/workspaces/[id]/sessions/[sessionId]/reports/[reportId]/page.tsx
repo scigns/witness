@@ -28,6 +28,7 @@ import {
   type RenderedReport,
   type ReportDetail,
   type ReportExportFormat,
+  type ReportSourceType,
   type ReportTransitionRequest,
 } from '@witness/contracts';
 
@@ -67,6 +68,16 @@ export default function ReportDetailPage({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [exporting, setExporting] = useState<ReportExportFormat | null>(null);
+
+  /**
+   * What this report may cite: the session's validated evidence and its
+   * authoritative outcomes. Loaded lazily, and only while the report is still
+   * editable — an approved report's citations are frozen.
+   */
+  const [citable, setCitable] = useState<{ type: ReportSourceType; id: string; label: string }[]>(
+    [],
+  );
+  const [citing, setCiting] = useState('');
 
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [reason, setReason] = useState('');
@@ -143,6 +154,55 @@ export default function ReportDetailPage({
     };
   }, [ready, load]);
 
+  // What may be cited, loaded once. Kept out of `load` because a caller who
+  // cannot list evidence should still see the report; a failure here narrows
+  // the picker rather than breaking the page.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+
+    void (async () => {
+      const [evidence, decisions, commitments, actions] = await Promise.allSettled([
+        api.listEvidence(workspaceId, sessionId, user),
+        api.listDecisions(workspaceId, sessionId, user),
+        api.listCommitments(workspaceId, sessionId, user),
+        api.listActionItems(workspaceId, sessionId, user),
+      ]);
+      if (cancelled) return;
+
+      const options: { type: ReportSourceType; id: string; label: string }[] = [];
+      if (evidence.status === 'fulfilled') {
+        for (const item of evidence.value.evidence) {
+          // Only validated evidence is admissible; offering the rest would be
+          // an invitation to a refusal the picker could have prevented.
+          if (item.reviewStatus === 'validated' && !item.withdrawn) {
+            options.push({ type: 'evidence', id: item.id, label: `Evidence — ${item.title}` });
+          }
+        }
+      }
+      if (decisions.status === 'fulfilled') {
+        for (const item of decisions.value.decisions) {
+          options.push({ type: 'decision', id: item.id, label: `Decision — ${item.title}` });
+        }
+      }
+      if (commitments.status === 'fulfilled') {
+        for (const item of commitments.value.commitments) {
+          options.push({ type: 'commitment', id: item.id, label: `Commitment — ${item.title}` });
+        }
+      }
+      if (actions.status === 'fulfilled') {
+        for (const item of actions.value.actions) {
+          options.push({ type: 'action_item', id: item.id, label: `Action — ${item.title}` });
+        }
+      }
+      setCitable(options);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, workspaceId, sessionId, user]);
+
   const refresh = useCallback(async () => {
     try {
       await load({ current: false });
@@ -201,6 +261,29 @@ export default function ReportDetailPage({
       await refresh();
     } catch (caught) {
       setActionError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addSource = async () => {
+    const chosen = citable.find((candidate) => `${candidate.type}:${candidate.id}` === citing);
+    if (chosen === undefined) return;
+
+    setBusy(true);
+    setSaveError(null);
+    try {
+      await api.includeReportSource(
+        workspaceId,
+        sessionId,
+        reportId,
+        { sourceType: chosen.type, sourceId: chosen.id },
+        user,
+      );
+      setCiting('');
+      await refresh();
+    } catch (caught) {
+      setSaveError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
       setBusy(false);
     }
@@ -423,6 +506,47 @@ export default function ReportDetailPage({
             corrected since, it is flagged rather than silently swapped.
           </p>
         </div>
+        {detail.canEdit && (
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-64 flex-1">
+              <label htmlFor="citeSource" className="mb-1 block text-sm font-medium">
+                Cite a record
+              </label>
+              <select
+                id="citeSource"
+                value={citing}
+                onChange={(event) => setCiting(event.target.value)}
+                className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+              >
+                <option value="">Choose a record…</option>
+                {citable
+                  .filter(
+                    (candidate) =>
+                      !detail.sources.some(
+                        (source) =>
+                          source.sourceType === candidate.type && source.sourceId === candidate.id,
+                      ),
+                  )
+                  .map((candidate) => (
+                    <option
+                      key={`${candidate.type}:${candidate.id}`}
+                      value={`${candidate.type}:${candidate.id}`}
+                    >
+                      {candidate.label}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <Button
+              variant="primary"
+              disabled={busy || citing === ''}
+              onClick={() => void addSource()}
+            >
+              Cite
+            </Button>
+          </div>
+        )}
+
         {detail.sources.length === 0 ? (
           <p className="text-[var(--color-ink-muted)]">Nothing cited yet.</p>
         ) : (

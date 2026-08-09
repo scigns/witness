@@ -87,13 +87,16 @@ const main = async () => {
     } catch {
       body = '<unreadable>';
     }
-    apiFailures.push(`${response.status()} ${response.request().method()} ${response.url()} — ${body}`);
+    apiFailures.push(
+      `${response.status()} ${response.request().method()} ${response.url()} — ${body}`,
+    );
   });
 
   /** What is on this page, in the terms a screen reader would use. */
   const describe = async () => {
     const inventory = await page.evaluate(() => {
-      const text = (node) => (node.innerText ?? node.value ?? '').trim().replace(/\s+/g, ' ').slice(0, 70);
+      const text = (node) =>
+        (node.innerText ?? node.value ?? '').trim().replace(/\s+/g, ' ').slice(0, 70);
       return {
         url: location.href,
         headings: [...document.querySelectorAll('h1,h2,h3')].map(text),
@@ -104,9 +107,9 @@ const main = async () => {
           id: s.id,
           options: [...s.options].map((o) => o.value),
         })),
-        radiosAndChecks: [...document.querySelectorAll('input[type=radio],input[type=checkbox]')].map(
-          (i) => `${i.name}=${i.value}`,
-        ),
+        radiosAndChecks: [
+          ...document.querySelectorAll('input[type=radio],input[type=checkbox]'),
+        ].map((i) => `${i.name}=${i.value}`),
       };
     });
     process.stdout.write(`\n--- page inventory ---\n${JSON.stringify(inventory, null, 1)}\n`);
@@ -129,19 +132,17 @@ const main = async () => {
 
   /** Wait for a `<select>` to be populated with something choosable. */
   const chooseFirst = async (id) => {
-    await page.waitForFunction(
-      (selector) => {
-        const element = document.querySelector(selector);
-        return (
-          element !== null &&
-          !element.disabled &&
-          [...element.options].some((option) => option.value !== '')
-        );
-      },
+    await page.waitForFunction((selector) => {
+      const element = document.querySelector(selector);
+      return (
+        element !== null &&
+        !element.disabled &&
+        [...element.options].some((option) => option.value !== '')
+      );
+    }, `#${id}`);
+    const value = await page.$eval(
       `#${id}`,
-    );
-    const value = await page.$eval(`#${id}`, (element) =>
-      [...element.options].find((option) => option.value !== '').value,
+      (element) => [...element.options].find((option) => option.value !== '').value,
     );
     await page.selectOption(`#${id}`, value);
     return value;
@@ -153,7 +154,9 @@ const main = async () => {
     } catch (error) {
       const available = await page
         .$$eval('button', (buttons) =>
-          buttons.map((button) => `${button.innerText.trim()}${button.disabled ? ' [disabled]' : ''}`),
+          buttons.map(
+            (button) => `${button.innerText.trim()}${button.disabled ? ' [disabled]' : ''}`,
+          ),
         )
         .catch(() => []);
       throw new Error(
@@ -170,8 +173,7 @@ const main = async () => {
   const expectOk = async (urlPattern, action) => {
     const [response] = await Promise.all([
       page.waitForResponse(
-        (candidate) =>
-          urlPattern.test(candidate.url()) && candidate.request().method() !== 'GET',
+        (candidate) => urlPattern.test(candidate.url()) && candidate.request().method() !== 'GET',
       ),
       action(),
     ]);
@@ -232,7 +234,10 @@ const main = async () => {
     // ── Identity ───────────────────────────────────────────────────────────
     await step('log in through the identity provider', async () => {
       await page.goto(`${WEB}/signin`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('link', { name: /sign in/i }).first().click();
+      await page
+        .getByRole('link', { name: /sign in/i })
+        .first()
+        .click();
       await page.waitForURL(/\/protocol\/openid-connect\/auth/);
       await page.fill('#username', USERNAME);
       await page.fill('#password', PASSWORD);
@@ -247,7 +252,10 @@ const main = async () => {
       await page.fill('#name', unique('Pilot Workspace'));
       await submit(/create/i);
       await page.waitForURL(/\/workspaces/);
-      await page.getByRole('link', { name: new RegExp(unique('Pilot Workspace')) }).first().click();
+      await page
+        .getByRole('link', { name: new RegExp(unique('Pilot Workspace')) })
+        .first()
+        .click();
       await page.waitForURL(/\/workspaces\/[0-9a-f-]{36}/);
       state.workspaceId = page.url().match(/\/workspaces\/([0-9a-f-]{36})/)[1];
     });
@@ -258,7 +266,10 @@ const main = async () => {
     await step('join the workspace so a facilitator exists', async () => {
       await chooseFirst('userId');
       await submit(/add to workspace/i);
-      await page.getByRole('heading', { name: /members/i }).first().waitFor();
+      await page
+        .getByRole('heading', { name: /members/i })
+        .first()
+        .waitFor();
     });
 
     // ── Session ────────────────────────────────────────────────────────────
@@ -317,7 +328,10 @@ const main = async () => {
       await submit(/create|save/i);
       await page.waitForURL(/consent-templates\/[0-9a-f-]{36}/);
       await submit(/activate|publish/i);
-      await page.getByText(/active/i).first().waitFor();
+      await page
+        .getByText(/active/i)
+        .first()
+        .waitFor();
 
       await page.goto(
         `${WEB}/workspaces/${state.workspaceId}/sessions/${state.sessionId}/consent-configuration`,
@@ -327,7 +341,10 @@ const main = async () => {
       for (const group of await radioGroups('category-')) {
         await page.locator(`input[name="${group.name}"]`).first().check();
       }
-      await page.fill('#participantIntroduction', 'What you agree to, and how to change your mind.');
+      await page.fill(
+        '#participantIntroduction',
+        'What you agree to, and how to change your mind.',
+      );
       await expectOk(/consent-configuration/, () => submit(/configure consent|save changes/i));
     });
 
@@ -360,7 +377,10 @@ const main = async () => {
           // the optional categories, so the report later has something to
           // redact.
           const decline = group.optional && index > 0;
-          await page.locator(`input[name="${group.name}"]`).nth(decline ? 1 : 0).check();
+          await page
+            .locator(`input[name="${group.name}"]`)
+            .nth(decline ? 1 : 0)
+            .check();
         }
         await expectOk(/consent/, () => submit(/record|capture|save/i));
         if (index === 0) state.consentingParticipantId = participantId;
@@ -431,7 +451,10 @@ const main = async () => {
     // ── Review ─────────────────────────────────────────────────────────────
     const openEvidence = async (id) => {
       await page.goto(`${evidenceUrl}/${id}`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('button', { name: /assign|begin review|validate/i }).first().waitFor();
+      await page
+        .getByRole('button', { name: /assign|begin review|validate/i })
+        .first()
+        .waitFor();
     };
 
     const assignReviewer = async () => {
@@ -455,9 +478,10 @@ const main = async () => {
       await expectOk(/clarifications/, () => submit(/^send$/i));
 
       await submit(/^respond$/i);
-      await page.locator('textarea[id^="response-"]').first().fill(
-        'The internal-pilot verification session, recorded in this workspace.',
-      );
+      await page
+        .locator('textarea[id^="response-"]')
+        .first()
+        .fill('The internal-pilot verification session, recorded in this workspace.');
       await expectOk(/respond/, () => submit(/send response/i));
     });
 
@@ -566,6 +590,16 @@ const main = async () => {
     });
 
     // ── Reporting ──────────────────────────────────────────────────────────
+    await step('cite the validated evidence in the report', async () => {
+      await page.goto(`${reportsUrl}/${state.reportId}`, { waitUntil: 'domcontentloaded' });
+      await chooseFirst('citeSource');
+      await expectOk(/\/sources/, () => submit(/^cite$/i));
+      await page
+        .getByText(/cited at version/i)
+        .first()
+        .waitFor();
+    });
+
     await step('send the report for review', async () => {
       await page.goto(`${reportsUrl}/${state.reportId}`, { waitUntil: 'domcontentloaded' });
       await page.fill('#synthesis', 'The deployed application carries the whole workflow.');
@@ -601,7 +635,6 @@ const main = async () => {
         if (size === 0) throw new Error(`the ${format} export was empty`);
       });
     }
-
   } catch {
     // The step line and the inventory have already been printed.
   }

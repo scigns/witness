@@ -85,6 +85,11 @@ describe('ATTACK — smuggle an external model provider past the sovereign profi
     OIDC_ISSUER: 'https://keycloak.example.org/realms/witness',
     KEYCLOAK_CLIENT_ID: 'witness-api',
     JWT_AUDIENCE: 'witness-api',
+    // Likewise the two public addresses a deployed instance must state: their
+    // localhost defaults are refused outside development, and that rule is
+    // orthogonal to the egress attacks below.
+    WITNESS_WEB_ORIGIN: 'https://witness.example.org',
+    WITNESS_OIDC_REDIRECT_URI: 'https://api.witness.example.org/api/v1/auth/callback',
   };
 
   it('cannot use the base URL alone as a side channel', () => {

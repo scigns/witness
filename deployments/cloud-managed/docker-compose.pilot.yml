@@ -1,0 +1,149 @@
+# Witness — internal pilot, single node.
+#
+# The smallest deployment that is honestly production: the web application, the
+# API, PostgreSQL, a real Keycloak, and a reverse proxy that terminates TLS.
+# Nothing else, because nothing else is used yet — see the profile comments in
+# `infrastructure/docker/docker-compose.yml` for why the unused services in the
+# full stack stay switched off.
+#
+# Deliberately not Kubernetes. ADR-0013 makes single-node Compose a first-class
+# production target, and an internal pilot has no reason to be the exception.
+#
+# Everything secret comes from the environment. There are no defaults for
+# passwords here on purpose: `${VAR:?message}` fails the whole `up` rather than
+# quietly starting with a value someone copied out of a README.
+#
+#   cp .env.example .env    # then fill it in from your secret store
+#   docker compose -f deployments/cloud-managed/docker-compose.pilot.yml up -d --build
+#
+# The first deployment additionally needs, once:
+#   docker compose … run --rm api pnpm --filter @witness/api exec prisma migrate deploy
+#   docker compose … run --rm -e WITNESS_BOOTSTRAP_… api pnpm bootstrap
+
+name: witness-pilot
+
+x-common: &common
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  # ── System of record (ADR-0004, ADR-0011) ──────────────────────────────────
+  postgres:
+    <<: *common
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-witness}
+      POSTGRES_USER: ${POSTGRES_USER:-witness}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # No `ports:`. The database is reachable only from this compose network —
+    # publishing 5432 to the host is how an internal database becomes an
+    # internet-facing one.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-witness} -d ${POSTGRES_DB:-witness}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── Identity (ADR-0007) ────────────────────────────────────────────────────
+  keycloak:
+    <<: *common
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start", "--optimized", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:-keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:?KEYCLOAK_DB_USER must be set}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD must be set}
+      KC_HOSTNAME: ${OIDC_PUBLIC_URL:?OIDC_PUBLIC_URL must be set}
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?KEYCLOAK_ADMIN must be set}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD must be set}
+      # Substituted into the realm import — realm-as-code, no localhost.
+      WITNESS_OIDC_REDIRECT_URI: ${WITNESS_OIDC_REDIRECT_URI:?WITNESS_OIDC_REDIRECT_URI must be set}
+      WITNESS_WEB_ORIGIN: ${WITNESS_WEB_ORIGIN:?WITNESS_WEB_ORIGIN must be set}
+      WITNESS_OIDC_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-witness-api}
+      WITNESS_REALM_SEED_PASSWORD: ${WITNESS_REALM_SEED_PASSWORD:?WITNESS_REALM_SEED_PASSWORD must be set}
+    volumes:
+      - ../../infrastructure/docker/init/keycloak:/opt/keycloak/data/import:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q 'UP'",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+
+  # ── Application ────────────────────────────────────────────────────────────
+  api:
+    <<: *common
+    build:
+      context: ../..
+      dockerfile: services/api-gateway/Dockerfile
+    environment:
+      NODE_ENV: production
+      WITNESS_DEPLOYMENT_PROFILE: ${WITNESS_DEPLOYMENT_PROFILE:-sovereign}
+      WITNESS_INSTANCE_NAME: ${WITNESS_INSTANCE_NAME:?WITNESS_INSTANCE_NAME must be set}
+      WITNESS_DATA_RESIDENCY: ${WITNESS_DATA_RESIDENCY:?WITNESS_DATA_RESIDENCY must be set}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      WITNESS_API_PORT: 3001
+      WITNESS_WEB_ORIGIN: ${WITNESS_WEB_ORIGIN:?WITNESS_WEB_ORIGIN must be set}
+      WITNESS_OIDC_REDIRECT_URI: ${WITNESS_OIDC_REDIRECT_URI:?WITNESS_OIDC_REDIRECT_URI must be set}
+      OIDC_ISSUER: ${OIDC_ISSUER:?OIDC_ISSUER must be set}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-witness-api}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-witness-api}
+      WITNESS_SESSION_TTL_MINUTES: ${WITNESS_SESSION_TTL_MINUTES:-480}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+    depends_on:
+      postgres: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+
+  web:
+    <<: *common
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_WITNESS_API_URL: ${NEXT_PUBLIC_WITNESS_API_URL:?NEXT_PUBLIC_WITNESS_API_URL must be set}
+        NEXT_PUBLIC_WITNESS_PROFILE: ${WITNESS_DEPLOYMENT_PROFILE:-sovereign}
+    depends_on:
+      api: { condition: service_started }
+
+  # ── TLS termination ────────────────────────────────────────────────────────
+  # Caddy because it obtains and renews certificates itself. The alternative is
+  # a cron job nobody notices has stopped until a Monday morning.
+  proxy:
+    <<: *common
+    image: caddy:2-alpine
+    environment:
+      WITNESS_WEB_HOST: ${WITNESS_WEB_HOST:?WITNESS_WEB_HOST must be set}
+      WITNESS_API_HOST: ${WITNESS_API_HOST:?WITNESS_API_HOST must be set}
+      WITNESS_OIDC_HOST: ${WITNESS_OIDC_HOST:?WITNESS_OIDC_HOST must be set}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    ports: ["80:80", "443:443"]
+    depends_on:
+      web: { condition: service_started }
+      api: { condition: service_started }
+      keycloak: { condition: service_healthy }
+
+volumes:
+  postgres-data: # BACKED UP — the system of record (scripts/ops/backup.sh)
+  caddy-data: # certificates and their private keys
+  caddy-config:
+
+networks:
+  default:
+    name: witness-pilot

@@ -52,7 +52,7 @@ export default function UsersPage() {
         </div>
         <Link
           href="/users/new"
-          className="rounded bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+          className="rounded bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-[var(--color-accent-contrast)] hover:opacity-90"
         >
           Add user
         </Link>
