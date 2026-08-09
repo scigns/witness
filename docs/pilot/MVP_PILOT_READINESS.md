@@ -1,5 +1,8 @@
 # MVP Pilot Readiness
 
+**Status:** Active
+**Owner:** Founder / Product Lead with Engineering and QA
+
 **Date:** 2026-08-09
 **Scope:** the human-led MVP — Milestones 1–8, `Sign in → Organisation / Workspace → Session →
 Participants → Consent → Evidence → Review → Decisions / Commitments / Actions → Report → Export`
