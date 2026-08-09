@@ -32,6 +32,11 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'evidence_review:read',
     'outcome:read',
     'report:read',
+    // A published report is meant to be taken away and used. `policy.csv`
+    // grants this to reader too; the two tables must not disagree, because
+    // the dev-header path reads this one and the session-backed path reads
+    // that one.
+    'report:export',
   ],
   // `session:update`/`session:transition` are workspace-wide, not
   // per-session: any contributor in a workspace's scope may rename, close,

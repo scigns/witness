@@ -20,12 +20,14 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 
-import type {
-  Action,
-  AuthorizationDecision,
-  AuthorizationPort,
-  Principal,
-} from './authorization.port.js';
+// `AuthorizationPort` is imported as a *value*, not a type. It is the Nest
+// injection token for this service's first constructor parameter, and an
+// `import type` is erased at compile time — TypeScript then emits `Function`
+// for `design:paramtypes` and Nest cannot resolve the dependency, so the
+// application fails to boot. The unit tests do not catch this because they
+// construct the service directly rather than through the container.
+import { AuthorizationPort } from './authorization.port.js';
+import type { Action, AuthorizationDecision, Principal } from './authorization.port.js';
 import { PolicyEngineService } from './policy-engine.service.js';
 import { RoleResolutionService, type ResourceScope } from './role-resolution.service.js';
 

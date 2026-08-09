@@ -956,7 +956,12 @@ model Clarification {
 /// There is deliberately no update or delete path in the application.
 model AuditEvent {
   id          String @id @db.Uuid
-  subjectType String @map("subject_type") @db.VarChar(24)
+  /// Wide enough for the longest subject type the domain declares.
+  /// `session_consent_configuration` is 29 characters; the original
+  /// VARCHAR(24) silently fitted every subject type that existed when it was
+  /// written and then rejected the two consent ones at runtime. No test
+  /// caught it, because the in-memory Prisma double has no column widths.
+  subjectType String @map("subject_type") @db.VarChar(64)
   subjectId   String @map("subject_id") @db.Uuid
 
   action String @db.VarChar(64)
