@@ -1,0 +1,20 @@
+-- Widen `audit_event.subject_type`.
+--
+-- The column was VARCHAR(24), which fitted every subject type that existed
+-- when it was written. Two later ones do not: `session_consent_configuration`
+-- is 29 characters and `participant_consent_record` is 26. Against a real
+-- database, configuring a session's consent and capturing a participant's
+-- consent both failed at the audit write — and because the audit event is
+-- appended inside the same transaction as the record, the whole operation
+-- rolled back. Consent has therefore been unusable against real Postgres
+-- since Milestone 4.
+--
+-- No test caught it: the service tests run against an in-memory Prisma double
+-- with no column widths, and the migrations had never been applied to a live
+-- database. This was found by the MVP pilot-readiness walkthrough, which was
+-- the first run of the workflow against real Postgres.
+--
+-- Widening is safe and non-destructive: VARCHAR(24) → VARCHAR(64) rewrites no
+-- data and Postgres performs it without a table rewrite. 64 leaves room for
+-- every subject type the domain currently declares and for the next several.
+ALTER TABLE "audit_event" ALTER COLUMN "subject_type" TYPE VARCHAR(64);
