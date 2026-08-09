@@ -109,6 +109,62 @@ export interface WitnessConfig {
 }
 
 /**
+ * Hostnames that only ever mean "this machine". A deployed instance that names
+ * one of these has been handed a developer's configuration.
+ */
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1', '0.0.0.0']);
+
+/**
+ * Check one URL that a browser or an identity provider has to reach.
+ *
+ * Returns every problem rather than the first, matching `loadConfig`'s promise
+ * that an operator gets the whole list in one restart.
+ */
+function deployedUrlProblems(
+  name: string,
+  raw: string,
+  options: { readonly requirement?: string; readonly skipWhenEmpty?: boolean } = {},
+): string[] {
+  const value = raw.trim();
+
+  if (value === '') {
+    // OIDC_ISSUER's emptiness is already reported, with a better message, by the
+    // identity check above. Reporting it twice would just be noise.
+    return options.skipWhenEmpty === true
+      ? []
+      : [
+          `${name} must be set explicitly outside the development profile — ` +
+            `${options.requirement ?? 'it has no safe default for a deployed instance'}.`,
+        ];
+  }
+
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return [`${name} is not a valid absolute URL: ${value}`];
+  }
+
+  const problems: string[] = [];
+
+  if (url.protocol !== 'https:') {
+    problems.push(
+      `${name} must use https outside the development profile (got ${url.protocol.replace(':', '')}). ` +
+        'Session tokens and authorization codes travel over these URLs.',
+    );
+  }
+
+  if (LOOPBACK_HOSTS.has(url.hostname.toLowerCase())) {
+    problems.push(
+      `${name} points at ${url.hostname}, which is only reachable from the machine running ` +
+        'Witness. Set it to the address the browser actually uses.',
+    );
+  }
+
+  return problems;
+}
+
+/**
  * Validate configuration, or throw with every problem found.
  *
  * Reports all problems at once. An operator fixing a misconfigured deployment at
@@ -193,6 +249,31 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
           '— ID tokens are refused unless their audience is checked against a known value.',
       );
     }
+  }
+
+  // ── Deployed instances must be told their real public addresses ────────────
+  // `webOrigin` and `oidcRedirectUri` both fall back to a localhost URL derived
+  // from a port. That default is right for a developer and catastrophic for a
+  // deployment: CORS would refuse every request from the real frontend, and the
+  // OIDC callback would send an authenticated user's authorization code to a
+  // host that is not the API. Both failures surface as something else — a CORS
+  // error, an "invalid redirect_uri" from Keycloak — so outside development the
+  // values are required, and required to be the addresses a browser can
+  // actually reach over TLS.
+  if (value.WITNESS_DEPLOYMENT_PROFILE !== 'development') {
+    problems.push(
+      ...deployedUrlProblems('WITNESS_WEB_ORIGIN', value.WITNESS_WEB_ORIGIN, {
+        requirement:
+          'the exact origin the browser sends, used for the CORS policy — the localhost ' +
+          'default derived from WITNESS_WEB_PORT is never correct for a deployed instance',
+      }),
+      ...deployedUrlProblems('WITNESS_OIDC_REDIRECT_URI', value.WITNESS_OIDC_REDIRECT_URI, {
+        requirement:
+          'where the identity provider returns the authorization code — it must match the ' +
+          'redirect URI registered on the Keycloak client',
+      }),
+      ...deployedUrlProblems('OIDC_ISSUER', value.OIDC_ISSUER, { skipWhenEmpty: true }),
+    );
   }
 
   // ── Hybrid must be deliberate, not accidental ──────────────────────────────

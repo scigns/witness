@@ -47,6 +47,9 @@ importers:
       markdownlint-cli2:
         specifier: ^0.23.2
         version: 0.23.2
+      playwright-core:
+        specifier: ^1.62.1
+        version: 1.62.1
       prettier:
         specifier: ^3.3.3
         version: 3.9.6
@@ -2717,6 +2720,11 @@ packages:
   pify@4.0.1:
     resolution: {integrity: sha512-uB80kBFb/tfd68bVleG9T5GGsGPjJrLAUpR5PZIrhBnIaRTQRjqdJSsIKkOP6OAIFbj7GOrcudc5pNjZ+geV2g==}
     engines: {node: '>=6'}
+
+  playwright-core@1.62.1:
+    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   postcss@8.4.31:
     resolution: {integrity: sha512-PS08Iboia9mts/2ygV3eLpY5ghnUcfLV/EXTOW1E2qYxJKGGBUtNjN76FYHnMs36RmARn41bC0AZmn+rR0OVpQ==}
@@ -5805,6 +5813,8 @@ snapshots:
   pidtree@0.6.1: {}
 
   pify@4.0.1: {}
+
+  playwright-core@1.62.1: {}
 
   postcss@8.4.31:
     dependencies:

@@ -17,12 +17,18 @@ const base = {
   WITNESS_DEPLOYMENT_PROFILE: 'development',
 } satisfies NodeJS.ProcessEnv;
 
-/** `base`, plus the real identity-provider config every non-development profile requires. */
+/**
+ * `base`, plus everything a non-development profile requires: real
+ * identity-provider config, and the two public addresses whose localhost
+ * defaults are only ever right for a developer.
+ */
 const oidcBase = {
   ...base,
   OIDC_ISSUER: 'https://keycloak.example.org/realms/witness',
   KEYCLOAK_CLIENT_ID: 'witness-api',
   JWT_AUDIENCE: 'witness-api',
+  WITNESS_WEB_ORIGIN: 'https://pilot.example.org',
+  WITNESS_OIDC_REDIRECT_URI: 'https://api.pilot.example.org/api/v1/auth/callback',
 } satisfies NodeJS.ProcessEnv;
 
 describe('loadConfig', () => {
@@ -257,5 +263,71 @@ describe('web origin (CORS)', () => {
       WITNESS_WEB_ORIGIN: 'https://witness.gov.example',
     });
     expect(config.webOrigin).toBe('https://witness.gov.example');
+  });
+});
+
+describe('deployed public addresses', () => {
+  it('refuses a deployed profile that never states the browser origin', () => {
+    const { WITNESS_WEB_ORIGIN: _omitted, ...withoutOrigin } = oidcBase;
+    expect(() => loadConfig({ ...withoutOrigin, WITNESS_DEPLOYMENT_PROFILE: 'sovereign' })).toThrow(
+      /WITNESS_WEB_ORIGIN must be set explicitly/,
+    );
+  });
+
+  it('refuses a deployed profile that never states the OIDC redirect URI', () => {
+    const { WITNESS_OIDC_REDIRECT_URI: _omitted, ...withoutRedirect } = oidcBase;
+    expect(() =>
+      loadConfig({ ...withoutRedirect, WITNESS_DEPLOYMENT_PROFILE: 'sovereign' }),
+    ).toThrow(/WITNESS_OIDC_REDIRECT_URI must be set explicitly/);
+  });
+
+  it('refuses a localhost origin on a deployed instance', () => {
+    // The failure this prevents is silent and misattributed: CORS refuses every
+    // request from the real frontend, and the browser blames CORS rather than
+    // the configuration that was copied from a developer's machine.
+    expect(() =>
+      loadConfig({
+        ...oidcBase,
+        WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+        WITNESS_WEB_ORIGIN: 'https://localhost:3000',
+      }),
+    ).toThrow(/only reachable from the machine running Witness/);
+  });
+
+  it('refuses a plaintext redirect URI on a deployed instance', () => {
+    expect(() =>
+      loadConfig({
+        ...oidcBase,
+        WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+        WITNESS_OIDC_REDIRECT_URI: 'http://pilot.example.org/api/v1/auth/callback',
+      }),
+    ).toThrow(/must use https/);
+  });
+
+  it('refuses a plaintext issuer on a deployed instance', () => {
+    expect(() =>
+      loadConfig({
+        ...oidcBase,
+        WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+        OIDC_ISSUER: 'http://keycloak.example.org/realms/witness',
+      }),
+    ).toThrow(/must use https/);
+  });
+
+  it('reports both addresses at once rather than one restart at a time', () => {
+    const { WITNESS_WEB_ORIGIN: _o, WITNESS_OIDC_REDIRECT_URI: _r, ...bare } = oidcBase;
+    try {
+      loadConfig({ ...bare, WITNESS_DEPLOYMENT_PROFILE: 'sovereign' });
+      expect.unreachable('expected a ConfigurationError');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConfigurationError);
+      expect((error as ConfigurationError).problems).toHaveLength(2);
+    }
+  });
+
+  it('still derives localhost defaults in development', () => {
+    const config = loadConfig({ ...base });
+    expect(config.webOrigin).toBe('http://localhost:3000');
+    expect(config.oidcRedirectUri).toBe('http://localhost:3001/api/v1/auth/callback');
   });
 });

@@ -44,7 +44,8 @@
     "seed": "pnpm --filter @witness/api run seed",
     "migrate": "pnpm --filter @witness/api exec prisma migrate deploy",
     "test:invariants": "turbo run build && vitest run test/invariants",
-    "test:adversarial": "turbo run build && vitest run test/adversarial"
+    "test:adversarial": "turbo run build && vitest run test/adversarial",
+    "bootstrap": "pnpm --filter @witness/api run bootstrap"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.9",
@@ -60,6 +61,7 @@
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
     "markdownlint-cli2": "^0.23.2",
+    "playwright-core": "^1.62.1",
     "prettier": "^3.3.3",
     "tsx": "^4.19.2",
     "turbo": "^2.2.3",

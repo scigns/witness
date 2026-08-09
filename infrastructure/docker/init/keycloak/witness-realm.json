@@ -5,9 +5,15 @@
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 10,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
   "clients": [
     {
-      "clientId": "witness-api",
+      "clientId": "${WITNESS_OIDC_CLIENT_ID:witness-api}",
       "name": "Witness API",
       "enabled": true,
       "publicClient": true,
@@ -16,10 +22,11 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
-      "redirectUris": ["http://localhost:3001/api/v1/auth/callback"],
-      "webOrigins": ["http://localhost:3000"],
+      "redirectUris": ["${WITNESS_OIDC_REDIRECT_URI:http://localhost:3001/api/v1/auth/callback}"],
+      "webOrigins": ["${WITNESS_WEB_ORIGIN:http://localhost:3000}"],
       "attributes": {
-        "pkce.code.challenge.method": "S256"
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${WITNESS_WEB_ORIGIN:http://localhost:3000}/*"
       }
     }
   ],
@@ -34,7 +41,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "change-me-in-every-environment",
+          "value": "${WITNESS_REALM_SEED_PASSWORD:change-me-in-every-environment}",
           "temporary": false
         }
       ]
@@ -49,7 +56,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "change-me-in-every-environment",
+          "value": "${WITNESS_REALM_SEED_PASSWORD:change-me-in-every-environment}",
           "temporary": false
         }
       ]

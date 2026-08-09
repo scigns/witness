@@ -177,7 +177,11 @@ describe('SessionAuthenticator', () => {
       organisationMembershipState: 'active',
     });
     const principal = await issueAndAuthenticate(prisma, (t) => `Bearer ${t}`);
-    expect(principal?.roles).toEqual([]);
+    // Counted as `reader` globally, never `admin`: administrative global
+    // actions (organisation:create, user:create) stay out of reach, while the
+    // membership-filtered lists an administrator obviously needs to read stay
+    // reachable. See RoleResolutionService.globalGrantTiers.
+    expect(principal?.roles).toEqual(['reader']);
     expect(principal?.roles).not.toContain('admin');
   });
 

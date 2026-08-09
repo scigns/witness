@@ -11,10 +11,13 @@
  * built from unredacted data would show the author a document that does not
  * exist, and the first time anyone saw the real one would be after it left.
  *
- * Exports are plain links rather than fetches. The browser navigates, the
- * server's `Content-Disposition` names the file, and the bytes never pass
- * through client-side JavaScript — which is also what keeps the export from
- * being rendered in this origin.
+ * Exports are fetched with the session attached and then saved from memory.
+ * A plain `<a href>` was the obvious design and is wrong: a navigation sends
+ * cookies, the session travels as an `Authorization: Bearer` header, so the
+ * link is an unauthenticated request and a deployed instance answers it with
+ * 401. The bytes therefore do pass through client-side JavaScript, but they
+ * are never rendered — the blob is handed straight to a download, and the
+ * server's `Content-Disposition` still names the file.
  */
 
 import Link from 'next/link';
@@ -24,6 +27,7 @@ import {
   REPORT_EXPORT_FORMATS,
   type RenderedReport,
   type ReportDetail,
+  type ReportExportFormat,
   type ReportTransitionRequest,
 } from '@witness/contracts';
 
@@ -62,9 +66,44 @@ export default function ReportDetailPage({
   const [recommendations, setRecommendations] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const [exporting, setExporting] = useState<ReportExportFormat | null>(null);
+
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+
+  /**
+   * Take a copy: fetch with the session attached, then save from memory.
+   * See this file's header for why this cannot be a link.
+   */
+  const takeCopy = async (format: ReportExportFormat): Promise<void> => {
+    setExporting(format);
+    setError(null);
+    try {
+      const { blob, filename } = await api.downloadReportExport(
+        workspaceId,
+        sessionId,
+        reportId,
+        format,
+        user,
+      );
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      // Revoked on the next tick rather than immediately: Chromium starts the
+      // download asynchronously and a URL revoked in the same task can be gone
+      // before it is read.
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'The export failed.');
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
@@ -473,13 +512,14 @@ export default function ReportDetailPage({
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {REPORT_EXPORT_FORMATS.map((format) => (
-                  <a
+                  <Button
                     key={format}
-                    href={api.reportExportUrl(workspaceId, sessionId, reportId, format)}
-                    className="rounded border border-[var(--color-line)] px-3 py-1.5 text-sm underline"
+                    variant="secondary"
+                    disabled={exporting !== null}
+                    onClick={() => void takeCopy(format)}
                   >
-                    {format.toUpperCase()}
-                  </a>
+                    {exporting === format ? `${format.toUpperCase()}…` : format.toUpperCase()}
+                  </Button>
                 ))}
               </div>
             </div>

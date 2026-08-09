@@ -35,12 +35,13 @@ import { WITNESS_CONFIG } from '../tokens.js';
 const NOT_IMPLEMENTED: readonly string[] = [
   'AI extraction of candidate assertions (Phase 5)',
   'Transcription and diarisation (Phase 5)',
+  'Media and document storage (Phase 5)',
   'Knowledge graph projection (Phase 4)',
-  'Consent service — grants, scopes, revocation (Phase 3)',
-  'Casbin policy-engine authorisation — Authorisation hardening is the next capability after Milestone 1.3',
   'Hybrid search (Phase 6)',
-  'Multi-tenant isolation and row-level security (Phase 3)',
   'Event-driven projection rebuild (Phase 4)',
+  'PDF export — HTML, Markdown, JSON and CSV are implemented (Milestone 8)',
+  'Database row-level security — tenant isolation is enforced in the repository layer, ' +
+    'and the second, independent database-level layer is still to come (Phase 3)',
 ];
 
 @Controller()
