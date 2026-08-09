@@ -14,6 +14,7 @@ import { useState, type ReactNode } from 'react';
 
 import type {
   ActionItemStatus,
+  ReportStatus,
   CommitmentStatus,
   DecisionStatus,
   EvidenceReviewStatus,
@@ -331,6 +332,32 @@ export function SupportCountBadge({ count }: { count: number }) {
       }`}
     >
       {count === 0 ? 'No basis recorded' : `${count} ${count === 1 ? 'basis' : 'bases'}`}
+    </span>
+  );
+}
+
+const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
+  draft: 'Draft',
+  under_review: 'Under review',
+  approved: 'Approved',
+  published_internally: 'Published internally',
+  exported: 'Exported',
+};
+
+const REPORT_STATUS_CLASSES: Record<ReportStatus, string> = {
+  draft: 'border-current text-[var(--color-ink-muted)]',
+  under_review: 'border-amber-600 text-amber-700 dark:text-amber-400',
+  approved: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  published_internally: 'border-sky-700 text-sky-700 dark:text-sky-400',
+  exported: 'border-sky-700 text-sky-700 dark:text-sky-400',
+};
+
+export function ReportStatusBadge({ status }: { status: ReportStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${REPORT_STATUS_CLASSES[status]}`}
+    >
+      {REPORT_STATUS_LABELS[status]}
     </span>
   );
 }

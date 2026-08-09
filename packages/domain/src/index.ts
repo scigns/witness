@@ -39,3 +39,6 @@ export * from './outcome-support.js';
 export * from './decision.js';
 export * from './commitment.js';
 export * from './action-item.js';
+export * from './report.js';
+export * from './report-source.js';
+export * from './report-composition.js';

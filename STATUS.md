@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-08-08 (Milestone 7)
+**Last updated:** 2026-08-09 (Milestone 8)
 **Updated by:** CTO
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -61,11 +61,11 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 | Governance | `governance` | Governance Lead | 🟡 | Consent framework drafted; Indigenous protocols need external review |
 | Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun; Casbin-based, organisation/workspace-scoped authorisation shipped (ADR-0007); real identity is Phase 2 |
 | Infrastructure | `infrastructure` | Infrastructure Lead | 🟡 | Compose stack running; observability overlay added, wiring pending |
-| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2), Participant Management (Milestone 3), Consent Management (Milestone 4) and Structured Live Evidence Capture (Milestone 5) and Evidence Review and Validation (Milestone 6) shipped; Decisions, Commitments and Actions (Milestone 7) implemented in this PR, not yet merged |
+| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2), Participant Management (Milestone 3), Consent Management (Milestone 4) and Structured Live Evidence Capture (Milestone 5) and Evidence Review and Validation (Milestone 6) shipped; Decisions, Commitments and Actions (Milestone 7) shipped; Session Summary, Reporting and Export (Milestone 8) implemented in this PR, not yet merged |
 | Knowledge graph | `knowledge-graph` | Knowledge Graph Lead | 🟡 | Ontology v0.1 in design |
 | AI platform | `ai-platform` | AI Lead | ⚪ | Awaiting Phase 5; model policy drafted |
-| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2), participant (Milestone 3), consent management (Milestone 4) and evidence capture (Milestone 5) and evidence review (Milestone 6) screens shipped; outcome register and detail screens (Milestone 7) implemented in this PR, not yet merged; design system awaits Phase 6 |
-| Testing | `testing` | QA Lead | 🟡 | 787 tests across all packages (385 API-gateway, 362 domain); invariant and adversarial suites live |
+| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2), participant (Milestone 3), consent management (Milestone 4) and evidence capture (Milestone 5) and evidence review (Milestone 6) screens shipped; outcome register and detail screens (Milestone 7) shipped; report authoring, review and export screens (Milestone 8) implemented in this PR, not yet merged; design system awaits Phase 6 |
+| Testing | `testing` | QA Lead | 🟡 | 818 tests across all packages (413 API-gateway, 405 domain); invariant and adversarial suites live |
 | Release | `release` | Release Manager | 🟢 | Strategy and versioning defined |
 
 ---
@@ -88,6 +88,53 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ---
 
 ## What changed recently
+
+### 2026-08-09 — Session Summary, Reporting and Export delivered (Milestone 8), PR open
+
+- **The last capability of the human-led MVP.** A session now becomes a report an authorised person
+  can write, submit, have reviewed, approve, publish and take away — with every claim traceable and
+  every copy redacted by the server.
+- **A report references; it does not copy.** The narrative sections are the author's own words and
+  live on the aggregate. Everything else — evidence, decisions, commitments, actions — is cited
+  through `ReportSource` and composed at render time. That is a privacy decision before an
+  architectural one: a second copy of participant-derived content would sit outside the consent and
+  redaction boundaries Milestones 4 and 5 built, and a later withdrawal of consent would have to
+  chase it. Referencing means there is only ever one copy to redact.
+- **Traceability freezes, redaction does not.** `ReportSource` records the version each cited record
+  held at inclusion, so a reader can be told the evidence behind a paragraph has been corrected since
+  the report cited it. Consent, by contrast, is evaluated at *render* time — a participant who
+  withdraws after a report is approved disappears from the next copy of it, which a rule frozen at
+  approval would not achieve.
+- **`report-composition.ts` is the redaction rule, and it is pure.** Every export format goes through
+  the same call, so HTML, Markdown, JSON and CSV cannot disagree about what a participant agreed to.
+  Appearing, being quoted and being named are three separate permissions: withdrawn or
+  audience-refused consent removes a record entirely; refused quotation keeps the finding and
+  withholds the content, *structurally absent* rather than blanked, so a template cannot render a
+  redaction as though it were silence; attributed evidence without attributed-quotation consent falls
+  back to anonymous rather than vanishing, because losing the finding would distort the record in the
+  other direction.
+- **Participants are summarised by count and never listed.** In a session of six, a list of five
+  names plus a total of six identifies the sixth. Withdrawn participants stay in the total for the
+  same reason — a count that dropped by one between revisions would say who left.
+- **What a report may draw on is a domain rule, not a query filter.** Only validated evidence,
+  confirmed or superseded decisions, and active or fulfilled commitments are admissible; actions are
+  admissible in every state, because an honest account of what an institution did includes what it
+  stopped. Cross-session, cross-workspace and cross-organisation records are refused by name.
+- **An approved report is never edited.** Revising produces a new report at the next revision,
+  carrying its citations forward and pointing back at what it supersedes, so a reader who saw
+  revision 1 can still find exactly what they saw.
+- **Authorisation splits along the same seam once more.** Contributors write and submit; reviewers
+  approve and publish; the two sets do not overlap, so a contributor cannot approve their own report
+  and a reviewer cannot write the one they approve. `report:read` and `report:export` reach reader
+  tier — a published report is meant to be taken away, and export redaction is server-side either
+  way.
+- **Exports are hostile-input aware.** CSV prefixes fields beginning `=`, `+`, `-` or `@`, because a
+  participant quotation starting with a dash would otherwise be executed by a spreadsheet rather than
+  displayed; HTML escapes; and every export is served as an attachment rather than rendered inline in
+  the application's own origin.
+- **Same standing constraint.** The migration is hand-authored and validated with `prisma validate`
+  and `prisma generate` only — no Postgres or Docker in this sandbox — and no browser walkthrough was
+  performed. Closing both gaps is the MVP pilot-readiness gate's first job.
 
 ### 2026-08-08 — Decisions, Commitments and Actions delivered (BUILD_ROADMAP.md Milestone 7), PR open
 

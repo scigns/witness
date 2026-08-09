@@ -48,6 +48,8 @@ import { ParticipantConsentRecordsService } from './participant-consent-records/
 import { ParticipantsController } from './participants/participants.controller.js';
 import { ParticipantsService } from './participants/participants.service.js';
 import { RecordsController } from './records/records.controller.js';
+import { ReportsController } from './reports/reports.controller.js';
+import { ReportsService } from './reports/reports.service.js';
 import { RecordsService } from './records/records.service.js';
 import { RolesController } from './roles/roles.controller.js';
 import { SessionConsentConfigurationController } from './session-consent-configuration/session-consent-configuration.controller.js';
@@ -84,6 +86,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     EvidenceController,
     EvidenceReviewController,
     OutcomesController,
+    ReportsController,
     AuthenticationController,
     CurrentUserController,
   ],
@@ -108,6 +111,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     EvidenceReviewService,
     OutcomesService,
     OutcomeSupportService,
+    ReportsService,
     SessionService,
     RoleResolutionService,
     PolicyEngineService,

@@ -31,6 +31,7 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'evidence_review:list',
     'evidence_review:read',
     'outcome:read',
+    'report:read',
   ],
   // `session:update`/`session:transition` are workspace-wide, not
   // per-session: any contributor in a workspace's scope may rename, close,
@@ -107,6 +108,11 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'outcome:update',
     'outcome:transition',
     'outcome:link_support',
+    'report:read',
+    'report:create',
+    'report:update',
+    'report:submit',
+    'report:export',
   ],
   // `evidence_review:*` (BUILD_ROADMAP.md Milestone 6, Evidence Review and
   // Validation) is where `reviewer` first gains write actions of its own —
@@ -145,6 +151,23 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
   // carries no restricted participant identity by construction — see
   // packages/domain/src/commitment.ts on why an owner is plain language and
   // is never a session participant.
+  //
+  // `report:*` (BUILD_ROADMAP.md Milestone 8, Session Summary, Reporting and
+  // Export) splits along the same seam once more. Writing a report —
+  // `create`/`update`/`submit` — is contributor work; `approve` and `publish`
+  // are reviewer work, because those are the moments the institution takes
+  // responsibility for what the report says. Nobody approves their own report
+  // by default: a contributor cannot approve at all, and a reviewer cannot
+  // create one. That is segregation of duties by grant rather than by
+  // per-report ownership check, which is as far as the MVP goes — an
+  // organisation needing a named approver distinct from every author should
+  // grant `report:approve` to a narrower tier.
+  //
+  // `report:export` sits on both tiers *and* on reader: a report that has been
+  // approved and published is meant to be taken away and used, and requiring
+  // reviewer rights to save a copy of an already-published document would make
+  // the approval gate meaningless while making the product annoying. The
+  // export path still redacts server-side against the reader's own scope.
   reviewer: [
     'record:read',
     'record:create',
@@ -174,6 +197,10 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'outcome:confirm',
     'outcome:close',
     'outcome:link_support',
+    'report:read',
+    'report:approve',
+    'report:publish',
+    'report:export',
   ],
   // Least privilege (Constitution, Authority and Access): organisation and
   // workspace creation are the privileged actions in this slice, so they are the
@@ -251,6 +278,13 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'outcome:confirm',
     'outcome:close',
     'outcome:link_support',
+    'report:read',
+    'report:create',
+    'report:update',
+    'report:submit',
+    'report:approve',
+    'report:publish',
+    'report:export',
   ],
 });
 

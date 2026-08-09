@@ -958,6 +958,95 @@ export const recordOutcomeSupportRequestSchema = z.discriminatedUnion('basis', [
 ]);
 export type RecordOutcomeSupportRequest = z.infer<typeof recordOutcomeSupportRequestSchema>;
 
+// ─── Session reporting and export (BUILD_ROADMAP.md Milestone 8) ─────────────
+
+export const REPORT_STATUSES = [
+  'draft',
+  'under_review',
+  'approved',
+  'published_internally',
+  'exported',
+] as const;
+export type ReportStatus = (typeof REPORT_STATUSES)[number];
+
+/**
+ * Which audience a report is written for. This selects which consent category
+ * every included record must satisfy, so an internal report and an external
+ * one are different documents even when their narrative is identical.
+ */
+export const REPORT_AUDIENCES = ['internal', 'external', 'public'] as const;
+export type ReportAudience = (typeof REPORT_AUDIENCES)[number];
+
+export const REPORT_SOURCE_TYPES = ['evidence', 'decision', 'commitment', 'action_item'] as const;
+export type ReportSourceType = (typeof REPORT_SOURCE_TYPES)[number];
+
+/** How evidence may be attributed in a report once redacted. Never a real name. */
+export const REPORT_ATTRIBUTION_LABELS = [
+  'named_participant',
+  'pseudonymous_participant',
+  'anonymous_participant',
+  'facilitator_observation',
+  'institutional_source',
+  'unattributed',
+] as const;
+export type ReportAttributionLabel = (typeof REPORT_ATTRIBUTION_LABELS)[number];
+
+/** Export formats. PDF is deliberately not here — see the Milestone 8 PR. */
+export const REPORT_EXPORT_FORMATS = ['html', 'markdown', 'json', 'csv'] as const;
+export type ReportExportFormat = (typeof REPORT_EXPORT_FORMATS)[number];
+
+export const createReportRequestSchema = z.object({
+  title: z.string().trim().min(1, 'A title is required').max(300),
+  purpose: z.string().trim().max(20000).optional(),
+  audience: z.enum(REPORT_AUDIENCES).optional(),
+  /**
+   * Draw in everything eligible in the session at creation. Default true: a
+   * report that starts empty invites an author to write a narrative first and
+   * attach sources afterwards, which is the wrong way round.
+   */
+  includeEligibleSources: z.boolean().optional(),
+});
+export type CreateReportRequest = z.infer<typeof createReportRequestSchema>;
+
+export const updateReportRequestSchema = z.object({
+  title: z.string().trim().min(1).max(300).optional(),
+  purpose: z.string().trim().max(20000).nullable().optional(),
+  audience: z.enum(REPORT_AUDIENCES).optional(),
+  facilitatorSynthesis: z.string().trim().max(20000).nullable().optional(),
+  unresolvedQuestions: z.string().trim().max(20000).nullable().optional(),
+  recommendations: z.string().trim().max(20000).nullable().optional(),
+  expectedVersion: z.number().int().positive(),
+});
+export type UpdateReportRequest = z.infer<typeof updateReportRequestSchema>;
+
+/**
+ * `request_changes` carries a required reason: "changes requested" with no
+ * statement of what changes is not review, it is delay. `revise` produces a
+ * new report at the next revision rather than editing the approved one.
+ */
+export const reportTransitionRequestSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('submit'), expectedVersion: z.number().int().positive() }),
+  z.object({
+    action: z.literal('request_changes'),
+    reason: z.string().trim().min(1, 'A reason is required').max(2000),
+    expectedVersion: z.number().int().positive(),
+  }),
+  z.object({ action: z.literal('approve'), expectedVersion: z.number().int().positive() }),
+  z.object({ action: z.literal('publish'), expectedVersion: z.number().int().positive() }),
+  z.object({
+    action: z.literal('revise'),
+    reason: z.string().trim().min(1, 'A revision reason is required').max(2000),
+    expectedVersion: z.number().int().positive(),
+  }),
+]);
+export type ReportTransitionRequest = z.infer<typeof reportTransitionRequestSchema>;
+
+export const includeReportSourceRequestSchema = z.object({
+  sourceType: z.enum(REPORT_SOURCE_TYPES),
+  sourceId: z.string().uuid('A valid record id is required'),
+});
+export type IncludeReportSourceRequest = z.infer<typeof includeReportSourceRequestSchema>;
+
 // ─── Responses ───────────────────────────────────────────────────────────────
 
 export interface ActorView {
@@ -1556,6 +1645,131 @@ export interface ActionItemDetail extends ActionItemSummary {
   permittedActions: ActionItemTransitionRequest['action'][];
   canEdit: boolean;
   supports: OutcomeSupportView[];
+}
+
+export interface ReportSummary {
+  id: string;
+  sessionId: string;
+  title: string;
+  audience: ReportAudience;
+  status: ReportStatus;
+  revision: number;
+  supersedesReportId: string | null;
+  sourceCount: number;
+  approvedAt: string | null;
+  publishedAt: string | null;
+  updatedAt: string;
+}
+
+/**
+ * A record the report draws on, as cited.
+ *
+ * `sourceVersion` is the version frozen at inclusion, not the record's
+ * current one. `drifted` says the record has moved since — not an error, but
+ * something a reader is entitled to be told rather than have silently
+ * papered over.
+ */
+export interface ReportSourceView {
+  id: string;
+  sourceType: ReportSourceType;
+  sourceId: string;
+  sourceVersion: number;
+  sourceStatus: string;
+  /** The record's title at read time, for display; absent if unreadable. */
+  sourceTitle?: string;
+  drifted: boolean;
+  includedBy: ActorView;
+  includedAt: string;
+}
+
+export interface ReportDetail extends ReportSummary {
+  organisationId: string;
+  workspaceId: string;
+  purpose: string | null;
+  facilitatorSynthesis: string | null;
+  unresolvedQuestions: string | null;
+  recommendations: string | null;
+  createdBy: ActorView;
+  submittedBy: ActorView | null;
+  submittedAt: string | null;
+  approvedBy: ActorView | null;
+  changesRequestedReason: string | null;
+  firstExportedAt: string | null;
+  createdAt: string;
+  /** Optimistic-concurrency counter — send back as `expectedVersion` on the next write. */
+  version: number;
+  /** Server-computed, so a client never reimplements the lifecycle state machine. */
+  permittedActions: ReportTransitionRequest['action'][];
+  canEdit: boolean;
+  canExport: boolean;
+  sources: ReportSourceView[];
+}
+
+/**
+ * Evidence as it appears in a rendered report, after server-side redaction.
+ *
+ * `content` is *structurally absent* when the participant did not agree to
+ * quotation — not an empty string, so a template cannot render a redaction as
+ * though it were silence. `attribution` is a label, never an identity: there
+ * is no field here that could carry a real name for a participant who did not
+ * agree to be named.
+ */
+export interface RenderedEvidence {
+  id: string;
+  title: string;
+  evidenceType: string;
+  attribution: ReportAttributionLabel;
+  quotable: boolean;
+  content?: string;
+  pseudonym?: string;
+}
+
+/** Who took part, by count. A report never lists participants — see the API. */
+export interface RenderedParticipantSummary {
+  total: number;
+  named: number;
+  pseudonymous: number;
+  anonymous: number;
+  withdrawn: number;
+  attendedInPerson: number;
+  attendedOnline: number;
+}
+
+export interface RenderedOutcome {
+  id: string;
+  title: string;
+  status: string;
+  detail: string;
+  /** Plain-language owner, for commitments and actions. Never a participant. */
+  owner?: string;
+  dueDate?: string;
+}
+
+/**
+ * A report composed for reading or export. Everything here has already passed
+ * through server-side redaction; the client renders it, it does not filter it.
+ */
+export interface RenderedReport {
+  report: ReportDetail;
+  session: {
+    title: string;
+    sessionType: string;
+    purpose: string | null;
+    scheduledStart: string | null;
+    location: string | null;
+  };
+  participants: RenderedParticipantSummary;
+  evidence: RenderedEvidence[];
+  decisions: RenderedOutcome[];
+  commitments: RenderedOutcome[];
+  actions: RenderedOutcome[];
+  /**
+   * Records the report cites that were excluded from this rendering by
+   * consent. Counted, never described — the count tells a reader the report
+   * is not the whole picture, while naming them would leak what was withheld.
+   */
+  redactedCount: number;
+  generatedAt: string;
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────────
