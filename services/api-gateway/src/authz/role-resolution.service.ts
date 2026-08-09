@@ -83,8 +83,22 @@ export class RoleResolutionService {
         continue;
       }
       const role = assignment.role as WitnessRole;
-      if (role === 'admin') continue; // Global resolution never grants the admin tier — see file header.
-      tiers.add(ROLE_TO_TIER[role]);
+      // Global resolution never grants the admin tier — see the file header,
+      // and `organisation:create`/`user:create` stay unreachable because of it.
+      //
+      // An `admin` assignment still counts as *reader* here, though. Dropping
+      // it entirely left anyone whose only role is an organisation
+      // administrator holding no global tier at all, which denied them
+      // `organisation:read`, `workspace:read` and `record:read` — the
+      // membership-filtered list endpoints, and every picker in the UI built
+      // on them. An organisation's administrator could not open the
+      // organisations page or choose an organisation when creating a
+      // workspace. Nothing was leaked by the denial and nothing is leaked by
+      // lifting it: those endpoints return only the caller's own memberships
+      // either way. This surfaced the first time the application was driven
+      // through a real signed-in session rather than the development header,
+      // which resolves a flat global tier and so never reached this branch.
+      tiers.add(role === 'admin' ? 'reader' : ROLE_TO_TIER[role]);
     }
 
     return [...tiers];

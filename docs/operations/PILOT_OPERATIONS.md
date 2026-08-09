@@ -1,0 +1,198 @@
+# Pilot Operations
+
+**Status:** Active
+**Owner:** Infrastructure Lead with Engineering
+
+The minimum needed to run a controlled internal pilot safely, and nothing more.
+This is not an observability platform; it is the set of procedures somebody has
+to be able to follow at 2am without reading the source.
+
+For the target-state, full-scale operator experience see
+[`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md). For a live incident see
+[`INCIDENT_RESPONSE.md`](INCIDENT_RESPONSE.md).
+
+---
+
+## What is deployed
+
+Five components, on one node:
+
+| Component | What it is | Exposed |
+|---|---|---|
+| `proxy` | Caddy — terminates TLS, obtains and renews certificates | 80, 443 |
+| `web` | Next.js standalone server | via proxy only |
+| `api` | NestJS API gateway | via proxy only |
+| `keycloak` | The identity provider (ADR-0007) | via proxy only |
+| `postgres` | The system of record (ADR-0004) | **not exposed at all** |
+
+The database publishes no port. It is reachable only from the compose network.
+Publishing 5432 "just for a moment" is how an internal database becomes an
+internet-facing one.
+
+## Environment variables
+
+Names only — every value comes from the operator's secret store.
+[`.env.example`](../../.env.example) is the full list with commentary; these are
+the ones a deployment cannot start without:
+
+`WITNESS_DEPLOYMENT_PROFILE`, `NODE_ENV`, `WITNESS_INSTANCE_NAME`,
+`WITNESS_DATA_RESIDENCY`, `DATABASE_URL`, `OIDC_ISSUER`, `KEYCLOAK_CLIENT_ID`,
+`JWT_AUDIENCE`, `WITNESS_WEB_ORIGIN`, `WITNESS_OIDC_REDIRECT_URI`,
+`NEXT_PUBLIC_WITNESS_API_URL`, `NEXT_PUBLIC_WITNESS_PROFILE`,
+`WITNESS_WEB_HOST`, `WITNESS_API_HOST`, `WITNESS_OIDC_HOST`,
+`OIDC_PUBLIC_URL`, `WITNESS_ACME_EMAIL`, `POSTGRES_PASSWORD`,
+`KEYCLOAK_ADMIN`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_DB_USER`,
+`KEYCLOAK_DB_PASSWORD`, `WITNESS_REALM_SEED_PASSWORD`.
+
+Outside the `development` profile the API **refuses to start** if the OIDC
+values are missing, or if `WITNESS_WEB_ORIGIN` / `WITNESS_OIDC_REDIRECT_URI` is
+absent, plaintext, or points at loopback. That is deliberate: both have a
+localhost default that is right for a developer and silently wrong for a
+deployment, and the resulting failure surfaces as something else — a CORS error,
+an "invalid redirect_uri" from Keycloak.
+
+## Deployment
+
+```bash
+docker compose -f deployments/cloud-managed/docker-compose.pilot.yml up -d --build
+docker compose -f deployments/cloud-managed/docker-compose.pilot.yml \
+  run --rm api pnpm --filter @witness/api exec prisma migrate deploy
+curl -fsS https://$WITNESS_API_HOST/ready | jq '.status, .components'
+```
+
+`prisma migrate deploy` applies committed migrations and nothing else. Never use
+`prisma db push` against a deployed database: it reshapes the schema to match the
+current source with no migration history and no review.
+
+Do **not** run `pnpm seed` against a deployed instance. It writes synthetic
+fixtures that read like real institutional decisions.
+
+## First run
+
+Deny-by-default goes all the way down: on a freshly migrated database nobody
+holds an `admin` role, so no HTTP request can create the first organisation.
+One command, once:
+
+```bash
+docker compose … run --rm \
+  -e WITNESS_BOOTSTRAP_ORGANISATION_NAME="Your Institution" \
+  -e WITNESS_BOOTSTRAP_ADMIN_EMAIL=… -e WITNESS_BOOTSTRAP_ADMIN_NAME="…" \
+  api pnpm bootstrap
+```
+
+It refuses to run once any organisation exists.
+
+## Onboarding a pilot user
+
+Two steps, in this order.
+
+1. Create the person in Keycloak (or federate your directory to it) with a
+   **verified** email address.
+2. Invite them into the organisation:
+
+```bash
+docker compose … run --rm \
+  -e WITNESS_INVITE_ORGANISATION="Your Institution" \
+  -e WITNESS_INVITE_EMAIL=… -e WITNESS_INVITE_NAME="…" \
+  -e WITNESS_INVITE_ROLE=contributor \
+  api pnpm invite
+```
+
+The Witness account stays inert until that person signs in through the identity
+provider with a verified email that matches. An invitation grants nothing to
+anyone who cannot already authenticate.
+
+Roles: `admin`, `facilitator`, `contributor`, `reviewer`, `participant`,
+`reader`. Adding someone to a *workspace* is done in the application, on the
+workspace page, by an administrator.
+
+## Backup
+
+```bash
+DATABASE_URL=… scripts/ops/backup.sh /var/backups/witness
+```
+
+Only PostgreSQL is backed up. Under ADR-0011 the graph and search projections
+are rebuildable from the event log; copying them costs storage and buys nothing.
+If the dump restores, Witness restores.
+
+Schedule it daily, keep it off the node it came from, and encrypt it at rest —
+it contains everything anyone said in a session.
+
+## Restore
+
+```bash
+DATABASE_URL=… scripts/ops/restore.sh /var/backups/witness/witness-….dump
+```
+
+The script verifies the checksum and then **refuses** to restore over a database
+that already holds Witness tables unless `WITNESS_RESTORE_CONFIRM` names that
+database exactly. Restoring over a live instance destroys institutional memory
+people consented to have kept; the guard against it should not be a habit of
+care.
+
+Afterwards, in this order: `prisma migrate deploy`, then `/ready`, then sign in
+and open one session. An untested backup is a hypothesis — run a restore drill
+into a scratch database quarterly.
+
+## Rollback
+
+Roll the application back, not the database. Migrations in this repository are
+additive within a release, so the previous image runs against the current schema:
+
+```bash
+docker compose … up -d --no-deps api web   # with the previous image tags
+```
+
+If a release contains a migration that the previous version genuinely cannot
+run against, the rollback is: stop the API, restore the pre-deployment backup,
+deploy the previous images. That is a data-loss window equal to the time since
+the backup, so take one immediately before any deployment that migrates.
+
+## Logs
+
+Outside the development profile the API writes one JSON object per line to
+stdout, carrying `timestamp`, `level`, `message`, `context`, `service`,
+`version`, `buildId` and `profile`. Read them with the platform's own log
+collection — `docker compose logs -f api` during the pilot.
+
+Refused requests are logged at `warn` with the principal, the action and the
+reason. Request bodies, session tokens and connection strings are never logged;
+the live security smoke test asserts this against the running instance.
+
+## Health
+
+- `GET /health` — liveness. Does no I/O, so a database blip cannot cause a
+  restart loop across every replica.
+- `GET /ready` — readiness. Checks PostgreSQL and the identity provider, and
+  names the capabilities this build does *not* implement.
+
+Neither exposes a secret. Alert on `/ready` reporting `down`, not on `/health`.
+
+## Incident basics
+
+1. **Is it up?** `curl -fsS https://$WITNESS_API_HOST/ready`. A `down`
+   PostgreSQL component with a healthy process means the database, not the app.
+2. **Is it authentication?** Sign-in failures with a healthy API usually mean
+   Keycloak, its database, or a redirect URI that no longer matches the client.
+   `/ready` reports the identity provider as a component for exactly this reason.
+3. **Is it a bad release?** Roll the application back first, diagnose second.
+4. **Is it data?** Stop writes before restoring. A restore during live use loses
+   whatever was written after the dump.
+
+Anything involving personal data, consent or a suspected disclosure follows
+[`INCIDENT_RESPONSE.md`](INCIDENT_RESPONSE.md), which is a governance procedure
+rather than a technical one.
+
+## Verification you can run against the deployment
+
+```bash
+node scripts/pilot/browser-walkthrough.mjs    # the whole workflow, in a browser
+node scripts/pilot/accessibility-audit.mjs    # axe plus a keyboard walk
+node scripts/pilot/security-smoke.mjs         # auth, authz, privacy, transport
+```
+
+Each needs `WITNESS_PILOT_WEB_URL`, `WITNESS_PILOT_API_URL`,
+`WITNESS_PILOT_USERNAME` / `WITNESS_PILOT_PASSWORD` and a Chromium path. They
+write to the environment they run against — point them at the pilot, never at
+an instance holding real deliberation you cannot afford to add test rows to.

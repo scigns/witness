@@ -17,7 +17,7 @@ import type { CurrentUserView } from '@witness/contracts';
 
 import { useAuth, type AuthStatus } from '@/lib/auth';
 import { useSession } from '@/lib/session';
-import type { ActingUser } from '@/lib/api';
+import { IS_DEVELOPMENT_BUILD, type ActingUser } from '@/lib/api';
 
 const NAV = [
   { href: '/', label: 'Dashboard' },
@@ -39,7 +39,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="min-h-dvh flex flex-col">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-3 focus:rounded focus:bg-[var(--color-accent)] focus:px-4 focus:py-2 focus:text-white"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-3 focus:rounded focus:bg-[var(--color-accent)] focus:px-4 focus:py-2 focus:text-[var(--color-accent-contrast)]"
       >
         Skip to main content
       </a>
@@ -48,8 +48,17 @@ export function Shell({ children }: { children: ReactNode }) {
         role="status"
         className="border-b border-[var(--color-line)] bg-[var(--color-accent-soft)] px-4 py-2 text-center text-sm"
       >
-        <strong>Developer Preview</strong> — not production software. Requests are{' '}
-        <strong>not authenticated</strong>. Content here is synthetic.
+        {IS_DEVELOPMENT_BUILD ? (
+          <>
+            <strong>Developer Preview</strong> — not production software. Requests are{' '}
+            <strong>not authenticated</strong>. Content here is synthetic.
+          </>
+        ) : (
+          <>
+            <strong>Internal pilot</strong> — requests are authenticated and every entry is
+            recorded. Treat what you enter here as real institutional memory.
+          </>
+        )}
       </div>
 
       <header className="border-b border-[var(--color-line)] bg-[var(--color-paper-raised)]">
@@ -58,7 +67,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
               <span
                 aria-hidden="true"
-                className="grid h-8 w-8 place-items-center rounded bg-[var(--color-accent)] text-sm font-bold text-white"
+                className="grid h-8 w-8 place-items-center rounded bg-[var(--color-accent)] text-sm font-bold text-[var(--color-accent-contrast)]"
               >
                 W
               </span>
@@ -99,7 +108,17 @@ export function Shell({ children }: { children: ReactNode }) {
           />
         </div>
 
-        <div className="border-t border-[var(--color-line)] bg-[var(--color-paper)]">
+        {/*
+          The "Acting as" switcher drives the unverified `X-Witness-Dev-User`
+          header, which only a development build ever sends. Rendering it on a
+          deployed instance would offer every pilot user a role selector that
+          silently does nothing — an invitation to believe they had changed
+          their permissions when they had not.
+        */}
+        <div
+          hidden={!IS_DEVELOPMENT_BUILD}
+          className="border-t border-[var(--color-line)] bg-[var(--color-paper)]"
+        >
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-2 text-sm">
             <label htmlFor="acting-role" className="text-[var(--color-ink-muted)]">
               Acting as

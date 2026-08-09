@@ -17,6 +17,13 @@
   --color-line: oklch(0.9 0.008 250);
   --color-accent: oklch(0.48 0.13 250);
   --color-accent-soft: oklch(0.95 0.03 250);
+  /*
+   * Text drawn ON the accent. It is a separate token because the accent
+   * inverts between schemes: dark mode's accent is a *light* blue, and white
+   * on it measures 2.2:1 — a WCAG AA failure on every primary button in the
+   * application. `text-white` was correct for exactly one of the two schemes.
+   */
+  --color-accent-contrast: oklch(1 0 0);
 }
 
 :root {
@@ -32,6 +39,7 @@
     --color-line: oklch(0.32 0.02 250);
     --color-accent: oklch(0.75 0.11 250);
     --color-accent-soft: oklch(0.27 0.04 250);
+    --color-accent-contrast: oklch(0.17 0.015 250);
   }
 }
 

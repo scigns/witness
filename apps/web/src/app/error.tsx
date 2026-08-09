@@ -21,7 +21,7 @@ export default function Error({ error, reset }: { error: Error; reset: () => voi
       <button
         type="button"
         onClick={reset}
-        className="rounded bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white"
+        className="rounded bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-[var(--color-accent-contrast)]"
       >
         Try again
       </button>

@@ -15,7 +15,9 @@
     "test:unit": "vitest run",
     "lint": "eslint src",
     "seed": "prisma generate && tsx prisma/seed.ts",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "bootstrap": "prisma generate && tsx prisma/bootstrap.ts",
+    "invite": "prisma generate && tsx prisma/invite.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",

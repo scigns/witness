@@ -12,24 +12,41 @@ import 'reflect-metadata';
 
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 
 import { loadConfigOrExit } from '@witness/config';
 
 import { AppModule } from './app.module.js';
 import { BUILD_INFO } from './build-info.js';
+import { StructuredLogger } from './observability/structured-logger.js';
 
 async function bootstrap(): Promise<void> {
   const config = loadConfigOrExit();
-  const logger = new Logger('Bootstrap');
 
-  const app = await NestFactory.create(AppModule, {
+  const levels =
+    config.logLevel === 'debug'
+      ? (['error', 'warn', 'log', 'debug'] as const)
+      : config.logLevel === 'info'
+        ? (['error', 'warn', 'log'] as const)
+        : ([config.logLevel] as const);
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // Deployed instances emit one JSON object per line, because that is what a
+    // log aggregator can query and what an operator can grep six weeks later.
+    // Development keeps Nest's coloured console output, which is easier to read
+    // while a human is watching it scroll.
     logger:
-      config.logLevel === 'debug'
-        ? ['error', 'warn', 'log', 'debug']
-        : config.logLevel === 'info'
-          ? ['error', 'warn', 'log']
-          : [config.logLevel],
+      config.profile === 'development'
+        ? [...levels]
+        : new StructuredLogger([...levels], {
+            service: 'witness-api',
+            version: BUILD_INFO.version,
+            buildId: BUILD_INFO.buildId,
+            profile: config.profile,
+          }),
   });
+
+  const logger = new Logger('Bootstrap');
 
   // No global ValidationPipe. Request bodies are validated with zod schemas from
   // @witness/contracts at each controller, so the same schema that defines the
@@ -50,8 +67,24 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: config.webOrigin,
     credentials: false,
-    allowedHeaders: ['Content-Type', 'X-Witness-Dev-User', 'Authorization'],
+    // The development impersonation header is allowed only where an adapter
+    // exists to read it. Outside development it is already inert — nothing is
+    // bound that would honour it — but advertising it in
+    // `Access-Control-Allow-Headers` on a deployed instance invites someone to
+    // spend an afternoon establishing that.
+    allowedHeaders:
+      config.profile === 'development'
+        ? ['Content-Type', 'X-Witness-Dev-User', 'Authorization']
+        : ['Content-Type', 'Authorization'],
   });
+
+  // Behind the pilot's TLS terminator, every connection Express sees arrives
+  // over loopback HTTP. Without this, `req.protocol` reports `http` and
+  // `req.ip` is the proxy — which turns audit and access logs into a record of
+  // the proxy talking to itself.
+  if (config.profile !== 'development') {
+    app.set('trust proxy', 'loopback');
+  }
 
   app.enableShutdownHooks();
 

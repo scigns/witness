@@ -1,0 +1,42 @@
+# TLS termination for the internal pilot.
+#
+# Three names, one certificate authority, no manual renewal: Caddy obtains and
+# renews certificates over ACME on its own. Each host forwards to exactly one
+# upstream on the compose network, so nothing but this container is reachable
+# from outside.
+#
+# The hostnames come from the environment (`docker-compose.pilot.yml`), because
+# the domain belongs to the operator, not to this repository.
+
+{
+	# Where expiry notices go. An unattended certificate is a fixed-date outage.
+	email {$WITNESS_ACME_EMAIL}
+}
+
+(hardening) {
+	header {
+		# Redundant with Caddy's own redirect, but it is the header that keeps
+		# a browser from ever trying plaintext again.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		# The server decides what it is; it should not also advertise its version.
+		-Server
+	}
+}
+
+{$WITNESS_WEB_HOST} {
+	import hardening
+	reverse_proxy web:3000
+}
+
+{$WITNESS_API_HOST} {
+	import hardening
+	reverse_proxy api:3001
+}
+
+{$WITNESS_OIDC_HOST} {
+	import hardening
+	reverse_proxy keycloak:8080
+}

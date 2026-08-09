@@ -375,7 +375,7 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
 type ButtonVariant = 'primary' | 'secondary' | 'danger';
 
 const BUTTON_VARIANT_STYLES: Record<ButtonVariant, string> = {
-  primary: 'bg-[var(--color-accent)] text-white hover:opacity-90',
+  primary: 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)] hover:opacity-90',
   secondary:
     'border border-[var(--color-line)] bg-[var(--color-paper)] hover:bg-[var(--color-accent-soft)]',
   danger: 'border border-red-700 text-red-700 hover:bg-red-50 dark:hover:bg-red-950',

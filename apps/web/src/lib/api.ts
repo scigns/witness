@@ -100,6 +100,42 @@ import type {
 
 const BASE_URL = process.env['NEXT_PUBLIC_WITNESS_API_URL'] ?? 'http://localhost:3001';
 
+/**
+ * Which deployment this bundle was built for, mirroring the API's
+ * `WITNESS_DEPLOYMENT_PROFILE`. Set from `NEXT_PUBLIC_WITNESS_PROFILE` through
+ * `next.config.mjs`'s `env` block, which inlines one value into both the server
+ * render and the client bundle — a deployed frontend is already built
+ * per-environment because the API URL has to be.
+ *
+ * It gates one thing: whether the unverified `X-Witness-Dev-User` header may
+ * be sent at all. Defaulting to `development` keeps `pnpm dev` working with no
+ * new setup; a deployment that forgets to set it gets a frontend that sends
+ * the header, which the API refuses and CORS refuses before that — a loud
+ * failure rather than a quiet one.
+ */
+const DEPLOYMENT_PROFILE = process.env.WITNESS_BUILD_PROFILE ?? 'development';
+
+export const IS_DEVELOPMENT_BUILD = DEPLOYMENT_PROFILE === 'development';
+
+/**
+ * Shared with `lib/auth.tsx`, which owns the lifecycle of this value. Read
+ * directly here because `request` is a plain function called from server-ish
+ * and client code alike, and threading a React context through every call site
+ * would change several hundred lines to move one header.
+ */
+const SESSION_TOKEN_STORAGE_KEY = 'witness.auth.sessionToken';
+
+function sessionToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
+  } catch {
+    // Storage can be unavailable (private mode, blocked cookies). No session
+    // is a valid answer; a thrown exception here is not.
+    return null;
+  }
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -119,7 +155,13 @@ export interface ActingUser {
 async function request<T>(path: string, user: ActingUser | null, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
-  if (user !== null) {
+  // A real signed-in session always wins. The dev header is a stand-in for one,
+  // and sending both would let the two disagree about who is acting.
+  const token = sessionToken();
+
+  if (token !== null) {
+    headers['Authorization'] = `Bearer ${token}`;
+  } else if (user !== null && IS_DEVELOPMENT_BUILD) {
     headers['X-Witness-Dev-User'] = `${user.name}|${user.role}`;
   }
 
@@ -1301,6 +1343,64 @@ export const api = {
     format: ReportExportFormat,
   ): string =>
     `${BASE_URL}${reportPath(workspaceId, sessionId)}/${encodeURIComponent(reportId)}/export?format=${format}`,
+
+  /**
+   * Fetch an export and hand back the bytes and the server's filename.
+   *
+   * This cannot be a plain `<a href>`. A navigation carries cookies, and the
+   * session travels as an `Authorization: Bearer` header — so a link to the
+   * export URL is an unauthenticated request, and a deployed instance answers
+   * it with 401. The export must be fetched with the session attached and
+   * then saved from memory.
+   *
+   * The filename comes from the response's `Content-Disposition` rather than
+   * being rebuilt here, so the name on disk is the one the server recorded.
+   */
+  downloadReportExport: async (
+    workspaceId: string,
+    sessionId: string,
+    reportId: string,
+    format: ReportExportFormat,
+    user: ActingUser | null,
+  ): Promise<{ blob: Blob; filename: string }> => {
+    const url = `${BASE_URL}${reportPath(workspaceId, sessionId)}/${encodeURIComponent(reportId)}/export?format=${format}`;
+    const headers: Record<string, string> = {};
+    const token = sessionToken();
+
+    if (token !== null) {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else if (user !== null && IS_DEVELOPMENT_BUILD) {
+      headers['X-Witness-Dev-User'] = `${user.name}|${user.role}`;
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(url, { headers, cache: 'no-store' });
+    } catch {
+      throw new ApiError(`Cannot reach the Witness API at ${BASE_URL}.`, 0, 'API_UNREACHABLE');
+    }
+
+    if (!response.ok) {
+      let code = 'EXPORT_FAILED';
+      let message = `The export failed (HTTP ${response.status}).`;
+      try {
+        const body = (await response.json()) as { error?: { code?: string; message?: string } };
+        code = body.error?.code ?? code;
+        message = body.error?.message ?? message;
+      } catch {
+        // Not JSON; keep the status-derived message.
+      }
+      throw new ApiError(message, response.status, code);
+    }
+
+    const disposition = response.headers.get('content-disposition') ?? '';
+    const match = /filename="([^"]+)"/.exec(disposition);
+
+    return {
+      blob: await response.blob(),
+      filename: match?.[1] ?? `report.${format}`,
+    };
+  },
 };
 
 /**

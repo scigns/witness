@@ -11,10 +11,13 @@
  * built from unredacted data would show the author a document that does not
  * exist, and the first time anyone saw the real one would be after it left.
  *
- * Exports are plain links rather than fetches. The browser navigates, the
- * server's `Content-Disposition` names the file, and the bytes never pass
- * through client-side JavaScript — which is also what keeps the export from
- * being rendered in this origin.
+ * Exports are fetched with the session attached and then saved from memory.
+ * A plain `<a href>` was the obvious design and is wrong: a navigation sends
+ * cookies, the session travels as an `Authorization: Bearer` header, so the
+ * link is an unauthenticated request and a deployed instance answers it with
+ * 401. The bytes therefore do pass through client-side JavaScript, but they
+ * are never rendered — the blob is handed straight to a download, and the
+ * server's `Content-Disposition` still names the file.
  */
 
 import Link from 'next/link';
@@ -24,6 +27,8 @@ import {
   REPORT_EXPORT_FORMATS,
   type RenderedReport,
   type ReportDetail,
+  type ReportExportFormat,
+  type ReportSourceType,
   type ReportTransitionRequest,
 } from '@witness/contracts';
 
@@ -62,9 +67,54 @@ export default function ReportDetailPage({
   const [recommendations, setRecommendations] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const [exporting, setExporting] = useState<ReportExportFormat | null>(null);
+
+  /**
+   * What this report may cite: the session's validated evidence and its
+   * authoritative outcomes. Loaded lazily, and only while the report is still
+   * editable — an approved report's citations are frozen.
+   */
+  const [citable, setCitable] = useState<{ type: ReportSourceType; id: string; label: string }[]>(
+    [],
+  );
+  const [citing, setCiting] = useState('');
+
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+
+  /**
+   * Take a copy: fetch with the session attached, then save from memory.
+   * See this file's header for why this cannot be a link.
+   */
+  const takeCopy = async (format: ReportExportFormat): Promise<void> => {
+    setExporting(format);
+    setError(null);
+    try {
+      const { blob, filename } = await api.downloadReportExport(
+        workspaceId,
+        sessionId,
+        reportId,
+        format,
+        user,
+      );
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      // Revoked on the next tick rather than immediately: Chromium starts the
+      // download asynchronously and a URL revoked in the same task can be gone
+      // before it is read.
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'The export failed.');
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
@@ -103,6 +153,55 @@ export default function ReportDetailPage({
       cancelledRef.current = true;
     };
   }, [ready, load]);
+
+  // What may be cited, loaded once. Kept out of `load` because a caller who
+  // cannot list evidence should still see the report; a failure here narrows
+  // the picker rather than breaking the page.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+
+    void (async () => {
+      const [evidence, decisions, commitments, actions] = await Promise.allSettled([
+        api.listEvidence(workspaceId, sessionId, user),
+        api.listDecisions(workspaceId, sessionId, user),
+        api.listCommitments(workspaceId, sessionId, user),
+        api.listActionItems(workspaceId, sessionId, user),
+      ]);
+      if (cancelled) return;
+
+      const options: { type: ReportSourceType; id: string; label: string }[] = [];
+      if (evidence.status === 'fulfilled') {
+        for (const item of evidence.value.evidence) {
+          // Only validated evidence is admissible; offering the rest would be
+          // an invitation to a refusal the picker could have prevented.
+          if (item.reviewStatus === 'validated' && !item.withdrawn) {
+            options.push({ type: 'evidence', id: item.id, label: `Evidence — ${item.title}` });
+          }
+        }
+      }
+      if (decisions.status === 'fulfilled') {
+        for (const item of decisions.value.decisions) {
+          options.push({ type: 'decision', id: item.id, label: `Decision — ${item.title}` });
+        }
+      }
+      if (commitments.status === 'fulfilled') {
+        for (const item of commitments.value.commitments) {
+          options.push({ type: 'commitment', id: item.id, label: `Commitment — ${item.title}` });
+        }
+      }
+      if (actions.status === 'fulfilled') {
+        for (const item of actions.value.actions) {
+          options.push({ type: 'action_item', id: item.id, label: `Action — ${item.title}` });
+        }
+      }
+      setCitable(options);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, workspaceId, sessionId, user]);
 
   const refresh = useCallback(async () => {
     try {
@@ -162,6 +261,29 @@ export default function ReportDetailPage({
       await refresh();
     } catch (caught) {
       setActionError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addSource = async () => {
+    const chosen = citable.find((candidate) => `${candidate.type}:${candidate.id}` === citing);
+    if (chosen === undefined) return;
+
+    setBusy(true);
+    setSaveError(null);
+    try {
+      await api.includeReportSource(
+        workspaceId,
+        sessionId,
+        reportId,
+        { sourceType: chosen.type, sourceId: chosen.id },
+        user,
+      );
+      setCiting('');
+      await refresh();
+    } catch (caught) {
+      setSaveError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
       setBusy(false);
     }
@@ -384,6 +506,47 @@ export default function ReportDetailPage({
             corrected since, it is flagged rather than silently swapped.
           </p>
         </div>
+        {detail.canEdit && (
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-64 flex-1">
+              <label htmlFor="citeSource" className="mb-1 block text-sm font-medium">
+                Cite a record
+              </label>
+              <select
+                id="citeSource"
+                value={citing}
+                onChange={(event) => setCiting(event.target.value)}
+                className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+              >
+                <option value="">Choose a record…</option>
+                {citable
+                  .filter(
+                    (candidate) =>
+                      !detail.sources.some(
+                        (source) =>
+                          source.sourceType === candidate.type && source.sourceId === candidate.id,
+                      ),
+                  )
+                  .map((candidate) => (
+                    <option
+                      key={`${candidate.type}:${candidate.id}`}
+                      value={`${candidate.type}:${candidate.id}`}
+                    >
+                      {candidate.label}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <Button
+              variant="primary"
+              disabled={busy || citing === ''}
+              onClick={() => void addSource()}
+            >
+              Cite
+            </Button>
+          </div>
+        )}
+
         {detail.sources.length === 0 ? (
           <p className="text-[var(--color-ink-muted)]">Nothing cited yet.</p>
         ) : (
@@ -473,13 +636,14 @@ export default function ReportDetailPage({
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {REPORT_EXPORT_FORMATS.map((format) => (
-                  <a
+                  <Button
                     key={format}
-                    href={api.reportExportUrl(workspaceId, sessionId, reportId, format)}
-                    className="rounded border border-[var(--color-line)] px-3 py-1.5 text-sm underline"
+                    variant="secondary"
+                    disabled={exporting !== null}
+                    onClick={() => void takeCopy(format)}
                   >
-                    {format.toUpperCase()}
-                  </a>
+                    {exporting === format ? `${format.toUpperCase()}…` : format.toUpperCase()}
+                  </Button>
                 ))}
               </div>
             </div>

@@ -33,7 +33,6 @@ import {
   type EvidenceDetail,
   type EvidenceLinkView,
   type ReviewAssignmentView,
-  type UserSummary,
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
@@ -55,6 +54,19 @@ const LINK_TYPE_LABELS: Record<(typeof EVIDENCE_LINK_TYPES)[number], string> = {
   follows_from: 'Follows from',
   related_to: 'Related to',
 };
+
+/** Who this page may offer as a reviewer: a member of the evidence's workspace. */
+interface ReviewerOption {
+  readonly id: string;
+  readonly displayName: string;
+}
+
+/**
+ * Membership states that still mean "part of this workspace". A suspended or
+ * removed member must not appear in the picker — assigning to them would
+ * create work nobody can do.
+ */
+const ELIGIBLE_REVIEWER_STATES = new Set(['invited', 'active']);
 
 export default function EvidenceDetailPage({
   params,
@@ -91,7 +103,7 @@ export default function EvidenceDetailPage({
 
   const [assignment, setAssignment] = useState<ReviewAssignmentView | null>(null);
   const [clarifications, setClarifications] = useState<ClarificationView[]>([]);
-  const [users, setUsers] = useState<UserSummary[]>([]);
+  const [users, setUsers] = useState<ReviewerOption[]>([]);
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
@@ -150,17 +162,31 @@ export default function EvidenceDetailPage({
       // Settled, not all: a caller who may read the assignment but not the
       // user list would otherwise lose the assignment too, and the card would
       // read "No reviewer assigned yet" for evidence that has one.
-      const [assignmentResult, clarificationsResult, usersResult] = await Promise.allSettled([
+      const [assignmentResult, clarificationsResult, membersResult] = await Promise.allSettled([
         api.getReviewAssignment(workspaceId, sessionId, evidenceId, user),
         api.listClarifications(workspaceId, sessionId, evidenceId, user),
-        api.listUsers(user),
+        // The workspace's members, not the whole user directory. A reviewer
+        // from outside the workspace could not read the evidence they were
+        // assigned, so offering one was never right — and `user:read` is an
+        // administrative action a facilitator does not hold, which left the
+        // picker empty for every real signed-in reviewer.
+        api.listWorkspaceMemberships(workspaceId, user),
       ]);
       if (cancelledRef.current) return;
       if (assignmentResult.status === 'fulfilled') setAssignment(assignmentResult.value.assignment);
       if (clarificationsResult.status === 'fulfilled') {
         setClarifications(clarificationsResult.value.clarifications);
       }
-      if (usersResult.status === 'fulfilled') setUsers(usersResult.value.users);
+      if (membersResult.status === 'fulfilled') {
+        setUsers(
+          membersResult.value.memberships
+            .filter((membership) => ELIGIBLE_REVIEWER_STATES.has(membership.state))
+            .map((membership) => ({
+              id: membership.userId,
+              displayName: membership.userDisplayName,
+            })),
+        );
+      }
     },
     [workspaceId, sessionId, evidenceId, user],
   );
