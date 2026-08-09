@@ -293,13 +293,22 @@ export function removeOutcomeSupport(support: OutcomeSupport, actor: Actor): Pen
 }
 
 /**
- * Whether a set of support records is enough to make an outcome
- * authoritative — at least one admissible basis. Called by each outcome
- * aggregate before it lets a proposal become confirmed or active, which is
- * what stops "confirmed with nothing behind it" from being representable.
+ * Whether a set of support records is enough to make a *specific* outcome
+ * authoritative — at least one admissible basis that actually belongs to it.
+ *
+ * The ownership check is not paranoia about the caller's query. It is what
+ * makes the guard mean what it says: a list of support records is just an
+ * array, and an aggregate that accepts any non-empty array would be satisfied
+ * by another outcome's evidence. The service loads support by outcome id, so
+ * this cannot happen through the API today — but "cannot happen today" is a
+ * property of a caller, and this is the function that has to hold regardless
+ * of who calls it.
  */
-export function hasAdmissibleSupport(supports: readonly OutcomeSupport[]): boolean {
-  return supports.length > 0;
+export function hasAdmissibleSupport(
+  supports: readonly OutcomeSupport[],
+  outcomeId: string,
+): boolean {
+  return supports.some((support) => support.outcomeId === outcomeId);
 }
 
 /**
@@ -307,8 +316,12 @@ export function hasAdmissibleSupport(supports: readonly OutcomeSupport[]): boole
  * `hasAdmissibleSupport` so the failure carries the outcome's own vocabulary
  * rather than a generic false.
  */
-export function assertSupported(supports: readonly OutcomeSupport[], what: string): void {
-  if (!hasAdmissibleSupport(supports)) {
+export function assertSupported(
+  supports: readonly OutcomeSupport[],
+  outcomeId: string,
+  what: string,
+): void {
+  if (!hasAdmissibleSupport(supports, outcomeId)) {
     throw new InvariantViolation(
       `A ${what} must rest on validated evidence or a stated institutional synthesis before it can be made authoritative.`,
       'OUTCOME_NOT_SUPPORTED',

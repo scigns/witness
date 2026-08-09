@@ -286,9 +286,9 @@ Pilot-blocking gate
 A facilitator can prepare a real session without an external setup spreadsheet — PARTIALLY READY.
 Session creation and lifecycle management (Milestone 2), participant management (Milestone 3),
 consent management (Milestone 4), structured evidence capture (Milestone 5, merged as PR #29) and
-evidence review and validation (Milestone 6, PR not yet merged) are all now implemented. This gate
-is not fully met until the Milestone 6 PR merges and the flow is walked through end to end against
-a live Postgres and browser, which this sandbox does not have.
+evidence review and validation (Milestone 6, merged as PR #35) are all now implemented. This gate
+is not fully met until the flow is walked through end to end against a live Postgres and browser,
+which this sandbox does not have.
 
 C.1 Participant Privacy (Milestone 3)
 
@@ -554,7 +554,8 @@ return a confirmed or active aggregate, so "confirmed with nothing behind it" is
 Exactly two bases are admissible: validated evidence, or an explicitly recorded institutional
 synthesis whose rationale is mandatory.
 
-Only validated evidence can carry an outcome — READY (Outcomes PR, not yet merged).
+Validated evidence or a recorded institutional synthesis can support an authoritative outcome —
+READY (Outcomes PR, not yet merged). Nothing else can.
 `assertEvidenceSupportable` (`packages/domain/src/outcome-support.ts`) refuses evidence that is
 `draft`, `submitted`, `under_review`, `needs_clarification`, `rejected` or `withdrawn` by name
 rather than by a catch-all, refuses evidence whose verification is `disputed`, and refuses evidence

@@ -433,20 +433,15 @@ export class OutcomesController {
     @Req() request: RequestWithPrincipal,
   ): Promise<void> {
     const resolved = toOutcomeType(outcomeType);
-    const { scope, isAuthoritative } = await this.outcomes.resolveOutcomeForSupport(
+    // Scoping only. Whether the outcome is authoritative is re-read inside
+    // the removal's own transaction — see `OutcomeSupportService.remove`.
+    const { scope } = await this.outcomes.resolveOutcomeForSupport(
       workspaceId,
       sessionId,
       resolved,
       outcomeId,
     );
-    await this.support.remove(
-      scope,
-      resolved,
-      outcomeId,
-      supportId,
-      isAuthoritative,
-      request.principal!,
-    );
+    await this.support.remove(scope, resolved, outcomeId, supportId, request.principal!);
   }
 
   /**

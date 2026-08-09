@@ -615,38 +615,34 @@ export class OutcomesService {
   // ─── Support ──────────────────────────────────────────────────────────────
 
   /**
-   * Resolve an outcome for the support endpoints, returning the scope the
-   * support record inherits and whether the outcome is already authoritative
-   * (which decides whether its last basis may be removed).
+   * Resolve an outcome for the support endpoints, confirming it exists in this
+   * workspace and session and returning the scope its support records inherit.
+   *
+   * Scoping only. Whether the outcome is already authoritative — which decides
+   * whether its last basis may be detached — is deliberately *not* returned
+   * here: `OutcomeSupportService.remove` re-reads it inside its own
+   * transaction, because a status read out here would be stale by the time the
+   * delete lands.
    */
   async resolveOutcomeForSupport(
     workspaceId: string,
     sessionId: string,
     outcomeType: OutcomeType,
     outcomeId: string,
-  ): Promise<{
-    scope: { organisationId: string; workspaceId: string; sessionId: string };
-    isAuthoritative: boolean;
-  }> {
+  ): Promise<{ scope: { organisationId: string; workspaceId: string; sessionId: string } }> {
     const session = await this.requireSessionRow(workspaceId, sessionId);
     const scope = { organisationId: session.organisationId, workspaceId, sessionId };
 
     switch (outcomeType) {
-      case 'decision': {
-        const row = await this.requireDecisionRow(workspaceId, sessionId, outcomeId);
-        return { scope, isAuthoritative: row.status === 'confirmed' };
-      }
-      case 'commitment': {
-        const row = await this.requireCommitmentRow(workspaceId, sessionId, outcomeId);
-        return { scope, isAuthoritative: row.status === 'active' };
-      }
-      case 'action_item': {
+      case 'decision':
+        await this.requireDecisionRow(workspaceId, sessionId, outcomeId);
+        return { scope };
+      case 'commitment':
+        await this.requireCommitmentRow(workspaceId, sessionId, outcomeId);
+        return { scope };
+      case 'action_item':
         await this.requireActionItemRow(workspaceId, sessionId, outcomeId);
-        // An action carries no authority of its own — see
-        // `packages/domain/src/action-item.ts` — so nothing rests on its
-        // support and any of it may be detached.
-        return { scope, isAuthoritative: false };
-      }
+        return { scope };
     }
   }
 

@@ -906,23 +906,15 @@ describe('OutcomeSupportService — what an outcome may rest on', () => {
     );
 
     const [support] = await fixture.support.listViews('decision', decision.id);
-    const { scope, isAuthoritative } = await fixture.outcomes.resolveOutcomeForSupport(
+    const { scope } = await fixture.outcomes.resolveOutcomeForSupport(
       WORKSPACE_1,
       SESSION_1,
       'decision',
       decision.id,
     );
-    expect(isAuthoritative).toBe(true);
 
     await expect(
-      fixture.support.remove(
-        scope,
-        'decision',
-        decision.id,
-        support!.id,
-        isAuthoritative,
-        REVIEWER,
-      ),
+      fixture.support.remove(scope, 'decision', decision.id, support!.id, REVIEWER),
     ).rejects.toBeInstanceOf(ConflictException);
 
     expect(fixture.supports).toHaveLength(1);
@@ -933,22 +925,14 @@ describe('OutcomeSupportService — what an outcome may rest on', () => {
     const { decision } = await supportedDecision(fixture);
 
     const [support] = await fixture.support.listViews('decision', decision.id);
-    const { scope, isAuthoritative } = await fixture.outcomes.resolveOutcomeForSupport(
+    const { scope } = await fixture.outcomes.resolveOutcomeForSupport(
       WORKSPACE_1,
       SESSION_1,
       'decision',
       decision.id,
     );
-    expect(isAuthoritative).toBe(false);
 
-    await fixture.support.remove(
-      scope,
-      'decision',
-      decision.id,
-      support!.id,
-      isAuthoritative,
-      FACILITATOR,
-    );
+    await fixture.support.remove(scope, 'decision', decision.id, support!.id, FACILITATOR);
 
     expect(fixture.supports).toHaveLength(0);
   });
@@ -972,8 +956,50 @@ describe('OutcomeSupportService — what an outcome may rest on', () => {
     );
 
     await expect(
-      fixture.support.remove(scope, 'decision', other.id, support!.id, false, FACILITATOR),
+      fixture.support.remove(scope, 'decision', other.id, support!.id, FACILITATOR),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('serialises concurrent removals so a confirmed decision cannot lose every basis', async () => {
+    const fixture = services();
+    const { decision } = await supportedDecision(fixture);
+
+    // A second basis, so each removal on its own is legitimate.
+    const { scope } = await fixture.outcomes.resolveOutcomeForSupport(
+      WORKSPACE_1,
+      SESSION_1,
+      'decision',
+      decision.id,
+    );
+    await fixture.support.record(
+      scope,
+      'decision',
+      decision.id,
+      { basis: 'institutional_synthesis', rationale: 'Corroborated by the ward survey.' },
+      REVIEWER,
+    );
+    await fixture.outcomes.transitionDecision(
+      WORKSPACE_1,
+      SESSION_1,
+      decision.id,
+      { action: 'confirm', expectedVersion: decision.version },
+      REVIEWER,
+    );
+
+    const supports = await fixture.support.listViews('decision', decision.id);
+    expect(supports).toHaveLength(2);
+
+    // Both removals see two bases and would each pass a check made outside the
+    // transaction. The version claim is what stops the second.
+    const results = await Promise.allSettled(
+      supports.map((support) =>
+        fixture.support.remove(scope, 'decision', decision.id, support.id, REVIEWER),
+      ),
+    );
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(fixture.supports).toHaveLength(1);
   });
 
   it('refuses to confirm when the last basis was removed after it was loaded', async () => {
