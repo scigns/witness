@@ -353,12 +353,19 @@ export default function OutcomeDetailPage({
 
   /**
    * The server refuses to detach the last basis from an outcome that is
-   * already authoritative. The client can tell without another round trip: an
-   * outcome that can no longer be confirmed or activated already has been, and
-   * one basis is all that is left.
+   * already authoritative — and "authoritative" means exactly a confirmed
+   * decision or an active commitment.
+   *
+   * Reading it off `permittedActions` instead would be wrong in several
+   * states: an action never offers `confirm` or `activate`, and neither does a
+   * superseded decision, a withdrawn commitment, or anything at all in an
+   * archived session. All of those would read as authoritative and have their
+   * last basis pinned in the UI while the server accepted its removal.
    */
-  const permitted: readonly string[] = detail.permittedActions;
-  const isAuthoritative = !permitted.includes('confirm') && !permitted.includes('activate');
+  const outcomeStatus: string = detail.status;
+  const isAuthoritative =
+    ('statement' in detail && outcomeStatus === 'confirmed') ||
+    ('fulfilmentNote' in detail && outcomeStatus === 'active');
   const lastBasisIsLoadBearing = isAuthoritative && detail.supports.length === 1;
 
   const isDecision = 'statement' in detail;

@@ -240,7 +240,7 @@ export class OutcomeSupportService {
     const now = new Date();
 
     await this.prisma.$transaction(async (tx) => {
-      const isAuthoritative = await claimOutcome(tx, outcomeType, outcomeId);
+      const isAuthoritative = await claimOutcome(tx, outcomeType, outcomeId, now);
 
       const row = await tx.outcomeSupport.findUnique({ where: { id: supportId } });
 
@@ -324,6 +324,10 @@ async function requireSupportableEvidence(
  * Claim the outcome for the duration of this transaction and report whether it
  * is already authoritative, by bumping its optimistic-concurrency version.
  *
+ * The bump carries `updatedAt` with it. A version that moves while the
+ * timestamp stands still leaves the row disagreeing with itself, and any
+ * reader using `updatedAt` to notice change would miss the removal entirely.
+ *
  * A version bump is the honest record of what happened — the outcome's set of
  * bases changed — and it is also the serialisation point: two concurrent
  * removals contend on the same conditional update, so the second is rejected
@@ -337,6 +341,7 @@ async function claimOutcome(
   tx: PrismaTransaction,
   outcomeType: OutcomeType,
   outcomeId: string,
+  at: Date,
 ): Promise<boolean> {
   const claim = async (
     current: { status: string; version: number } | null,
@@ -376,7 +381,7 @@ async function claimOutcome(
         (version) =>
           tx.decision.updateMany({
             where: { id: outcomeId, version },
-            data: { version: version + 1 },
+            data: { version: version + 1, updatedAt: at },
           }),
         'confirmed',
       );
@@ -389,7 +394,7 @@ async function claimOutcome(
         (version) =>
           tx.commitment.updateMany({
             where: { id: outcomeId, version },
-            data: { version: version + 1 },
+            data: { version: version + 1, updatedAt: at },
           }),
         'active',
       );
@@ -402,7 +407,7 @@ async function claimOutcome(
         (version) =>
           tx.actionItem.updateMany({
             where: { id: outcomeId, version },
-            data: { version: version + 1 },
+            data: { version: version + 1, updatedAt: at },
           }),
         null,
       );
