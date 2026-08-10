@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { api, authApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -17,13 +18,17 @@ import { Card } from '@/components/ui';
 
 export default function SignInPage() {
   const { status, currentUser } = useAuth();
+  const router = useRouter();
   const [developmentProfile, setDevelopmentProfile] = useState(false);
 
   useEffect(() => {
     if (status === 'authenticated' && currentUser !== null) {
-      window.location.href = '/';
+      // The router, not `window.location` — it applies
+      // NEXT_PUBLIC_WITNESS_BASE_PATH; a raw href would land at the origin's
+      // true root, which under a path deployment is a different site.
+      router.replace('/');
     }
-  }, [status, currentUser]);
+  }, [status, currentUser, router]);
 
   useEffect(() => {
     // Best-effort — a failed health check here just means the notice below

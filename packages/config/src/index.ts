@@ -53,6 +53,12 @@ const schema = z.object({
   // Explicit override for deployments where the browser reaches the web app at
   // something other than localhost. Left empty, it is derived from the web port.
   WITNESS_WEB_ORIGIN: z.string().optional().default(''),
+  // Where the web application actually lives, when that is not the root of its
+  // origin. Witness is served at `/witness` on a domain whose `/` belongs to
+  // something else, and the API has to send a signed-in browser back to the
+  // application rather than to that something else. Empty means "the root",
+  // which is what a dedicated hostname gives you.
+  WITNESS_WEB_BASE_URL: z.string().optional().default(''),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
@@ -92,6 +98,17 @@ export interface WitnessConfig {
    * that was actually changed.
    */
   readonly webOrigin: string;
+  /**
+   * The web application's base URL, always with a trailing slash so that
+   * `new URL('auth/callback', webBaseUrl)` resolves *under* it. Without the
+   * slash, `new URL` replaces the last path segment and the callback lands on
+   * whatever else is served at that origin.
+   *
+   * Same origin as `webOrigin`, enforced at load: these are the only redirect
+   * targets `AuthenticationController` produces, and that file's promise that
+   * it cannot be used as an open redirect rests on it.
+   */
+  readonly webBaseUrl: string;
   readonly logLevel: 'debug' | 'info' | 'warn' | 'error';
   readonly databaseUrl: string;
   /** True only when the profile permits egress AND a provider is configured. */
@@ -289,6 +306,36 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
     );
   }
 
+  const webOrigin =
+    value.WITNESS_WEB_ORIGIN.trim() !== ''
+      ? value.WITNESS_WEB_ORIGIN.trim()
+      : `http://localhost:${value.WITNESS_WEB_PORT}`;
+
+  const webBaseUrl = (() => {
+    const raw = value.WITNESS_WEB_BASE_URL.trim();
+    if (raw === '') return `${webOrigin.replace(/\/$/, '')}/`;
+
+    let parsed: URL;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      problems.push(`WITNESS_WEB_BASE_URL is not a valid absolute URL: ${raw}`);
+      return `${webOrigin.replace(/\/$/, '')}/`;
+    }
+
+    // A base URL on a different origin would turn the OIDC callback into an
+    // open redirect carrying a live session token in its fragment.
+    if (parsed.origin !== new URL(webOrigin).origin) {
+      problems.push(
+        `WITNESS_WEB_BASE_URL (${parsed.origin}) is on a different origin from ` +
+          `WITNESS_WEB_ORIGIN (${webOrigin}). The callback redirect must stay on the ` +
+          'origin the CORS policy admits.',
+      );
+    }
+
+    return parsed.pathname.endsWith('/') ? parsed.toString() : `${parsed.toString()}/`;
+  })();
+
   if (problems.length > 0) {
     throw new ConfigurationError(
       'Configuration violates the deployment profile contract.',
@@ -302,10 +349,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
     instanceName: value.WITNESS_INSTANCE_NAME,
     dataResidency: value.WITNESS_DATA_RESIDENCY,
     apiPort: value.WITNESS_API_PORT,
-    webOrigin:
-      value.WITNESS_WEB_ORIGIN.trim() !== ''
-        ? value.WITNESS_WEB_ORIGIN.trim()
-        : `http://localhost:${value.WITNESS_WEB_PORT}`,
+    webOrigin,
+    webBaseUrl,
     logLevel: value.LOG_LEVEL,
     databaseUrl: value.DATABASE_URL,
     externalInferenceEnabled:

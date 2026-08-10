@@ -11,6 +11,13 @@
 
 FROM node:22-bookworm-slim AS build
 
+# Without this, `prisma generate` can't detect the build stage's real OpenSSL
+# version, silently assumes 1.1.x, and generates a query engine the runtime
+# stage's actual 3.0.x can't load — a startup crash, not a build failure.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
 ENV PNPM_HOME=/pnpm
 ENV PATH="${PNPM_HOME}:${PATH}"
 RUN corepack enable
@@ -22,7 +29,9 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.js
 COPY packages/config/package.json packages/config/
 COPY packages/contracts/package.json packages/contracts/
 COPY packages/domain/package.json packages/domain/
-COPY packages/policy/package.json packages/policy/
+# packages/policy is Casbin config (model.conf, policy.csv), not a pnpm
+# workspace package — it has no package.json. It still reaches the image via
+# the full `COPY packages packages` below.
 COPY services/api-gateway/package.json services/api-gateway/
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
@@ -52,11 +61,14 @@ RUN corepack enable
 
 WORKDIR /repo
 
-COPY --from=build /repo/node_modules ./node_modules
-COPY --from=build /repo/package.json ./package.json
-COPY --from=build /repo/pnpm-workspace.yaml ./pnpm-workspace.yaml
-COPY --from=build /repo/packages ./packages
-COPY --from=build /repo/services/api-gateway ./services/api-gateway
+# --chown so `node` — not root — owns everything below: `prisma migrate deploy`
+# and the bootstrap script both run `prisma generate` again via `docker compose
+# run`, which needs to rewrite the generated client in place.
+COPY --from=build --chown=node:node /repo/node_modules ./node_modules
+COPY --from=build --chown=node:node /repo/package.json ./package.json
+COPY --from=build --chown=node:node /repo/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=build --chown=node:node /repo/packages ./packages
+COPY --from=build --chown=node:node /repo/services/api-gateway ./services/api-gateway
 
 # Never root. A compromised process should not be able to rewrite its own image.
 USER node

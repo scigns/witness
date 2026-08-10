@@ -1,0 +1,31 @@
+# The `/witness` path route.
+#
+# Deployed with `wrangler deploy` from this directory, against the zone that
+# already serves the Pacific Digital Consultancy site. It adds one route and
+# changes nothing else — no DNS record, no existing route, no Pages project.
+#
+# The route pattern is deliberately two entries rather than one wildcard:
+# `/witness` (the bare entry point, no trailing slash) and `/witness/*`
+# (everything under it, including Next's `/witness/_next/…` assets). A single
+# `/witness*` would also match `/witnesses-of-something`, which is not ours.
+
+name = "witness-path-route"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# The tunnel-backed hostname this route forwards to. Public, but only useful
+# to someone who already knows it — and closable entirely with the WAF rule
+# described in src/index.js.
+[vars]
+WITNESS_ORIGIN_HOST = "witness-web.pacificdigitalconsultancy.org"
+
+[[routes]]
+pattern = "pacificdigitalconsultancy.org/witness"
+zone_name = "pacificdigitalconsultancy.org"
+
+[[routes]]
+pattern = "pacificdigitalconsultancy.org/witness/*"
+zone_name = "pacificdigitalconsultancy.org"
+
+# Optional shared secret, set out of band and never committed:
+#   wrangler secret put WITNESS_ORIGIN_SECRET
