@@ -7,12 +7,14 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/lib/auth';
 import { ErrorNotice } from '@/components/ui';
 
 export default function AuthCallbackPage() {
   const { setSessionToken } = useAuth();
+  const router = useRouter();
   const [missingToken, setMissingToken] = useState(false);
 
   useEffect(() => {
@@ -25,9 +27,12 @@ export default function AuthCallbackPage() {
 
     setSessionToken(decodeURIComponent(match[1]));
     // Replace, not push — a back-navigation must not return to a URL that
-    // once carried a session token in its fragment.
-    window.location.replace('/');
-  }, [setSessionToken]);
+    // once carried a session token in its fragment. The router — not
+    // `window.location` — because it applies NEXT_PUBLIC_WITNESS_BASE_PATH;
+    // a raw `window.location.replace('/')` lands at the origin's true root,
+    // which under a path deployment is a different site, not this app.
+    router.replace('/');
+  }, [router, setSessionToken]);
 
   return (
     <div className="mx-auto max-w-md">

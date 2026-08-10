@@ -21,6 +21,7 @@
  */
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { use, useCallback, useEffect, useState, type FormEvent } from 'react';
 
 import {
@@ -54,6 +55,7 @@ export default function ReportDetailPage({
 }) {
   const { id: workspaceId, sessionId, reportId } = use(params);
   const { user, ready } = useSession();
+  const router = useRouter();
 
   const [detail, setDetail] = useState<ReportDetail | null>(null);
   const [rendered, setRendered] = useState<RenderedReport | null>(null);
@@ -255,7 +257,7 @@ export default function ReportDetailPage({
 
       // A revision is a *different* report, so stay useful and go to it.
       if (next.id !== reportId) {
-        window.location.href = `/workspaces/${workspaceId}/sessions/${sessionId}/reports/${next.id}`;
+        router.push(`/workspaces/${workspaceId}/sessions/${sessionId}/reports/${next.id}`);
         return;
       }
       await refresh();
