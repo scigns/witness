@@ -1,0 +1,18 @@
+# Every Dockerfile in this repo installs dependencies fresh inside the build
+# stage. A local node_modules on the host is a different install — a
+# different lockfile resolution, a different platform, a different point in
+# time — and every `COPY <dir> <dir>` step in a Dockerfile blindly includes it
+# if it exists, silently shadowing the correctly-installed one underneath.
+# The failure this produces (a module resolves to a version that isn't in the
+# image) has no stack trace pointing back here, so it stays ignored.
+node_modules/
+.next/
+.turbo/
+.pnpm-store/
+dist/
+*.tsbuildinfo
+
+.git/
+.env
+.env.*
+!.env.example
