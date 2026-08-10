@@ -45,6 +45,7 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
   const [organisation, setOrganisation] = useState<OrganisationSummary | null>(null);
   const [memberships, setMemberships] = useState<OrganisationMembershipView[]>([]);
   const [users, setUsers] = useState<UserSummary[]>([]);
+  const [usersUnavailable, setUsersUnavailable] = useState(false);
   const [roles, setRoles] = useState<RoleDefinition[]>([]);
   const [roleAssignments, setRoleAssignments] = useState<Record<string, RoleAssignmentView>>({});
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -55,19 +56,34 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
       try {
-        const [organisationsResult, membershipsResult, usersResult, rolesResult] =
-          await Promise.all([
-            api.listOrganisations(user),
-            api.listOrganisationMemberships(id, user),
-            api.listUsers(user),
-            api.listRoles(user),
-          ]);
+        // `listUsers` reads the platform-wide user directory, which today's
+        // domain model has no role for anyone to hold (see
+        // `RoleResolutionService.globalGrantTiers` and `prisma/invite.ts`) —
+        // an organisation admin gets `FORBIDDEN` here even though everything
+        // else on this page is properly in their scope. Best-effort, not
+        // `Promise.all`'d with the rest: a directory nobody can reach yet
+        // must not take the whole page down with it.
+        const [organisationsResult, membershipsResult, rolesResult] = await Promise.all([
+          api.listOrganisations(user),
+          api.listOrganisationMemberships(id, user),
+          api.listRoles(user),
+        ]);
         if (cancelledRef.current) return;
 
         setOrganisation(organisationsResult.organisations.find((o) => o.id === id) ?? null);
         setMemberships(membershipsResult.memberships);
-        setUsers(usersResult.users);
         setRoles(rolesResult.roles);
+
+        try {
+          const usersResult = await api.listUsers(user);
+          if (cancelledRef.current) return;
+          setUsers(usersResult.users);
+          setUsersUnavailable(false);
+        } catch {
+          if (cancelledRef.current) return;
+          setUsers([]);
+          setUsersUnavailable(true);
+        }
 
         const assignments = await Promise.all(
           membershipsResult.memberships.map((membership) =>
@@ -185,7 +201,15 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
           Add a user to this organisation
         </h2>
         <Card className="space-y-3">
-          {eligibleUsers.length === 0 ? (
+          {usersUnavailable ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              You can&apos;t browse the full user directory from here — that needs a
+              platform-administrator role nobody holds yet, by design (see{' '}
+              <code>prisma/invite.ts</code>). Ask an operator to run{' '}
+              <code>pnpm invite</code> to register a new person against this organisation; once
+              they exist, assign or change their role in the table below.
+            </p>
+          ) : eligibleUsers.length === 0 ? (
             <p className="text-sm text-[var(--color-ink-muted)]">
               Every registered user is already a member, or none exist yet.{' '}
               <Link href="/users/new" className="underline">
