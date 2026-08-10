@@ -205,9 +205,9 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
             <p className="text-sm text-[var(--color-ink-muted)]">
               You can&apos;t browse the full user directory from here — that needs a
               platform-administrator role nobody holds yet, by design (see{' '}
-              <code>prisma/invite.ts</code>). Ask an operator to run{' '}
-              <code>pnpm invite</code> to register a new person against this organisation; once
-              they exist, assign or change their role in the table below.
+              <code>prisma/invite.ts</code>). Ask an operator to run <code>pnpm invite</code> to
+              register a new person against this organisation; once they exist, assign or change
+              their role in the table below.
             </p>
           ) : eligibleUsers.length === 0 ? (
             <p className="text-sm text-[var(--color-ink-muted)]">
