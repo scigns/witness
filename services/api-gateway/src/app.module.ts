@@ -34,6 +34,8 @@ import { EvidenceReviewService } from './evidence/evidence-review.service.js';
 import { EvidenceService } from './evidence/evidence.service.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
+import { OrganisationInvitationsController } from './organisation-invitations/organisation-invitations.controller.js';
+import { OrganisationInvitationsService } from './organisation-invitations/organisation-invitations.service.js';
 import { OrganisationMembershipsController } from './organisation-memberships/organisation-memberships.controller.js';
 import { OrganisationMembershipsService } from './organisation-memberships/organisation-memberships.service.js';
 import { OrganisationRoleAssignmentsController } from './organisation-role-assignments/organisation-role-assignments.controller.js';
@@ -73,6 +75,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     OrganisationsController,
     WorkspacesController,
     UsersController,
+    OrganisationInvitationsController,
     OrganisationMembershipsController,
     WorkspaceMembershipsController,
     RolesController,
@@ -96,6 +99,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     OrganisationsService,
     WorkspacesService,
     UsersService,
+    OrganisationInvitationsService,
     OrganisationMembershipsService,
     WorkspaceMembershipsService,
     OrganisationRoleAssignmentsService,

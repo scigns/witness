@@ -41,7 +41,9 @@ import type {
   EvidenceSummary,
   EvidenceTransitionRequest,
   HealthResponse,
+  InviteOrganisationUserRequest,
   MembershipAction,
+  OrganisationInvitationView,
   OrganisationMembershipView,
   OrganisationSummary,
   ParticipantConsentRecordDetail,
@@ -268,6 +270,16 @@ export const api = {
 
   createUser: (body: CreateUserRequest, user: ActingUser): Promise<UserSummary> =>
     request<UserSummary>('/api/v1/users', user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  inviteOrganisationUser: (
+    organisationId: string,
+    body: InviteOrganisationUserRequest,
+    user: ActingUser,
+  ): Promise<OrganisationInvitationView> =>
+    request<OrganisationInvitationView>(`/api/v1/organisations/${organisationId}/users`, user, {
       method: 'POST',
       body: JSON.stringify(body),
     }),

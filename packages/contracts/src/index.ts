@@ -90,6 +90,27 @@ export const addMembershipRequestSchema = z.object({
 export type AddMembershipRequest = z.infer<typeof addMembershipRequestSchema>;
 
 /**
+ * Onboard a brand-new person into one organisation in a single call: account,
+ * membership and role assignment together. This is the organisation-scoped
+ * counterpart to `createUserRequestSchema` — that request has no
+ * organisation to scope to and so only ever reaches the `admin` tier through
+ * the (deliberately unreachable) global grant resolution; this one is
+ * authorised against the organisation itself, which an organisation
+ * administrator does hold.
+ */
+export const inviteOrganisationUserRequestSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'An email address is required')
+    .max(320)
+    .email('A valid email address is required'),
+  displayName: z.string().trim().min(1, 'A display name is required').max(200),
+  role: z.enum(WITNESS_ROLES, { message: 'A recognised Witness role is required' }),
+});
+export type InviteOrganisationUserRequest = z.infer<typeof inviteOrganisationUserRequestSchema>;
+
+/**
  * Mirrors the review-action pattern (`reviewActionSchema` above): a named
  * transition rather than a raw target state, so an invalid transition is a
  * validation error with a clear name rather than an opaque enum value.
@@ -1131,6 +1152,24 @@ export interface OrganisationMembershipView {
   permittedActions: MembershipAction['action'][];
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * The result of `POST /api/v1/organisations/:organisationId/users` — a new
+ * account, already a member of that organisation and already carrying the
+ * given role. The account is `invited` until the person signs in through the
+ * identity provider with this exact (verified) email address, same as an
+ * account created through `pnpm invite`.
+ */
+export interface OrganisationInvitationView {
+  userId: string;
+  email: string;
+  displayName: string;
+  accountState: AccountState;
+  organisationId: string;
+  membershipId: string;
+  role: WitnessRole;
+  createdAt: string;
 }
 
 export interface WorkspaceMembershipView {
