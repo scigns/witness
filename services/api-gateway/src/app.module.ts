@@ -28,6 +28,7 @@ import { ConsentPolicyService } from './consent/consent-policy.service.js';
 import { ConsentTemplatesController } from './consent-templates/consent-templates.controller.js';
 import { ConsentTemplatesService } from './consent-templates/consent-templates.service.js';
 import { EvidenceController } from './evidence/evidence.controller.js';
+import { EvidenceAttachmentService } from './evidence/evidence-attachment.service.js';
 import { EvidenceLinkService } from './evidence/evidence-link.service.js';
 import { EvidenceReviewController } from './evidence/evidence-review.controller.js';
 import { EvidenceReviewService } from './evidence/evidence-review.service.js';
@@ -111,6 +112,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     SessionConsentConfigurationService,
     ParticipantConsentRecordsService,
     EvidenceService,
+    EvidenceAttachmentService,
     EvidenceLinkService,
     EvidenceReviewService,
     OutcomesService,

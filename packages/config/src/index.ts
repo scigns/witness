@@ -76,6 +76,13 @@ const schema = z.object({
   WITNESS_OIDC_REDIRECT_URI: z.string().optional().default(''),
   WITNESS_SESSION_TTL_MINUTES: z.coerce.number().int().min(1).default(480),
 
+  // Evidence attachments are stored as bytes in Postgres (ADR-0011: the
+  // database is the whole system of record, so `scripts/ops/backup.sh`
+  // backs them up for free — no second, unbacked-up volume to lose). This
+  // caps a single upload; multer enforces it before the bytes reach the
+  // database at all.
+  WITNESS_MAX_EVIDENCE_ATTACHMENT_MB: z.coerce.number().int().min(1).default(200),
+
   // Egress-related. Empty is the sovereign default.
   EXTERNAL_MODEL_PROVIDER: z.string().optional().default(''),
   EXTERNAL_MODEL_API_KEY: z.string().optional().default(''),
@@ -123,6 +130,7 @@ export interface WitnessConfig {
   readonly jwtAudience: string;
   readonly oidcRedirectUri: string;
   readonly sessionTtlMinutes: number;
+  readonly maxEvidenceAttachmentMb: number;
 }
 
 /**
@@ -367,6 +375,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
         ? value.WITNESS_OIDC_REDIRECT_URI.trim()
         : `http://localhost:${value.WITNESS_API_PORT}/api/v1/auth/callback`,
     sessionTtlMinutes: value.WITNESS_SESSION_TTL_MINUTES,
+    maxEvidenceAttachmentMb: value.WITNESS_MAX_EVIDENCE_ATTACHMENT_MB,
   };
 }
 

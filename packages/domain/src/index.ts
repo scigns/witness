@@ -33,6 +33,7 @@ export * from './participant-consent-record.js';
 export * from './consent-decision.js';
 export * from './evidence.js';
 export * from './evidence-link.js';
+export * from './evidence-attachment.js';
 export * from './review-assignment.js';
 export * from './clarification.js';
 export * from './outcome-support.js';

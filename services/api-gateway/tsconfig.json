@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "types": ["node"],
+    "types": ["node", "multer"],
     "lib": ["ES2023"],
     "verbatimModuleSyntax": false,
     "strictPropertyInitialization": false

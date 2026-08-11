@@ -35,6 +35,7 @@ export type SessionConsentConfigurationId = Branded<string, 'SessionConsentConfi
 export type ParticipantConsentRecordId = Branded<string, 'ParticipantConsentRecordId'>;
 export type EvidenceId = Branded<string, 'EvidenceId'>;
 export type EvidenceLinkId = Branded<string, 'EvidenceLinkId'>;
+export type EvidenceAttachmentId = Branded<string, 'EvidenceAttachmentId'>;
 export type ReviewAssignmentId = Branded<string, 'ReviewAssignmentId'>;
 export type ClarificationId = Branded<string, 'ClarificationId'>;
 export type DecisionId = Branded<string, 'DecisionId'>;
@@ -139,6 +140,11 @@ export function toParticipantConsentRecordId(value: string): ParticipantConsentR
 export function toEvidenceId(value: string): EvidenceId {
   assertUuid(value, 'EvidenceId');
   return value as EvidenceId;
+}
+
+export function toEvidenceAttachmentId(value: string): EvidenceAttachmentId {
+  assertUuid(value, 'EvidenceAttachmentId');
+  return value as EvidenceAttachmentId;
 }
 
 export function toEvidenceLinkId(value: string): EvidenceLinkId {

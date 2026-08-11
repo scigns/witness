@@ -1506,6 +1506,27 @@ export interface EvidenceDetail extends EvidenceSummary {
   withdrawalReason?: string | null;
   /** The reviewer's stated reason for the most recent validate/reject decision. */
   reviewDecisionReason: string | null;
+  /** `null` when no file has been attached to this evidence yet. */
+  attachment: EvidenceAttachmentView | null;
+}
+
+export const EVIDENCE_ATTACHMENT_KINDS = ['audio'] as const;
+export type EvidenceAttachmentKind = (typeof EVIDENCE_ATTACHMENT_KINDS)[number];
+
+/**
+ * The source file backing one piece of evidence — metadata only. The bytes
+ * themselves are fetched separately, from
+ * `GET .../evidence/:evidenceId/attachment/content`.
+ */
+export interface EvidenceAttachmentView {
+  id: string;
+  evidenceId: string;
+  kind: EvidenceAttachmentKind;
+  originalFilename: string;
+  contentType: string;
+  sizeBytes: number;
+  checksumSha256: string;
+  createdAt: string;
 }
 
 export interface EvidenceLinkView {

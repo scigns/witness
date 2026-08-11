@@ -55,6 +55,18 @@ const LINK_TYPE_LABELS: Record<(typeof EVIDENCE_LINK_TYPES)[number], string> = {
   related_to: 'Related to',
 };
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
+
 /** Who this page may offer as a reviewer: a member of the evidence's workspace. */
 interface ReviewerOption {
   readonly id: string;
@@ -94,6 +106,12 @@ export default function EvidenceDetailPage({
 
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawReason, setWithdrawReason] = useState('');
+
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [attachmentAudioUrl, setAttachmentAudioUrl] = useState<string | null>(null);
+  const [attachmentLoadingAudio, setAttachmentLoadingAudio] = useState(false);
 
   const [linkType, setLinkType] = useState<(typeof EVIDENCE_LINK_TYPES)[number]>('related_to');
   const [linkTargetId, setLinkTargetId] = useState('');
@@ -204,6 +222,48 @@ export default function EvidenceDetailPage({
     setStaleUpdate(false);
     setLoading(true);
     void load({ current: false });
+  };
+
+  // Revoke the object URL whenever it changes or the page unmounts — the
+  // browser will not release the underlying blob memory on its own.
+  useEffect(() => {
+    return () => {
+      if (attachmentAudioUrl !== null) URL.revokeObjectURL(attachmentAudioUrl);
+    };
+  }, [attachmentAudioUrl]);
+
+  const uploadAttachment = async () => {
+    if (attachmentFile === null) return;
+    setAttachmentBusy(true);
+    setAttachmentError(null);
+    try {
+      const uploaded = await api.uploadEvidenceAttachment(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        attachmentFile,
+        user,
+      );
+      setEvidence((current) => (current === null ? current : { ...current, attachment: uploaded }));
+      setAttachmentFile(null);
+    } catch (caught) {
+      setAttachmentError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setAttachmentBusy(false);
+    }
+  };
+
+  const loadAttachmentAudio = async () => {
+    setAttachmentLoadingAudio(true);
+    setAttachmentError(null);
+    try {
+      const blob = await api.getEvidenceAttachmentBlob(workspaceId, sessionId, evidenceId, user);
+      setAttachmentAudioUrl(URL.createObjectURL(blob));
+    } catch (caught) {
+      setAttachmentError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setAttachmentLoadingAudio(false);
+    }
   };
 
   const runMutation = async (operation: () => Promise<EvidenceDetail>) => {
@@ -646,6 +706,66 @@ export default function EvidenceDetailPage({
           )}
         </Card>
       )}
+
+      <section aria-labelledby="attachment-heading">
+        <h2 id="attachment-heading" className="mb-3 text-lg font-semibold">
+          Audio recording
+        </h2>
+        {attachmentError !== null && <ErrorNotice message={attachmentError} />}
+        <Card className="space-y-3">
+          {evidence.attachment !== null ? (
+            <div className="space-y-3 text-sm">
+              <p>
+                <span className="font-medium">{evidence.attachment.originalFilename}</span>{' '}
+                <span className="text-[var(--color-ink-muted)]">
+                  ({formatBytes(evidence.attachment.sizeBytes)}, {evidence.attachment.contentType})
+                </span>
+              </p>
+              {attachmentAudioUrl === null ? (
+                <Button
+                  variant="secondary"
+                  disabled={attachmentLoadingAudio}
+                  onClick={() => void loadAttachmentAudio()}
+                >
+                  {attachmentLoadingAudio ? 'Loading…' : 'Load recording'}
+                </Button>
+              ) : (
+                <audio controls src={attachmentAudioUrl} className="w-full">
+                  <track kind="captions" />
+                </audio>
+              )}
+              <p className="text-xs text-[var(--color-ink-muted)]">
+                sha256 {evidence.attachment.checksumSha256}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-[var(--color-ink-muted)]">
+                No audio has been attached to this evidence yet.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label htmlFor="attachmentFile" className="sr-only">
+                  Audio file
+                </label>
+                <input
+                  id="attachmentFile"
+                  type="file"
+                  accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/x-wav,audio/webm,audio/ogg"
+                  onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
+                  className="text-sm"
+                />
+                <Button
+                  variant="primary"
+                  disabled={attachmentBusy || attachmentFile === null}
+                  onClick={() => void uploadAttachment()}
+                >
+                  {attachmentBusy ? 'Uploading…' : 'Attach recording'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      </section>
 
       {(canSubmit || canWithdraw) && (
         <Card className="space-y-3">
