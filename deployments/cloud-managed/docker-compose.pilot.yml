@@ -144,6 +144,7 @@ services:
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-witness-api}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-witness-api}
       WITNESS_SESSION_TTL_MINUTES: ${WITNESS_SESSION_TTL_MINUTES:-480}
+      WITNESS_MAX_EVIDENCE_ATTACHMENT_MB: ${WITNESS_MAX_EVIDENCE_ATTACHMENT_MB:-200}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
     depends_on:
       postgres: { condition: service_healthy }
