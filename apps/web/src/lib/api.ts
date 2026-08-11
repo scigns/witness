@@ -35,6 +35,7 @@ import type {
   CreateUserRequest,
   CreateWorkspaceRequest,
   CurrentUserView,
+  EditSummaryRequest,
   EditTranscriptRequest,
   EvidenceAttachmentView,
   EvidenceDetail,
@@ -46,6 +47,7 @@ import type {
   InviteOrganisationUserRequest,
   MembershipAction,
   OrganisationInvitationView,
+  SessionSummaryView,
   TranscriptVersionRequest,
   TranscriptView,
   OrganisationMembershipView,
@@ -978,6 +980,62 @@ export const api = {
   ): Promise<TranscriptView> =>
     request<TranscriptView>(
       `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/transcript/confirm`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  requestSummary: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<SessionSummaryView> =>
+    request<SessionSummaryView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/summary`,
+      user,
+      { method: 'POST' },
+    ),
+
+  retrySummary: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<SessionSummaryView> =>
+    request<SessionSummaryView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/summary/retry`,
+      user,
+      { method: 'POST' },
+    ),
+
+  getSummary: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<SessionSummaryView> =>
+    request<SessionSummaryView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/summary`,
+      user,
+    ),
+
+  editSummary: (
+    workspaceId: string,
+    sessionId: string,
+    body: EditSummaryRequest,
+    user: ActingUser,
+  ): Promise<SessionSummaryView> =>
+    request<SessionSummaryView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/summary`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  confirmSummary: (
+    workspaceId: string,
+    sessionId: string,
+    body: TranscriptVersionRequest,
+    user: ActingUser,
+  ): Promise<SessionSummaryView> =>
+    request<SessionSummaryView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/summary/confirm`,
       user,
       { method: 'POST', body: JSON.stringify(body) },
     ),

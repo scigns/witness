@@ -435,6 +435,7 @@ model CoDesignSession {
   outcomeSupports           OutcomeSupport[]
   reports                   Report[]
   reportSources             ReportSource[]
+  summary                   SessionSummary?
 
   @@index([organisationId])
   @@index([workspaceId, status])
@@ -889,6 +890,41 @@ model Transcript {
   version Int @default(1)
 
   @@map("transcript")
+}
+
+/// An AI-drafted summary of one co-design session's confirmed content — see
+/// `packages/domain/src/session-summary.ts`'s file header. One per session
+/// (the unique constraint on `sessionId`), same pending/processing/completed/
+/// failed lifecycle as `Transcript`.
+model SessionSummary {
+  id String @id @db.Uuid
+
+  sessionId String          @unique @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  status String @default("pending") @db.VarChar(16)
+
+  /// Evidence ids that fed this summary — provenance, not a foreign key
+  /// list (an evidence row can later be withdrawn without invalidating the
+  /// citation of what was true when the summary was generated).
+  sourceEvidenceIds String[] @default([]) @map("source_evidence_ids")
+
+  generatedText String? @map("generated_text") @db.Text
+  editedText    String? @map("edited_text") @db.Text
+
+  model String? @db.VarChar(100)
+
+  confirmed Boolean @default(false)
+
+  failureReason String? @map("failure_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every mutation.
+  version Int @default(1)
+
+  @@map("session_summary")
 }
 
 /// Who is reviewing a specific piece of evidence, and where that review

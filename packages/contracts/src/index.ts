@@ -1546,6 +1546,31 @@ export interface TranscriptView {
   version: number;
 }
 
+export const SUMMARY_STATUSES = ['pending', 'processing', 'completed', 'failed'] as const;
+export type SummaryStatus = (typeof SUMMARY_STATUSES)[number];
+
+/**
+ * An AI-drafted summary of one co-design session's confirmed content.
+ * `sourceEvidenceIds` is the citation list — which evidence fed the
+ * summary, for the "inspect provenance" requirement every generated-content
+ * view in this product carries.
+ */
+export interface SessionSummaryView {
+  id: string;
+  sessionId: string;
+  status: SummaryStatus;
+  sourceEvidenceIds: string[];
+  generatedText: string | null;
+  editedText: string | null;
+  effectiveText: string | null;
+  model: string | null;
+  confirmed: boolean;
+  failureReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
 export const editTranscriptRequestSchema = z.object({
   editedText: z.string().trim().min(1, 'A transcript must not be empty').max(200_000),
   expectedVersion: z.number().int().min(1),
@@ -1556,6 +1581,12 @@ export const transcriptVersionRequestSchema = z.object({
   expectedVersion: z.number().int().min(1),
 });
 export type TranscriptVersionRequest = z.infer<typeof transcriptVersionRequestSchema>;
+
+export const editSummaryRequestSchema = z.object({
+  editedText: z.string().trim().min(1, 'A summary must not be empty').max(50_000),
+  expectedVersion: z.number().int().min(1),
+});
+export type EditSummaryRequest = z.infer<typeof editSummaryRequestSchema>;
 
 export const EVIDENCE_ATTACHMENT_KINDS = ['audio'] as const;
 export type EvidenceAttachmentKind = (typeof EVIDENCE_ATTACHMENT_KINDS)[number];

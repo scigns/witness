@@ -83,6 +83,14 @@ const schema = z.object({
   // database at all.
   WITNESS_MAX_EVIDENCE_ATTACHMENT_MB: z.coerce.number().int().min(1).default(200),
 
+  // Local text generation (session summaries, candidate outcome extraction —
+  // Phases 4-5), served by the `ollama` sidecar over the compose network.
+  // Not `EXTERNAL_MODEL_*`: that family is specifically the sovereign-profile
+  // egress gate (see the ADR-0009 block below), and a same-network sidecar
+  // with no route out of this deployment is not what that gate is for.
+  WITNESS_LOCAL_LLM_URL: z.string().optional().default('http://ollama:11434'),
+  WITNESS_LOCAL_LLM_MODEL: z.string().optional().default('qwen2.5:1.5b'),
+
   // Egress-related. Empty is the sovereign default.
   EXTERNAL_MODEL_PROVIDER: z.string().optional().default(''),
   EXTERNAL_MODEL_API_KEY: z.string().optional().default(''),
@@ -131,6 +139,8 @@ export interface WitnessConfig {
   readonly oidcRedirectUri: string;
   readonly sessionTtlMinutes: number;
   readonly maxEvidenceAttachmentMb: number;
+  readonly localLlmUrl: string;
+  readonly localLlmModel: string;
 }
 
 /**
@@ -376,6 +386,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
         : `http://localhost:${value.WITNESS_API_PORT}/api/v1/auth/callback`,
     sessionTtlMinutes: value.WITNESS_SESSION_TTL_MINUTES,
     maxEvidenceAttachmentMb: value.WITNESS_MAX_EVIDENCE_ATTACHMENT_MB,
+    localLlmUrl: value.WITNESS_LOCAL_LLM_URL,
+    localLlmModel: value.WITNESS_LOCAL_LLM_MODEL,
   };
 }
 

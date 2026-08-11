@@ -34,6 +34,10 @@ import { EvidenceReviewController } from './evidence/evidence-review.controller.
 import { EvidenceReviewService } from './evidence/evidence-review.service.js';
 import { EvidenceService } from './evidence/evidence.service.js';
 import { TranscriptService } from './evidence/transcript.service.js';
+import { LlmPort } from './summarization/llm.port.js';
+import { OllamaLlmAdapter } from './summarization/ollama.adapter.js';
+import { SessionSummaryController } from './summarization/session-summary.controller.js';
+import { SessionSummaryService } from './summarization/session-summary.service.js';
 import { LocalWhisperAdapter } from './transcription/local-whisper.adapter.js';
 import { TranscriptionPort } from './transcription/transcription.port.js';
 import { HealthController } from './health/health.controller.js';
@@ -94,6 +98,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     EvidenceReviewController,
     OutcomesController,
     ReportsController,
+    SessionSummaryController,
     AuthenticationController,
     CurrentUserController,
   ],
@@ -119,10 +124,13 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     EvidenceLinkService,
     EvidenceReviewService,
     TranscriptService,
+    SessionSummaryService,
     // Only implementation bound (ADR-0009: the sovereign profile makes zero
     // external calls, so a cloud transcription adapter has no legitimate
     // reason to exist here at all — see transcription.port.ts).
     { provide: TranscriptionPort, useClass: LocalWhisperAdapter },
+    // Same reasoning, same shape — see summarization/llm.port.ts.
+    { provide: LlmPort, useClass: OllamaLlmAdapter },
     OutcomesService,
     OutcomeSupportService,
     ReportsService,
