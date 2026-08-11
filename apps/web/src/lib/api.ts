@@ -54,6 +54,7 @@ import type {
   OrganisationSummary,
   OutcomeCandidateJobView,
   ParticipantConsentRecordDetail,
+  SearchResultView,
   ReassignReviewerRequest,
   ReconfigureSessionConsentRequest,
   RecordDetail,
@@ -1240,6 +1241,16 @@ export const api = {
   ): Promise<DecisionDetail> =>
     request(
       `${outcomePath(workspaceId, sessionId, 'decisions')}/${encodeURIComponent(decisionId)}`,
+      user,
+    ),
+
+  search: (
+    workspaceId: string,
+    query: string,
+    user: ActingUser,
+  ): Promise<{ results: SearchResultView[] }> =>
+    request<{ results: SearchResultView[] }>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/search?q=${encodeURIComponent(query)}`,
       user,
     ),
 

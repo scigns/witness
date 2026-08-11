@@ -1973,6 +1973,45 @@ export interface HealthResponse {
   notImplemented: string[];
 }
 
+// ─── Search (Phase 6) ──────────────────────────────────────────────────────────
+
+export const SEARCH_RESULT_TYPES = [
+  'session',
+  'evidence',
+  'transcript',
+  'summary',
+  'decision',
+  'commitment',
+  'action_item',
+] as const;
+export type SearchResultType = (typeof SEARCH_RESULT_TYPES)[number];
+
+/**
+ * One matched thing, from a plain scoped-text search across a workspace —
+ * "have we discussed this before?", not a knowledge graph or a vector
+ * index. Always traceable: `sessionId` and (where the match has one)
+ * `evidenceId` are the same ids the rest of the product already uses to
+ * link to the source, and `aiGenerated`/`confirmed` say plainly whether a
+ * result is someone's own words or a model's, and whether a human has
+ * signed off on it yet.
+ */
+export interface SearchResultView {
+  type: SearchResultType;
+  sessionId: string;
+  sessionTitle: string;
+  /** The matched row's own id, for types with a dedicated detail view (evidence, decision, commitment, action_item). */
+  entityId: string | null;
+  /** The evidence a transcript match belongs to — absent for every other type. */
+  evidenceId: string | null;
+  title: string;
+  snippet: string;
+  /** The matched row's own lifecycle status (draft/submitted/proposed/open/…), for display, not for a state machine. */
+  status: string | null;
+  aiGenerated: boolean;
+  /** Only meaningful for AI-generated content (transcript, summary) — `null` for everything else. */
+  confirmed: boolean | null;
+}
+
 // ─── Errors ──────────────────────────────────────────────────────────────────
 
 export interface ApiError {

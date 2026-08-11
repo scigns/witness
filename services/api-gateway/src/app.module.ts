@@ -64,6 +64,8 @@ import { ReportsController } from './reports/reports.controller.js';
 import { ReportsService } from './reports/reports.service.js';
 import { RecordsService } from './records/records.service.js';
 import { RolesController } from './roles/roles.controller.js';
+import { SearchController } from './search/search.controller.js';
+import { SearchService } from './search/search.service.js';
 import { SessionConsentConfigurationController } from './session-consent-configuration/session-consent-configuration.controller.js';
 import { SessionConsentConfigurationService } from './session-consent-configuration/session-consent-configuration.service.js';
 import { SessionsController } from './sessions/sessions.controller.js';
@@ -102,6 +104,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     ReportsController,
     SessionSummaryController,
     OutcomeCandidateController,
+    SearchController,
     AuthenticationController,
     CurrentUserController,
   ],
@@ -129,6 +132,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     TranscriptService,
     SessionSummaryService,
     OutcomeCandidateService,
+    SearchService,
     // Only implementation bound (ADR-0009: the sovereign profile makes zero
     // external calls, so a cloud transcription adapter has no legitimate
     // reason to exist here at all — see transcription.port.ts).
