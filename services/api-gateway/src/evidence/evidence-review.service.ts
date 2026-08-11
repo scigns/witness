@@ -833,7 +833,10 @@ export class EvidenceReviewService {
     sessionId: string,
     evidenceId: string,
   ): Promise<EvidenceRow> {
-    const row = await this.prisma.evidence.findUnique({ where: { id: evidenceId } });
+    const row = await this.prisma.evidence.findUnique({
+      where: { id: evidenceId },
+      include: { attachment: true, transcript: true },
+    });
     if (row === null || row.workspaceId !== workspaceId || row.sessionId !== sessionId) {
       throw new NotFoundException({
         error: {

@@ -35,16 +35,26 @@ import type {
   CreateUserRequest,
   CreateWorkspaceRequest,
   CurrentUserView,
+  EditSummaryRequest,
+  EditTranscriptRequest,
+  EvidenceAttachmentView,
   EvidenceDetail,
   EvidenceLinkView,
   EvidenceReviewActionRequest,
   EvidenceSummary,
   EvidenceTransitionRequest,
   HealthResponse,
+  InviteOrganisationUserRequest,
   MembershipAction,
+  OrganisationInvitationView,
+  SessionSummaryView,
+  TranscriptVersionRequest,
+  TranscriptView,
   OrganisationMembershipView,
   OrganisationSummary,
+  OutcomeCandidateJobView,
   ParticipantConsentRecordDetail,
+  SearchResultView,
   ReassignReviewerRequest,
   ReconfigureSessionConsentRequest,
   RecordDetail,
@@ -152,11 +162,15 @@ export interface ActingUser {
   role: 'reader' | 'contributor' | 'reviewer' | 'admin';
 }
 
-async function request<T>(path: string, user: ActingUser | null, init?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-
-  // A real signed-in session always wins. The dev header is a stand-in for one,
-  // and sending both would let the two disagree about who is acting.
+/**
+ * A real signed-in session always wins. The dev header is a stand-in for one,
+ * and sending both would let the two disagree about who is acting. Shared by
+ * every request helper below, including the two (`requestMultipart`,
+ * `requestBlob`) that cannot go through `request()` itself because it always
+ * sends JSON.
+ */
+function authHeaders(user: ActingUser | null): Record<string, string> {
+  const headers: Record<string, string> = {};
   const token = sessionToken();
 
   if (token !== null) {
@@ -164,6 +178,32 @@ async function request<T>(path: string, user: ActingUser | null, init?: RequestI
   } else if (user !== null && IS_DEVELOPMENT_BUILD) {
     headers['X-Witness-Dev-User'] = `${user.name}|${user.role}`;
   }
+
+  return headers;
+}
+
+async function throwOnError(response: Response): Promise<void> {
+  if (response.ok) return;
+
+  let code = 'UNKNOWN';
+  let message = `Request failed with status ${response.status}.`;
+
+  try {
+    const body = (await response.json()) as { error?: { code?: string; message?: string } };
+    code = body.error?.code ?? code;
+    message = body.error?.message ?? message;
+  } catch {
+    // Response was not JSON. Keep the status-derived message.
+  }
+
+  throw new ApiError(message, response.status, code);
+}
+
+async function request<T>(path: string, user: ActingUser | null, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...authHeaders(user),
+  };
 
   let response: Response;
 
@@ -183,20 +223,7 @@ async function request<T>(path: string, user: ActingUser | null, init?: RequestI
     );
   }
 
-  if (!response.ok) {
-    let code = 'UNKNOWN';
-    let message = `Request failed with status ${response.status}.`;
-
-    try {
-      const body = (await response.json()) as { error?: { code?: string; message?: string } };
-      code = body.error?.code ?? code;
-      message = body.error?.message ?? message;
-    } catch {
-      // Response was not JSON. Keep the status-derived message.
-    }
-
-    throw new ApiError(message, response.status, code);
-  }
+  await throwOnError(response);
 
   // A 204 (e.g. removing a role assignment) has no body — `response.json()`
   // would throw on it rather than return an absence.
@@ -205,6 +232,56 @@ async function request<T>(path: string, user: ActingUser | null, init?: RequestI
   }
 
   return (await response.json()) as T;
+}
+
+/**
+ * For a multipart body (a file upload): unlike `request()`, this must NOT
+ * set `Content-Type` itself — `fetch` sets it from the `FormData` instance,
+ * including the multipart boundary, and a manually-set header here would be
+ * missing that boundary and break parsing on the server.
+ */
+async function requestMultipart<T>(
+  path: string,
+  user: ActingUser | null,
+  formData: FormData,
+): Promise<T> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${BASE_URL}${path}`, {
+      method: 'POST',
+      headers: authHeaders(user),
+      body: formData,
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError(
+      `Cannot reach the Witness API at ${BASE_URL}. Is it running? Try: make app`,
+      0,
+      'API_UNREACHABLE',
+    );
+  }
+
+  await throwOnError(response);
+  return (await response.json()) as T;
+}
+
+/** For a binary response (an attachment's bytes) — everything else expects JSON. */
+async function requestBlob(path: string, user: ActingUser | null): Promise<Blob> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${BASE_URL}${path}`, { headers: authHeaders(user), cache: 'no-store' });
+  } catch {
+    throw new ApiError(
+      `Cannot reach the Witness API at ${BASE_URL}. Is it running? Try: make app`,
+      0,
+      'API_UNREACHABLE',
+    );
+  }
+
+  await throwOnError(response);
+  return response.blob();
 }
 
 /**
@@ -268,6 +345,16 @@ export const api = {
 
   createUser: (body: CreateUserRequest, user: ActingUser): Promise<UserSummary> =>
     request<UserSummary>('/api/v1/users', user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  inviteOrganisationUser: (
+    organisationId: string,
+    body: InviteOrganisationUserRequest,
+    user: ActingUser,
+  ): Promise<OrganisationInvitationView> =>
+    request<OrganisationInvitationView>(`/api/v1/organisations/${organisationId}/users`, user, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -811,6 +898,150 @@ export const api = {
       { method: 'POST', body: JSON.stringify(body) },
     ),
 
+  uploadEvidenceAttachment: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    file: File,
+    user: ActingUser,
+  ): Promise<EvidenceAttachmentView> => {
+    const formData = new FormData();
+    formData.set('file', file);
+    return requestMultipart<EvidenceAttachmentView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/attachment`,
+      user,
+      formData,
+    );
+  },
+
+  getEvidenceAttachmentBlob: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    user: ActingUser,
+  ): Promise<Blob> =>
+    requestBlob(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/attachment/content`,
+      user,
+    ),
+
+  requestTranscript: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    user: ActingUser,
+  ): Promise<TranscriptView> =>
+    request<TranscriptView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/transcript`,
+      user,
+      { method: 'POST' },
+    ),
+
+  retryTranscript: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    user: ActingUser,
+  ): Promise<TranscriptView> =>
+    request<TranscriptView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/transcript/retry`,
+      user,
+      { method: 'POST' },
+    ),
+
+  getTranscript: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    user: ActingUser,
+  ): Promise<TranscriptView> =>
+    request<TranscriptView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/transcript`,
+      user,
+    ),
+
+  editTranscript: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    body: EditTranscriptRequest,
+    user: ActingUser,
+  ): Promise<TranscriptView> =>
+    request<TranscriptView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/transcript`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  confirmTranscript: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    body: TranscriptVersionRequest,
+    user: ActingUser,
+  ): Promise<TranscriptView> =>
+    request<TranscriptView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/transcript/confirm`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  requestSummary: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<SessionSummaryView> =>
+    request<SessionSummaryView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/summary`,
+      user,
+      { method: 'POST' },
+    ),
+
+  retrySummary: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<SessionSummaryView> =>
+    request<SessionSummaryView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/summary/retry`,
+      user,
+      { method: 'POST' },
+    ),
+
+  getSummary: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<SessionSummaryView> =>
+    request<SessionSummaryView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/summary`,
+      user,
+    ),
+
+  editSummary: (
+    workspaceId: string,
+    sessionId: string,
+    body: EditSummaryRequest,
+    user: ActingUser,
+  ): Promise<SessionSummaryView> =>
+    request<SessionSummaryView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/summary`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  confirmSummary: (
+    workspaceId: string,
+    sessionId: string,
+    body: TranscriptVersionRequest,
+    user: ActingUser,
+  ): Promise<SessionSummaryView> =>
+    request<SessionSummaryView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/summary/confirm`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   listEvidenceLinks: (
     workspaceId: string,
     sessionId: string,
@@ -1010,6 +1241,38 @@ export const api = {
   ): Promise<DecisionDetail> =>
     request(
       `${outcomePath(workspaceId, sessionId, 'decisions')}/${encodeURIComponent(decisionId)}`,
+      user,
+    ),
+
+  search: (
+    workspaceId: string,
+    query: string,
+    user: ActingUser,
+  ): Promise<{ results: SearchResultView[] }> =>
+    request<{ results: SearchResultView[] }>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/search?q=${encodeURIComponent(query)}`,
+      user,
+    ),
+
+  requestOutcomeCandidates: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<{ jobId: string }> =>
+    request<{ jobId: string }>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/outcome-candidates`,
+      user,
+      { method: 'POST' },
+    ),
+
+  getOutcomeCandidateJob: (
+    workspaceId: string,
+    sessionId: string,
+    jobId: string,
+    user: ActingUser,
+  ): Promise<OutcomeCandidateJobView> =>
+    request<OutcomeCandidateJobView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/outcome-candidates/${encodeURIComponent(jobId)}`,
       user,
     ),
 

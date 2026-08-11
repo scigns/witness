@@ -55,6 +55,7 @@ import {
 } from '@witness/domain';
 import type {
   CaptureEvidenceRequest,
+  EvidenceAttachmentView,
   EvidenceDetail,
   EvidenceReviewActionRequest,
   EvidenceReviewStatus,
@@ -68,6 +69,10 @@ import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { PolicyEnforcementService } from '../authz/policy-enforcement.service.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
+import {
+  toDomain as toDomainTranscript,
+  toView as toTranscriptView,
+} from './transcript.service.js';
 import type { Principal } from '../authz/authorization.port.js';
 
 export interface EvidenceListFilter {
@@ -439,7 +444,10 @@ export class EvidenceService {
     sessionId: string,
     evidenceId: string,
   ): Promise<EvidenceRow> {
-    const row = await this.prisma.evidence.findUnique({ where: { id: evidenceId } });
+    const row = await this.prisma.evidence.findUnique({
+      where: { id: evidenceId },
+      include: { attachment: true, transcript: true },
+    });
 
     if (row === null || row.workspaceId !== workspaceId || row.sessionId !== sessionId) {
       throw new NotFoundException({
@@ -454,7 +462,41 @@ export class EvidenceService {
   }
 }
 
-export type EvidenceRow = Awaited<ReturnType<PrismaService['evidence']['findUniqueOrThrow']>>;
+export type EvidenceRow = Awaited<ReturnType<PrismaService['evidence']['findUniqueOrThrow']>> & {
+  /**
+   * Optional, not always fetched — only `toDetail`'s callers need it, and
+   * they `include: { attachment: true }` to get it. `toSummary` and other
+   * `EvidenceRow` consumers (`EvidenceLinkService`) never read this field,
+   * so their plain `findUnique`/`findMany` calls stay structurally valid
+   * without an unnecessary join.
+   */
+  attachment?: {
+    id: string;
+    evidenceId: string;
+    kind: string;
+    originalFilename: string;
+    contentType: string;
+    sizeBytes: number;
+    checksumSha256: string;
+    createdAt: Date;
+  } | null;
+  transcript?: {
+    id: string;
+    evidenceId: string;
+    attachmentId: string;
+    status: string;
+    generatedText: string | null;
+    editedText: string | null;
+    segments: unknown;
+    model: string | null;
+    language: string | null;
+    confirmed: boolean;
+    failureReason: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    version: number;
+  } | null;
+};
 
 export function toDomainEvidence(row: EvidenceRow): Evidence {
   return {
@@ -593,6 +635,23 @@ export function toDetail(
     canEdit: canEditEvidence(evidence, sessionStatus),
     canCorrect: canCorrectEvidence(evidence, sessionStatus),
     reviewDecisionReason: row.reviewDecisionReason,
+    attachment:
+      row.attachment === null || row.attachment === undefined
+        ? null
+        : {
+            id: row.attachment.id,
+            evidenceId: row.attachment.evidenceId,
+            kind: row.attachment.kind as EvidenceAttachmentView['kind'],
+            originalFilename: row.attachment.originalFilename,
+            contentType: row.attachment.contentType,
+            sizeBytes: row.attachment.sizeBytes,
+            checksumSha256: row.attachment.checksumSha256,
+            createdAt: row.attachment.createdAt.toISOString(),
+          },
+    transcript:
+      row.transcript === null || row.transcript === undefined
+        ? null
+        : toTranscriptView(toDomainTranscript(row.transcript)),
     ...(includeRestricted
       ? { consentBasis: [...row.consentBasis], withdrawalReason: row.withdrawalReason }
       : {}),

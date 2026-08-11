@@ -78,6 +78,8 @@ function fakePrisma(sessionStatus = 'closed') {
   const decisions: Row[] = [];
   const commitments: Row[] = [];
   const actionItems: Row[] = [];
+  const transcripts: Row[] = [];
+  const summaries: Row[] = [];
   const reports: Row[] = [];
   const reportSources: Row[] = [];
   const actors: Row[] = [];
@@ -168,6 +170,73 @@ function fakePrisma(sessionStatus = 'closed') {
     decision: table(decisions),
     commitment: table(commitments),
     actionItem: table(actionItems),
+    // Bespoke rather than the generic `table()` helper: these two are the
+    // only models `ReportsService` queries through a nested relation filter
+    // (`where: { evidence: { sessionId } }`) and a nested include, neither
+    // of which `table()`'s flat `matches()` supports.
+    transcript: {
+      findMany: async (args?: { where?: Record<string, unknown> }) => {
+        const where = args?.where ?? {};
+        return transcripts
+          .filter((row) => {
+            if (where['confirmed'] !== undefined && row['confirmed'] !== where['confirmed']) {
+              return false;
+            }
+            const idClause = where['id'] as { in?: string[] } | undefined;
+            if (idClause?.in !== undefined && !idClause.in.includes(row['id'] as string)) {
+              return false;
+            }
+            const evidenceClause = where['evidence'] as { sessionId?: string } | undefined;
+            if (evidenceClause?.sessionId !== undefined) {
+              const evidenceRow = evidenceRows.find((e) => e.id === row['evidenceId']);
+              if (
+                evidenceRow === undefined ||
+                evidenceRow['sessionId'] !== evidenceClause.sessionId
+              ) {
+                return false;
+              }
+            }
+            return true;
+          })
+          .map((row) => ({
+            ...row,
+            evidence: evidenceRows.find((e) => e.id === row['evidenceId']) ?? null,
+          }));
+      },
+      findUnique: async ({ where }: { where: { id: string } }) => {
+        const row = transcripts.find((t) => t.id === where.id);
+        if (row === undefined) return null;
+        return { ...row, evidence: evidenceRows.find((e) => e.id === row['evidenceId']) ?? null };
+      },
+    },
+    sessionSummary: {
+      findMany: async (args?: { where?: Record<string, unknown> }) => {
+        const where = args?.where ?? {};
+        return summaries
+          .filter((row) => {
+            if (where['confirmed'] !== undefined && row['confirmed'] !== where['confirmed']) {
+              return false;
+            }
+            if (where['sessionId'] !== undefined && row['sessionId'] !== where['sessionId']) {
+              return false;
+            }
+            const idClause = where['id'] as { in?: string[] } | undefined;
+            if (idClause?.in !== undefined && !idClause.in.includes(row['id'] as string)) {
+              return false;
+            }
+            return true;
+          })
+          .map((row) => ({
+            ...row,
+            session: sessions.find((s) => s.id === row['sessionId']) ?? null,
+          }));
+      },
+      findUnique: async ({ where }: { where: { id: string } }) => {
+        const row = summaries.find((s) => s.id === where.id);
+        if (row === undefined) return null;
+        return { ...row, session: sessions.find((s) => s.id === row['sessionId']) ?? null };
+      },
+    },
     report: table(
       reports,
       { createdBy: 'createdById', submittedBy: 'submittedById', approvedBy: 'approvedById' },
@@ -244,6 +313,8 @@ function fakePrisma(sessionStatus = 'closed') {
     decisions,
     commitments,
     actionItems,
+    transcripts,
+    summaries,
     reports,
     reportSources,
     auditEvents,
@@ -321,6 +392,40 @@ function seedEvidence(fixture: Fixture, overrides: Record<string, unknown> = {})
     reviewStatus: 'validated',
     verificationStatus: 'verified',
     version: 3,
+    ...overrides,
+  } as Row);
+  return id;
+}
+
+function seedTranscript(
+  fixture: Fixture,
+  evidenceId: string,
+  overrides: Record<string, unknown> = {},
+): string {
+  const id = uuid();
+  fixture.transcripts.push({
+    id,
+    evidenceId,
+    status: 'completed',
+    confirmed: true,
+    generatedText: 'There is nowhere to sit out of the sun, as recorded.',
+    editedText: null,
+    version: 3,
+    ...overrides,
+  } as Row);
+  return id;
+}
+
+function seedSummary(fixture: Fixture, overrides: Record<string, unknown> = {}): string {
+  const id = uuid();
+  fixture.summaries.push({
+    id,
+    sessionId: SESSION,
+    status: 'completed',
+    confirmed: true,
+    generatedText: 'The session discussed shade near the fountain.',
+    editedText: null,
+    version: 1,
     ...overrides,
   } as Row);
   return id;
@@ -733,6 +838,78 @@ describe('ReportsService — what a rendered report says', () => {
     const after = await fixture.reportsService.render(WORKSPACE, SESSION, report.id);
     expect(after.evidence).toHaveLength(0);
     expect(after.redactedCount).toBe(1);
+  });
+
+  it('draws in a confirmed transcript and renders its own text, not the evidence content', async () => {
+    const fixture = services();
+    const evidenceId = seedEvidence(fixture, {
+      attributionMode: 'facilitator_observation',
+      sourceParticipantId: null,
+    });
+    seedTranscript(fixture, evidenceId, { editedText: 'A human-corrected transcript.' });
+
+    const report = await draft(fixture);
+    const rendered = await fixture.reportsService.render(WORKSPACE, SESSION, report.id);
+
+    expect(rendered.transcripts).toHaveLength(1);
+    expect(rendered.transcripts[0]).toMatchObject({
+      evidenceId,
+      content: 'A human-corrected transcript.',
+      quotable: true,
+    });
+  });
+
+  it('does not auto-draw-in an unconfirmed transcript', async () => {
+    const fixture = services();
+    const evidenceId = seedEvidence(fixture);
+    seedTranscript(fixture, evidenceId, { confirmed: false });
+
+    const report = await draft(fixture);
+    const rendered = await fixture.reportsService.render(WORKSPACE, SESSION, report.id);
+
+    expect(rendered.transcripts).toHaveLength(0);
+  });
+
+  it("redacts a transcript exactly as it would redact its evidence's content", async () => {
+    const fixture = services();
+    const participant = seedParticipant(
+      fixture,
+      {},
+      { category: true, attributed: false, anonymous: false },
+    );
+    const evidenceId = seedEvidence(fixture, {
+      attributionMode: 'attributed',
+      sourceParticipantId: participant,
+    });
+    seedTranscript(fixture, evidenceId);
+
+    const report = await draft(fixture);
+    const rendered = await fixture.reportsService.render(WORKSPACE, SESSION, report.id);
+
+    expect(rendered.transcripts).toHaveLength(1);
+    expect(rendered.transcripts[0]!.quotable).toBe(false);
+    expect(rendered.transcripts[0]!.content).toBeUndefined();
+    expect(rendered.redactedCount).toBe(0);
+  });
+
+  it('draws in a confirmed session summary', async () => {
+    const fixture = services();
+    seedSummary(fixture, { editedText: 'A human-edited session summary.' });
+
+    const report = await draft(fixture);
+    const rendered = await fixture.reportsService.render(WORKSPACE, SESSION, report.id);
+
+    expect(rendered.sessionSummary).toEqual({ content: 'A human-edited session summary.' });
+  });
+
+  it('does not auto-draw-in an unconfirmed session summary', async () => {
+    const fixture = services();
+    seedSummary(fixture, { confirmed: false });
+
+    const report = await draft(fixture);
+    const rendered = await fixture.reportsService.render(WORKSPACE, SESSION, report.id);
+
+    expect(rendered.sessionSummary).toBeNull();
   });
 });
 

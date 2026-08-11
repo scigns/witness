@@ -35,6 +35,7 @@ import {
   hasSourceDrifted,
   includeReportSource,
   projectEvidenceForReport,
+  projectTranscriptForReport,
   publishReportInternally,
   recordReportExport,
   requestReportChanges,
@@ -65,6 +66,8 @@ import type {
   IncludeReportSourceRequest,
   RenderedEvidence,
   RenderedReport,
+  RenderedSessionSummary,
+  RenderedTranscript,
   ReportDetail,
   ReportExportFormat,
   ReportSourceView,
@@ -433,14 +436,36 @@ export class ReportsService {
     const sourceIds = (type: ReportSourceType): string[] =>
       sources.filter((source) => source.sourceType === type).map((source) => source.sourceId);
 
-    const [evidenceRows, decisionRows, commitmentRows, actionRows, participantRows] =
-      await Promise.all([
-        this.prisma.evidence.findMany({ where: { id: { in: sourceIds('evidence') } } }),
-        this.prisma.decision.findMany({ where: { id: { in: sourceIds('decision') } } }),
-        this.prisma.commitment.findMany({ where: { id: { in: sourceIds('commitment') } } }),
-        this.prisma.actionItem.findMany({ where: { id: { in: sourceIds('action_item') } } }),
-        this.prisma.sessionParticipant.findMany({ where: { sessionId } }),
-      ]);
+    const [
+      evidenceRows,
+      decisionRows,
+      commitmentRows,
+      actionRows,
+      participantRows,
+      transcriptRows,
+      summaryRows,
+    ] = await Promise.all([
+      this.prisma.evidence.findMany({ where: { id: { in: sourceIds('evidence') } } }),
+      this.prisma.decision.findMany({ where: { id: { in: sourceIds('decision') } } }),
+      this.prisma.commitment.findMany({ where: { id: { in: sourceIds('commitment') } } }),
+      this.prisma.actionItem.findMany({ where: { id: { in: sourceIds('action_item') } } }),
+      this.prisma.sessionParticipant.findMany({ where: { sessionId } }),
+      this.prisma.transcript.findMany({
+        where: { id: { in: sourceIds('transcript') } },
+        include: {
+          evidence: {
+            select: {
+              id: true,
+              title: true,
+              evidenceType: true,
+              attributionMode: true,
+              sourceParticipantId: true,
+            },
+          },
+        },
+      }),
+      this.prisma.sessionSummary.findMany({ where: { id: { in: sourceIds('session_summary') } } }),
+    ]);
 
     const category = consentCategoryForAudience(row.audience as 'internal' | 'external' | 'public');
 
@@ -474,6 +499,59 @@ export class ReportsService {
       evidence.push(projected);
     }
 
+    // A transcript carries the same participant-consent exposure as the
+    // evidence it belongs to — see `projectTranscriptForReport`'s file
+    // header. `sessionSummary` gets no redaction pass of its own: consent
+    // was already applied per-participant when it was generated
+    // (`SessionSummaryService.assembleSource` excludes anyone who withheld
+    // AI-processing consent before the model ever sees their words), so a
+    // second pass here would be redacting nothing.
+    const transcripts: RenderedTranscript[] = [];
+
+    for (const item of transcriptRows) {
+      const consent = await this.resolveConsent(
+        sessionId,
+        item.evidence.sourceParticipantId,
+        category,
+        now,
+      );
+      const pseudonym =
+        item.evidence.sourceParticipantId === null
+          ? null
+          : (participantRows.find((p) => p.id === item.evidence.sourceParticipantId)?.displayName ??
+            null);
+
+      const projected = projectTranscriptForReport(
+        {
+          id: item.evidence.id,
+          title: item.evidence.title,
+          content: '',
+          evidenceType: item.evidence.evidenceType,
+          attributionMode: item.evidence.attributionMode as EvidenceAttributionMode,
+          hasParticipantSource: item.evidence.sourceParticipantId !== null,
+          pseudonym,
+        },
+        {
+          evidenceId: item.evidenceId,
+          evidenceTitle: item.evidence.title,
+          text: item.editedText ?? item.generatedText ?? '',
+        },
+        consent,
+      );
+
+      if (projected === null) {
+        redactedCount += 1;
+        continue;
+      }
+      transcripts.push(projected);
+    }
+
+    const summaryRow = summaryRows[0];
+    const sessionSummary: RenderedSessionSummary | null =
+      summaryRow === undefined
+        ? null
+        : { content: summaryRow.editedText ?? summaryRow.generatedText ?? '' };
+
     const participants = summariseParticipants(
       participantRows.map((participant) => ({
         identityMode: participant.identityMode as 'named' | 'pseudonymous' | 'anonymous',
@@ -502,6 +580,8 @@ export class ReportsService {
         attendedOnline: participants.attendedOnline,
       },
       evidence,
+      transcripts,
+      sessionSummary,
       decisions: decisionRows.map((decision) => ({
         id: decision.id,
         title: decision.title,
@@ -631,7 +711,7 @@ export class ReportsService {
       sessionId: report.sessionId,
     };
 
-    const [evidence, decisions, commitments, actions] = await Promise.all([
+    const [evidence, decisions, commitments, actions, transcripts, summaries] = await Promise.all([
       tx.evidence.findMany({
         where: { sessionId: report.sessionId, reviewStatus: 'validated' },
         select: { id: true, version: true, reviewStatus: true },
@@ -647,6 +727,14 @@ export class ReportsService {
       tx.actionItem.findMany({
         where: { sessionId: report.sessionId },
         select: { id: true, version: true, status: true },
+      }),
+      tx.transcript.findMany({
+        where: { evidence: { sessionId: report.sessionId }, confirmed: true },
+        select: { id: true, version: true, status: true, confirmed: true },
+      }),
+      tx.sessionSummary.findMany({
+        where: { sessionId: report.sessionId, confirmed: true },
+        select: { id: true, version: true, status: true, confirmed: true },
       }),
     ]);
 
@@ -678,6 +766,20 @@ export class ReportsService {
         type: 'action_item' as const,
         version: row.version,
         status: row.status,
+      })),
+      ...transcripts.map((row) => ({
+        ...scope,
+        id: row.id,
+        type: 'transcript' as const,
+        version: row.version,
+        status: row.confirmed ? 'confirmed' : row.status,
+      })),
+      ...summaries.map((row) => ({
+        ...scope,
+        id: row.id,
+        type: 'session_summary' as const,
+        version: row.version,
+        status: row.confirmed ? 'confirmed' : row.status,
       })),
     ];
 
@@ -730,6 +832,40 @@ export class ReportsService {
           return tx.commitment.findUnique({ where: { id: sourceId } });
         case 'action_item':
           return tx.actionItem.findUnique({ where: { id: sourceId } });
+        case 'transcript': {
+          const found = await tx.transcript.findUnique({
+            where: { id: sourceId },
+            include: {
+              evidence: { select: { organisationId: true, workspaceId: true, sessionId: true } },
+            },
+          });
+          return found === null
+            ? null
+            : {
+                id: found.id,
+                version: found.version,
+                status: found.confirmed ? 'confirmed' : found.status,
+                organisationId: found.evidence.organisationId,
+                workspaceId: found.evidence.workspaceId,
+                sessionId: found.evidence.sessionId,
+              };
+        }
+        case 'session_summary': {
+          const found = await tx.sessionSummary.findUnique({
+            where: { id: sourceId },
+            include: { session: { select: { organisationId: true, workspaceId: true } } },
+          });
+          return found === null
+            ? null
+            : {
+                id: found.id,
+                version: found.version,
+                status: found.confirmed ? 'confirmed' : found.status,
+                organisationId: found.session.organisationId,
+                workspaceId: found.session.workspaceId,
+                sessionId: found.sessionId,
+              };
+        }
       }
     })();
 
@@ -827,7 +963,7 @@ export class ReportsService {
     const byType = (type: ReportSourceType): string[] =>
       rows.filter((row) => row.sourceType === type).map((row) => row.sourceId);
 
-    const [evidence, decisions, commitments, actions] = await Promise.all([
+    const [evidence, decisions, commitments, actions, transcripts, summaries] = await Promise.all([
       this.prisma.evidence.findMany({
         where: { id: { in: byType('evidence') } },
         select: { id: true, title: true, version: true },
@@ -844,11 +980,25 @@ export class ReportsService {
         where: { id: { in: byType('action_item') } },
         select: { id: true, title: true, version: true },
       }),
+      this.prisma.transcript.findMany({
+        where: { id: { in: byType('transcript') } },
+        select: { id: true, version: true, evidence: { select: { title: true } } },
+      }),
+      this.prisma.sessionSummary.findMany({
+        where: { id: { in: byType('session_summary') } },
+        select: { id: true, version: true, session: { select: { title: true } } },
+      }),
     ]);
 
     const current = new Map<string, { title: string; version: number }>();
     for (const row of [...evidence, ...decisions, ...commitments, ...actions]) {
       current.set(row.id, { title: row.title, version: row.version });
+    }
+    for (const row of transcripts) {
+      current.set(row.id, { title: `Transcript of "${row.evidence.title}"`, version: row.version });
+    }
+    for (const row of summaries) {
+      current.set(row.id, { title: `Summary of "${row.session.title}"`, version: row.version });
     }
 
     return rows.map((row: ReportSourceRow) => {

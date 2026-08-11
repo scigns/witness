@@ -435,6 +435,7 @@ model CoDesignSession {
   outcomeSupports           OutcomeSupport[]
   reports                   Report[]
   reportSources             ReportSource[]
+  summary                   SessionSummary?
 
   @@index([organisationId])
   @@index([workspaceId, status])
@@ -767,8 +768,10 @@ model Evidence {
   /// Optimistic-concurrency counter; bumped on every mutation.
   version Int @default(1)
 
-  linksFrom         EvidenceLink[]     @relation("EvidenceLinkFrom")
-  linksTo           EvidenceLink[]     @relation("EvidenceLinkTo")
+  linksFrom         EvidenceLink[]      @relation("EvidenceLinkFrom")
+  linksTo           EvidenceLink[]      @relation("EvidenceLinkTo")
+  attachment        EvidenceAttachment?
+  transcript        Transcript?
   reviewAssignments ReviewAssignment[]
   clarifications    Clarification[]
   outcomeSupports   OutcomeSupport[]   @relation("OutcomeSupportEvidence")
@@ -820,6 +823,108 @@ model EvidenceLink {
   @@index([sessionId])
   @@index([toEvidenceId])
   @@map("evidence_link")
+}
+
+/// The source file (an audio recording, to start) backing one piece of
+/// `Evidence` — see `packages/domain/src/evidence-attachment.ts`'s file
+/// header for why the bytes live in this database rather than a separate
+/// store, and why this is capture-once rather than editable.
+///
+/// One attachment per `Evidence` row for this MVP slice — the unique
+/// constraint on `evidenceId` is what enforces that; a future capability
+/// that needs several source files per piece of evidence drops it.
+model EvidenceAttachment {
+  id String @id @db.Uuid
+
+  evidenceId String   @unique @map("evidence_id") @db.Uuid
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  kind             String @db.VarChar(16)
+  originalFilename String @map("original_filename") @db.VarChar(300)
+  contentType      String @map("content_type") @db.VarChar(100)
+  sizeBytes        Int    @map("size_bytes")
+  checksumSha256   String @map("checksum_sha256") @db.VarChar(64)
+
+  /// The file itself.
+  content Bytes
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("evidence_attachment")
+}
+
+/// Speech-to-text output for one piece of evidence's audio attachment —
+/// see `packages/domain/src/transcript.ts`'s file header for the
+/// pending/processing/completed/failed state machine and why
+/// `generatedText`/`editedText` are two separate columns rather than one
+/// that gets overwritten.
+model Transcript {
+  id String @id @db.Uuid
+
+  evidenceId String   @unique @map("evidence_id") @db.Uuid
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  attachmentId String @map("attachment_id") @db.Uuid
+
+  status String @default("pending") @db.VarChar(16)
+
+  generatedText String? @map("generated_text") @db.Text
+  editedText    String? @map("edited_text") @db.Text
+
+  /// `TranscriptSegment[]` — see the domain type. Stored as JSON rather than
+  /// a child table: segments are read and written as one unit with the
+  /// transcript, never queried independently.
+  segments Json @default("[]")
+
+  model    String? @db.VarChar(100)
+  language String? @db.VarChar(50)
+
+  confirmed Boolean @default(false)
+
+  failureReason String? @map("failure_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every mutation.
+  version Int @default(1)
+
+  @@map("transcript")
+}
+
+/// An AI-drafted summary of one co-design session's confirmed content — see
+/// `packages/domain/src/session-summary.ts`'s file header. One per session
+/// (the unique constraint on `sessionId`), same pending/processing/completed/
+/// failed lifecycle as `Transcript`.
+model SessionSummary {
+  id String @id @db.Uuid
+
+  sessionId String          @unique @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  status String @default("pending") @db.VarChar(16)
+
+  /// Evidence ids that fed this summary — provenance, not a foreign key
+  /// list (an evidence row can later be withdrawn without invalidating the
+  /// citation of what was true when the summary was generated).
+  sourceEvidenceIds String[] @default([]) @map("source_evidence_ids")
+
+  generatedText String? @map("generated_text") @db.Text
+  editedText    String? @map("edited_text") @db.Text
+
+  model String? @db.VarChar(100)
+
+  confirmed Boolean @default(false)
+
+  failureReason String? @map("failure_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every mutation.
+  version Int @default(1)
+
+  @@map("session_summary")
 }
 
 /// Who is reviewing a specific piece of evidence, and where that review

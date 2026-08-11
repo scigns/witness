@@ -9,6 +9,39 @@
 #
 #   docker build -f services/api-gateway/Dockerfile -t witness-api .
 
+# ── Local speech-to-text (Phase 3, ADR-0009) ────────────────────────────────
+# Compiled and its model downloaded once, here, at build time — the only
+# network access this capability ever needs. The runtime stage below copies
+# just the binary and the model file; at request time, transcription is a
+# local subprocess with no network access at all, which is what lets it run
+# in the `sovereign` profile.
+FROM node:22-bookworm-slim AS whisper
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential cmake git curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /whisper
+
+# Pinned tag — a moving `master` would make this image's build nondeterministic.
+RUN git clone --depth 1 --branch v1.7.4 https://github.com/ggerganov/whisper.cpp.git .
+# GGML_NATIVE=OFF: ggml's CPU-feature auto-detection composes an -mcpu value
+# (e.g. `native+nodotprod+noi8mm+nosve`) that this GCC on aarch64 rejects.
+# Building for a generic target is the portable, cross-host-reproducible
+# choice anyway — this image is not compiled separately per deployment
+# machine.
+# BUILD_SHARED_LIBS=OFF: a shared-library build leaves `whisper-cli` needing
+# libwhisper.so/libggml*.so at runtime, which the slim runtime stage below
+# does not have — copying just the CLI binary is the whole point of this
+# multi-stage build. Static linking means the one binary is self-contained.
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DBUILD_SHARED_LIBS=OFF \
+ && cmake --build build --config Release -j"$(nproc)"
+
+# Multilingual "base" — CPU-fast enough for a single-laptop pilot, and
+# meaningfully more accurate than "tiny". `WITNESS_WHISPER_MODEL` in
+# local-whisper.adapter.ts must agree with whichever name is downloaded here.
+RUN bash ./models/download-ggml-model.sh base
+
 FROM node:22-bookworm-slim AS build
 
 # Without this, `prisma generate` can't detect the build stage's real OpenSSL
@@ -49,9 +82,12 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 FROM node:22-bookworm-slim AS runtime
 
 # `prisma migrate deploy` runs from this image during a controlled deployment,
-# and pg_isready is what the healthcheck and the runbook use.
+# and pg_isready is what the healthcheck and the runbook use. `ffmpeg` is
+# `LocalWhisperAdapter`'s only way to turn whatever format a browser recorded
+# into the 16kHz mono PCM WAV whisper.cpp requires — a local binary, no
+# network access, same category as `postgresql-client`.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends openssl postgresql-client ca-certificates \
+ && apt-get install -y --no-install-recommends openssl postgresql-client ca-certificates ffmpeg \
  && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
@@ -69,6 +105,9 @@ COPY --from=build --chown=node:node /repo/package.json ./package.json
 COPY --from=build --chown=node:node /repo/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=build --chown=node:node /repo/packages ./packages
 COPY --from=build --chown=node:node /repo/services/api-gateway ./services/api-gateway
+
+COPY --from=whisper --chown=node:node /whisper/build/bin/whisper-cli /usr/local/bin/whisper-cli
+COPY --from=whisper --chown=node:node /whisper/models/ggml-base.bin /opt/whisper/ggml-base.bin
 
 # Never root. A compromised process should not be able to rewrite its own image.
 USER node

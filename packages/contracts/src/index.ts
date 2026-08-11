@@ -90,6 +90,27 @@ export const addMembershipRequestSchema = z.object({
 export type AddMembershipRequest = z.infer<typeof addMembershipRequestSchema>;
 
 /**
+ * Onboard a brand-new person into one organisation in a single call: account,
+ * membership and role assignment together. This is the organisation-scoped
+ * counterpart to `createUserRequestSchema` — that request has no
+ * organisation to scope to and so only ever reaches the `admin` tier through
+ * the (deliberately unreachable) global grant resolution; this one is
+ * authorised against the organisation itself, which an organisation
+ * administrator does hold.
+ */
+export const inviteOrganisationUserRequestSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'An email address is required')
+    .max(320)
+    .email('A valid email address is required'),
+  displayName: z.string().trim().min(1, 'A display name is required').max(200),
+  role: z.enum(WITNESS_ROLES, { message: 'A recognised Witness role is required' }),
+});
+export type InviteOrganisationUserRequest = z.infer<typeof inviteOrganisationUserRequestSchema>;
+
+/**
  * Mirrors the review-action pattern (`reviewActionSchema` above): a named
  * transition rather than a raw target state, so an invalid transition is a
  * validation error with a clear name rather than an opaque enum value.
@@ -803,6 +824,40 @@ export type OutcomeType = (typeof OUTCOME_TYPES)[number];
 export const OUTCOME_SUPPORT_BASES = ['validated_evidence', 'institutional_synthesis'] as const;
 export type OutcomeSupportBasis = (typeof OUTCOME_SUPPORT_BASES)[number];
 
+export const OUTCOME_CANDIDATE_JOB_STATUSES = ['pending', 'completed', 'failed'] as const;
+export type OutcomeCandidateJobStatus = (typeof OUTCOME_CANDIDATE_JOB_STATUSES)[number];
+
+/**
+ * A candidate decision, commitment, or action suggested by the local model
+ * from a session's evidence and transcripts — never persisted, never itself
+ * an outcome. Accepting one means calling the matching `propose*`/`create*`
+ * request below with these fields pre-filled; the human may edit anything
+ * before that request is ever sent, and nothing here becomes institutional
+ * record until they do.
+ */
+export interface OutcomeCandidateView {
+  type: OutcomeType;
+  title: string;
+  description: string;
+  /** Only meaningful for `commitment`/`action_item` — `null` when the source text does not say. */
+  ownerDescription: string | null;
+  /** Which evidence item most directly supports this candidate, if any. */
+  sourceEvidenceId: string | null;
+  model: string;
+}
+
+/**
+ * Generation runs as a background job (CPU-bound local inference can take
+ * longer than a proxy in front of this deployment holds a connection open)
+ * — `POST .../outcome-candidates` returns a `jobId` immediately;
+ * `GET .../outcome-candidates/:jobId` polls this until `status` is terminal.
+ */
+export interface OutcomeCandidateJobView {
+  status: OutcomeCandidateJobStatus;
+  candidates: OutcomeCandidateView[] | null;
+  failureReason: string | null;
+}
+
 export const proposeDecisionRequestSchema = z.object({
   title: z.string().trim().min(1, 'A title is required').max(300),
   statement: z.string().trim().min(1, 'A decision statement is required').max(5000),
@@ -977,7 +1032,14 @@ export type ReportStatus = (typeof REPORT_STATUSES)[number];
 export const REPORT_AUDIENCES = ['internal', 'external', 'public'] as const;
 export type ReportAudience = (typeof REPORT_AUDIENCES)[number];
 
-export const REPORT_SOURCE_TYPES = ['evidence', 'decision', 'commitment', 'action_item'] as const;
+export const REPORT_SOURCE_TYPES = [
+  'evidence',
+  'decision',
+  'commitment',
+  'action_item',
+  'transcript',
+  'session_summary',
+] as const;
 export type ReportSourceType = (typeof REPORT_SOURCE_TYPES)[number];
 
 /** How evidence may be attributed in a report once redacted. Never a real name. */
@@ -1131,6 +1193,24 @@ export interface OrganisationMembershipView {
   permittedActions: MembershipAction['action'][];
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * The result of `POST /api/v1/organisations/:organisationId/users` — a new
+ * account, already a member of that organisation and already carrying the
+ * given role. The account is `invited` until the person signs in through the
+ * identity provider with this exact (verified) email address, same as an
+ * account created through `pnpm invite`.
+ */
+export interface OrganisationInvitationView {
+  userId: string;
+  email: string;
+  displayName: string;
+  accountState: AccountState;
+  organisationId: string;
+  membershipId: string;
+  role: WitnessRole;
+  createdAt: string;
 }
 
 export interface WorkspaceMembershipView {
@@ -1467,6 +1547,105 @@ export interface EvidenceDetail extends EvidenceSummary {
   withdrawalReason?: string | null;
   /** The reviewer's stated reason for the most recent validate/reject decision. */
   reviewDecisionReason: string | null;
+  /** `null` when no file has been attached to this evidence yet. */
+  attachment: EvidenceAttachmentView | null;
+  /** `null` until a transcription has been requested for this evidence's attachment. */
+  transcript: TranscriptView | null;
+}
+
+export const TRANSCRIPT_STATUSES = ['pending', 'processing', 'completed', 'failed'] as const;
+export type TranscriptStatus = (typeof TRANSCRIPT_STATUSES)[number];
+
+export interface TranscriptSegmentView {
+  text: string;
+  startMs: number | null;
+  endMs: number | null;
+}
+
+/**
+ * `generatedText` is what the local model produced and is never overwritten;
+ * `editedText` is a human correction, kept separately. `effectiveText` (the
+ * server-computed convenience the rest of the product should read) is
+ * `editedText` when present, `generatedText` otherwise — see
+ * `packages/domain/src/transcript.ts`'s `effectiveTranscriptText`.
+ */
+export interface TranscriptView {
+  id: string;
+  evidenceId: string;
+  attachmentId: string;
+  status: TranscriptStatus;
+  generatedText: string | null;
+  editedText: string | null;
+  effectiveText: string | null;
+  segments: TranscriptSegmentView[];
+  model: string | null;
+  language: string | null;
+  confirmed: boolean;
+  failureReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export const SUMMARY_STATUSES = ['pending', 'processing', 'completed', 'failed'] as const;
+export type SummaryStatus = (typeof SUMMARY_STATUSES)[number];
+
+/**
+ * An AI-drafted summary of one co-design session's confirmed content.
+ * `sourceEvidenceIds` is the citation list — which evidence fed the
+ * summary, for the "inspect provenance" requirement every generated-content
+ * view in this product carries.
+ */
+export interface SessionSummaryView {
+  id: string;
+  sessionId: string;
+  status: SummaryStatus;
+  sourceEvidenceIds: string[];
+  generatedText: string | null;
+  editedText: string | null;
+  effectiveText: string | null;
+  model: string | null;
+  confirmed: boolean;
+  failureReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export const editTranscriptRequestSchema = z.object({
+  editedText: z.string().trim().min(1, 'A transcript must not be empty').max(200_000),
+  expectedVersion: z.number().int().min(1),
+});
+export type EditTranscriptRequest = z.infer<typeof editTranscriptRequestSchema>;
+
+export const transcriptVersionRequestSchema = z.object({
+  expectedVersion: z.number().int().min(1),
+});
+export type TranscriptVersionRequest = z.infer<typeof transcriptVersionRequestSchema>;
+
+export const editSummaryRequestSchema = z.object({
+  editedText: z.string().trim().min(1, 'A summary must not be empty').max(50_000),
+  expectedVersion: z.number().int().min(1),
+});
+export type EditSummaryRequest = z.infer<typeof editSummaryRequestSchema>;
+
+export const EVIDENCE_ATTACHMENT_KINDS = ['audio'] as const;
+export type EvidenceAttachmentKind = (typeof EVIDENCE_ATTACHMENT_KINDS)[number];
+
+/**
+ * The source file backing one piece of evidence — metadata only. The bytes
+ * themselves are fetched separately, from
+ * `GET .../evidence/:evidenceId/attachment/content`.
+ */
+export interface EvidenceAttachmentView {
+  id: string;
+  evidenceId: string;
+  kind: EvidenceAttachmentKind;
+  originalFilename: string;
+  contentType: string;
+  sizeBytes: number;
+  checksumSha256: string;
+  createdAt: string;
 }
 
 export interface EvidenceLinkView {
@@ -1746,6 +1925,26 @@ export interface RenderedOutcome {
 }
 
 /**
+ * A confirmed transcript as it appears in a rendered report — the same
+ * redaction shape as `RenderedEvidence` (`content` structurally absent when
+ * not quotable), applied to the evidence the transcript belongs to. See
+ * `packages/domain/src/report-composition.ts`'s `projectTranscriptForReport`.
+ */
+export interface RenderedTranscript {
+  evidenceId: string;
+  evidenceTitle: string;
+  attribution: ReportAttributionLabel;
+  quotable: boolean;
+  content?: string;
+  pseudonym?: string;
+}
+
+/** A confirmed session summary as it appears in a rendered report. */
+export interface RenderedSessionSummary {
+  content: string;
+}
+
+/**
  * A report composed for reading or export. Everything here has already passed
  * through server-side redaction; the client renders it, it does not filter it.
  */
@@ -1760,6 +1959,8 @@ export interface RenderedReport {
   };
   participants: RenderedParticipantSummary;
   evidence: RenderedEvidence[];
+  transcripts: RenderedTranscript[];
+  sessionSummary: RenderedSessionSummary | null;
   decisions: RenderedOutcome[];
   commitments: RenderedOutcome[];
   actions: RenderedOutcome[];
@@ -1799,6 +2000,45 @@ export interface HealthResponse {
    * or simply not built yet.
    */
   notImplemented: string[];
+}
+
+// ─── Search (Phase 6) ──────────────────────────────────────────────────────────
+
+export const SEARCH_RESULT_TYPES = [
+  'session',
+  'evidence',
+  'transcript',
+  'summary',
+  'decision',
+  'commitment',
+  'action_item',
+] as const;
+export type SearchResultType = (typeof SEARCH_RESULT_TYPES)[number];
+
+/**
+ * One matched thing, from a plain scoped-text search across a workspace —
+ * "have we discussed this before?", not a knowledge graph or a vector
+ * index. Always traceable: `sessionId` and (where the match has one)
+ * `evidenceId` are the same ids the rest of the product already uses to
+ * link to the source, and `aiGenerated`/`confirmed` say plainly whether a
+ * result is someone's own words or a model's, and whether a human has
+ * signed off on it yet.
+ */
+export interface SearchResultView {
+  type: SearchResultType;
+  sessionId: string;
+  sessionTitle: string;
+  /** The matched row's own id, for types with a dedicated detail view (evidence, decision, commitment, action_item). */
+  entityId: string | null;
+  /** The evidence a transcript match belongs to — absent for every other type. */
+  evidenceId: string | null;
+  title: string;
+  snippet: string;
+  /** The matched row's own lifecycle status (draft/submitted/proposed/open/…), for display, not for a state machine. */
+  status: string | null;
+  aiGenerated: boolean;
+  /** Only meaningful for AI-generated content (transcript, summary) — `null` for everything else. */
+  confirmed: boolean | null;
 }
 
 // ─── Errors ──────────────────────────────────────────────────────────────────

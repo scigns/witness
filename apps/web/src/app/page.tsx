@@ -222,12 +222,12 @@ export default function DashboardPage() {
       {health !== null && health.notImplemented.length > 0 && (
         <section aria-labelledby="gaps-heading" className="space-y-3">
           <h2 id="gaps-heading" className="text-lg font-semibold">
-            Not implemented in this build
+            Post-MVP / deferred
           </h2>
           <Card>
             <p className="mb-3 text-sm text-[var(--color-ink-muted)]">
-              Listed so you never have to guess whether something is broken or simply not built yet.
-              Nothing below is simulated.
+              Deliberately out of scope for this release, not broken or forgotten — listed so you
+              never have to guess which is which.
             </p>
             <ul className="list-inside list-disc space-y-1 text-sm">
               {health.notImplemented.map((item) => (

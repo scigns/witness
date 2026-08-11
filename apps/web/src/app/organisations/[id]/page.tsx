@@ -9,7 +9,7 @@
  */
 
 import Link from 'next/link';
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useState, type FormEvent } from 'react';
 
 import type {
   MembershipAction,
@@ -49,6 +49,10 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
   const [roles, setRoles] = useState<RoleDefinition[]>([]);
   const [roleAssignments, setRoleAssignments] = useState<Record<string, RoleAssignmentView>>({});
   const [selectedUserId, setSelectedUserId] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteDisplayName, setInviteDisplayName] = useState('');
+  const [inviteRole, setInviteRole] = useState('');
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -132,6 +136,33 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
     }
   };
 
+  const inviteUser = async (event: FormEvent) => {
+    event.preventDefault();
+    if (inviteRole === '') return;
+    setBusy(true);
+    setError(null);
+    setInviteMessage(null);
+    try {
+      const invited = await api.inviteOrganisationUser(
+        id,
+        { email: inviteEmail, displayName: inviteDisplayName, role: inviteRole as WitnessRole },
+        user,
+      );
+      setInviteEmail('');
+      setInviteDisplayName('');
+      setInviteRole('');
+      setInviteMessage(
+        `${invited.displayName} was added to this organisation as ${invited.role}. They can sign ` +
+          `in once they authenticate with ${invited.email}.`,
+      );
+      await load({ current: false });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const applyAction = async (membershipId: string, action: MembershipAction['action']) => {
     setBusy(true);
     try {
@@ -196,26 +227,102 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
         <LinkButton href={`/organisations/${id}/consent-templates`}>Consent templates →</LinkButton>
       </div>
 
+      <section aria-labelledby="invite-user-heading">
+        <h2 id="invite-user-heading" className="mb-3 text-lg font-semibold">
+          Invite a new person
+        </h2>
+        <Card className="space-y-4">
+          {inviteMessage !== null && (
+            <p className="text-sm text-[var(--color-ink)]" role="status">
+              {inviteMessage}
+            </p>
+          )}
+          <form onSubmit={(event) => void inviteUser(event)} className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label htmlFor="inviteDisplayName" className="mb-1 block text-sm font-medium">
+                  Name <span aria-hidden="true">*</span>
+                  <span className="sr-only">(required)</span>
+                </label>
+                <input
+                  id="inviteDisplayName"
+                  required
+                  maxLength={200}
+                  value={inviteDisplayName}
+                  onChange={(event) => setInviteDisplayName(event.target.value)}
+                  placeholder="Mele Tupou"
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                />
+              </div>
+              <div>
+                <label htmlFor="inviteEmail" className="mb-1 block text-sm font-medium">
+                  Email <span aria-hidden="true">*</span>
+                  <span className="sr-only">(required)</span>
+                </label>
+                <input
+                  id="inviteEmail"
+                  type="email"
+                  required
+                  maxLength={320}
+                  value={inviteEmail}
+                  onChange={(event) => setInviteEmail(event.target.value)}
+                  placeholder="mele@example.org"
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                />
+              </div>
+              <div>
+                <label htmlFor="inviteRole" className="mb-1 block text-sm font-medium">
+                  Role <span aria-hidden="true">*</span>
+                  <span className="sr-only">(required)</span>
+                </label>
+                <select
+                  id="inviteRole"
+                  required
+                  value={inviteRole}
+                  onChange={(event) => setInviteRole(event.target.value)}
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                >
+                  <option value="">Choose a role…</option>
+                  {roles.map((definition) => (
+                    <option
+                      key={definition.role}
+                      value={definition.role}
+                      title={definition.description}
+                    >
+                      {definition.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <p className="text-xs text-[var(--color-ink-muted)]">
+              Registers a Witness account, adds it to this organisation and assigns the chosen role,
+              all at once. There is no invitation email yet — the person activates their account by
+              signing in through the identity provider with this exact email address.
+            </p>
+            <Button type="submit" variant="primary" disabled={busy || inviteRole === ''}>
+              {busy ? 'Inviting…' : 'Invite to this organisation'}
+            </Button>
+          </form>
+        </Card>
+      </section>
+
       <section aria-labelledby="add-member-heading">
         <h2 id="add-member-heading" className="mb-3 text-lg font-semibold">
-          Add a user to this organisation
+          Add an existing Witness user
         </h2>
         <Card className="space-y-3">
           {usersUnavailable ? (
             <p className="text-sm text-[var(--color-ink-muted)]">
               You can&apos;t browse the full user directory from here — that needs a
               platform-administrator role nobody holds yet, by design (see{' '}
-              <code>prisma/invite.ts</code>). Ask an operator to run <code>pnpm invite</code> to
-              register a new person against this organisation; once they exist, assign or change
-              their role in the table below.
+              <code>prisma/invite.ts</code>). This only affects moving someone who already has a
+              Witness account into this organisation; use the invite form above for anyone new.
             </p>
           ) : eligibleUsers.length === 0 ? (
             <p className="text-sm text-[var(--color-ink-muted)]">
-              Every registered user is already a member, or none exist yet.{' '}
-              <Link href="/users/new" className="underline">
-                Add a user
-              </Link>{' '}
-              first.
+              Every registered user is already a member, or none exist yet. Use the invite form
+              above to register someone new.
             </p>
           ) : (
             <div className="flex flex-wrap items-center gap-2">

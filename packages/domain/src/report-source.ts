@@ -8,8 +8,8 @@
  * for the same reason. A reader of revision 2 can tell that the evidence
  * behind a paragraph has been corrected since revision 1 said it.
  *
- * Only four kinds of record are admissible, and the gate below refuses
- * everything else by name:
+ * Six kinds of record are admissible, and the gate below refuses everything
+ * else by name:
  *
  * - **validated evidence** — reviewed and validated in Milestone 6. Draft,
  *   submitted, under-review, needs-clarification, rejected and withdrawn
@@ -21,6 +21,15 @@
  *   an undertaking; a withdrawn one is the opposite of one.
  * - **actions** in any state, because an action that was cancelled is part of
  *   an honest account of what happened.
+ * - **confirmed transcripts** and **confirmed session summaries** (Phase 3/4)
+ *   — both are AI-generated until a human confirms them, and the same
+ *   "confirmed, not merely completed" bar that governs `outcome:confirm`
+ *   applies here: a report is exactly the kind of institutional artefact
+ *   Phase 4's confirm gate exists to keep unconfirmed AI output out of.
+ *   `assertSourceAdmissible` reuses the `status` field to carry this —
+ *   the service passes `'confirmed'` when the record's own `confirmed`
+ *   flag is true, its raw status otherwise, so this gate stays a single
+ *   flat status check like every other source type.
  *
  * The facilitator's own synthesis is *not* a source. It lives on the report
  * itself (`report.ts`) precisely so that it can never be rendered as though a
@@ -41,7 +50,14 @@ import type {
   WorkspaceId,
 } from './ids.js';
 
-export const REPORT_SOURCE_TYPES = ['evidence', 'decision', 'commitment', 'action_item'] as const;
+export const REPORT_SOURCE_TYPES = [
+  'evidence',
+  'decision',
+  'commitment',
+  'action_item',
+  'transcript',
+  'session_summary',
+] as const;
 export type ReportSourceType = (typeof REPORT_SOURCE_TYPES)[number];
 
 /**
@@ -78,6 +94,8 @@ const ADMISSIBLE_COMMITMENT: ReadonlySet<CommitmentStatus> = new Set<CommitmentS
   'active',
   'fulfilled',
 ]);
+/** See the file header — the service maps `confirmed: true` to this status string. */
+const CONFIRMED_STATUS = 'confirmed';
 
 /**
  * The single gate on what a report may draw on.
@@ -136,6 +154,22 @@ export function assertSourceAdmissible(candidate: CandidateSource, report: Repor
     case 'action_item':
       // Every state of an action is reportable, including cancelled: an
       // honest account of what an institution did includes what it stopped.
+      return;
+    case 'transcript':
+      if (candidate.status !== CONFIRMED_STATUS) {
+        throw new InvariantViolation(
+          'Only a confirmed transcript can appear in a report.',
+          'SOURCE_TRANSCRIPT_NOT_CONFIRMED',
+        );
+      }
+      return;
+    case 'session_summary':
+      if (candidate.status !== CONFIRMED_STATUS) {
+        throw new InvariantViolation(
+          'Only a confirmed session summary can appear in a report.',
+          'SOURCE_SUMMARY_NOT_CONFIRMED',
+        );
+      }
       return;
   }
 }

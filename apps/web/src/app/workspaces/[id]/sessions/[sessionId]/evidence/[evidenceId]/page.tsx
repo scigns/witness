@@ -33,6 +33,7 @@ import {
   type EvidenceDetail,
   type EvidenceLinkView,
   type ReviewAssignmentView,
+  type TranscriptView,
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
@@ -54,6 +55,18 @@ const LINK_TYPE_LABELS: Record<(typeof EVIDENCE_LINK_TYPES)[number], string> = {
   follows_from: 'Follows from',
   related_to: 'Related to',
 };
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
 
 /** Who this page may offer as a reviewer: a member of the evidence's workspace. */
 interface ReviewerOption {
@@ -95,6 +108,18 @@ export default function EvidenceDetailPage({
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawReason, setWithdrawReason] = useState('');
 
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [attachmentAudioUrl, setAttachmentAudioUrl] = useState<string | null>(null);
+  const [attachmentLoadingAudio, setAttachmentLoadingAudio] = useState(false);
+
+  const [transcript, setTranscript] = useState<TranscriptView | null>(null);
+  const [transcriptBusy, setTranscriptBusy] = useState(false);
+  const [transcriptError, setTranscriptError] = useState<string | null>(null);
+  const [editingTranscript, setEditingTranscript] = useState(false);
+  const [transcriptEditText, setTranscriptEditText] = useState('');
+
   const [linkType, setLinkType] = useState<(typeof EVIDENCE_LINK_TYPES)[number]>('related_to');
   const [linkTargetId, setLinkTargetId] = useState('');
   const [linkNote, setLinkNote] = useState('');
@@ -134,6 +159,7 @@ export default function EvidenceDetailPage({
         ]);
         if (cancelledRef.current) return;
         setEvidence(evidenceResult);
+        setTranscript(evidenceResult.transcript);
         setEditTitle(evidenceResult.title);
         setEditContent(evidenceResult.content);
         setEditTags(evidenceResult.tags.join(', '));
@@ -204,6 +230,133 @@ export default function EvidenceDetailPage({
     setStaleUpdate(false);
     setLoading(true);
     void load({ current: false });
+  };
+
+  // Revoke the object URL whenever it changes or the page unmounts — the
+  // browser will not release the underlying blob memory on its own.
+  useEffect(() => {
+    return () => {
+      if (attachmentAudioUrl !== null) URL.revokeObjectURL(attachmentAudioUrl);
+    };
+  }, [attachmentAudioUrl]);
+
+  const uploadAttachment = async () => {
+    if (attachmentFile === null) return;
+    setAttachmentBusy(true);
+    setAttachmentError(null);
+    try {
+      const uploaded = await api.uploadEvidenceAttachment(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        attachmentFile,
+        user,
+      );
+      setEvidence((current) => (current === null ? current : { ...current, attachment: uploaded }));
+      setAttachmentFile(null);
+    } catch (caught) {
+      setAttachmentError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setAttachmentBusy(false);
+    }
+  };
+
+  const loadAttachmentAudio = async () => {
+    setAttachmentLoadingAudio(true);
+    setAttachmentError(null);
+    try {
+      const blob = await api.getEvidenceAttachmentBlob(workspaceId, sessionId, evidenceId, user);
+      setAttachmentAudioUrl(URL.createObjectURL(blob));
+    } catch (caught) {
+      setAttachmentError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setAttachmentLoadingAudio(false);
+    }
+  };
+
+  // Transcription runs as a background job on the server (local CPU
+  // inference can take minutes) — poll while it is in flight, and stop as
+  // soon as it lands on a terminal status.
+  useEffect(() => {
+    if (transcript === null) return;
+    if (transcript.status !== 'pending' && transcript.status !== 'processing') return;
+
+    const interval = setInterval(() => {
+      api
+        .getTranscript(workspaceId, sessionId, evidenceId, user)
+        .then(setTranscript)
+        .catch(() => {
+          // A transient poll failure is not worth surfacing as an error —
+          // the next tick tries again.
+        });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [transcript, workspaceId, sessionId, evidenceId, user]);
+
+  const requestTranscription = async () => {
+    setTranscriptBusy(true);
+    setTranscriptError(null);
+    try {
+      setTranscript(await api.requestTranscript(workspaceId, sessionId, evidenceId, user));
+    } catch (caught) {
+      setTranscriptError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setTranscriptBusy(false);
+    }
+  };
+
+  const retryTranscription = async () => {
+    setTranscriptBusy(true);
+    setTranscriptError(null);
+    try {
+      setTranscript(await api.retryTranscript(workspaceId, sessionId, evidenceId, user));
+    } catch (caught) {
+      setTranscriptError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setTranscriptBusy(false);
+    }
+  };
+
+  const saveTranscriptEdit = async () => {
+    if (transcript === null || transcriptEditText.trim() === '') return;
+    setTranscriptBusy(true);
+    setTranscriptError(null);
+    try {
+      const updated = await api.editTranscript(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        { editedText: transcriptEditText, expectedVersion: transcript.version },
+        user,
+      );
+      setTranscript(updated);
+      setEditingTranscript(false);
+    } catch (caught) {
+      setTranscriptError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setTranscriptBusy(false);
+    }
+  };
+
+  const confirmTranscription = async () => {
+    if (transcript === null) return;
+    setTranscriptBusy(true);
+    setTranscriptError(null);
+    try {
+      const confirmed = await api.confirmTranscript(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        { expectedVersion: transcript.version },
+        user,
+      );
+      setTranscript(confirmed);
+    } catch (caught) {
+      setTranscriptError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setTranscriptBusy(false);
+    }
   };
 
   const runMutation = async (operation: () => Promise<EvidenceDetail>) => {
@@ -645,6 +798,186 @@ export default function EvidenceDetailPage({
             </p>
           )}
         </Card>
+      )}
+
+      <section aria-labelledby="attachment-heading">
+        <h2 id="attachment-heading" className="mb-3 text-lg font-semibold">
+          Audio recording
+        </h2>
+        {attachmentError !== null && <ErrorNotice message={attachmentError} />}
+        <Card className="space-y-3">
+          {evidence.attachment !== null ? (
+            <div className="space-y-3 text-sm">
+              <p>
+                <span className="font-medium">{evidence.attachment.originalFilename}</span>{' '}
+                <span className="text-[var(--color-ink-muted)]">
+                  ({formatBytes(evidence.attachment.sizeBytes)}, {evidence.attachment.contentType})
+                </span>
+              </p>
+              {attachmentAudioUrl === null ? (
+                <Button
+                  variant="secondary"
+                  disabled={attachmentLoadingAudio}
+                  onClick={() => void loadAttachmentAudio()}
+                >
+                  {attachmentLoadingAudio ? 'Loading…' : 'Load recording'}
+                </Button>
+              ) : (
+                <audio controls src={attachmentAudioUrl} className="w-full">
+                  <track kind="captions" />
+                </audio>
+              )}
+              <p className="text-xs text-[var(--color-ink-muted)]">
+                sha256 {evidence.attachment.checksumSha256}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-[var(--color-ink-muted)]">
+                No audio has been attached to this evidence yet.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label htmlFor="attachmentFile" className="sr-only">
+                  Audio file
+                </label>
+                <input
+                  id="attachmentFile"
+                  type="file"
+                  accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/x-wav,audio/webm,audio/ogg"
+                  onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
+                  className="text-sm"
+                />
+                <Button
+                  variant="primary"
+                  disabled={attachmentBusy || attachmentFile === null}
+                  onClick={() => void uploadAttachment()}
+                >
+                  {attachmentBusy ? 'Uploading…' : 'Attach recording'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      </section>
+
+      {evidence.attachment !== null && (
+        <section aria-labelledby="transcript-heading">
+          <h2 id="transcript-heading" className="mb-3 text-lg font-semibold">
+            Transcript
+          </h2>
+          {transcriptError !== null && <ErrorNotice message={transcriptError} />}
+          <Card className="space-y-3">
+            {transcript === null ? (
+              <div className="space-y-2">
+                <p className="text-sm text-[var(--color-ink-muted)]">
+                  No transcript yet. Generated locally on this deployment — the recording never
+                  leaves it.
+                </p>
+                <Button
+                  variant="primary"
+                  disabled={transcriptBusy}
+                  onClick={() => void requestTranscription()}
+                >
+                  {transcriptBusy ? 'Requesting…' : 'Transcribe recording'}
+                </Button>
+              </div>
+            ) : transcript.status === 'pending' || transcript.status === 'processing' ? (
+              <p className="text-sm text-[var(--color-ink-muted)]" role="status">
+                {transcript.status === 'pending' ? 'Queued…' : 'Transcribing…'} This can take a few
+                minutes on a laptop CPU.
+              </p>
+            ) : transcript.status === 'failed' ? (
+              <div className="space-y-2 text-sm">
+                <p className="text-red-700 dark:text-red-400">
+                  Transcription failed: {transcript.failureReason}
+                </p>
+                <Button
+                  variant="secondary"
+                  disabled={transcriptBusy}
+                  onClick={() => void retryTranscription()}
+                >
+                  {transcriptBusy ? 'Retrying…' : 'Retry'}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-[var(--color-ink-muted)]">
+                    AI-generated by {transcript.model}
+                    {transcript.language !== null ? ` (${transcript.language})` : ''}
+                  </span>
+                  {transcript.confirmed && (
+                    <span className="inline-flex items-center rounded-full border border-current px-2 py-0.5 text-xs font-medium">
+                      Confirmed
+                    </span>
+                  )}
+                </div>
+                {editingTranscript ? (
+                  <div className="space-y-2">
+                    <label htmlFor="transcriptEditText" className="sr-only">
+                      Transcript text
+                    </label>
+                    <textarea
+                      id="transcriptEditText"
+                      rows={6}
+                      maxLength={200000}
+                      value={transcriptEditText}
+                      onChange={(event) => setTranscriptEditText(event.target.value)}
+                      className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        variant="primary"
+                        disabled={transcriptBusy || transcriptEditText.trim() === ''}
+                        onClick={() => void saveTranscriptEdit()}
+                      >
+                        {transcriptBusy ? 'Saving…' : 'Save'}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={transcriptBusy}
+                        onClick={() => setEditingTranscript(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="whitespace-pre-wrap">{transcript.effectiveText}</p>
+                    {transcript.editedText !== null && (
+                      <p className="text-xs text-[var(--color-ink-muted)]">
+                        Human-edited. The original AI transcript is preserved in this evidence's
+                        history.
+                      </p>
+                    )}
+                    {!transcript.confirmed && (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="secondary"
+                          disabled={transcriptBusy}
+                          onClick={() => {
+                            setTranscriptEditText(transcript.effectiveText ?? '');
+                            setEditingTranscript(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="primary"
+                          disabled={transcriptBusy}
+                          onClick={() => void confirmTranscription()}
+                        >
+                          Confirm
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </Card>
+        </section>
       )}
 
       {(canSubmit || canWithdraw) && (

@@ -95,6 +95,33 @@ services:
       timeout: 10s
       retries: 15
 
+  # ── Local text generation (Phase 4/5) ───────────────────────────────────────
+  # Session summaries and candidate-outcome extraction (services/api-gateway/
+  # src/summarization/). ADR-0009 forbids the sovereign profile from making any
+  # external call, so this runs in-network: no `ports:`, reachable only at
+  # http://ollama:11434 from the api container. The model is pulled once, into
+  # the named volume below, by this service's own start command — a one-time
+  # provisioning fetch, the same shape as the Dockerfile's whisper.cpp model
+  # download, not a per-request external call.
+  ollama:
+    <<: *common
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ollama serve &
+        sleep 3
+        ollama pull qwen2.5:1.5b
+        wait
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
   # ── Application ────────────────────────────────────────────────────────────
   api:
     <<: *common
@@ -117,6 +144,7 @@ services:
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-witness-api}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-witness-api}
       WITNESS_SESSION_TTL_MINUTES: ${WITNESS_SESSION_TTL_MINUTES:-480}
+      WITNESS_MAX_EVIDENCE_ATTACHMENT_MB: ${WITNESS_MAX_EVIDENCE_ATTACHMENT_MB:-200}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
     depends_on:
       postgres: { condition: service_healthy }
@@ -202,6 +230,7 @@ volumes:
   postgres-data: # BACKED UP — the system of record (scripts/ops/backup.sh)
   caddy-data: # certificates and their private keys
   caddy-config:
+  ollama-data: # re-downloadable model weights — not backed up, same reasoning as caddy-config
 
 networks:
   default:

@@ -197,6 +197,58 @@ export function projectEvidenceForReport(
   };
 }
 
+/**
+ * A confirmed transcript, as text, ready to be redacted the same way its
+ * evidence would be. Not a `Transcript` (packages/domain/src/transcript.ts)
+ * directly — this module never imports the domain models it redacts, only
+ * the flattened facts it needs (same convention `EvidenceForReport` sets).
+ */
+export interface TranscriptForReport {
+  readonly evidenceId: string;
+  readonly evidenceTitle: string;
+  readonly text: string;
+}
+
+export interface ReportedTranscript {
+  readonly evidenceId: string;
+  readonly evidenceTitle: string;
+  readonly attribution: ReportAttributionLabel;
+  readonly quotable: boolean;
+  readonly content?: string;
+  readonly pseudonym?: string;
+}
+
+/**
+ * Project a transcript into a report, or refuse it.
+ *
+ * A transcript is speech-to-text of a specific piece of evidence's audio —
+ * it carries exactly the same participant-consent exposure as that
+ * evidence's own `content`, arguably more so, being closer to verbatim
+ * speech. Rather than re-deriving that judgement, this reuses
+ * `projectEvidenceForReport`'s answer for the evidence the transcript
+ * belongs to and substitutes the transcript's own text for `content` — one
+ * redaction rule, applied to two different renderings of the same consent
+ * boundary, exactly the reasoning this module's file header states for why
+ * the rule lives here rather than once per renderer.
+ */
+export function projectTranscriptForReport(
+  evidence: EvidenceForReport,
+  transcript: TranscriptForReport,
+  consent: SourceConsentAnswers | null,
+): ReportedTranscript | null {
+  const projected = projectEvidenceForReport(evidence, consent);
+  if (projected === null) return null;
+
+  return {
+    evidenceId: transcript.evidenceId,
+    evidenceTitle: transcript.evidenceTitle,
+    attribution: projected.attribution,
+    quotable: projected.quotable,
+    ...(projected.quotable ? { content: transcript.text } : {}),
+    ...(projected.pseudonym !== undefined ? { pseudonym: projected.pseudonym } : {}),
+  };
+}
+
 /** How many participants took part, and under what identity arrangements. */
 export interface ParticipantIdentityCounts {
   readonly named: number;

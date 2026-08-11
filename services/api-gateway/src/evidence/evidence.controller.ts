@@ -28,17 +28,26 @@ import {
   Post,
   Query,
   Req,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 
 import {
   captureEvidenceRequestSchema,
   createEvidenceLinkRequestSchema,
+  editTranscriptRequestSchema,
   evidenceTransitionRequestSchema,
+  transcriptVersionRequestSchema,
   updateEvidenceDraftRequestSchema,
+  type EvidenceAttachmentView,
   type EvidenceDetail,
   type EvidenceLinkView,
   type EvidenceSummary,
+  type TranscriptView,
 } from '@witness/contracts';
 import { DomainError } from '@witness/domain';
 
@@ -48,7 +57,17 @@ import {
   type RequestWithPrincipal,
 } from '../authz/authorization.guard.js';
 import { EvidenceService } from './evidence.service.js';
+import { EvidenceAttachmentService } from './evidence-attachment.service.js';
 import { EvidenceLinkService } from './evidence-link.service.js';
+import { TranscriptService } from './transcript.service.js';
+
+/**
+ * A memory-safety backstop, not the product limit — `EvidenceAttachmentService`
+ * enforces the real, configurable `WITNESS_MAX_EVIDENCE_ATTACHMENT_MB` cap
+ * once it can see the file's actual size. This just stops multer from
+ * buffering something absurd into process memory before that check runs.
+ */
+const MULTER_HARD_CEILING_BYTES = 500 * 1024 * 1024;
 
 @Controller('api/v1/workspaces/:workspaceId/sessions/:sessionId/evidence')
 @UseGuards(AuthorizationGuard)
@@ -56,6 +75,8 @@ export class EvidenceController {
   constructor(
     private readonly evidence: EvidenceService,
     private readonly links: EvidenceLinkService,
+    private readonly attachments: EvidenceAttachmentService,
+    private readonly transcripts: TranscriptService,
   ) {}
 
   @Get()
@@ -223,6 +244,132 @@ export class EvidenceController {
     @Req() request: RequestWithPrincipal,
   ): Promise<void> {
     await this.links.remove(workspaceId, sessionId, evidenceId, linkId, request.principal!);
+  }
+
+  /**
+   * Attaching a file is enriching the evidence record, not a separate
+   * lifecycle action — same permission as editing the draft (`evidence:update`).
+   */
+  @Post(':evidenceId/attachment')
+  @Requires('evidence:update')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MULTER_HARD_CEILING_BYTES } }))
+  async uploadAttachment(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<EvidenceAttachmentView> {
+    return this.translateDomainErrors(() =>
+      this.attachments.upload(workspaceId, sessionId, evidenceId, file, request.principal!),
+    );
+  }
+
+  @Get(':evidenceId/attachment/content')
+  @Requires('evidence:read')
+  async downloadAttachment(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const file = await this.attachments.content(workspaceId, sessionId, evidenceId);
+    res.set({
+      'Content-Type': file.contentType,
+      'Content-Disposition':
+        `attachment; filename="${file.filename.replace(/"/g, '')}"; ` +
+        `filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+      'Content-Length': String(file.content.length),
+    });
+    res.send(file.content);
+  }
+
+  @Post(':evidenceId/transcript')
+  @Requires('transcript:create')
+  async requestTranscript(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<TranscriptView> {
+    return this.transcripts.request(workspaceId, sessionId, evidenceId, request.principal!);
+  }
+
+  @Post(':evidenceId/transcript/retry')
+  @HttpCode(200)
+  @Requires('transcript:create')
+  async retryTranscript(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<TranscriptView> {
+    return this.transcripts.retry(workspaceId, sessionId, evidenceId, request.principal!);
+  }
+
+  @Get(':evidenceId/transcript')
+  @Requires('transcript:read')
+  async getTranscript(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+  ): Promise<TranscriptView> {
+    return this.transcripts.get(workspaceId, sessionId, evidenceId);
+  }
+
+  @Patch(':evidenceId/transcript')
+  @Requires('transcript:update')
+  async editTranscript(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<TranscriptView> {
+    const parsed = editTranscriptRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: 'The request body is not valid.',
+          fields: parsed.error.flatten().fieldErrors,
+        },
+      });
+    }
+    return this.translateDomainErrors(() =>
+      this.transcripts.edit(workspaceId, sessionId, evidenceId, parsed.data, request.principal!),
+    );
+  }
+
+  @Post(':evidenceId/transcript/confirm')
+  @HttpCode(200)
+  @Requires('transcript:update')
+  async confirmTranscript(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<TranscriptView> {
+    const parsed = transcriptVersionRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: 'The request body is not valid.',
+          fields: parsed.error.flatten().fieldErrors,
+        },
+      });
+    }
+    return this.translateDomainErrors(() =>
+      this.transcripts.confirm(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        parsed.data.expectedVersion,
+        request.principal!,
+      ),
+    );
   }
 
   private async translateDomainErrors<T>(operation: () => Promise<T>): Promise<T> {

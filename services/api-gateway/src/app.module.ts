@@ -28,12 +28,24 @@ import { ConsentPolicyService } from './consent/consent-policy.service.js';
 import { ConsentTemplatesController } from './consent-templates/consent-templates.controller.js';
 import { ConsentTemplatesService } from './consent-templates/consent-templates.service.js';
 import { EvidenceController } from './evidence/evidence.controller.js';
+import { EvidenceAttachmentService } from './evidence/evidence-attachment.service.js';
 import { EvidenceLinkService } from './evidence/evidence-link.service.js';
 import { EvidenceReviewController } from './evidence/evidence-review.controller.js';
 import { EvidenceReviewService } from './evidence/evidence-review.service.js';
 import { EvidenceService } from './evidence/evidence.service.js';
+import { TranscriptService } from './evidence/transcript.service.js';
+import { LlmPort } from './summarization/llm.port.js';
+import { OllamaLlmAdapter } from './summarization/ollama.adapter.js';
+import { OutcomeCandidateController } from './summarization/outcome-candidate.controller.js';
+import { OutcomeCandidateService } from './summarization/outcome-candidate.service.js';
+import { SessionSummaryController } from './summarization/session-summary.controller.js';
+import { SessionSummaryService } from './summarization/session-summary.service.js';
+import { LocalWhisperAdapter } from './transcription/local-whisper.adapter.js';
+import { TranscriptionPort } from './transcription/transcription.port.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
+import { OrganisationInvitationsController } from './organisation-invitations/organisation-invitations.controller.js';
+import { OrganisationInvitationsService } from './organisation-invitations/organisation-invitations.service.js';
 import { OrganisationMembershipsController } from './organisation-memberships/organisation-memberships.controller.js';
 import { OrganisationMembershipsService } from './organisation-memberships/organisation-memberships.service.js';
 import { OrganisationRoleAssignmentsController } from './organisation-role-assignments/organisation-role-assignments.controller.js';
@@ -52,6 +64,8 @@ import { ReportsController } from './reports/reports.controller.js';
 import { ReportsService } from './reports/reports.service.js';
 import { RecordsService } from './records/records.service.js';
 import { RolesController } from './roles/roles.controller.js';
+import { SearchController } from './search/search.controller.js';
+import { SearchService } from './search/search.service.js';
 import { SessionConsentConfigurationController } from './session-consent-configuration/session-consent-configuration.controller.js';
 import { SessionConsentConfigurationService } from './session-consent-configuration/session-consent-configuration.service.js';
 import { SessionsController } from './sessions/sessions.controller.js';
@@ -73,6 +87,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     OrganisationsController,
     WorkspacesController,
     UsersController,
+    OrganisationInvitationsController,
     OrganisationMembershipsController,
     WorkspaceMembershipsController,
     RolesController,
@@ -87,6 +102,9 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     EvidenceReviewController,
     OutcomesController,
     ReportsController,
+    SessionSummaryController,
+    OutcomeCandidateController,
+    SearchController,
     AuthenticationController,
     CurrentUserController,
   ],
@@ -96,6 +114,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     OrganisationsService,
     WorkspacesService,
     UsersService,
+    OrganisationInvitationsService,
     OrganisationMembershipsService,
     WorkspaceMembershipsService,
     OrganisationRoleAssignmentsService,
@@ -107,8 +126,19 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     SessionConsentConfigurationService,
     ParticipantConsentRecordsService,
     EvidenceService,
+    EvidenceAttachmentService,
     EvidenceLinkService,
     EvidenceReviewService,
+    TranscriptService,
+    SessionSummaryService,
+    OutcomeCandidateService,
+    SearchService,
+    // Only implementation bound (ADR-0009: the sovereign profile makes zero
+    // external calls, so a cloud transcription adapter has no legitimate
+    // reason to exist here at all — see transcription.port.ts).
+    { provide: TranscriptionPort, useClass: LocalWhisperAdapter },
+    // Same reasoning, same shape — see summarization/llm.port.ts.
+    { provide: LlmPort, useClass: OllamaLlmAdapter },
     OutcomesService,
     OutcomeSupportService,
     ReportsService,

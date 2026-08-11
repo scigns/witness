@@ -216,12 +216,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             )}
           </p>
         </div>
-        <Link
-          href={`/workspaces/${id}/sessions`}
-          className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
-        >
-          Co-design sessions →
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={`/workspaces/${id}/search`}
+            className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
+          >
+            Search →
+          </Link>
+          <Link
+            href={`/workspaces/${id}/sessions`}
+            className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
+          >
+            Co-design sessions →
+          </Link>
+        </div>
       </div>
 
       <section aria-labelledby="add-member-heading">

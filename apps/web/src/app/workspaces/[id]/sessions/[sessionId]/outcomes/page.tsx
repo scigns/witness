@@ -27,6 +27,7 @@ import {
   type CoDesignSessionDetail,
   type CommitmentSummary,
   type DecisionSummary,
+  type OutcomeCandidateView,
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
@@ -74,6 +75,12 @@ export default function SessionOutcomesPage({
 
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  const [candidates, setCandidates] = useState<OutcomeCandidateView[]>([]);
+  const [candidatesLoaded, setCandidatesLoaded] = useState(false);
+  const [candidatesJobId, setCandidatesJobId] = useState<string | null>(null);
+  const [candidatesBusy, setCandidatesBusy] = useState(false);
+  const [candidatesError, setCandidatesError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [ownerDescription, setOwnerDescription] = useState('');
@@ -150,6 +157,69 @@ export default function SessionOutcomesPage({
     setOwnerDescription('');
     setDueDate('');
     setPriority('medium');
+  };
+
+  const suggestCandidates = async () => {
+    setCandidatesBusy(true);
+    setCandidatesError(null);
+    setCandidatesLoaded(false);
+    try {
+      const { jobId } = await api.requestOutcomeCandidates(workspaceId, sessionId, user);
+      setCandidatesJobId(jobId);
+    } catch (caught) {
+      setCandidatesError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+      setCandidatesBusy(false);
+    }
+  };
+
+  // CPU-bound local generation can take longer than a proxy in front of
+  // this deployment holds a connection open, so this is a background job —
+  // poll it rather than waiting on one long request.
+  useEffect(() => {
+    if (candidatesJobId === null) return;
+
+    const poll = async () => {
+      try {
+        const job = await api.getOutcomeCandidateJob(workspaceId, sessionId, candidatesJobId, user);
+        if (job.status === 'pending') return;
+
+        if (job.status === 'completed') {
+          setCandidates(job.candidates ?? []);
+        } else {
+          setCandidatesError(job.failureReason ?? 'Candidate suggestion failed.');
+        }
+        setCandidatesLoaded(true);
+        setCandidatesBusy(false);
+        setCandidatesJobId(null);
+      } catch (caught) {
+        setCandidatesError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+        setCandidatesBusy(false);
+        setCandidatesJobId(null);
+      }
+    };
+
+    void poll();
+    const interval = setInterval(() => void poll(), 3000);
+    return () => clearInterval(interval);
+  }, [candidatesJobId, workspaceId, sessionId, user]);
+
+  const useCandidate = (candidate: OutcomeCandidateView) => {
+    setTab(
+      candidate.type === 'decision'
+        ? 'decisions'
+        : candidate.type === 'commitment'
+          ? 'commitments'
+          : 'actions',
+    );
+    setTitle(candidate.title);
+    setBody(candidate.description);
+    setOwnerDescription(candidate.ownerDescription ?? '');
+    setCreateError(null);
+    setCandidates((current) => current.filter((c) => c !== candidate));
+  };
+
+  const dismissCandidate = (candidate: OutcomeCandidateView) => {
+    setCandidates((current) => current.filter((c) => c !== candidate));
   };
 
   const create = async (event: FormEvent) => {
@@ -246,6 +316,92 @@ export default function SessionOutcomesPage({
           evidence or a stated institutional synthesis.
         </p>
       </div>
+
+      {canRecord && !notStarted && (
+        <section aria-labelledby="candidates-heading">
+          <h2 id="candidates-heading" className="mb-3 text-lg font-semibold">
+            Candidate decisions, commitments and actions
+          </h2>
+          {candidatesError !== null && <ErrorNotice message={candidatesError} />}
+          <Card className="space-y-3">
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              Generated locally from this session's submitted evidence and confirmed transcripts —
+              suggestions only. Nothing is recorded until you review one and submit it below.
+            </p>
+            <Button
+              variant="secondary"
+              disabled={candidatesBusy}
+              onClick={() => void suggestCandidates()}
+            >
+              {candidatesBusy
+                ? 'Looking…'
+                : candidatesLoaded
+                  ? 'Suggest again'
+                  : 'Suggest candidates'}
+            </Button>
+            {candidatesBusy && (
+              <p className="text-xs text-[var(--color-ink-muted)]" role="status">
+                This can take a minute or two on a laptop CPU.
+              </p>
+            )}
+            {candidatesLoaded && candidates.length === 0 && (
+              <p className="text-sm text-[var(--color-ink-muted)]">
+                No confident candidates found in this session's content.
+              </p>
+            )}
+            {candidates.length > 0 && (
+              <ul className="space-y-3">
+                {candidates.map((candidate) => (
+                  <li
+                    key={`${candidate.type}-${candidate.title}`}
+                    className="space-y-2 border-t border-[var(--color-line)] pt-3 text-sm first:border-t-0 first:pt-0"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center rounded-full border border-current px-2 py-0.5 text-xs font-medium">
+                        {
+                          REGISTER_LABELS[
+                            candidate.type === 'decision'
+                              ? 'decisions'
+                              : candidate.type === 'commitment'
+                                ? 'commitments'
+                                : 'actions'
+                          ]
+                        }
+                      </span>
+                      <span className="text-xs text-[var(--color-ink-muted)]">
+                        AI-generated by {candidate.model}
+                      </span>
+                    </div>
+                    <p className="font-medium">{candidate.title}</p>
+                    <p className="text-[var(--color-ink-muted)]">{candidate.description}</p>
+                    {candidate.ownerDescription !== null && (
+                      <p className="text-xs text-[var(--color-ink-muted)]">
+                        Owner: {candidate.ownerDescription}
+                      </p>
+                    )}
+                    {candidate.sourceEvidenceId !== null && (
+                      <Link
+                        href={`/workspaces/${workspaceId}/sessions/${sessionId}/evidence/${candidate.sourceEvidenceId}`}
+                        className="text-xs underline"
+                      >
+                        Source evidence →
+                      </Link>
+                    )}
+                    <div className="flex gap-2">
+                      <Button variant="primary" onClick={() => useCandidate(candidate)}>
+                        Use this
+                      </Button>
+                      <Button variant="secondary" onClick={() => dismissCandidate(candidate)}>
+                        Dismiss
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </section>
+      )}
 
       {/*
         Ordinary buttons rather than an ARIA tablist: a tablist owes the
