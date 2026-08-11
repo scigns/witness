@@ -33,6 +33,9 @@ import { EvidenceLinkService } from './evidence/evidence-link.service.js';
 import { EvidenceReviewController } from './evidence/evidence-review.controller.js';
 import { EvidenceReviewService } from './evidence/evidence-review.service.js';
 import { EvidenceService } from './evidence/evidence.service.js';
+import { TranscriptService } from './evidence/transcript.service.js';
+import { LocalWhisperAdapter } from './transcription/local-whisper.adapter.js';
+import { TranscriptionPort } from './transcription/transcription.port.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
 import { OrganisationInvitationsController } from './organisation-invitations/organisation-invitations.controller.js';
@@ -115,6 +118,11 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     EvidenceAttachmentService,
     EvidenceLinkService,
     EvidenceReviewService,
+    TranscriptService,
+    // Only implementation bound (ADR-0009: the sovereign profile makes zero
+    // external calls, so a cloud transcription adapter has no legitimate
+    // reason to exist here at all — see transcription.port.ts).
+    { provide: TranscriptionPort, useClass: LocalWhisperAdapter },
     OutcomesService,
     OutcomeSupportService,
     ReportsService,

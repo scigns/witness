@@ -770,6 +770,7 @@ model Evidence {
   linksFrom         EvidenceLink[]      @relation("EvidenceLinkFrom")
   linksTo           EvidenceLink[]      @relation("EvidenceLinkTo")
   attachment        EvidenceAttachment?
+  transcript        Transcript?
   reviewAssignments ReviewAssignment[]
   clarifications    Clarification[]
   outcomeSupports   OutcomeSupport[]   @relation("OutcomeSupportEvidence")
@@ -849,6 +850,45 @@ model EvidenceAttachment {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("evidence_attachment")
+}
+
+/// Speech-to-text output for one piece of evidence's audio attachment —
+/// see `packages/domain/src/transcript.ts`'s file header for the
+/// pending/processing/completed/failed state machine and why
+/// `generatedText`/`editedText` are two separate columns rather than one
+/// that gets overwritten.
+model Transcript {
+  id String @id @db.Uuid
+
+  evidenceId String   @unique @map("evidence_id") @db.Uuid
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  attachmentId String @map("attachment_id") @db.Uuid
+
+  status String @default("pending") @db.VarChar(16)
+
+  generatedText String? @map("generated_text") @db.Text
+  editedText    String? @map("edited_text") @db.Text
+
+  /// `TranscriptSegment[]` — see the domain type. Stored as JSON rather than
+  /// a child table: segments are read and written as one unit with the
+  /// transcript, never queried independently.
+  segments Json @default("[]")
+
+  model    String? @db.VarChar(100)
+  language String? @db.VarChar(50)
+
+  confirmed Boolean @default(false)
+
+  failureReason String? @map("failure_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Optimistic-concurrency counter; bumped on every mutation.
+  version Int @default(1)
+
+  @@map("transcript")
 }
 
 /// Who is reviewing a specific piece of evidence, and where that review

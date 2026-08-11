@@ -35,6 +35,7 @@ import type {
   CreateUserRequest,
   CreateWorkspaceRequest,
   CurrentUserView,
+  EditTranscriptRequest,
   EvidenceAttachmentView,
   EvidenceDetail,
   EvidenceLinkView,
@@ -45,6 +46,8 @@ import type {
   InviteOrganisationUserRequest,
   MembershipAction,
   OrganisationInvitationView,
+  TranscriptVersionRequest,
+  TranscriptView,
   OrganisationMembershipView,
   OrganisationSummary,
   ParticipantConsentRecordDetail,
@@ -916,6 +919,67 @@ export const api = {
     requestBlob(
       `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/attachment/content`,
       user,
+    ),
+
+  requestTranscript: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    user: ActingUser,
+  ): Promise<TranscriptView> =>
+    request<TranscriptView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/transcript`,
+      user,
+      { method: 'POST' },
+    ),
+
+  retryTranscript: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    user: ActingUser,
+  ): Promise<TranscriptView> =>
+    request<TranscriptView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/transcript/retry`,
+      user,
+      { method: 'POST' },
+    ),
+
+  getTranscript: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    user: ActingUser,
+  ): Promise<TranscriptView> =>
+    request<TranscriptView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/transcript`,
+      user,
+    ),
+
+  editTranscript: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    body: EditTranscriptRequest,
+    user: ActingUser,
+  ): Promise<TranscriptView> =>
+    request<TranscriptView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/transcript`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  confirmTranscript: (
+    workspaceId: string,
+    sessionId: string,
+    evidenceId: string,
+    body: TranscriptVersionRequest,
+    user: ActingUser,
+  ): Promise<TranscriptView> =>
+    request<TranscriptView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/evidence/${encodeURIComponent(evidenceId)}/transcript/confirm`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
     ),
 
   listEvidenceLinks: (

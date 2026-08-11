@@ -835,7 +835,7 @@ export class EvidenceReviewService {
   ): Promise<EvidenceRow> {
     const row = await this.prisma.evidence.findUnique({
       where: { id: evidenceId },
-      include: { attachment: true },
+      include: { attachment: true, transcript: true },
     });
     if (row === null || row.workspaceId !== workspaceId || row.sessionId !== sessionId) {
       throw new NotFoundException({

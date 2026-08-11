@@ -139,6 +139,7 @@ p, reader, evidence:read
 p, reader, evidence_link:read
 p, reader, evidence_review:list
 p, reader, evidence_review:read
+p, reader, transcript:read
 p, reader, outcome:read
 p, reader, report:read
 p, reader, report:export
@@ -173,6 +174,9 @@ p, contributor, evidence_review:list
 p, contributor, evidence_review:read
 p, contributor, evidence_review:respond
 p, contributor, evidence_review:correct
+p, contributor, transcript:read
+p, contributor, transcript:create
+p, contributor, transcript:update
 p, contributor, outcome:read
 p, contributor, outcome:create
 p, contributor, outcome:update
@@ -208,6 +212,7 @@ p, reviewer, evidence_review:correct
 p, reviewer, evidence_review:validate
 p, reviewer, evidence_review:reject
 p, reviewer, evidence_review:view_history
+p, reviewer, transcript:read
 p, reviewer, outcome:read
 p, reviewer, outcome:confirm
 p, reviewer, outcome:close
@@ -270,6 +275,9 @@ p, admin, evidence_review:validate
 p, admin, evidence_review:reject
 p, admin, evidence_review:view_history
 p, admin, evidence_review:manage_restricted
+p, admin, transcript:read
+p, admin, transcript:create
+p, admin, transcript:update
 p, admin, outcome:read
 p, admin, outcome:create
 p, admin, outcome:update

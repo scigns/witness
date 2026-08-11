@@ -69,6 +69,10 @@ import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { PolicyEnforcementService } from '../authz/policy-enforcement.service.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
+import {
+  toDomain as toDomainTranscript,
+  toView as toTranscriptView,
+} from './transcript.service.js';
 import type { Principal } from '../authz/authorization.port.js';
 
 export interface EvidenceListFilter {
@@ -442,7 +446,7 @@ export class EvidenceService {
   ): Promise<EvidenceRow> {
     const row = await this.prisma.evidence.findUnique({
       where: { id: evidenceId },
-      include: { attachment: true },
+      include: { attachment: true, transcript: true },
     });
 
     if (row === null || row.workspaceId !== workspaceId || row.sessionId !== sessionId) {
@@ -475,6 +479,22 @@ export type EvidenceRow = Awaited<ReturnType<PrismaService['evidence']['findUniq
     sizeBytes: number;
     checksumSha256: string;
     createdAt: Date;
+  } | null;
+  transcript?: {
+    id: string;
+    evidenceId: string;
+    attachmentId: string;
+    status: string;
+    generatedText: string | null;
+    editedText: string | null;
+    segments: unknown;
+    model: string | null;
+    language: string | null;
+    confirmed: boolean;
+    failureReason: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    version: number;
   } | null;
 };
 
@@ -628,6 +648,10 @@ export function toDetail(
             checksumSha256: row.attachment.checksumSha256,
             createdAt: row.attachment.createdAt.toISOString(),
           },
+    transcript:
+      row.transcript === null || row.transcript === undefined
+        ? null
+        : toTranscriptView(toDomainTranscript(row.transcript)),
     ...(includeRestricted
       ? { consentBasis: [...row.consentBasis], withdrawalReason: row.withdrawalReason }
       : {}),

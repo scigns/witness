@@ -1508,7 +1508,54 @@ export interface EvidenceDetail extends EvidenceSummary {
   reviewDecisionReason: string | null;
   /** `null` when no file has been attached to this evidence yet. */
   attachment: EvidenceAttachmentView | null;
+  /** `null` until a transcription has been requested for this evidence's attachment. */
+  transcript: TranscriptView | null;
 }
+
+export const TRANSCRIPT_STATUSES = ['pending', 'processing', 'completed', 'failed'] as const;
+export type TranscriptStatus = (typeof TRANSCRIPT_STATUSES)[number];
+
+export interface TranscriptSegmentView {
+  text: string;
+  startMs: number | null;
+  endMs: number | null;
+}
+
+/**
+ * `generatedText` is what the local model produced and is never overwritten;
+ * `editedText` is a human correction, kept separately. `effectiveText` (the
+ * server-computed convenience the rest of the product should read) is
+ * `editedText` when present, `generatedText` otherwise — see
+ * `packages/domain/src/transcript.ts`'s `effectiveTranscriptText`.
+ */
+export interface TranscriptView {
+  id: string;
+  evidenceId: string;
+  attachmentId: string;
+  status: TranscriptStatus;
+  generatedText: string | null;
+  editedText: string | null;
+  effectiveText: string | null;
+  segments: TranscriptSegmentView[];
+  model: string | null;
+  language: string | null;
+  confirmed: boolean;
+  failureReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export const editTranscriptRequestSchema = z.object({
+  editedText: z.string().trim().min(1, 'A transcript must not be empty').max(200_000),
+  expectedVersion: z.number().int().min(1),
+});
+export type EditTranscriptRequest = z.infer<typeof editTranscriptRequestSchema>;
+
+export const transcriptVersionRequestSchema = z.object({
+  expectedVersion: z.number().int().min(1),
+});
+export type TranscriptVersionRequest = z.infer<typeof transcriptVersionRequestSchema>;
 
 export const EVIDENCE_ATTACHMENT_KINDS = ['audio'] as const;
 export type EvidenceAttachmentKind = (typeof EVIDENCE_ATTACHMENT_KINDS)[number];

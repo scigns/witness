@@ -39,12 +39,15 @@ import type { Response } from 'express';
 import {
   captureEvidenceRequestSchema,
   createEvidenceLinkRequestSchema,
+  editTranscriptRequestSchema,
   evidenceTransitionRequestSchema,
+  transcriptVersionRequestSchema,
   updateEvidenceDraftRequestSchema,
   type EvidenceAttachmentView,
   type EvidenceDetail,
   type EvidenceLinkView,
   type EvidenceSummary,
+  type TranscriptView,
 } from '@witness/contracts';
 import { DomainError } from '@witness/domain';
 
@@ -56,6 +59,7 @@ import {
 import { EvidenceService } from './evidence.service.js';
 import { EvidenceAttachmentService } from './evidence-attachment.service.js';
 import { EvidenceLinkService } from './evidence-link.service.js';
+import { TranscriptService } from './transcript.service.js';
 
 /**
  * A memory-safety backstop, not the product limit — `EvidenceAttachmentService`
@@ -72,6 +76,7 @@ export class EvidenceController {
     private readonly evidence: EvidenceService,
     private readonly links: EvidenceLinkService,
     private readonly attachments: EvidenceAttachmentService,
+    private readonly transcripts: TranscriptService,
   ) {}
 
   @Get()
@@ -277,6 +282,94 @@ export class EvidenceController {
       'Content-Length': String(file.content.length),
     });
     res.send(file.content);
+  }
+
+  @Post(':evidenceId/transcript')
+  @Requires('transcript:create')
+  async requestTranscript(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<TranscriptView> {
+    return this.transcripts.request(workspaceId, sessionId, evidenceId, request.principal!);
+  }
+
+  @Post(':evidenceId/transcript/retry')
+  @HttpCode(200)
+  @Requires('transcript:create')
+  async retryTranscript(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<TranscriptView> {
+    return this.transcripts.retry(workspaceId, sessionId, evidenceId, request.principal!);
+  }
+
+  @Get(':evidenceId/transcript')
+  @Requires('transcript:read')
+  async getTranscript(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+  ): Promise<TranscriptView> {
+    return this.transcripts.get(workspaceId, sessionId, evidenceId);
+  }
+
+  @Patch(':evidenceId/transcript')
+  @Requires('transcript:update')
+  async editTranscript(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<TranscriptView> {
+    const parsed = editTranscriptRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: 'The request body is not valid.',
+          fields: parsed.error.flatten().fieldErrors,
+        },
+      });
+    }
+    return this.translateDomainErrors(() =>
+      this.transcripts.edit(workspaceId, sessionId, evidenceId, parsed.data, request.principal!),
+    );
+  }
+
+  @Post(':evidenceId/transcript/confirm')
+  @HttpCode(200)
+  @Requires('transcript:update')
+  async confirmTranscript(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<TranscriptView> {
+    const parsed = transcriptVersionRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: 'The request body is not valid.',
+          fields: parsed.error.flatten().fieldErrors,
+        },
+      });
+    }
+    return this.translateDomainErrors(() =>
+      this.transcripts.confirm(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        parsed.data.expectedVersion,
+        request.principal!,
+      ),
+    );
   }
 
   private async translateDomainErrors<T>(operation: () => Promise<T>): Promise<T> {
