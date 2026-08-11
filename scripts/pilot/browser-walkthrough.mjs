@@ -234,10 +234,15 @@ const main = async () => {
     // ── Identity ───────────────────────────────────────────────────────────
     await step('log in through the identity provider', async () => {
       await page.goto(`${WEB}/signin`, { waitUntil: 'domcontentloaded' });
-      await page
-        .getByRole('link', { name: /sign in/i })
-        .first()
-        .click();
+      await page.waitForTimeout(400);
+      // Two "Sign in" links exist on this page: the nav bar's is a
+      // self-referential Next.js <Link> back to /signin (a no-op once
+      // already here), and only the page's own button actually points at
+      // the OIDC login endpoint. `.first()` picked the nav one by DOM
+      // order, so the click landed on /signin and every following step
+      // timed out waiting for a redirect that was never coming — targets
+      // the real one by its actual destination instead.
+      await page.locator('a[href*="/auth/login"]').first().click();
       await page.waitForURL(/\/protocol\/openid-connect\/auth/);
       await page.fill('#username', USERNAME);
       await page.fill('#password', PASSWORD);
@@ -248,6 +253,7 @@ const main = async () => {
 
     await step('select organisation and workspace', async () => {
       await page.goto(`${WEB}/workspaces/new`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(400);
       state.organisationId = await chooseFirst('organisationId');
       await page.fill('#name', unique('Pilot Workspace'));
       await submit(/create/i);
@@ -277,6 +283,14 @@ const main = async () => {
       await page.goto(`${WEB}/workspaces/${state.workspaceId}/sessions/new`, {
         waitUntil: 'domcontentloaded',
       });
+      await page.waitForTimeout(400);
+      // The member list (and with it, this form) loads asynchronously after
+      // hydration. Selecting the facilitator first, before typing into the
+      // text fields, guarantees the client bundle has actually attached its
+      // event listeners — fill title/purpose first and a fill that lands
+      // before hydration gets silently overwritten the moment React
+      // reconciles the controlled inputs against still-empty state.
+      await chooseFirst('primaryFacilitatorId');
       await page.fill('#title', unique('Pilot Session'));
       await page.fill('#purpose', 'Verify the deployed application end to end before the pilot.');
       await chooseFirst('sessionType');
@@ -290,10 +304,16 @@ const main = async () => {
 
     const addParticipant = async (identityMode, displayName) => {
       await page.goto(`${participantsUrl}/new`, { waitUntil: 'domcontentloaded' });
-      await page.selectOption('#identityMode', identityMode);
-      if (identityMode !== 'anonymous') await page.fill('#displayName', displayName);
+      await page.waitForTimeout(400);
+      // Same hydration race as session creation: this page's member list
+      // loads asynchronously and its arrival re-renders the form, stomping
+      // any text typed into a still-un-hydrated controlled input. Resolving
+      // the two selects first (their options are static, but selecting them
+      // costs enough round-trips to outlast hydration) before touching text.
       await chooseFirst('participantType');
       await chooseFirst('participationMode');
+      await page.selectOption('#identityMode', identityMode);
+      if (identityMode !== 'anonymous') await page.fill('#displayName', displayName);
       await submit(/add|create/i);
       await page.waitForURL(/\/participants/);
     };
@@ -311,6 +331,7 @@ const main = async () => {
       await page.goto(`${WEB}/organisations/${state.organisationId}/consent-templates/new`, {
         waitUntil: 'domcontentloaded',
       });
+      await page.waitForTimeout(400);
       await page.fill('#name', unique('Pilot Consent'));
       await page.fill('#purpose', 'Consent for the internal pilot verification session.');
       await page.fill(
@@ -337,6 +358,7 @@ const main = async () => {
         `${WEB}/workspaces/${state.workspaceId}/sessions/${state.sessionId}/consent-configuration`,
         { waitUntil: 'domcontentloaded' },
       );
+      await page.waitForTimeout(400);
       await chooseFirst('template');
       for (const group of await radioGroups('category-')) {
         await page.locator(`input[name="${group.name}"]`).first().check();
@@ -350,6 +372,7 @@ const main = async () => {
 
     await step('capture mixed consent decisions', async () => {
       await page.goto(participantsUrl, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(400);
       // The list arrives from the API after hydration; reading the DOM before
       // it lands finds an empty page and silently skips everyone.
       await page.locator('a[href*="/participants/"]:not([href$="/new"])').first().waitFor();
@@ -369,6 +392,7 @@ const main = async () => {
         await page.goto(`${participantsUrl}/${participantId}/consent`, {
           waitUntil: 'domcontentloaded',
         });
+        await page.waitForTimeout(400);
         // `captureMethod` is a free-text record of how the facilitator took
         // the decision, and already carries a sensible default.
         for (const group of await radioGroups('decision-')) {
@@ -394,6 +418,7 @@ const main = async () => {
       await page.goto(`${WEB}/workspaces/${state.workspaceId}/sessions/${state.sessionId}`, {
         waitUntil: 'domcontentloaded',
       });
+      await page.waitForTimeout(400);
       await expectOk(/\/transition/, () => submit(/^open$/i));
     });
 
@@ -403,6 +428,7 @@ const main = async () => {
 
     const captureEvidence = async (title, attribution) => {
       await page.goto(evidenceUrl, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(400);
       await page.selectOption('#evidenceType', 'observation');
       await page.selectOption('#attributionMode', attribution);
       // Attribution decides whether a source participant is required: an
@@ -433,6 +459,7 @@ const main = async () => {
 
     await step('propose a decision', async () => {
       await page.goto(outcomesUrl, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(400);
       await submit(/decisions/i);
       await page.fill('#outcomeTitle', unique('Pilot Decision'));
       await page.fill('#outcomeBody', 'The pilot proceeds on the deployed environment.');
@@ -442,6 +469,7 @@ const main = async () => {
 
     await step('create a report', async () => {
       await page.goto(reportsUrl, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(400);
       await page.fill('#reportTitle', unique('Pilot Report'));
       await page.selectOption('#reportAudience', 'internal');
       const response = await expectOk(/\/reports$/, () => submit(/create report/i));
@@ -451,6 +479,7 @@ const main = async () => {
     // ── Review ─────────────────────────────────────────────────────────────
     const openEvidence = async (id) => {
       await page.goto(`${evidenceUrl}/${id}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(400);
       await page
         .getByRole('button', { name: /assign|begin review|validate/i })
         .first()
@@ -508,6 +537,7 @@ const main = async () => {
       await page.goto(`${outcomesUrl}/decisions/${state.decisionId}`, {
         waitUntil: 'domcontentloaded',
       });
+      await page.waitForTimeout(400);
       await chooseFirst('supportEvidenceId');
       await expectOk(/support/, () => submit(/record basis/i));
       await outcomeAction(/^confirm$/i);
@@ -515,6 +545,7 @@ const main = async () => {
 
     const createOutcome = async (tab, title, body, extra) => {
       await page.goto(outcomesUrl, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(400);
       await submit(new RegExp(tab, 'i'));
       await page.fill('#outcomeTitle', title);
       await page.fill('#outcomeBody', body);
@@ -536,6 +567,7 @@ const main = async () => {
       await page.goto(`${outcomesUrl}/commitments/${state.commitmentId}`, {
         waitUntil: 'domcontentloaded',
       });
+      await page.waitForTimeout(400);
       await chooseFirst('supportEvidenceId');
       await expectOk(/support/, () => submit(/record basis/i));
       await outcomeAction(/^activate$/i);
@@ -554,6 +586,7 @@ const main = async () => {
       await page.goto(`${outcomesUrl}/actions/${state.actionId}`, {
         waitUntil: 'domcontentloaded',
       });
+      await page.waitForTimeout(400);
       // Progress only exists once the work has started; a percentage on a
       // not-yet-started action would be a number about nothing.
       // Progress only exists once the work has started; every outcome action
@@ -567,6 +600,7 @@ const main = async () => {
       await page.goto(`${outcomesUrl}/actions/${state.actionId}`, {
         waitUntil: 'domcontentloaded',
       });
+      await page.waitForTimeout(400);
       await outcomeAction(/^record progress$/i, async () => {
         await page.fill('#percentComplete', '50');
         await page.fill('#reason', 'Half of the write-up is drafted.');
@@ -577,6 +611,7 @@ const main = async () => {
       await page.goto(`${outcomesUrl}/actions/${state.actionId}`, {
         waitUntil: 'domcontentloaded',
       });
+      await page.waitForTimeout(400);
       await outcomeAction(/^mark complete$/i, async () =>
         page.fill('#reason', 'The write-up is finished.'),
       );
@@ -586,12 +621,14 @@ const main = async () => {
       await page.goto(`${WEB}/workspaces/${state.workspaceId}/sessions/${state.sessionId}`, {
         waitUntil: 'domcontentloaded',
       });
+      await page.waitForTimeout(400);
       await expectOk(/\/transition/, () => submit(/^close$/i));
     });
 
     // ── Reporting ──────────────────────────────────────────────────────────
     await step('cite the validated evidence in the report', async () => {
       await page.goto(`${reportsUrl}/${state.reportId}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(400);
       await chooseFirst('citeSource');
       await expectOk(/\/sources/, () => submit(/^cite$/i));
       await page
@@ -602,6 +639,7 @@ const main = async () => {
 
     await step('send the report for review', async () => {
       await page.goto(`${reportsUrl}/${state.reportId}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(400);
       await page.fill('#synthesis', 'The deployed application carries the whole workflow.');
       await expectOk(/\/reports\//, () => submit(/^save$/i));
       await expectOk(/\/transitions/, () => submit(/submit for review/i));
@@ -623,6 +661,7 @@ const main = async () => {
     for (const format of ['HTML', 'MARKDOWN', 'JSON', 'CSV']) {
       await step(`export the report as ${format.toLowerCase()}`, async () => {
         await page.goto(`${reportsUrl}/${state.reportId}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(400);
         const [download] = await Promise.all([
           page.waitForEvent('download'),
           submit(new RegExp(`^${format}$`)),
