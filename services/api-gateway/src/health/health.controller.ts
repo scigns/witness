@@ -30,15 +30,19 @@ import { WITNESS_CONFIG } from '../tokens.js';
  *
  * Kept here, served over the API and rendered in the UI, so that one list is the
  * single answer to "what is missing" — three separate lists would disagree
- * within a month.
+ * within a month. Updated as capabilities ship: an item stays only for the part
+ * of it that is genuinely still deferred, worded to say so, rather than naming
+ * the whole original capability once part of it is real.
  */
 const NOT_IMPLEMENTED: readonly string[] = [
-  'AI extraction of candidate assertions (Phase 5)',
-  'Transcription and diarisation (Phase 5)',
-  'Media and document storage (Phase 5)',
+  'Speaker diarisation — transcription itself is local and working; ' +
+    'per-speaker attribution within one recording is deferred (Phase 3)',
+  'Document and image evidence storage — audio attachments are implemented; ' +
+    'other file types are not yet (Phase 5)',
   'Knowledge graph projection (Phase 4)',
-  'Hybrid search (Phase 6)',
   'Event-driven projection rebuild (Phase 4)',
+  'Hybrid/vector search — plain scoped text search across sessions, evidence, ' +
+    'transcripts, summaries and outcomes is implemented (Phase 6)',
   'PDF export — HTML, Markdown, JSON and CSV are implemented (Milestone 8)',
   'Database row-level security — tenant isolation is enforced in the repository layer, ' +
     'and the second, independent database-level layer is still to come (Phase 3)',
@@ -94,10 +98,7 @@ export class HealthController {
     components['neo4j'] = { status: 'not_configured', detail: 'Graph projection — Phase 4' };
     components['opensearch'] = { status: 'not_configured', detail: 'Lexical index — Phase 6' };
     components['keycloak'] = await this.checkIdentityProvider();
-    components['ollama'] = {
-      status: 'not_configured',
-      detail: 'Local inference — Phase 5 (ADR-0009)',
-    };
+    components['ollama'] = await this.checkLocalLlm();
 
     const statuses = Object.values(components).map((component) => component.status);
     const status: HealthResponse['status'] = statuses.includes('down')
@@ -148,6 +149,33 @@ export class HealthController {
       return response.ok
         ? { status: 'ok', detail: 'Identity provider (ADR-0007)', latencyMs: Date.now() - started }
         : { status: 'down', detail: `Discovery document returned HTTP ${response.status}` };
+    } catch (error) {
+      return {
+        status: 'down',
+        detail: `Unreachable: ${error instanceof Error ? error.message.slice(0, 120) : 'unknown'}`,
+      };
+    }
+  }
+
+  /**
+   * Real reachability, same reasoning as `checkIdentityProvider` — session
+   * summaries and candidate extraction (Phase 4/5) depend on this being up,
+   * and a readiness probe that says "ok" while local generation is actually
+   * unreachable is worse than no check.
+   */
+  private async checkLocalLlm(): Promise<HealthComponent> {
+    const started = Date.now();
+    try {
+      const response = await fetch(`${this.config.localLlmUrl}/api/tags`, {
+        signal: AbortSignal.timeout(2000),
+      });
+      return response.ok
+        ? {
+            status: 'ok',
+            detail: `Local inference (${this.config.localLlmModel}) — ADR-0009`,
+            latencyMs: Date.now() - started,
+          }
+        : { status: 'down', detail: `Ollama returned HTTP ${response.status}` };
     } catch (error) {
       return {
         status: 'down',
