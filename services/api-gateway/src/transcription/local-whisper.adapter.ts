@@ -61,17 +61,42 @@ export class LocalWhisperAdapter extends TranscriptionPort {
 
       // ffmpeg sniffs the container from the bytes themselves, not the file
       // extension, so an extensionless input file is fine here.
-      await execFileAsync(
-        'ffmpeg',
-        ['-y', '-i', inputPath, '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', wavPath],
-        { timeout: TRANSCRIBE_TIMEOUT_MS },
-      );
+      try {
+        await execFileAsync(
+          'ffmpeg',
+          ['-y', '-i', inputPath, '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', wavPath],
+          { timeout: TRANSCRIBE_TIMEOUT_MS },
+        );
+      } catch (error) {
+        // execFile's rejection message is "Command failed: <cmd>" followed by
+        // ffmpeg's full stderr — which opens with a multi-line build-config
+        // banner (compiler flags, every linked library and its version)
+        // before ever getting to the one line a reader needs, and
+        // `failTranscription`'s 2000-char cap on the stored reason is easily
+        // consumed by that banner alone. The facilitator reading this failure
+        // needs "this file isn't usable audio", not ffmpeg's configure
+        // invocation, so the raw detail is logged here and a clean message
+        // takes its place in what gets stored and shown.
+        this.logger.error(
+          `ffmpeg transcode failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw new Error(
+          'This recording could not be processed as audio. It may be corrupted, empty, or in a format ffmpeg cannot decode.',
+        );
+      }
 
-      await execFileAsync(
-        WHISPER_BIN,
-        ['-m', WHISPER_MODEL_PATH, '-f', wavPath, '-l', 'auto', '-oj', '-of', outputPrefix],
-        { timeout: TRANSCRIBE_TIMEOUT_MS, maxBuffer: 1024 * 1024 * 64 },
-      );
+      try {
+        await execFileAsync(
+          WHISPER_BIN,
+          ['-m', WHISPER_MODEL_PATH, '-f', wavPath, '-l', 'auto', '-oj', '-of', outputPrefix],
+          { timeout: TRANSCRIBE_TIMEOUT_MS, maxBuffer: 1024 * 1024 * 64 },
+        );
+      } catch (error) {
+        this.logger.error(
+          `whisper-cli failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw new Error('Local speech recognition failed while processing this recording.');
+      }
 
       const raw = await readFile(`${outputPrefix}.json`, 'utf8');
       const parsed = JSON.parse(raw) as WhisperCliJson;
