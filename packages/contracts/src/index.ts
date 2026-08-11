@@ -824,6 +824,9 @@ export type OutcomeType = (typeof OUTCOME_TYPES)[number];
 export const OUTCOME_SUPPORT_BASES = ['validated_evidence', 'institutional_synthesis'] as const;
 export type OutcomeSupportBasis = (typeof OUTCOME_SUPPORT_BASES)[number];
 
+export const OUTCOME_CANDIDATE_JOB_STATUSES = ['pending', 'completed', 'failed'] as const;
+export type OutcomeCandidateJobStatus = (typeof OUTCOME_CANDIDATE_JOB_STATUSES)[number];
+
 /**
  * A candidate decision, commitment, or action suggested by the local model
  * from a session's evidence and transcripts — never persisted, never itself
@@ -841,6 +844,18 @@ export interface OutcomeCandidateView {
   /** Which evidence item most directly supports this candidate, if any. */
   sourceEvidenceId: string | null;
   model: string;
+}
+
+/**
+ * Generation runs as a background job (CPU-bound local inference can take
+ * longer than a proxy in front of this deployment holds a connection open)
+ * — `POST .../outcome-candidates` returns a `jobId` immediately;
+ * `GET .../outcome-candidates/:jobId` polls this until `status` is terminal.
+ */
+export interface OutcomeCandidateJobView {
+  status: OutcomeCandidateJobStatus;
+  candidates: OutcomeCandidateView[] | null;
+  failureReason: string | null;
 }
 
 export const proposeDecisionRequestSchema = z.object({

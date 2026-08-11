@@ -78,6 +78,7 @@ export default function SessionOutcomesPage({
 
   const [candidates, setCandidates] = useState<OutcomeCandidateView[]>([]);
   const [candidatesLoaded, setCandidatesLoaded] = useState(false);
+  const [candidatesJobId, setCandidatesJobId] = useState<string | null>(null);
   const [candidatesBusy, setCandidatesBusy] = useState(false);
   const [candidatesError, setCandidatesError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -161,16 +162,46 @@ export default function SessionOutcomesPage({
   const suggestCandidates = async () => {
     setCandidatesBusy(true);
     setCandidatesError(null);
+    setCandidatesLoaded(false);
     try {
-      const result = await api.suggestOutcomeCandidates(workspaceId, sessionId, user);
-      setCandidates(result.candidates);
-      setCandidatesLoaded(true);
+      const { jobId } = await api.requestOutcomeCandidates(workspaceId, sessionId, user);
+      setCandidatesJobId(jobId);
     } catch (caught) {
       setCandidatesError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
-    } finally {
       setCandidatesBusy(false);
     }
   };
+
+  // CPU-bound local generation can take longer than a proxy in front of
+  // this deployment holds a connection open, so this is a background job —
+  // poll it rather than waiting on one long request.
+  useEffect(() => {
+    if (candidatesJobId === null) return;
+
+    const poll = async () => {
+      try {
+        const job = await api.getOutcomeCandidateJob(workspaceId, sessionId, candidatesJobId, user);
+        if (job.status === 'pending') return;
+
+        if (job.status === 'completed') {
+          setCandidates(job.candidates ?? []);
+        } else {
+          setCandidatesError(job.failureReason ?? 'Candidate suggestion failed.');
+        }
+        setCandidatesLoaded(true);
+        setCandidatesBusy(false);
+        setCandidatesJobId(null);
+      } catch (caught) {
+        setCandidatesError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+        setCandidatesBusy(false);
+        setCandidatesJobId(null);
+      }
+    };
+
+    void poll();
+    const interval = setInterval(() => void poll(), 3000);
+    return () => clearInterval(interval);
+  }, [candidatesJobId, workspaceId, sessionId, user]);
 
   const useCandidate = (candidate: OutcomeCandidateView) => {
     setTab(
@@ -308,6 +339,11 @@ export default function SessionOutcomesPage({
                   ? 'Suggest again'
                   : 'Suggest candidates'}
             </Button>
+            {candidatesBusy && (
+              <p className="text-xs text-[var(--color-ink-muted)]" role="status">
+                This can take a minute or two on a laptop CPU.
+              </p>
+            )}
             {candidatesLoaded && candidates.length === 0 && (
               <p className="text-sm text-[var(--color-ink-muted)]">
                 No confident candidates found in this session's content.

@@ -52,7 +52,7 @@ import type {
   TranscriptView,
   OrganisationMembershipView,
   OrganisationSummary,
-  OutcomeCandidateView,
+  OutcomeCandidateJobView,
   ParticipantConsentRecordDetail,
   ReassignReviewerRequest,
   ReconfigureSessionConsentRequest,
@@ -1243,13 +1243,25 @@ export const api = {
       user,
     ),
 
-  suggestOutcomeCandidates: (
+  requestOutcomeCandidates: (
     workspaceId: string,
     sessionId: string,
     user: ActingUser,
-  ): Promise<{ candidates: OutcomeCandidateView[] }> =>
-    request<{ candidates: OutcomeCandidateView[] }>(
+  ): Promise<{ jobId: string }> =>
+    request<{ jobId: string }>(
       `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/outcome-candidates`,
+      user,
+      { method: 'POST' },
+    ),
+
+  getOutcomeCandidateJob: (
+    workspaceId: string,
+    sessionId: string,
+    jobId: string,
+    user: ActingUser,
+  ): Promise<OutcomeCandidateJobView> =>
+    request<OutcomeCandidateJobView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/outcome-candidates/${encodeURIComponent(jobId)}`,
       user,
     ),
 

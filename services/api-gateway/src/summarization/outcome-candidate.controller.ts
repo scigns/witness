@@ -1,12 +1,15 @@
 /**
- * HTTP adapter for candidate decisions/commitments/actions — read-only,
- * gated by `outcome:create` (the same permission proposing one from scratch
- * already requires, since accepting a candidate is exactly that).
+ * HTTP adapter for candidate decisions/commitments/actions — gated by
+ * `outcome:create` (the same permission proposing one from scratch already
+ * requires, since accepting a candidate is exactly that). `POST` starts a
+ * background job and returns immediately; `GET` polls it — see
+ * `OutcomeCandidateService`'s file header for why this is async rather than
+ * a single blocking request.
  */
 
-import { Controller, Get, Param, ParseUUIDPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 
-import type { OutcomeCandidateView } from '@witness/contracts';
+import type { OutcomeCandidateJobView } from '@witness/contracts';
 
 import { AuthorizationGuard, Requires } from '../authz/authorization.guard.js';
 import { OutcomeCandidateService } from './outcome-candidate.service.js';
@@ -16,12 +19,19 @@ import { OutcomeCandidateService } from './outcome-candidate.service.js';
 export class OutcomeCandidateController {
   constructor(private readonly candidates: OutcomeCandidateService) {}
 
-  @Get()
+  @Post()
   @Requires('outcome:create')
-  async suggest(
+  async request(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
-  ): Promise<{ candidates: OutcomeCandidateView[] }> {
-    return { candidates: await this.candidates.suggest(workspaceId, sessionId) };
+  ): Promise<{ jobId: string }> {
+    return this.candidates.request(workspaceId, sessionId);
+  }
+
+  @Get(':jobId')
+  @HttpCode(200)
+  @Requires('outcome:create')
+  getJob(@Param('jobId') jobId: string): OutcomeCandidateJobView {
+    return this.candidates.getJob(jobId);
   }
 }

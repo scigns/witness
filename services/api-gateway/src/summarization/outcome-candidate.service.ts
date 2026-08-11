@@ -9,14 +9,29 @@
  * human typing from scratch would, which is where the real domain
  * invariants, the audit trail, and the human-confirmation gate already
  * live. Inventing a second, AI-specific outcome model to hold a draft would
- * duplicate all of that for no reason — the instruction this milestone
- * follows is "reuse the existing outcome domain model," and the smallest
- * way to do that is to not create a new one at all.
+ * duplicate all of that for no reason.
+ *
+ * Async for the same reason `TranscriptService`/`SessionSummaryService`
+ * are: CPU-bound local generation of a several-item JSON array reliably
+ * takes longer than the ~100s a proxy in front of this deployment will hold
+ * a connection open for (observed directly — the first version of this
+ * endpoint answered synchronously and the browser saw a dead connection
+ * before Ollama finished). The job itself is in memory, not the database —
+ * losing an in-flight suggestion on a restart is fine, because nothing
+ * about a candidate is meant to survive one; it is not a second persistence
+ * layer for the same data, only a way to hand back a result that arrives
+ * after the request that asked for it.
  */
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 
-import type { OutcomeCandidateView, OutcomeType } from '@witness/contracts';
+import type {
+  OutcomeCandidateJobStatus,
+  OutcomeCandidateJobView,
+  OutcomeCandidateView,
+  OutcomeType,
+} from '@witness/contracts';
 
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
@@ -25,6 +40,15 @@ import { assembleSessionSource, type SourceItem } from './source-assembly.helper
 
 const SOURCE_TEXT_MAX = 12_000;
 const MAX_CANDIDATES = 10;
+/** How long a finished (or failed) job's result stays fetchable before cleanup. */
+const JOB_TTL_MS = 15 * 60 * 1000;
+
+interface Job {
+  status: OutcomeCandidateJobStatus;
+  candidates: OutcomeCandidateView[] | null;
+  failureReason: string | null;
+  expiresAt: number;
+}
 
 interface RawCandidate {
   type: OutcomeType;
@@ -100,37 +124,102 @@ function buildPrompt(items: readonly SourceItem[]): string {
 
 @Injectable()
 export class OutcomeCandidateService {
+  private readonly logger = new Logger(OutcomeCandidateService.name);
+  private readonly jobs = new Map<string, Job>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly consentPolicy: ConsentPolicyService,
     private readonly llm: LlmPort,
   ) {}
 
-  async suggest(workspaceId: string, sessionId: string): Promise<OutcomeCandidateView[]> {
+  async request(workspaceId: string, sessionId: string): Promise<{ jobId: string }> {
     await this.requireSessionRow(workspaceId, sessionId);
 
-    const items = await assembleSessionSource(
-      this.prisma,
-      this.consentPolicy,
-      sessionId,
-      new Date(),
-    );
-    if (items.length === 0) return [];
-
-    const result = await this.llm.complete(buildPrompt(items));
-    const parsed = parseCandidates(result.text);
-
-    return parsed.map((candidate) => {
-      const source = candidate.sourceIndex !== null ? items[candidate.sourceIndex] : undefined;
-      return {
-        type: candidate.type,
-        title: candidate.title,
-        description: candidate.description,
-        ownerDescription: candidate.ownerDescription,
-        sourceEvidenceId: source?.evidenceId ?? null,
-        model: result.model,
-      };
+    const jobId = randomUUID();
+    this.jobs.set(jobId, {
+      status: 'pending',
+      candidates: null,
+      failureReason: null,
+      expiresAt: 0,
     });
+    this.evictExpired();
+
+    this.run(jobId, sessionId).catch((error: unknown) => {
+      this.logger.error(
+        `Unhandled error running outcome-candidate job '${jobId}': ` +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    });
+
+    return { jobId };
+  }
+
+  getJob(jobId: string): OutcomeCandidateJobView {
+    const job = this.jobs.get(jobId);
+    if (job === undefined) {
+      throw new NotFoundException({
+        error: { code: 'JOB_NOT_FOUND', message: `No candidate-suggestion job '${jobId}'.` },
+      });
+    }
+    return { status: job.status, candidates: job.candidates, failureReason: job.failureReason };
+  }
+
+  private async run(jobId: string, sessionId: string): Promise<void> {
+    try {
+      const items = await assembleSessionSource(
+        this.prisma,
+        this.consentPolicy,
+        sessionId,
+        new Date(),
+      );
+
+      if (items.length === 0) {
+        this.complete(jobId, []);
+        return;
+      }
+
+      const result = await this.llm.complete(buildPrompt(items));
+      const parsed = parseCandidates(result.text);
+
+      const candidates: OutcomeCandidateView[] = parsed.map((candidate) => {
+        const source = candidate.sourceIndex !== null ? items[candidate.sourceIndex] : undefined;
+        return {
+          type: candidate.type,
+          title: candidate.title,
+          description: candidate.description,
+          ownerDescription: candidate.ownerDescription,
+          sourceEvidenceId: source?.evidenceId ?? null,
+          model: result.model,
+        };
+      });
+
+      this.complete(jobId, candidates);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.jobs.set(jobId, {
+        status: 'failed',
+        candidates: null,
+        failureReason: reason.slice(0, 2000),
+        expiresAt: Date.now() + JOB_TTL_MS,
+      });
+    }
+  }
+
+  private complete(jobId: string, candidates: OutcomeCandidateView[]): void {
+    this.jobs.set(jobId, {
+      status: 'completed',
+      candidates,
+      failureReason: null,
+      expiresAt: Date.now() + JOB_TTL_MS,
+    });
+  }
+
+  private evictExpired(): void {
+    const now = Date.now();
+    for (const [id, job] of this.jobs) {
+      if (job.expiresAt !== 0 && job.expiresAt < now) this.jobs.delete(id);
+    }
   }
 
   private async requireSessionRow(workspaceId: string, sessionId: string): Promise<void> {

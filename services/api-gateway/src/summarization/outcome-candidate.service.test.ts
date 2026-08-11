@@ -1,7 +1,8 @@
 /**
- * Service-level tests for `OutcomeCandidateService` — a stateless read, so
- * these focus on prompt-response parsing robustness (malformed JSON, an
- * out-of-range source index, an unrecognised type) rather than persistence.
+ * Service-level tests for `OutcomeCandidateService` — async (a job id, then
+ * polled), so these also cover the job lifecycle itself, not just
+ * prompt-response parsing robustness (malformed JSON, an out-of-range
+ * source index, an unrecognised type).
  */
 
 import { NotFoundException } from '@nestjs/common';
@@ -23,9 +24,12 @@ function fakeConsent(): ConsentPolicyService {
   } as unknown as ConsentPolicyService;
 }
 
-function fakeLlm(text: string): LlmPort {
+function fakeLlm(text: string | (() => Promise<string>)): LlmPort {
   return {
-    complete: async (): Promise<LlmCompletionResult> => ({ text, model: 'ollama:qwen2.5:1.5b' }),
+    complete: async (): Promise<LlmCompletionResult> => ({
+      text: typeof text === 'function' ? await text() : text,
+      model: 'ollama:qwen2.5:1.5b',
+    }),
   } as unknown as LlmPort;
 }
 
@@ -62,21 +66,28 @@ function fakePrisma() {
   } as unknown as PrismaService;
 }
 
-function service(llmText: string) {
+function service(llmText: string | (() => Promise<string>)) {
   return new OutcomeCandidateService(fakePrisma(), fakeConsent(), fakeLlm(llmText));
 }
 
+const flush = () => new Promise((resolve) => setTimeout(resolve, 10));
+
 describe('OutcomeCandidateService', () => {
-  it('parses a well-formed JSON array and maps sourceIndex to the evidence id', async () => {
+  it('starts pending, then completes with a well-formed response, mapping sourceIndex to the evidence id', async () => {
     const svc = service(
       'Here you go:\n' +
         '[{"type":"decision","title":"Launch intake process","description":"Launch next month.","ownerDescription":null,"sourceIndex":0}]',
     );
 
-    const candidates = await svc.suggest(WORKSPACE_1, SESSION_1);
+    const { jobId } = await svc.request(WORKSPACE_1, SESSION_1);
+    expect(svc.getJob(jobId).status).toBe('pending');
 
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]).toMatchObject({
+    await flush();
+
+    const job = svc.getJob(jobId);
+    expect(job.status).toBe('completed');
+    expect(job.candidates).toHaveLength(1);
+    expect(job.candidates?.[0]).toMatchObject({
       type: 'decision',
       title: 'Launch intake process',
       sourceEvidenceId: EVIDENCE_1,
@@ -84,16 +95,20 @@ describe('OutcomeCandidateService', () => {
     });
   });
 
-  it('returns no candidates for an empty array response', async () => {
+  it('completes with no candidates for an empty array response', async () => {
     const svc = service('[]');
+    const { jobId } = await svc.request(WORKSPACE_1, SESSION_1);
+    await flush();
 
-    expect(await svc.suggest(WORKSPACE_1, SESSION_1)).toEqual([]);
+    expect(svc.getJob(jobId)).toMatchObject({ status: 'completed', candidates: [] });
   });
 
-  it('returns no candidates when the model output has no parseable JSON', async () => {
+  it('completes with no candidates when the model output has no parseable JSON', async () => {
     const svc = service('I could not find any candidates in this text.');
+    const { jobId } = await svc.request(WORKSPACE_1, SESSION_1);
+    await flush();
 
-    expect(await svc.suggest(WORKSPACE_1, SESSION_1)).toEqual([]);
+    expect(svc.getJob(jobId)).toMatchObject({ status: 'completed', candidates: [] });
   });
 
   it('drops entries with an unrecognised type or missing required fields', async () => {
@@ -102,30 +117,53 @@ describe('OutcomeCandidateService', () => {
         '{"type":"action_item","title":"","description":"y"},' +
         '{"type":"commitment","title":"Ship it","description":"Ship the feature."}]',
     );
+    const { jobId } = await svc.request(WORKSPACE_1, SESSION_1);
+    await flush();
 
-    const candidates = await svc.suggest(WORKSPACE_1, SESSION_1);
-
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]?.type).toBe('commitment');
+    const job = svc.getJob(jobId);
+    expect(job.candidates).toHaveLength(1);
+    expect(job.candidates?.[0]?.type).toBe('commitment');
   });
 
   it('treats an out-of-range sourceIndex as no citation rather than throwing', async () => {
     const svc = service('[{"type":"decision","title":"x","description":"y","sourceIndex":99}]');
+    const { jobId } = await svc.request(WORKSPACE_1, SESSION_1);
+    await flush();
 
-    const candidates = await svc.suggest(WORKSPACE_1, SESSION_1);
-
-    expect(candidates[0]?.sourceEvidenceId).toBeNull();
+    expect(svc.getJob(jobId).candidates?.[0]?.sourceEvidenceId).toBeNull();
   });
 
-  it('returns no candidates when the session has no source content, without calling the LLM', async () => {
-    const svc = service('should never be read');
+  it('completes with no candidates when the session has no source content, without calling the LLM', async () => {
+    const svc = service(() => {
+      throw new Error('the LLM should not have been called');
+    });
+    const { jobId } = await svc.request(WORKSPACE_1, SESSION_EMPTY);
+    await flush();
 
-    expect(await svc.suggest(WORKSPACE_1, SESSION_EMPTY)).toEqual([]);
+    expect(svc.getJob(jobId)).toMatchObject({ status: 'completed', candidates: [] });
   });
 
-  it('404s for a session outside the given workspace', async () => {
+  it('moves to failed when the LLM port throws', async () => {
+    const svc = service(() => {
+      throw new Error('local LLM unreachable');
+    });
+    const { jobId } = await svc.request(WORKSPACE_1, SESSION_1);
+    await flush();
+
+    const job = svc.getJob(jobId);
+    expect(job.status).toBe('failed');
+    expect(job.failureReason).toContain('unreachable');
+  });
+
+  it('404s requesting a job for a session outside the given workspace', async () => {
     const svc = service('[]');
 
-    await expect(svc.suggest('does-not-exist', SESSION_1)).rejects.toThrow(NotFoundException);
+    await expect(svc.request('does-not-exist', SESSION_1)).rejects.toThrow(NotFoundException);
+  });
+
+  it('404s polling an unknown job id', () => {
+    const svc = service('[]');
+
+    expect(() => svc.getJob('does-not-exist')).toThrow(NotFoundException);
   });
 });
