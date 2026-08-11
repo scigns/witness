@@ -44,6 +44,7 @@ import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
 import { LlmPort } from './llm.port.js';
+import { assembleSessionSource } from './source-assembly.helper.js';
 import type { Principal } from '../authz/authorization.port.js';
 
 const SYSTEM_PRINCIPAL: Principal = {
@@ -201,49 +202,22 @@ export class SessionSummaryService {
   }
 
   /**
-   * Gathers not-withdrawn evidence content (title + content, plus a
-   * completed transcript's effective text when one exists), excluding any
-   * participant-linked item consent refuses AI processing for. Truncated to
-   * `SOURCE_TEXT_MAX` characters — a CPU-bound local model has a real
-   * context-length and latency ceiling, and a multi-hour session's raw
-   * transcript would exceed both.
+   * Truncated to `SOURCE_TEXT_MAX` characters — a CPU-bound local model has
+   * a real context-length and latency ceiling, and a multi-hour session's
+   * raw transcript would exceed both.
    */
   private async assembleSource(
     sessionId: string,
     now: Date,
   ): Promise<{ sourceText: string; sourceEvidenceIds: string[] }> {
-    const rows = await this.prisma.evidence.findMany({
-      where: { sessionId, withdrawnAt: null },
-      include: { transcript: true },
-      orderBy: { capturedAt: 'asc' },
-    });
-
-    const parts: string[] = [];
-    const includedIds: string[] = [];
-
-    for (const row of rows) {
-      if (row.sourceParticipantId !== null) {
-        const consent = await this.consentPolicy.mayProcessWithAi(
-          sessionId,
-          row.sourceParticipantId,
-          now,
-        );
-        if (!consent.allowed) continue;
-      }
-
-      parts.push(`[${row.evidenceType}] ${row.title}: ${row.content}`);
-      if (row.transcript !== null && row.transcript.status === 'completed') {
-        const text = row.transcript.editedText ?? row.transcript.generatedText;
-        if (text !== null && text.trim() !== '') {
-          parts.push(`[transcript] ${text}`);
-        }
-      }
-      includedIds.push(row.id);
-    }
+    const items = await assembleSessionSource(this.prisma, this.consentPolicy, sessionId, now);
 
     return {
-      sourceText: parts.join('\n\n').slice(0, SOURCE_TEXT_MAX),
-      sourceEvidenceIds: includedIds,
+      sourceText: items
+        .map((item) => item.text)
+        .join('\n\n')
+        .slice(0, SOURCE_TEXT_MAX),
+      sourceEvidenceIds: items.map((item) => item.evidenceId),
     };
   }
 

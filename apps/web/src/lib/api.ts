@@ -52,6 +52,7 @@ import type {
   TranscriptView,
   OrganisationMembershipView,
   OrganisationSummary,
+  OutcomeCandidateView,
   ParticipantConsentRecordDetail,
   ReassignReviewerRequest,
   ReconfigureSessionConsentRequest,
@@ -1239,6 +1240,16 @@ export const api = {
   ): Promise<DecisionDetail> =>
     request(
       `${outcomePath(workspaceId, sessionId, 'decisions')}/${encodeURIComponent(decisionId)}`,
+      user,
+    ),
+
+  suggestOutcomeCandidates: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<{ candidates: OutcomeCandidateView[] }> =>
+    request<{ candidates: OutcomeCandidateView[] }>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/outcome-candidates`,
       user,
     ),
 

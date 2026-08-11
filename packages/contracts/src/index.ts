@@ -824,6 +824,25 @@ export type OutcomeType = (typeof OUTCOME_TYPES)[number];
 export const OUTCOME_SUPPORT_BASES = ['validated_evidence', 'institutional_synthesis'] as const;
 export type OutcomeSupportBasis = (typeof OUTCOME_SUPPORT_BASES)[number];
 
+/**
+ * A candidate decision, commitment, or action suggested by the local model
+ * from a session's evidence and transcripts — never persisted, never itself
+ * an outcome. Accepting one means calling the matching `propose*`/`create*`
+ * request below with these fields pre-filled; the human may edit anything
+ * before that request is ever sent, and nothing here becomes institutional
+ * record until they do.
+ */
+export interface OutcomeCandidateView {
+  type: OutcomeType;
+  title: string;
+  description: string;
+  /** Only meaningful for `commitment`/`action_item` — `null` when the source text does not say. */
+  ownerDescription: string | null;
+  /** Which evidence item most directly supports this candidate, if any. */
+  sourceEvidenceId: string | null;
+  model: string;
+}
+
 export const proposeDecisionRequestSchema = z.object({
   title: z.string().trim().min(1, 'A title is required').max(300),
   statement: z.string().trim().min(1, 'A decision statement is required').max(5000),
