@@ -1032,7 +1032,14 @@ export type ReportStatus = (typeof REPORT_STATUSES)[number];
 export const REPORT_AUDIENCES = ['internal', 'external', 'public'] as const;
 export type ReportAudience = (typeof REPORT_AUDIENCES)[number];
 
-export const REPORT_SOURCE_TYPES = ['evidence', 'decision', 'commitment', 'action_item'] as const;
+export const REPORT_SOURCE_TYPES = [
+  'evidence',
+  'decision',
+  'commitment',
+  'action_item',
+  'transcript',
+  'session_summary',
+] as const;
 export type ReportSourceType = (typeof REPORT_SOURCE_TYPES)[number];
 
 /** How evidence may be attributed in a report once redacted. Never a real name. */
@@ -1918,6 +1925,26 @@ export interface RenderedOutcome {
 }
 
 /**
+ * A confirmed transcript as it appears in a rendered report — the same
+ * redaction shape as `RenderedEvidence` (`content` structurally absent when
+ * not quotable), applied to the evidence the transcript belongs to. See
+ * `packages/domain/src/report-composition.ts`'s `projectTranscriptForReport`.
+ */
+export interface RenderedTranscript {
+  evidenceId: string;
+  evidenceTitle: string;
+  attribution: ReportAttributionLabel;
+  quotable: boolean;
+  content?: string;
+  pseudonym?: string;
+}
+
+/** A confirmed session summary as it appears in a rendered report. */
+export interface RenderedSessionSummary {
+  content: string;
+}
+
+/**
  * A report composed for reading or export. Everything here has already passed
  * through server-side redaction; the client renders it, it does not filter it.
  */
@@ -1932,6 +1959,8 @@ export interface RenderedReport {
   };
   participants: RenderedParticipantSummary;
   evidence: RenderedEvidence[];
+  transcripts: RenderedTranscript[];
+  sessionSummary: RenderedSessionSummary | null;
   decisions: RenderedOutcome[];
   commitments: RenderedOutcome[];
   actions: RenderedOutcome[];

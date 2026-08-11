@@ -629,6 +629,41 @@ export default function ReportDetailPage({
             </ul>
           </div>
 
+          {rendered.transcripts.length > 0 && (
+            <div>
+              <h3 className="font-medium">Transcripts</h3>
+              <ul className="mt-2 space-y-2">
+                {rendered.transcripts.map((item) => (
+                  <li key={item.evidenceId} className="border-l-2 border-[var(--color-line)] pl-3">
+                    <p className="text-sm font-medium">{item.evidenceTitle}</p>
+                    <p className="text-xs text-[var(--color-ink-muted)]">
+                      {item.attribution.replace(/_/g, ' ')}
+                      {item.pseudonym !== undefined ? ` (${item.pseudonym})` : ''}
+                    </p>
+                    <p
+                      className={
+                        item.quotable
+                          ? 'mt-1 text-sm'
+                          : 'mt-1 text-sm italic text-[var(--color-ink-muted)]'
+                      }
+                    >
+                      {item.quotable
+                        ? item.content
+                        : 'Content withheld — this participant did not consent to being quoted for this audience.'}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {rendered.sessionSummary !== null && (
+            <div>
+              <h3 className="font-medium">Session summary</h3>
+              <p className="mt-2 text-sm">{rendered.sessionSummary.content}</p>
+            </div>
+          )}
+
           {detail.canExport && (
             <div className="border-t border-[var(--color-line)] pt-4">
               <h3 className="font-medium">Take a copy</h3>
