@@ -3,7 +3,7 @@
  * generated changelog. Scopes correspond to the domain integration branches defined
  * in docs/engineering/BRANCH_STRATEGY.md.
  */
-export default {
+module.exports = {
   extends: ['@commitlint/config-conventional'],
   rules: {
     'body-max-line-length': [1, 'always', 100],
