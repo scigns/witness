@@ -178,7 +178,14 @@ services:
     <<: *common
     profiles: ["cloudflare"]
     image: cloudflare/cloudflared:latest
-    command: ["tunnel", "--config", "/etc/cloudflared/config.yml", "run"]
+    # QUIC (the default) runs over UDP, which home/office networks throttle,
+    # NAT-time-out, or drop far more often than they do TCP — observed here as
+    # recurring "no recent network activity" disconnects that self-healed
+    # within a second but landed mid-request often enough to break a scripted
+    # walkthrough. HTTP/2 over TCP/443 is slower per-connection but goes
+    # through the same path as every other HTTPS request this host makes,
+    # which is the path that's actually reliable on this network.
+    command: ["tunnel", "--protocol", "http2", "--config", "/etc/cloudflared/config.yml", "run"]
     environment:
       CLOUDFLARE_TUNNEL_ID: ${CLOUDFLARE_TUNNEL_ID:?CLOUDFLARE_TUNNEL_ID must be set}
     volumes:

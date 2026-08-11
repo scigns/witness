@@ -13,6 +13,7 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import type { NextFunction, Request, Response } from 'express';
 
 import { loadConfigOrExit } from '@witness/config';
 
@@ -90,6 +91,17 @@ async function bootstrap(): Promise<void> {
   // still never trusted to describe itself.
   if (config.profile !== 'development') {
     app.set('trust proxy', 'loopback, uniquelocal');
+
+    // The connection Express sees is plaintext, but the one the browser made
+    // was not — Cloudflare terminates TLS in front of every deployed profile.
+    // HSTS is a response header, not a TLS behaviour, so the origin can set
+    // it without knowing anything about the edge that did the terminating.
+    // Gated to non-development only: a browser that visits localhost over
+    // HTTP and receives this header will refuse to load it as HTTP again.
+    app.use((_req: Request, res: Response, next: NextFunction) => {
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+      next();
+    });
   }
 
   app.enableShutdownHooks();
