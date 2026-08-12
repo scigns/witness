@@ -70,8 +70,19 @@ export type CreateOrganisationRequest = z.infer<typeof createOrganisationRequest
 export const createWorkspaceRequestSchema = z.object({
   name: z.string().trim().min(1, 'A name is required').max(200),
   organisationId: z.string().uuid('A valid organisation id is required'),
+  description: z.string().trim().max(4000).optional(),
 });
 export type CreateWorkspaceRequest = z.infer<typeof createWorkspaceRequestSchema>;
+
+export const updateWorkspaceRequestSchema = z.object({
+  description: z.string().trim().max(4000).nullable(),
+});
+export type UpdateWorkspaceRequest = z.infer<typeof updateWorkspaceRequestSchema>;
+
+export const updateOwnProfileRequestSchema = z.object({
+  bio: z.string().trim().max(1000).nullable(),
+});
+export type UpdateOwnProfileRequest = z.infer<typeof updateOwnProfileRequestSchema>;
 
 export const createUserRequestSchema = z.object({
   email: z
@@ -1170,6 +1181,7 @@ export interface WorkspaceSummary {
   id: string;
   name: string;
   organisationId: string;
+  description: string | null;
   createdAt: string;
 }
 
@@ -1188,6 +1200,7 @@ export interface OrganisationMembershipView {
   userId: string;
   userEmail: string;
   userDisplayName: string;
+  userBio: string | null;
   state: MembershipState;
   /** Permitted next actions, server-computed — same reasoning as `RecordDetail.permittedActions`. */
   permittedActions: MembershipAction['action'][];
@@ -1219,6 +1232,7 @@ export interface WorkspaceMembershipView {
   userId: string;
   userEmail: string;
   userDisplayName: string;
+  userBio: string | null;
   state: MembershipState;
   permittedActions: MembershipAction['action'][];
   createdAt: string;
@@ -1279,6 +1293,7 @@ export interface CurrentUserView {
   id: string;
   displayName: string;
   email: string;
+  bio: string | null;
   accountState: AccountState;
   organisations: CurrentUserOrganisationView[];
   workspaces: CurrentUserWorkspaceView[];

@@ -33,6 +33,7 @@ export type Action =
   | 'organisation:create'
   | 'workspace:read'
   | 'workspace:create'
+  | 'workspace:update'
   | 'user:read'
   | 'user:create'
   | 'organisation_membership:read'

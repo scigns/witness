@@ -22,13 +22,14 @@ import {
   recordSignIn,
   toIdentityLinkId,
   toUserId,
+  updateOwnProfile,
   type AccountState,
   type IdentityLink,
   type MembershipState,
   type User,
   type WitnessRole,
 } from '@witness/domain';
-import type { CurrentUserView } from '@witness/contracts';
+import type { CurrentUserView, UpdateOwnProfileRequest } from '@witness/contracts';
 
 import type { Principal } from '../authz/authorization.port.js';
 import { PrismaService } from '../infrastructure/prisma.service.js';
@@ -277,6 +278,7 @@ export class AuthenticationService {
       id: toUserId(candidateRow.id),
       email: candidateRow.email,
       displayName: candidateRow.displayName,
+      bio: candidateRow.bio,
       accountState: 'invited',
       createdAt: candidateRow.createdAt,
       updatedAt: candidateRow.updatedAt,
@@ -388,6 +390,7 @@ export class AuthenticationService {
         id: user.id,
         displayName: user.displayName,
         email: user.email,
+        bio: user.bio,
         accountState: user.accountState as AccountState,
         organisations: organisationMemberships
           .filter((m) => isInGoodStanding(m.state as MembershipState))
@@ -403,11 +406,50 @@ export class AuthenticationService {
             id: m.workspace.id,
             name: m.workspace.name,
             organisationId: m.workspace.organisationId,
+            description: m.workspace.description,
             createdAt: m.workspace.createdAt.toISOString(),
             role: roleByWorkspace.get(m.workspace.id) ?? null,
           })),
       },
     };
+  }
+
+  /**
+   * A person editing their own profile. Not gated by `AuthorizationGuard` —
+   * same "may describe yourself" reasoning as `getCurrentUser` — so this
+   * takes a raw `userId` from the caller's own session, not a `Principal`.
+   */
+  async updateProfile(userId: string, input: UpdateOwnProfileRequest): Promise<CurrentUserResult> {
+    const row = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (row === null) return { status: 'not_found' };
+    if (row.accountState === 'suspended') return { status: 'suspended' };
+    if (row.accountState === 'deactivated') return { status: 'deactivated' };
+
+    const user: User = {
+      id: toUserId(row.id),
+      email: row.email,
+      displayName: row.displayName,
+      bio: row.bio,
+      accountState: row.accountState as AccountState,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+
+    const actor = await resolveActor(this.prisma, {
+      subject: `user:${userId}`,
+      displayName: user.displayName,
+      kind: 'human',
+      roles: [],
+    });
+    const now = new Date();
+    const outcome = updateOwnProfile(user, input, actor, now);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: userId }, data: { bio: outcome.user.bio } });
+      await appendAuditEvent(tx, 'user', outcome.user.id, outcome.event, now);
+    });
+
+    return this.getCurrentUser(userId);
   }
 }
 

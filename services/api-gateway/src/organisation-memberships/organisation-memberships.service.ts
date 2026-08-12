@@ -36,7 +36,7 @@ type MembershipRowWithUser = {
   state: string;
   createdAt: Date;
   updatedAt: Date;
-  user: { email: string; displayName: string };
+  user: { email: string; displayName: string; bio: string | null };
 };
 
 @Injectable()
@@ -49,7 +49,7 @@ export class OrganisationMembershipsService {
     const rows = await this.prisma.organisationMembership.findMany({
       where: { organisationId },
       orderBy: { createdAt: 'desc' },
-      include: { user: { select: { email: true, displayName: true } } },
+      include: { user: { select: { email: true, displayName: true, bio: true } } },
       take: 200,
     });
 
@@ -120,7 +120,7 @@ export class OrganisationMembershipsService {
   ): Promise<OrganisationMembershipView> {
     const row = await this.prisma.organisationMembership.findUnique({
       where: { id: membershipId },
-      include: { user: { select: { email: true, displayName: true } } },
+      include: { user: { select: { email: true, displayName: true, bio: true } } },
     });
 
     if (row === null || row.organisationId !== organisationId) {
@@ -184,10 +184,12 @@ export class OrganisationMembershipsService {
     }
   }
 
-  private async requireUser(userId: string): Promise<{ email: string; displayName: string }> {
+  private async requireUser(
+    userId: string,
+  ): Promise<{ email: string; displayName: string; bio: string | null }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true, displayName: true },
+      select: { email: true, displayName: true, bio: true },
     });
 
     if (user === null) {
@@ -209,6 +211,7 @@ function toView(membership: MembershipRowWithUser): OrganisationMembershipView {
     userId: membership.userId,
     userEmail: membership.user.email,
     userDisplayName: membership.user.displayName,
+    userBio: membership.user.bio,
     state,
     permittedActions: permittedMembershipActionNames(state),
     createdAt: membership.createdAt.toISOString(),

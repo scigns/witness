@@ -1,105 +1,85 @@
 'use client';
 
 /**
- * Workspace detail — membership management.
+ * Program Home — the participant-first landing experience (Client-Ready
+ * Experience overhaul, Phase 3).
  *
- * The "add to workspace" list is restricted to organisation members whose
- * organisation membership is in good standing (`invited` or `active`) — the
- * same eligibility rule the API enforces server-side
- * (`packages/domain/src/workspace-membership.ts`). Filtering the dropdown to
- * only eligible users is a convenience; it is not what makes the rule real —
- * the API would refuse an ineligible user even if this filter had a bug.
+ * "Workspace" stays the backend/domain name (BUILD_ROADMAP.md Release 0.2) —
+ * this page presents it as a co-design Program without duplicating the
+ * concept, per the overhaul's explicit instruction to adapt the existing
+ * structure rather than invent a parallel one. A first-time participant
+ * should read this page and understand where they are, why, who else is
+ * here, and what to do next — not land on a membership-administration table
+ * (that experience still exists, moved to `/manage`, for facilitators and
+ * admins who need it).
  */
 
 import Link from 'next/link';
 import { use, useCallback, useEffect, useState } from 'react';
 
 import type {
-  MembershipAction,
-  MembershipState,
-  OrganisationMembershipView,
+  CoDesignSessionSummary,
   OrganisationSummary,
-  RoleAssignmentView,
-  RoleDefinition,
-  WitnessRole,
   WorkspaceMembershipView,
   WorkspaceSummary,
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { useAuth } from '@/lib/auth';
 import {
   Button,
   Card,
+  EmptyState,
   ErrorNotice,
-  MembershipStateBadge,
-  RoleAssignmentControl,
+  PersonCard,
+  RoleBadge,
+  SessionStatusBadge,
 } from '@/components/ui';
 
-const ACTION_LABELS: Record<MembershipAction['action'], string> = {
-  activate: 'Activate',
-  suspend: 'Suspend access',
-  revoke: 'Revoke membership',
-};
+const CAN_MANAGE_ROLES = new Set(['admin', 'facilitator']);
 
-const GOOD_STANDING: ReadonlySet<MembershipState> = new Set<MembershipState>(['invited', 'active']);
+/** Session type is free text (not a fixed set), so this is a display formatter, not a lookup table. */
+function formatSessionType(sessionType: string): string {
+  const spaced = sessionType.replace(/_/g, ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
 
 export default function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user, ready } = useSession();
+  const { currentUser } = useAuth();
 
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   const [organisation, setOrganisation] = useState<OrganisationSummary | null>(null);
-  const [memberships, setMemberships] = useState<WorkspaceMembershipView[]>([]);
-  const [organisationMembers, setOrganisationMembers] = useState<OrganisationMembershipView[]>([]);
-  const [roles, setRoles] = useState<RoleDefinition[]>([]);
-  const [roleAssignments, setRoleAssignments] = useState<Record<string, RoleAssignmentView>>({});
-  const [selectedUserId, setSelectedUserId] = useState('');
+  const [members, setMembers] = useState<WorkspaceMembershipView[]>([]);
+  const [sessions, setSessions] = useState<CoDesignSessionSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+
+  const [editingAbout, setEditingAbout] = useState(false);
+  const [aboutDraft, setAboutDraft] = useState('');
+  const [savingAbout, setSavingAbout] = useState(false);
 
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
       try {
-        const [workspacesResult, organisationsResult, membershipsResult, rolesResult] =
+        const [workspaceResult, organisationsResult, membersResult, sessionsResult] =
           await Promise.all([
-            api.listWorkspaces(user),
+            api.getWorkspace(id, user),
             api.listOrganisations(user),
             api.listWorkspaceMemberships(id, user),
-            api.listRoles(user),
+            api.listSessions(id, user),
           ]);
         if (cancelledRef.current) return;
 
-        const foundWorkspace = workspacesResult.workspaces.find((w) => w.id === id) ?? null;
-        setWorkspace(foundWorkspace);
+        setWorkspace(workspaceResult);
         setOrganisation(
-          foundWorkspace === null
-            ? null
-            : (organisationsResult.organisations.find(
-                (o) => o.id === foundWorkspace.organisationId,
-              ) ?? null),
+          organisationsResult.organisations.find((o) => o.id === workspaceResult.organisationId) ??
+            null,
         );
-        setMemberships(membershipsResult.memberships);
-        setRoles(rolesResult.roles);
-
-        const assignments = await Promise.all(
-          membershipsResult.memberships.map((membership) =>
-            api.getWorkspaceRoleAssignment(id, membership.id, user),
-          ),
-        );
-        if (cancelledRef.current) return;
-        setRoleAssignments(Object.fromEntries(assignments.map((a) => [a.membershipId, a])));
-
-        if (foundWorkspace !== null) {
-          const orgMembersResult = await api.listOrganisationMemberships(
-            foundWorkspace.organisationId,
-            user,
-          );
-          if (cancelledRef.current) return;
-          setOrganisationMembers(orgMembersResult.memberships);
-        }
-
+        setMembers(membersResult.memberships);
+        setSessions(sessionsResult.sessions);
         setError(null);
       } catch (caught) {
         if (cancelledRef.current) return;
@@ -113,67 +93,41 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   useEffect(() => {
     if (!ready) return;
-
     const cancelledRef = { current: false };
     void load(cancelledRef);
-
     return () => {
       cancelledRef.current = true;
     };
   }, [ready, load]);
 
-  const workspaceMemberUserIds = new Set(memberships.map((m) => m.userId));
-  const eligibleOrganisationMembers = organisationMembers.filter(
-    (member) => GOOD_STANDING.has(member.state) && !workspaceMemberUserIds.has(member.userId),
-  );
+  const role = currentUser?.workspaces.find((w) => w.id === id)?.role ?? null;
+  const canManage = role !== null && CAN_MANAGE_ROLES.has(role);
 
-  const addMember = async () => {
-    if (selectedUserId === '') return;
-    setBusy(true);
-    try {
-      await api.addWorkspaceMembership(id, { userId: selectedUserId }, user);
-      setSelectedUserId('');
-      await load({ current: false });
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
-    } finally {
-      setBusy(false);
-    }
+  const openSession = sessions.find((s) => s.status === 'open') ?? null;
+  const upcomingSessions = sessions
+    .filter((s) => s.status === 'draft' || s.status === 'scheduled')
+    .slice(0, 3);
+  const recentSessions = sessions.filter((s) => s.status === 'closed').slice(0, 3);
+
+  const startEditingAbout = () => {
+    setAboutDraft(workspace?.description ?? '');
+    setEditingAbout(true);
   };
 
-  const applyAction = async (membershipId: string, action: MembershipAction['action']) => {
-    setBusy(true);
+  const saveAbout = async () => {
+    setSavingAbout(true);
     try {
-      await api.transitionWorkspaceMembership(id, membershipId, { action }, user);
-      await load({ current: false });
+      const updated = await api.updateWorkspace(
+        id,
+        { description: aboutDraft.trim() === '' ? null : aboutDraft.trim() },
+        user,
+      );
+      setWorkspace(updated);
+      setEditingAbout(false);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
-      setBusy(false);
-    }
-  };
-
-  const assignRole = async (membershipId: string, role: string) => {
-    setBusy(true);
-    try {
-      await api.assignWorkspaceRole(id, membershipId, { role: role as WitnessRole }, user);
-      await load({ current: false });
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const removeRole = async (membershipId: string) => {
-    setBusy(true);
-    try {
-      await api.removeWorkspaceRole(id, membershipId, user);
-      await load({ current: false });
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
-    } finally {
-      setBusy(false);
+      setSavingAbout(false);
     }
   };
 
@@ -184,175 +138,228 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   if (workspace === null) {
     return (
       <div className="space-y-4">
-        <ErrorNotice message={error ?? `No workspace with id '${id}'.`} />
+        <ErrorNotice message={error ?? `No program with id '${id}'.`} />
         <Link href="/workspaces" className="text-sm underline">
-          ← Back to workspaces
+          ← Back to programs
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <Link href="/workspaces" className="inline-block text-sm underline">
-        ← Back to workspaces
+        ← Back to programs
       </Link>
 
       {error !== null && <ErrorNotice message={error} />}
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* Welcome */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{workspace.name}</h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            {organisation === null ? (
-              'Organisation: unknown'
-            ) : (
-              <>
-                Organisation:{' '}
-                <Link href={`/organisations/${organisation.id}`} className="underline">
-                  {organisation.name}
-                </Link>
-              </>
-            )}
+          <p className="text-sm text-[var(--color-ink-muted)]">
+            {organisation === null ? 'A co-design program' : `Hosted by ${organisation.name}`}
           </p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">{workspace.name}</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {role !== null && (
+            <span className="text-sm text-[var(--color-ink-muted)]">
+              You&rsquo;re participating as <RoleBadge role={role} />
+            </span>
+          )}
           <Link
             href={`/workspaces/${id}/search`}
             className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
           >
             Search →
           </Link>
-          <Link
-            href={`/workspaces/${id}/sessions`}
-            className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
-          >
-            Co-design sessions →
-          </Link>
+          {canManage && (
+            <Link
+              href={`/workspaces/${id}/manage`}
+              className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
+            >
+              Manage program →
+            </Link>
+          )}
         </div>
       </div>
 
-      <section aria-labelledby="add-member-heading">
-        <h2 id="add-member-heading" className="mb-3 text-lg font-semibold">
-          Add an organisation member to this workspace
-        </h2>
-        <Card className="space-y-3">
-          {eligibleOrganisationMembers.length === 0 ? (
-            <p className="text-sm text-[var(--color-ink-muted)]">
-              No eligible organisation members. A user must be an invited or active member of{' '}
-              {organisation?.name ?? 'this workspace’s organisation'} before they can be added to a
-              workspace inside it.
-            </p>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <label htmlFor="userId" className="sr-only">
-                User to add
-              </label>
-              <select
-                id="userId"
-                value={selectedUserId}
-                onChange={(event) => setSelectedUserId(event.target.value)}
-                className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
-              >
-                <option value="">Choose a user…</option>
-                {eligibleOrganisationMembers.map((member) => (
-                  <option key={member.userId} value={member.userId}>
-                    {member.userDisplayName} ({member.userEmail})
-                  </option>
-                ))}
-              </select>
+      {/* About */}
+      <section aria-labelledby="about-heading" className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 id="about-heading" className="text-lg font-semibold">
+            About this program
+          </h2>
+          {canManage && !editingAbout && (
+            <button
+              type="button"
+              onClick={startEditingAbout}
+              className="text-sm underline hover:no-underline"
+            >
+              {workspace.description === null ? 'Add a description' : 'Edit'}
+            </button>
+          )}
+        </div>
+        {editingAbout ? (
+          <Card className="space-y-3">
+            <label htmlFor="about" className="sr-only">
+              About this program
+            </label>
+            <textarea
+              id="about"
+              rows={4}
+              maxLength={4000}
+              value={aboutDraft}
+              onChange={(event) => setAboutDraft(event.target.value)}
+              placeholder="Why this co-design exists, what it hopes to achieve, and who it's for."
+              className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+            />
+            <div className="flex gap-2">
+              <Button variant="primary" disabled={savingAbout} onClick={() => void saveAbout()}>
+                {savingAbout ? 'Saving…' : 'Save'}
+              </Button>
               <Button
-                variant="primary"
-                disabled={busy || selectedUserId === ''}
-                onClick={() => void addMember()}
+                variant="secondary"
+                disabled={savingAbout}
+                onClick={() => setEditingAbout(false)}
               >
-                Add to workspace
+                Cancel
               </Button>
             </div>
-          )}
-        </Card>
-      </section>
-
-      <section aria-labelledby="members-heading">
-        <h2 id="members-heading" className="mb-3 text-lg font-semibold">
-          Members
-        </h2>
-        {memberships.length === 0 ? (
+          </Card>
+        ) : workspace.description !== null ? (
           <Card>
-            <p className="text-sm text-[var(--color-ink-muted)]">No members yet.</p>
+            <p className="whitespace-pre-wrap text-sm">{workspace.description}</p>
           </Card>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-sm">
-              <caption className="sr-only">Workspace members and their status</caption>
-              <thead>
-                <tr className="border-b border-[var(--color-line)]">
-                  <th scope="col" className="py-2 pr-4 font-medium">
-                    User
-                  </th>
-                  <th scope="col" className="py-2 pr-4 font-medium">
-                    Membership status
-                  </th>
-                  <th scope="col" className="py-2 pr-4 font-medium">
-                    Role
-                  </th>
-                  <th scope="col" className="py-2 font-medium">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {memberships.map((membership) => {
-                  const assignment: RoleAssignmentView = roleAssignments[membership.id] ?? {
-                    membershipId: membership.id,
-                    userId: membership.userId,
-                    userEmail: membership.userEmail,
-                    userDisplayName: membership.userDisplayName,
-                    role: null,
-                    roleLabel: null,
-                    permittedActions: [],
-                    updatedAt: null,
-                  };
+          <EmptyState
+            title="No description yet"
+            body={
+              canManage
+                ? "Tell participants why this co-design exists and what it hopes to achieve — it's the first thing they read."
+                : 'The facilitators preparing this program haven’t added a description yet.'
+            }
+            action={
+              canManage ? (
+                <Button variant="secondary" onClick={startEditingAbout}>
+                  Add a description
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
+      </section>
 
-                  return (
-                    <tr key={membership.id} className="border-b border-[var(--color-line)]">
-                      <td className="py-3 pr-4">
-                        <div className="font-medium">{membership.userDisplayName}</div>
-                        <div className="text-xs text-[var(--color-ink-muted)]">
-                          {membership.userEmail}
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <MembershipStateBadge state={membership.state} />
-                      </td>
-                      <td className="py-3 pr-4">
-                        <RoleAssignmentControl
-                          roles={roles}
-                          assignment={assignment}
-                          busy={busy}
-                          onAssign={(role) => void assignRole(membership.id, role)}
-                          onRemove={() => void removeRole(membership.id)}
-                        />
-                      </td>
-                      <td className="py-3">
-                        <div className="flex flex-wrap gap-2">
-                          {membership.permittedActions.map((action) => (
-                            <Button
-                              key={action}
-                              variant={action === 'revoke' ? 'danger' : 'secondary'}
-                              disabled={busy}
-                              onClick={() => void applyAction(membership.id, action)}
-                            >
-                              {ACTION_LABELS[action]}
-                            </Button>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {/* Now / Sessions */}
+      <section aria-labelledby="sessions-heading" className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 id="sessions-heading" className="text-lg font-semibold">
+            Sessions
+          </h2>
+          <Link
+            href={`/workspaces/${id}/sessions`}
+            className="text-sm underline hover:no-underline"
+          >
+            See all →
+          </Link>
+        </div>
+
+        {openSession !== null && (
+          <Link
+            href={`/workspaces/${id}/sessions/${openSession.id}`}
+            className="block rounded-lg focus-visible:outline-none"
+          >
+            <Card className="border-[var(--color-accent)] bg-[var(--color-accent-soft)]">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">
+                Happening now
+              </p>
+              <p className="mt-1 font-medium">{openSession.title}</p>
+              <p className="text-sm text-[var(--color-ink-muted)]">
+                {formatSessionType(openSession.sessionType)}
+              </p>
+            </Card>
+          </Link>
+        )}
+
+        {sessions.length === 0 ? (
+          <EmptyState
+            title="No sessions yet"
+            body={
+              canManage
+                ? 'Create the first session in this program to start capturing the conversation.'
+                : 'Sessions will appear here once a facilitator schedules one.'
+            }
+            action={
+              canManage ? (
+                <Link href={`/workspaces/${id}/sessions/new`}>
+                  <Button variant="secondary">Create a session</Button>
+                </Link>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[...upcomingSessions, ...recentSessions]
+              .filter((s) => s.id !== openSession?.id)
+              .slice(0, 4)
+              .map((session) => (
+                <Link
+                  key={session.id}
+                  href={`/workspaces/${id}/sessions/${session.id}`}
+                  className="block rounded-lg focus-visible:outline-none"
+                >
+                  <Card className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{session.title}</p>
+                      <p className="truncate text-sm text-[var(--color-ink-muted)]">
+                        {formatSessionType(session.sessionType)}
+                      </p>
+                    </div>
+                    <SessionStatusBadge status={session.status} />
+                  </Card>
+                </Link>
+              ))}
+          </div>
+        )}
+      </section>
+
+      {/* People */}
+      <section aria-labelledby="people-heading" className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 id="people-heading" className="text-lg font-semibold">
+            People
+          </h2>
+          <Link href={`/workspaces/${id}/people`} className="text-sm underline hover:no-underline">
+            See everyone →
+          </Link>
+        </div>
+        {members.length === 0 ? (
+          <EmptyState
+            title="No one has joined yet"
+            body={
+              canManage
+                ? 'Invite the people who will take part in this co-design.'
+                : 'Participants will appear here as they join this program.'
+            }
+            action={
+              canManage ? (
+                <Link href={`/workspaces/${id}/manage`}>
+                  <Button variant="secondary">Invite people</Button>
+                </Link>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {members.slice(0, 4).map((member) => (
+              <PersonCard
+                key={member.id}
+                name={member.userDisplayName}
+                bio={member.userBio}
+                href={`/workspaces/${id}/people`}
+              />
+            ))}
           </div>
         )}
       </section>

@@ -4,9 +4,24 @@
  * expressed in the domain (ADR-0003).
  */
 
-import { BadRequestException, Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 
-import { createWorkspaceRequestSchema, type WorkspaceSummary } from '@witness/contracts';
+import {
+  createWorkspaceRequestSchema,
+  updateWorkspaceRequestSchema,
+  type WorkspaceSummary,
+} from '@witness/contracts';
 import { DomainError } from '@witness/domain';
 
 import {
@@ -25,6 +40,22 @@ export class WorkspacesController {
   @Requires('workspace:read')
   async list(@Req() request: RequestWithPrincipal): Promise<{ workspaces: WorkspaceSummary[] }> {
     return { workspaces: await this.workspaces.list(request.principal!) };
+  }
+
+  @Get(':workspaceId')
+  @Requires('workspace:read')
+  async get(
+    @Param('workspaceId') id: string,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<WorkspaceSummary> {
+    const workspaces = await this.workspaces.list(request.principal!);
+    const found = workspaces.find((w) => w.id === id);
+    if (found === undefined) {
+      throw new NotFoundException({
+        error: { code: 'WORKSPACE_NOT_FOUND', message: `No workspace with id '${id}'.` },
+      });
+    }
+    return found;
   }
 
   @Post()
@@ -50,7 +81,39 @@ export class WorkspacesController {
         parsed.data.name,
         parsed.data.organisationId,
         request.principal!,
+        parsed.data.description,
       );
+    } catch (error) {
+      if (error instanceof DomainError) {
+        throw new BadRequestException({
+          error: { code: error.code, message: error.message },
+        });
+      }
+      throw error;
+    }
+  }
+
+  @Patch(':workspaceId')
+  @Requires('workspace:update')
+  async update(
+    @Param('workspaceId') id: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<WorkspaceSummary> {
+    const parsed = updateWorkspaceRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      throw new BadRequestException({
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: 'The request body is not valid.',
+          fields: parsed.error.flatten().fieldErrors,
+        },
+      });
+    }
+
+    try {
+      return await this.workspaces.updateDetails(id, parsed.data, request.principal!);
     } catch (error) {
       if (error instanceof DomainError) {
         throw new BadRequestException({

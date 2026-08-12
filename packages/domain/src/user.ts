@@ -50,11 +50,20 @@ const NO_WHITESPACE_OR_AT = /^[^\s@]+$/;
 /** Matches the `witness_user.email` column (`VARCHAR(320)`) — defence in depth, same reasoning as `DISPLAY_NAME_MAX`. */
 const EMAIL_MAX = 320;
 
+/** The maximum length of a user's self-authored bio. */
+const BIO_MAX = 1000;
+
 export interface User {
   readonly id: UserId;
   /** Normalised (trimmed, lower-cased) — see `normaliseEmail`. */
   readonly email: string;
   readonly displayName: string;
+  /**
+   * "What I bring to this conversation" — self-authored, never set by an
+   * administrator on someone else's behalf (see `updateOwnProfile`).
+   * `null` means nobody has written one yet, not "deliberately blank".
+   */
+  readonly bio: string | null;
   readonly accountState: AccountState;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -142,6 +151,7 @@ export function createUser(input: {
     id: input.id,
     email: normaliseEmail(input.email),
     displayName: assertDisplayName(input.displayName),
+    bio: null,
     accountState: 'invited',
     createdAt: input.registeredAt,
     updatedAt: input.registeredAt,
@@ -153,6 +163,46 @@ export function createUser(input: {
       action: 'user.created',
       actor: input.registeredBy,
       metadata: { email: user.email },
+    },
+  };
+}
+
+function assertBio(bio: string | null): string | null {
+  if (bio === null) return null;
+  const trimmed = bio.trim();
+  if (trimmed.length === 0) return null;
+
+  if (trimmed.length > BIO_MAX) {
+    throw new InvariantViolation(
+      `A bio must be ${BIO_MAX} characters or fewer, received ${trimmed.length}.`,
+      'BIO_TOO_LONG',
+    );
+  }
+
+  return trimmed;
+}
+
+/**
+ * A person editing their own profile — not gated by any role, because
+ * "may describe yourself" is not an authorisation-worthy action (same
+ * reasoning as `CurrentUserController`'s "may see my own identity").
+ * Deliberately narrow: only `bio`, not `displayName` or `email`, which stay
+ * administrator-managed identity fields (Milestone 1.1).
+ */
+export function updateOwnProfile(
+  user: User,
+  input: { bio?: string | null },
+  updatedBy: Actor,
+  at: Date,
+): UserOutcome {
+  const bio = input.bio === undefined ? user.bio : assertBio(input.bio);
+
+  return {
+    user: { ...user, bio, updatedAt: at },
+    event: {
+      action: 'user.profile_updated',
+      actor: updatedBy,
+      metadata: {},
     },
   };
 }

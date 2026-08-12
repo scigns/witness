@@ -137,8 +137,9 @@ model Organisation {
 /// belongs to exactly one organisation, never a polymorphic set of parents, so
 /// there is no reason to give up referential integrity here.
 model Workspace {
-  id   String @id @db.Uuid
-  name String @db.VarChar(200)
+  id          String  @id @db.Uuid
+  name        String  @db.VarChar(200)
+  description String? @db.VarChar(4000)
 
   organisationId String       @map("organisation_id") @db.Uuid
   organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
@@ -179,6 +180,10 @@ model User {
   id           String   @id @db.Uuid
   email        String   @unique @db.VarChar(320)
   displayName  String   @map("display_name") @db.VarChar(200)
+  /// Self-authored: "what I bring to this conversation" — see
+  /// packages/domain/src/user.ts's updateOwnProfile. Never set by an
+  /// administrator on someone else's behalf.
+  bio          String?  @db.VarChar(1000)
   accountState String   @map("account_state") @db.VarChar(24)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)

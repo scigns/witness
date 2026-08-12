@@ -528,3 +528,127 @@ export function NotImplemented({ capability, phase }: { capability: string; phas
     </div>
   );
 }
+
+/** A palette cycled by a stable hash of the name — the same person gets the same colour every time, without storing one. */
+const AVATAR_PALETTE = [
+  'oklch(0.55 0.14 250)',
+  'oklch(0.55 0.13 20)',
+  'oklch(0.55 0.13 145)',
+  'oklch(0.55 0.14 300)',
+  'oklch(0.55 0.15 60)',
+  'oklch(0.55 0.13 190)',
+];
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return `${parts[0]![0]}${parts[parts.length - 1]![0]}`.toUpperCase();
+}
+
+const AVATAR_SIZE_CLASSES = {
+  sm: 'h-8 w-8 text-xs',
+  md: 'h-11 w-11 text-sm',
+  lg: 'h-16 w-16 text-lg',
+};
+
+/**
+ * No photo upload in this build — an initials avatar gives every person a
+ * consistent, recognisable visual identity in the People directory and on
+ * their profile without one, and never needs a broken-image fallback.
+ */
+export function Avatar({
+  name,
+  size = 'md',
+}: {
+  name: string;
+  size?: keyof typeof AVATAR_SIZE_CLASSES;
+}) {
+  const colour = AVATAR_PALETTE[hashString(name) % AVATAR_PALETTE.length];
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-flex flex-shrink-0 items-center justify-center rounded-full font-semibold text-white ${AVATAR_SIZE_CLASSES[size]}`}
+      style={{ backgroundColor: colour }}
+    >
+      {initials(name)}
+    </span>
+  );
+}
+
+/**
+ * A card presenting a person — the People directory's building block, and
+ * deliberately reused nowhere near an admin table. `href` makes the whole
+ * card a link to that person's profile when one exists.
+ */
+export function PersonCard({
+  name,
+  subtitle,
+  bio,
+  badge,
+  href,
+}: {
+  name: string;
+  subtitle?: string;
+  bio?: string | null;
+  badge?: ReactNode;
+  href?: string;
+}) {
+  const content = (
+    <Card className="flex h-full flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <Avatar name={name} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{name}</p>
+          {subtitle !== undefined && (
+            <p className="truncate text-sm text-[var(--color-ink-muted)]">{subtitle}</p>
+          )}
+        </div>
+        {badge}
+      </div>
+      {bio !== undefined && bio !== null && bio.trim() !== '' && (
+        <p className="line-clamp-3 text-sm text-[var(--color-ink-muted)]">{bio}</p>
+      )}
+    </Card>
+  );
+
+  if (href === undefined) return content;
+
+  return (
+    <Link href={href} className="block h-full rounded-lg focus-visible:outline-none">
+      {content}
+    </Link>
+  );
+}
+
+/**
+ * A major empty screen that tells the reader what to do next rather than
+ * just what is missing — an empty state should enable the next action, not
+ * be a dead end (Client-Ready Experience, Phase 21).
+ */
+export function EmptyState({
+  title,
+  body,
+  action,
+}: {
+  title: string;
+  body: string;
+  action?: ReactNode;
+}) {
+  return (
+    <Card className="flex flex-col items-start gap-3 border-dashed py-8 text-center sm:items-center sm:text-center">
+      <p className="font-medium">{title}</p>
+      <p className="max-w-md text-sm text-[var(--color-ink-muted)]">{body}</p>
+      {action}
+    </Card>
+  );
+}

@@ -18,12 +18,15 @@ import {
   toAuditEventId,
   toOrganisationId,
   toWorkspaceId,
+  updateWorkspaceDetails,
   type Actor,
+  type Workspace,
 } from '@witness/domain';
 import type { WorkspaceSummary } from '@witness/contracts';
 
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { sha256 } from '../infrastructure/hashing.js';
+import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import type { Principal } from '../authz/authorization.port.js';
 
 @Injectable()
@@ -59,6 +62,7 @@ export class WorkspacesService {
       id: row.id,
       name: row.name,
       organisationId: row.organisationId,
+      description: row.description,
       createdAt: row.createdAt.toISOString(),
     }));
   }
@@ -91,6 +95,7 @@ export class WorkspacesService {
     name: string,
     organisationId: string,
     principal: Principal,
+    description?: string,
   ): Promise<WorkspaceSummary> {
     const organisation = await this.prisma.organisation.findUnique({
       where: { id: organisationId },
@@ -112,6 +117,7 @@ export class WorkspacesService {
       id: toWorkspaceId(randomUUID()),
       organisationId: toOrganisationId(organisationId),
       name,
+      description: description ?? null,
       createdBy: actor,
       createdAt: now,
     });
@@ -121,6 +127,7 @@ export class WorkspacesService {
         data: {
           id: outcome.workspace.id,
           name: outcome.workspace.name,
+          description: outcome.workspace.description,
           organisationId: outcome.workspace.organisationId,
           createdAt: outcome.workspace.createdAt,
         },
@@ -161,6 +168,48 @@ export class WorkspacesService {
       id: outcome.workspace.id,
       name: outcome.workspace.name,
       organisationId: outcome.workspace.organisationId,
+      description: outcome.workspace.description,
+      createdAt: outcome.workspace.createdAt.toISOString(),
+    };
+  }
+
+  async updateDetails(
+    workspaceId: string,
+    input: { description?: string | null },
+    principal: Principal,
+  ): Promise<WorkspaceSummary> {
+    const row = await this.prisma.workspace.findUnique({ where: { id: workspaceId } });
+    if (row === null) {
+      throw new NotFoundException({
+        error: { code: 'WORKSPACE_NOT_FOUND', message: `No workspace with id '${workspaceId}'.` },
+      });
+    }
+
+    const current: Workspace = {
+      id: toWorkspaceId(row.id),
+      organisationId: toOrganisationId(row.organisationId),
+      name: row.name,
+      description: row.description,
+      createdAt: row.createdAt,
+    };
+
+    const actor = await this.resolveActor(principal);
+    const now = new Date();
+    const outcome = updateWorkspaceDetails(current, input, actor);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.workspace.update({
+        where: { id: workspaceId },
+        data: { description: outcome.workspace.description },
+      });
+      await appendAuditEvent(tx, 'workspace', outcome.workspace.id, outcome.event, now);
+    });
+
+    return {
+      id: outcome.workspace.id,
+      name: outcome.workspace.name,
+      organisationId: outcome.workspace.organisationId,
+      description: outcome.workspace.description,
       createdAt: outcome.workspace.createdAt.toISOString(),
     };
   }
