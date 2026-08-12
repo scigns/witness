@@ -286,7 +286,7 @@ export default function SessionDetailPage({
             Consent →
           </LinkButton>
           <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/evidence`}>
-            Evidence →
+            Contributions →
           </LinkButton>
           <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/summary`}>
             Summary →
@@ -296,6 +296,9 @@ export default function SessionDetailPage({
           </LinkButton>
           <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/reports`}>
             Reports →
+          </LinkButton>
+          <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/recap`}>
+            Recap →
           </LinkButton>
           {!isArchived && (
             <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>

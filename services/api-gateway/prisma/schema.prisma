@@ -163,6 +163,8 @@ model Workspace {
   outcomeSupports              OutcomeSupport[]
   reports                      Report[]
   reportSources                ReportSource[]
+  agendaItems                  AgendaItem[]
+  resources                    Resource[]
 
   @@index([organisationId])
   @@map("workspace")
@@ -198,6 +200,8 @@ model User {
   reviewAssignments         ReviewAssignment[]       @relation("ReviewAssignmentReviewer")
   ownedCommitments          Commitment[]             @relation("CommitmentOwner")
   ownedActionItems          ActionItem[]             @relation("ActionItemOwner")
+  facilitatedAgendaItems    AgendaItem[]
+  uploadedResources         Resource[]
 
   @@index([accountState])
   @@map("witness_user")
@@ -441,6 +445,8 @@ model CoDesignSession {
   reports                   Report[]
   reportSources             ReportSource[]
   summary                   SessionSummary?
+  agendaItems               AgendaItem[]
+  resources                 Resource[]
 
   @@index([organisationId])
   @@index([workspaceId, status])
@@ -1081,6 +1087,22 @@ model AuditEvent {
 
   occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
 
+  /// True insertion order within a subject's chain — a Postgres sequence,
+  /// not caller-supplied. `occurredAt` alone cannot serve as the tail
+  /// tiebreaker: it is captured by the caller before the per-subject
+  /// `pg_advisory_xact_lock` (see `infrastructure/audit.helper.ts`) is even
+  /// acquired, so concurrent-but-correctly-serialized appends to the same
+  /// subject can still carry identical millisecond timestamps, and
+  /// `ORDER BY occurredAt DESC` has no defined tiebreak for ties — Postgres
+  /// may return any of them. Reproduced live: ten concurrent updates to one
+  /// agenda item forked the chain even with the advisory lock correctly
+  /// serializing every write, because two "tail" reads landed on the same
+  /// tied row. `sequence` is assigned by `nextval()` at INSERT time, and
+  /// because the advisory lock prevents a second insert for the same
+  /// subject from starting until the first has committed, ordering by it
+  /// is unambiguous.
+  sequence BigInt @default(autoincrement())
+
   /// Null only for the first event in a subject's chain.
   previousHash String? @map("previous_hash") @db.VarChar(64)
   hash         String  @unique @db.VarChar(64)
@@ -1092,6 +1114,7 @@ model AuditEvent {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([subjectType, subjectId, occurredAt])
+  @@index([subjectType, subjectId, sequence])
   @@map("audit_event")
 }
 
@@ -1471,4 +1494,90 @@ model ReportSource {
   @@index([reportId])
   @@index([sessionId])
   @@map("report_source")
+}
+
+/// A facilitator-managed agenda item — the ordered timeline of activities a
+/// co-design program runs through (Client-Ready Experience overhaul, Phase
+/// 11: agenda/timeline). Program-scoped (`workspaceId`), not session-scoped,
+/// because a program's agenda can reasonably span more than one session; the
+/// optional `sessionId` links an item to a specific session when it is one.
+model AgendaItem {
+  id          String    @id @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String?          @map("session_id") @db.Uuid
+  session   CoDesignSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  title       String  @db.VarChar(200)
+  description String? @db.Text
+  /// The question or activity participants are asked to respond to — shown
+  /// prominently in the live-session view while this item is `current`.
+  promptText  String? @map("prompt_text") @db.Text
+
+  facilitatorId String? @map("facilitator_id") @db.Uuid
+  facilitator   User?   @relation(fields: [facilitatorId], references: [id], onDelete: SetNull)
+
+  /// `upcoming` | `current` | `completed`. At most one item per workspace may
+  /// be `current` — enforced in the domain, not by a database constraint,
+  /// for the same reason session status transitions are (a state machine
+  /// needs the event trail, not just the end state).
+  status String @db.VarChar(16)
+
+  /// Dense ordering within a workspace — the domain renumbers on every
+  /// reorder rather than leaving gaps, so "insert between two items" never
+  /// runs out of room between adjacent integers.
+  sortOrder Int @map("sort_order")
+
+  startAt         DateTime? @map("start_at") @db.Timestamptz(6)
+  durationMinutes Int?      @map("duration_minutes")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  resources Resource[]
+
+  @@index([workspaceId, sortOrder])
+  @@index([sessionId])
+  @@map("agenda_item")
+}
+
+/// A facilitator-uploaded program resource — presentations, briefing papers,
+/// agendas, images, or an external link (Client-Ready Experience overhaul,
+/// Phase 12). Content is stored as bytes in Postgres for a file resource,
+/// same reasoning as `EvidenceAttachment` (ADR-0011: the database is the
+/// whole system of record, so the existing backup covers this for free) —
+/// `externalUrl` is used instead for a link resource; exactly one of the two
+/// is populated, enforced in the domain.
+model Resource {
+  id          String    @id @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String?          @map("session_id") @db.Uuid
+  session   CoDesignSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  agendaItemId String?     @map("agenda_item_id") @db.Uuid
+  agendaItem   AgendaItem? @relation(fields: [agendaItemId], references: [id], onDelete: SetNull)
+
+  title        String  @db.VarChar(300)
+  description  String? @db.Text
+  resourceType String  @map("resource_type") @db.VarChar(16)
+
+  originalFilename String? @map("original_filename") @db.VarChar(300)
+  contentType      String? @map("content_type") @db.VarChar(100)
+  sizeBytes        Int?    @map("size_bytes")
+  content          Bytes?
+
+  externalUrl String? @map("external_url") @db.VarChar(2000)
+
+  uploadedById String @map("uploaded_by_id") @db.Uuid
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([workspaceId])
+  @@index([sessionId])
+  @@index([agendaItemId])
+  @@map("resource")
 }

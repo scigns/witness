@@ -138,6 +138,12 @@ export const AUDIT_ACTIONS = [
   'report.revised',
   'report_source.included',
   'report_source.excluded',
+  'agenda_item.created',
+  'agenda_item.updated',
+  'agenda_item.status_changed',
+  'agenda_item.reordered',
+  'resource.uploaded',
+  'resource.removed',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -175,6 +181,8 @@ export const AUDIT_SUBJECT_TYPES = [
   'outcome_support',
   'report',
   'report_source',
+  'agenda_item',
+  'resource',
 ] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 

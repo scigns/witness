@@ -142,8 +142,15 @@ p, reader, evidence_review:read
 p, reader, transcript:read
 p, reader, summary:read
 p, reader, outcome:read
+# agenda_item:*/resource:* (Client-Ready Experience overhaul, Program Agenda
+# and Resources): follows session:*/evidence:*'s exact precedent —
+# contributor and admin manage, no per-item ownership check; read is granted
+# broadly (reader/contributor/reviewer/admin), since a program's agenda and
+# resources are what every participant orients around, not privileged data.
 p, reader, report:read
 p, reader, report:export
+p, reader, agenda_item:read
+p, reader, resource:read
 
 p, contributor, record:read
 p, contributor, record:create
@@ -192,6 +199,10 @@ p, contributor, report:create
 p, contributor, report:update
 p, contributor, report:submit
 p, contributor, report:export
+p, contributor, agenda_item:read
+p, contributor, agenda_item:manage
+p, contributor, resource:read
+p, contributor, resource:manage
 
 p, reviewer, record:read
 p, reviewer, record:create
@@ -227,6 +238,8 @@ p, reviewer, report:read
 p, reviewer, report:approve
 p, reviewer, report:publish
 p, reviewer, report:export
+p, reviewer, agenda_item:read
+p, reviewer, resource:read
 
 p, admin, record:read
 p, admin, record:create
@@ -302,3 +315,7 @@ p, admin, report:submit
 p, admin, report:approve
 p, admin, report:publish
 p, admin, report:export
+p, admin, agenda_item:read
+p, admin, agenda_item:manage
+p, admin, resource:read
+p, admin, resource:manage

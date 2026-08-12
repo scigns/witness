@@ -356,19 +356,35 @@ export class RecordsService {
   /**
    * Append one event to the record's hash chain.
    *
-   * Reads the current tail inside the transaction so two concurrent reviews
-   * cannot both chain onto the same predecessor. The unique index on `hash`
-   * turns the remaining race into a constraint violation rather than a silently
-   * forked chain — a rejected request being far better than an unverifiable log.
+   * Reads the current tail inside the transaction, guarded by a
+   * `pg_advisory_xact_lock` keyed on the record's id — without it, two
+   * concurrent reviews of the same record can both read the same tail before
+   * either commits and both chain onto it, forking the chain. `hash` staying
+   * globally unique does not catch this: the fork is two rows agreeing on
+   * `previousHash`, not two rows sharing a `hash`. See
+   * `infrastructure/audit.helper.ts`'s identical fix for the reproduction and
+   * for why the lock call is feature-detected (this service's own tests use
+   * a hand-rolled, single-threaded fake transaction that has no
+   * `$executeRaw`, and no concurrent callers to race).
+   *
+   * Orders the tail lookup by `sequence`, not `occurredAt`, for the same
+   * reason: `occurredAt` is read from the caller's clock before the lock is
+   * acquired, so tied timestamps under concurrency give `ORDER BY
+   * occurredAt DESC` no reliable tiebreak. See `sequence`'s doc comment on
+   * the `AuditEvent` model.
    */
   private async appendAudit(
     tx: Parameters<Parameters<PrismaService['$transaction']>[0]>[0],
     outcome: RecordOutcome,
     at: Date,
   ): Promise<void> {
+    if (typeof tx.$executeRaw === 'function') {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('record'), hashtext(${outcome.record.id}))`;
+    }
+
     const tail = await tx.auditEvent.findFirst({
       where: { subjectType: 'record', subjectId: outcome.record.id },
-      orderBy: { occurredAt: 'desc' },
+      orderBy: { sequence: 'desc' },
       select: { hash: true },
     });
 

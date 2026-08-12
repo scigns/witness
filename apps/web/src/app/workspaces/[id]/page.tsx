@@ -27,6 +27,7 @@ import type {
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { useAuth } from '@/lib/auth';
+import { OnboardingOverlay, useOnboardingVisible } from '@/components/onboarding';
 import {
   Button,
   Card,
@@ -38,6 +39,7 @@ import {
 } from '@/components/ui';
 
 const CAN_MANAGE_ROLES = new Set(['admin', 'facilitator']);
+const CAN_REVIEW_ROLES = new Set(['admin', 'reviewer']);
 
 /** Session type is free text (not a fixed set), so this is a display formatter, not a lookup table. */
 function formatSessionType(sessionType: string): string {
@@ -49,6 +51,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const { id } = use(params);
   const { user, ready } = useSession();
   const { currentUser } = useAuth();
+  const [onboardingVisible, dismissOnboarding] = useOnboardingVisible(id);
 
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   const [organisation, setOrganisation] = useState<OrganisationSummary | null>(null);
@@ -102,6 +105,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   const role = currentUser?.workspaces.find((w) => w.id === id)?.role ?? null;
   const canManage = role !== null && CAN_MANAGE_ROLES.has(role);
+  const canReview = role !== null && CAN_REVIEW_ROLES.has(role);
 
   const openSession = sessions.find((s) => s.status === 'open') ?? null;
   const upcomingSessions = sessions
@@ -148,6 +152,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   return (
     <div className="space-y-8">
+      {onboardingVisible && role !== null && (
+        <OnboardingOverlay
+          workspaceName={workspace.name}
+          organisationName={organisation?.name ?? 'this organisation'}
+          description={workspace.description}
+          memberCount={members.length}
+          onDismiss={dismissOnboarding}
+        />
+      )}
+
       <Link href="/workspaces" className="inline-block text-sm underline">
         ← Back to programs
       </Link>
@@ -169,11 +183,31 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             </span>
           )}
           <Link
+            href={`/workspaces/${id}/agenda`}
+            className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
+          >
+            Agenda →
+          </Link>
+          <Link
+            href={`/workspaces/${id}/resources`}
+            className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
+          >
+            Resources →
+          </Link>
+          <Link
             href={`/workspaces/${id}/search`}
             className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
           >
             Search →
           </Link>
+          {canReview && (
+            <Link
+              href={`/workspaces/${id}/review`}
+              className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
+            >
+              Needs your review →
+            </Link>
+          )}
           {canManage && (
             <Link
               href={`/workspaces/${id}/manage`}
@@ -265,14 +299,26 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           </Link>
         </div>
 
+        <Link
+          href={`/workspaces/${id}/live`}
+          className="block rounded-lg focus-visible:outline-none"
+        >
+          <Card className="border-[var(--color-accent)] bg-[var(--color-accent-soft)]">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">
+              Now →
+            </p>
+            <p className="mt-1 text-sm">See what&rsquo;s happening in this program right now.</p>
+          </Card>
+        </Link>
+
         {openSession !== null && (
           <Link
             href={`/workspaces/${id}/sessions/${openSession.id}`}
             className="block rounded-lg focus-visible:outline-none"
           >
-            <Card className="border-[var(--color-accent)] bg-[var(--color-accent-soft)]">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">
-                Happening now
+            <Card>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+                Open session
               </p>
               <p className="mt-1 font-medium">{openSession.title}</p>
               <p className="text-sm text-[var(--color-ink-muted)]">
