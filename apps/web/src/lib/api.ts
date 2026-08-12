@@ -34,6 +34,8 @@ import type {
   CreateRecordRequest,
   CreateUserRequest,
   CreateWorkspaceRequest,
+  UpdateWorkspaceRequest,
+  UpdateOwnProfileRequest,
   CurrentUserView,
   EditSummaryRequest,
   EditTranscriptRequest,
@@ -334,9 +336,22 @@ export const api = {
   listWorkspaces: (user: ActingUser): Promise<{ workspaces: WorkspaceSummary[] }> =>
     request<{ workspaces: WorkspaceSummary[] }>('/api/v1/workspaces', user),
 
+  getWorkspace: (workspaceId: string, user: ActingUser): Promise<WorkspaceSummary> =>
+    request<WorkspaceSummary>(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}`, user),
+
   createWorkspace: (body: CreateWorkspaceRequest, user: ActingUser): Promise<WorkspaceSummary> =>
     request<WorkspaceSummary>('/api/v1/workspaces', user, {
       method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateWorkspace: (
+    workspaceId: string,
+    body: UpdateWorkspaceRequest,
+    user: ActingUser,
+  ): Promise<WorkspaceSummary> =>
+    request<WorkspaceSummary>(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}`, user, {
+      method: 'PATCH',
       body: JSON.stringify(body),
     }),
 
@@ -1704,6 +1719,44 @@ export const authApi = {
         const body = (await response.json()) as { error?: { code?: string; message?: string } };
         code = body.error?.code ?? code;
         message = body.error?.message ?? message;
+      } catch {
+        // Response was not JSON. Keep the status-derived message.
+      }
+
+      throw new ApiError(message, response.status, code);
+    }
+
+    return (await response.json()) as CurrentUserView;
+  },
+
+  /** A person editing their own profile — same no-guard reasoning as `me`. */
+  updateProfile: async (
+    sessionToken: string,
+    body: UpdateOwnProfileRequest,
+  ): Promise<CurrentUserView> => {
+    let response: Response;
+
+    try {
+      response = await fetch(`${BASE_URL}/api/v1/me`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${sessionToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new ApiError(`Cannot reach the Witness API at ${BASE_URL}.`, 0, 'API_UNREACHABLE');
+    }
+
+    if (!response.ok) {
+      let code = 'PROFILE_UPDATE_FAILED';
+      let message = `Could not update the profile (HTTP ${response.status}).`;
+
+      try {
+        const body2 = (await response.json()) as { error?: { code?: string; message?: string } };
+        code = body2.error?.code ?? code;
+        message = body2.error?.message ?? message;
       } catch {
         // Response was not JSON. Keep the status-derived message.
       }

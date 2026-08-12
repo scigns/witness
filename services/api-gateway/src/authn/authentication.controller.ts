@@ -16,10 +16,12 @@
 
 import {
   BadRequestException,
+  Body,
   Controller,
   ForbiddenException,
   Get,
   Inject,
+  Patch,
   Post,
   Query,
   Req,
@@ -28,11 +30,15 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
-import type { CurrentUserView } from '@witness/contracts';
+import { updateOwnProfileRequestSchema, type CurrentUserView } from '@witness/contracts';
 import type { WitnessConfig } from '@witness/config';
 
 import { WITNESS_CONFIG } from '../tokens.js';
-import { AuthenticationDeniedError, AuthenticationService } from './authentication.service.js';
+import {
+  AuthenticationDeniedError,
+  AuthenticationService,
+  type CurrentUserResult,
+} from './authentication.service.js';
 import { DevelopmentIdentityProviderAdapter } from './development-identity-provider.adapter.js';
 import { IdentityProviderPort } from './identity-provider.port.js';
 import { SessionService } from './session.service.js';
@@ -173,6 +179,35 @@ export class CurrentUserController {
 
   @Get()
   async me(@Req() request: Request): Promise<CurrentUserView> {
+    const userId = await this.requireSessionUserId(request);
+    return toCurrentUserView(await this.authentication.getCurrentUser(userId));
+  }
+
+  /**
+   * A person editing their own profile. Same no-guard reasoning as `me` —
+   * "may describe yourself" is not a role-gated action — and deliberately
+   * narrow: `updateOwnProfileRequestSchema` only accepts `bio`, so there is
+   * no path here to change `displayName` or `email`.
+   */
+  @Patch()
+  async updateProfile(@Req() request: Request, @Body() body: unknown): Promise<CurrentUserView> {
+    const userId = await this.requireSessionUserId(request);
+    const parsed = updateOwnProfileRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      throw new BadRequestException({
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: 'The request body is not valid.',
+          fields: parsed.error.flatten().fieldErrors,
+        },
+      });
+    }
+
+    return toCurrentUserView(await this.authentication.updateProfile(userId, parsed.data));
+  }
+
+  private async requireSessionUserId(request: Request): Promise<string> {
     const token = bearerToken(request);
     if (token === null) {
       throw new UnauthorizedException({
@@ -192,35 +227,38 @@ export class CurrentUserController {
       });
     }
 
-    const currentUser = await this.authentication.getCurrentUser(session.userId);
-    switch (currentUser.status) {
-      case 'ok':
-        return currentUser.view;
-      case 'not_found':
-        // The session token was valid, but its account no longer is —
-        // defensive only: `AuthSession.user` has `onDelete: Restrict`, so a
-        // User row referenced by a live session cannot normally be deleted.
-        throw new UnauthorizedException({
-          error: {
-            code: 'UNKNOWN_ACCOUNT',
-            message: 'This session no longer maps to a valid account.',
-          },
-        });
-      case 'suspended':
-        throw new ForbiddenException({
-          error: {
-            code: 'ACCOUNT_SUSPENDED',
-            message: 'This account has been suspended. Contact an administrator.',
-          },
-        });
-      case 'deactivated':
-        throw new ForbiddenException({
-          error: {
-            code: 'ACCOUNT_DEACTIVATED',
-            message: 'This account has been deactivated. Contact an administrator.',
-          },
-        });
-    }
+    return session.userId;
+  }
+}
+
+function toCurrentUserView(currentUser: CurrentUserResult): CurrentUserView {
+  switch (currentUser.status) {
+    case 'ok':
+      return currentUser.view;
+    case 'not_found':
+      // The session token was valid, but its account no longer is —
+      // defensive only: `AuthSession.user` has `onDelete: Restrict`, so a
+      // User row referenced by a live session cannot normally be deleted.
+      throw new UnauthorizedException({
+        error: {
+          code: 'UNKNOWN_ACCOUNT',
+          message: 'This session no longer maps to a valid account.',
+        },
+      });
+    case 'suspended':
+      throw new ForbiddenException({
+        error: {
+          code: 'ACCOUNT_SUSPENDED',
+          message: 'This account has been suspended. Contact an administrator.',
+        },
+      });
+    case 'deactivated':
+      throw new ForbiddenException({
+        error: {
+          code: 'ACCOUNT_DEACTIVATED',
+          message: 'This account has been deactivated. Contact an administrator.',
+        },
+      });
   }
 }
 

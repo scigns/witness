@@ -24,10 +24,21 @@ import type { OrganisationId, WorkspaceId } from './ids.js';
 /** The maximum length of a workspace name. */
 const NAME_MAX = 200;
 
+/** The maximum length of a workspace's descriptive "about" text. */
+const DESCRIPTION_MAX = 4000;
+
 export interface Workspace {
   readonly id: WorkspaceId;
   readonly organisationId: OrganisationId;
   readonly name: string;
+  /**
+   * The "what is this co-design about, and why" text a participant reads on
+   * first arriving. `null` is a distinct, honest state from an empty
+   * string — nobody has written it yet, not "deliberately blank" — so a
+   * landing page can prompt a facilitator to add it rather than rendering
+   * nothing.
+   */
+  readonly description: string | null;
   readonly createdAt: Date;
 }
 
@@ -56,6 +67,21 @@ function assertName(name: string): string {
   return trimmed;
 }
 
+function assertDescription(description: string | null): string | null {
+  if (description === null) return null;
+  const trimmed = description.trim();
+  if (trimmed.length === 0) return null;
+
+  if (trimmed.length > DESCRIPTION_MAX) {
+    throw new InvariantViolation(
+      `A workspace description must be ${DESCRIPTION_MAX} characters or fewer, received ${trimmed.length}.`,
+      'DESCRIPTION_TOO_LONG',
+    );
+  }
+
+  return trimmed;
+}
+
 /**
  * Create a new workspace within an organisation.
  *
@@ -67,6 +93,7 @@ export function createWorkspace(input: {
   id: WorkspaceId;
   organisationId: OrganisationId;
   name: string;
+  description?: string | null;
   createdBy: Actor;
   createdAt: Date;
 }): WorkspaceOutcome {
@@ -74,6 +101,7 @@ export function createWorkspace(input: {
     id: input.id,
     organisationId: input.organisationId,
     name: assertName(input.name),
+    description: assertDescription(input.description ?? null),
     createdAt: input.createdAt,
   };
 
@@ -83,6 +111,33 @@ export function createWorkspace(input: {
       action: 'workspace.created',
       actor: input.createdBy,
       metadata: { name: workspace.name, organisationId: workspace.organisationId },
+    },
+  };
+}
+
+/**
+ * Update a workspace's descriptive "about" text — the only mutable field
+ * this preview models (see this file's header: no rename, archive or
+ * transfer operation exists yet either). Kept separate from `createWorkspace`
+ * because it is a distinct capability with its own audit action, not a
+ * variant of creation.
+ */
+export function updateWorkspaceDetails(
+  workspace: Workspace,
+  input: { description?: string | null },
+  updatedBy: Actor,
+): WorkspaceOutcome {
+  const description =
+    input.description === undefined ? workspace.description : assertDescription(input.description);
+
+  const updated: Workspace = { ...workspace, description };
+
+  return {
+    workspace: updated,
+    event: {
+      action: 'workspace.details_updated',
+      actor: updatedBy,
+      metadata: { description: updated.description ?? '' },
     },
   };
 }

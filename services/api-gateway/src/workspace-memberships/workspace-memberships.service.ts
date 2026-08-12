@@ -38,7 +38,7 @@ type MembershipRowWithUser = {
   state: string;
   createdAt: Date;
   updatedAt: Date;
-  user: { email: string; displayName: string };
+  user: { email: string; displayName: string; bio: string | null };
 };
 
 @Injectable()
@@ -51,7 +51,7 @@ export class WorkspaceMembershipsService {
     const rows = await this.prisma.workspaceMembership.findMany({
       where: { workspaceId },
       orderBy: { createdAt: 'desc' },
-      include: { user: { select: { email: true, displayName: true } } },
+      include: { user: { select: { email: true, displayName: true, bio: true } } },
       take: 200,
     });
 
@@ -128,7 +128,7 @@ export class WorkspaceMembershipsService {
   ): Promise<WorkspaceMembershipView> {
     const row = await this.prisma.workspaceMembership.findUnique({
       where: { id: membershipId },
-      include: { user: { select: { email: true, displayName: true } } },
+      include: { user: { select: { email: true, displayName: true, bio: true } } },
     });
 
     if (row === null || row.workspaceId !== workspaceId) {
@@ -187,10 +187,12 @@ export class WorkspaceMembershipsService {
     return workspace;
   }
 
-  private async requireUser(userId: string): Promise<{ email: string; displayName: string }> {
+  private async requireUser(
+    userId: string,
+  ): Promise<{ email: string; displayName: string; bio: string | null }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true, displayName: true },
+      select: { email: true, displayName: true, bio: true },
     });
 
     if (user === null) {
@@ -212,6 +214,7 @@ function toView(membership: MembershipRowWithUser): WorkspaceMembershipView {
     userId: membership.userId,
     userEmail: membership.user.email,
     userDisplayName: membership.user.displayName,
+    userBio: membership.user.bio,
     state,
     permittedActions: permittedMembershipActionNames(state),
     createdAt: membership.createdAt.toISOString(),

@@ -20,11 +20,11 @@ import { useSession } from '@/lib/session';
 import { IS_DEVELOPMENT_BUILD, type ActingUser } from '@/lib/api';
 
 const NAV = [
-  { href: '/', label: 'Dashboard' },
+  { href: '/', label: 'Home' },
+  { href: '/workspaces', label: 'Programs' },
   { href: '/records', label: 'Records' },
   { href: '/records/new', label: 'Capture' },
   { href: '/organisations', label: 'Organisations' },
-  { href: '/workspaces', label: 'Workspaces' },
   { href: '/users', label: 'Users' },
 ] as const;
 
@@ -220,9 +220,13 @@ function AuthStatusBadge({
 
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span title={currentUser.email} className="text-[var(--color-ink-muted)]">
+      <Link
+        href="/profile"
+        title={currentUser.email}
+        className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+      >
         Signed in as <strong className="text-[var(--color-ink)]">{currentUser.displayName}</strong>
-      </span>
+      </Link>
       <button
         type="button"
         onClick={signOut}
