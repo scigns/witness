@@ -299,14 +299,26 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           </Link>
         </div>
 
+        <Link
+          href={`/workspaces/${id}/live`}
+          className="block rounded-lg focus-visible:outline-none"
+        >
+          <Card className="border-[var(--color-accent)] bg-[var(--color-accent-soft)]">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">
+              Now →
+            </p>
+            <p className="mt-1 text-sm">See what&rsquo;s happening in this program right now.</p>
+          </Card>
+        </Link>
+
         {openSession !== null && (
           <Link
             href={`/workspaces/${id}/sessions/${openSession.id}`}
             className="block rounded-lg focus-visible:outline-none"
           >
-            <Card className="border-[var(--color-accent)] bg-[var(--color-accent-soft)]">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">
-                Happening now
+            <Card>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+                Open session
               </p>
               <p className="mt-1 font-medium">{openSession.title}</p>
               <p className="text-sm text-[var(--color-ink-muted)]">
