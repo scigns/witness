@@ -1087,6 +1087,22 @@ model AuditEvent {
 
   occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
 
+  /// True insertion order within a subject's chain — a Postgres sequence,
+  /// not caller-supplied. `occurredAt` alone cannot serve as the tail
+  /// tiebreaker: it is captured by the caller before the per-subject
+  /// `pg_advisory_xact_lock` (see `infrastructure/audit.helper.ts`) is even
+  /// acquired, so concurrent-but-correctly-serialized appends to the same
+  /// subject can still carry identical millisecond timestamps, and
+  /// `ORDER BY occurredAt DESC` has no defined tiebreak for ties — Postgres
+  /// may return any of them. Reproduced live: ten concurrent updates to one
+  /// agenda item forked the chain even with the advisory lock correctly
+  /// serializing every write, because two "tail" reads landed on the same
+  /// tied row. `sequence` is assigned by `nextval()` at INSERT time, and
+  /// because the advisory lock prevents a second insert for the same
+  /// subject from starting until the first has committed, ordering by it
+  /// is unambiguous.
+  sequence BigInt @default(autoincrement())
+
   /// Null only for the first event in a subject's chain.
   previousHash String? @map("previous_hash") @db.VarChar(64)
   hash         String  @unique @db.VarChar(64)
@@ -1098,6 +1114,7 @@ model AuditEvent {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([subjectType, subjectId, occurredAt])
+  @@index([subjectType, subjectId, sequence])
   @@map("audit_event")
 }
 
