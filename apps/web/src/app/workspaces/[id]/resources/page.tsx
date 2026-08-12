@@ -199,20 +199,32 @@ export default function ResourcesPage({ params }: { params: Promise<{ id: string
         <div className="grid gap-4 sm:grid-cols-2">
           <Card className="space-y-3">
             <h2 className="font-semibold">Add a link</h2>
+            <label htmlFor="link-title" className="sr-only">
+              Link title
+            </label>
             <input
+              id="link-title"
               value={linkTitle}
               onChange={(event) => setLinkTitle(event.target.value)}
               placeholder="Title"
               maxLength={300}
               className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
             />
+            <label htmlFor="link-url" className="sr-only">
+              Link URL
+            </label>
             <input
+              id="link-url"
               value={linkUrl}
               onChange={(event) => setLinkUrl(event.target.value)}
               placeholder="https://…"
               className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
             />
+            <label htmlFor="link-description" className="sr-only">
+              Link description
+            </label>
             <textarea
+              id="link-description"
               value={linkDescription}
               onChange={(event) => setLinkDescription(event.target.value)}
               placeholder="Description (optional)"
@@ -231,20 +243,32 @@ export default function ResourcesPage({ params }: { params: Promise<{ id: string
 
           <Card className="space-y-3">
             <h2 className="font-semibold">Upload a file</h2>
+            <label htmlFor="file-title" className="sr-only">
+              File title
+            </label>
             <input
+              id="file-title"
               value={fileTitle}
               onChange={(event) => setFileTitle(event.target.value)}
               placeholder="Title"
               maxLength={300}
               className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
             />
+            <label htmlFor="file-input" className="sr-only">
+              File to upload
+            </label>
             <input
+              id="file-input"
               ref={fileInputRef}
               type="file"
               onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
               className="w-full text-sm"
             />
+            <label htmlFor="file-description" className="sr-only">
+              File description
+            </label>
             <textarea
+              id="file-description"
               value={fileDescription}
               onChange={(event) => setFileDescription(event.target.value)}
               placeholder="Description (optional)"

@@ -390,18 +390,21 @@ export function Button({
   type = 'button',
   variant = 'secondary',
   disabled = false,
+  'aria-label': ariaLabel,
 }: {
   children: ReactNode;
   onClick?: () => void;
   type?: 'button' | 'submit';
   variant?: ButtonVariant;
   disabled?: boolean;
+  'aria-label'?: string;
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
+      aria-label={ariaLabel}
       className={`${BUTTON_BASE_CLASSES} ${BUTTON_VARIANT_STYLES[variant]}`}
     >
       {children}

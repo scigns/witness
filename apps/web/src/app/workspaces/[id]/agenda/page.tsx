@@ -367,15 +367,17 @@ export default function AgendaPage({ params }: { params: Promise<{ id: string }>
                             variant="secondary"
                             disabled={busy || index === 0}
                             onClick={() => void move(index, -1)}
+                            aria-label={`Move "${item.title}" earlier in the agenda`}
                           >
-                            ↑
+                            <span aria-hidden="true">↑</span>
                           </Button>
                           <Button
                             variant="secondary"
                             disabled={busy || index === items.length - 1}
                             onClick={() => void move(index, 1)}
+                            aria-label={`Move "${item.title}" later in the agenda`}
                           >
-                            ↓
+                            <span aria-hidden="true">↓</span>
                           </Button>
                         </div>
                         <div className="flex flex-wrap justify-end gap-2">
