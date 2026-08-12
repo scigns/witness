@@ -107,10 +107,11 @@ const main = async () => {
     const page = await context.newPage();
     page.setDefaultTimeout(25_000);
     await page.goto(`${WEB}/signin`, { waitUntil: 'domcontentloaded' });
-    await page
-      .getByRole('link', { name: /sign in/i })
-      .first()
-      .click();
+    // Two "Sign in" links exist on this page: the nav bar's is a
+    // self-referential Next.js <Link> back to /signin (a no-op once already
+    // here), and only the page's own button actually points at the OIDC
+    // login endpoint. Target the real one by its actual destination.
+    await page.locator('a[href*="/auth/login"]').first().click();
     await page.waitForURL(/\/protocol\/openid-connect\/auth/);
     await page.fill('#username', username);
     await page.fill('#password', PASSWORD);
