@@ -99,7 +99,11 @@ export type Action =
   | 'report:submit'
   | 'report:approve'
   | 'report:publish'
-  | 'report:export';
+  | 'report:export'
+  | 'agenda_item:read'
+  | 'agenda_item:manage'
+  | 'resource:read'
+  | 'resource:manage';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;

@@ -11,6 +11,14 @@
 
 import type {
   AddMembershipRequest,
+  AgendaItemTransitionRequest,
+  AgendaItemView,
+  CreateAgendaItemRequest,
+  CreateFileResourceMetadata,
+  CreateLinkResourceRequest,
+  ReorderAgendaItemRequest,
+  ResourceView,
+  UpdateAgendaItemRequest,
   AddSessionParticipantRequest,
   AssignReviewerRequest,
   AssignRoleRequest,
@@ -1679,6 +1687,107 @@ export const api = {
       filename: match?.[1] ?? `report.${format}`,
     };
   },
+
+  // ─── Program agenda (Client-Ready Experience overhaul, Phase 11) ──────────
+
+  listAgendaItems: (
+    workspaceId: string,
+    user: ActingUser,
+  ): Promise<{ agendaItems: AgendaItemView[] }> =>
+    request(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/agenda-items`, user),
+
+  createAgendaItem: (
+    workspaceId: string,
+    body: CreateAgendaItemRequest,
+    user: ActingUser,
+  ): Promise<AgendaItemView> =>
+    request(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/agenda-items`, user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateAgendaItem: (
+    workspaceId: string,
+    itemId: string,
+    body: UpdateAgendaItemRequest,
+    user: ActingUser,
+  ): Promise<AgendaItemView> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/agenda-items/${encodeURIComponent(itemId)}`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  transitionAgendaItem: (
+    workspaceId: string,
+    itemId: string,
+    body: AgendaItemTransitionRequest,
+    user: ActingUser,
+  ): Promise<AgendaItemView> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/agenda-items/${encodeURIComponent(itemId)}/status`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  reorderAgendaItem: (
+    workspaceId: string,
+    itemId: string,
+    body: ReorderAgendaItemRequest,
+    user: ActingUser,
+  ): Promise<AgendaItemView> =>
+    request(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/agenda-items/${encodeURIComponent(itemId)}/reorder`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  // ─── Program resources (Client-Ready Experience overhaul, Phase 12) ───────
+
+  listResources: (workspaceId: string, user: ActingUser): Promise<{ resources: ResourceView[] }> =>
+    request(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/resources`, user),
+
+  createLinkResource: (
+    workspaceId: string,
+    body: CreateLinkResourceRequest,
+    user: ActingUser,
+  ): Promise<ResourceView> =>
+    request(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/resources/link`, user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  createFileResource: (
+    workspaceId: string,
+    metadata: CreateFileResourceMetadata,
+    file: File,
+    user: ActingUser,
+  ): Promise<ResourceView> => {
+    const formData = new FormData();
+    formData.set('title', metadata.title);
+    if (metadata.description) formData.set('description', metadata.description);
+    if (metadata.sessionId) formData.set('sessionId', metadata.sessionId);
+    if (metadata.agendaItemId) formData.set('agendaItemId', metadata.agendaItemId);
+    formData.set('file', file);
+    return requestMultipart<ResourceView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/resources/file`,
+      user,
+      formData,
+    );
+  },
+
+  getResourceBlob: (workspaceId: string, resourceId: string, user: ActingUser): Promise<Blob> =>
+    requestBlob(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/resources/${encodeURIComponent(resourceId)}/content`,
+      user,
+    ),
+
+  removeResource: (workspaceId: string, resourceId: string, user: ActingUser): Promise<void> =>
+    request<void>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/resources/${encodeURIComponent(resourceId)}`,
+      user,
+      { method: 'DELETE' },
+    ),
 };
 
 /**

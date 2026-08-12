@@ -24,6 +24,8 @@ import { PolicyEnforcementService } from './authz/policy-enforcement.service.js'
 import { RoleResolutionService } from './authz/role-resolution.service.js';
 import { SessionAuthenticator } from './authz/session-authenticator.js';
 import { SessionBackedAuthorizationAdapter } from './authz/session-backed.adapter.js';
+import { AgendaItemsController } from './agenda-items/agenda-items.controller.js';
+import { AgendaItemsService } from './agenda-items/agenda-items.service.js';
 import { ConsentPolicyService } from './consent/consent-policy.service.js';
 import { ConsentTemplatesController } from './consent-templates/consent-templates.controller.js';
 import { ConsentTemplatesService } from './consent-templates/consent-templates.service.js';
@@ -63,6 +65,8 @@ import { RecordsController } from './records/records.controller.js';
 import { ReportsController } from './reports/reports.controller.js';
 import { ReportsService } from './reports/reports.service.js';
 import { RecordsService } from './records/records.service.js';
+import { ResourcesController } from './resources/resources.controller.js';
+import { ResourcesService } from './resources/resources.service.js';
 import { RolesController } from './roles/roles.controller.js';
 import { SearchController } from './search/search.controller.js';
 import { SearchService } from './search/search.service.js';
@@ -98,6 +102,8 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     ConsentTemplatesController,
     SessionConsentConfigurationController,
     ParticipantConsentRecordsController,
+    AgendaItemsController,
+    ResourcesController,
     EvidenceController,
     EvidenceReviewController,
     OutcomesController,
@@ -125,6 +131,8 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     ConsentPolicyService,
     SessionConsentConfigurationService,
     ParticipantConsentRecordsService,
+    AgendaItemsService,
+    ResourcesService,
     EvidenceService,
     EvidenceAttachmentService,
     EvidenceLinkService,

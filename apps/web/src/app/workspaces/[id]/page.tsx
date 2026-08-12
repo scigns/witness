@@ -183,6 +183,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             </span>
           )}
           <Link
+            href={`/workspaces/${id}/agenda`}
+            className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
+          >
+            Agenda →
+          </Link>
+          <Link
+            href={`/workspaces/${id}/resources`}
+            className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
+          >
+            Resources →
+          </Link>
+          <Link
             href={`/workspaces/${id}/search`}
             className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
           >

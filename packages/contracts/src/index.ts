@@ -2056,6 +2056,103 @@ export interface SearchResultView {
   confirmed: boolean | null;
 }
 
+// ─── Agenda ──────────────────────────────────────────────────────────────────
+
+export const AGENDA_ITEM_STATUSES = ['upcoming', 'current', 'completed'] as const;
+export type AgendaItemStatus = (typeof AGENDA_ITEM_STATUSES)[number];
+
+export const createAgendaItemRequestSchema = z.object({
+  title: z.string().trim().min(1, 'A title is required').max(200),
+  description: z.string().trim().max(4000).nullish(),
+  promptText: z.string().trim().max(4000).nullish(),
+  facilitatorId: z.string().uuid().nullish(),
+  sessionId: z.string().uuid().nullish(),
+  startAt: z.string().datetime().nullish(),
+  durationMinutes: z.number().int().positive().nullish(),
+});
+export type CreateAgendaItemRequest = z.infer<typeof createAgendaItemRequestSchema>;
+
+export const updateAgendaItemRequestSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  description: z.string().trim().max(4000).nullish(),
+  promptText: z.string().trim().max(4000).nullish(),
+  facilitatorId: z.string().uuid().nullish(),
+  startAt: z.string().datetime().nullish(),
+  durationMinutes: z.number().int().positive().nullish(),
+});
+export type UpdateAgendaItemRequest = z.infer<typeof updateAgendaItemRequestSchema>;
+
+export const agendaItemTransitionRequestSchema = z.object({
+  status: z.enum(AGENDA_ITEM_STATUSES),
+});
+export type AgendaItemTransitionRequest = z.infer<typeof agendaItemTransitionRequestSchema>;
+
+export const reorderAgendaItemRequestSchema = z.object({
+  sortOrder: z.number().int().min(0),
+});
+export type ReorderAgendaItemRequest = z.infer<typeof reorderAgendaItemRequestSchema>;
+
+export interface AgendaItemView {
+  id: string;
+  workspaceId: string;
+  sessionId: string | null;
+  title: string;
+  description: string | null;
+  promptText: string | null;
+  facilitatorId: string | null;
+  facilitatorName: string | null;
+  status: AgendaItemStatus;
+  sortOrder: number;
+  startAt: string | null;
+  durationMinutes: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Resources ───────────────────────────────────────────────────────────────
+
+export const RESOURCE_TYPES = ['file', 'link'] as const;
+export type ResourceType = (typeof RESOURCE_TYPES)[number];
+
+export const createLinkResourceRequestSchema = z.object({
+  title: z.string().trim().min(1, 'A title is required').max(300),
+  description: z.string().trim().max(2000).nullish(),
+  externalUrl: z.string().trim().url().max(2000),
+  sessionId: z.string().uuid().nullish(),
+  agendaItemId: z.string().uuid().nullish(),
+});
+export type CreateLinkResourceRequest = z.infer<typeof createLinkResourceRequestSchema>;
+
+/**
+ * Metadata accompanying a `multipart/form-data` file upload — `title` etc.
+ * arrive as form fields alongside the file, not as JSON, so this schema
+ * validates `req.body` after multer has split the file out.
+ */
+export const createFileResourceMetadataSchema = z.object({
+  title: z.string().trim().min(1, 'A title is required').max(300),
+  description: z.string().trim().max(2000).nullish(),
+  sessionId: z.string().uuid().nullish(),
+  agendaItemId: z.string().uuid().nullish(),
+});
+export type CreateFileResourceMetadata = z.infer<typeof createFileResourceMetadataSchema>;
+
+export interface ResourceView {
+  id: string;
+  workspaceId: string;
+  sessionId: string | null;
+  agendaItemId: string | null;
+  title: string;
+  description: string | null;
+  resourceType: ResourceType;
+  originalFilename: string | null;
+  contentType: string | null;
+  sizeBytes: number | null;
+  externalUrl: string | null;
+  uploadedById: string;
+  uploadedByName: string;
+  createdAt: string;
+}
+
 // ─── Errors ──────────────────────────────────────────────────────────────────
 
 export interface ApiError {
