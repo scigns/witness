@@ -244,7 +244,15 @@ export default function ParticipantConsentPage({
 
       {error !== null && <ErrorNotice message={error} />}
 
-      <h1 className="text-2xl font-semibold tracking-tight">Consent</h1>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Consent</h1>
+        <p className="mt-1 text-[var(--color-ink-muted)]">
+          You decide how this participant&rsquo;s contribution can be used — whether it&rsquo;s
+          attributed to them by name, recorded, transcribed, processed with local AI tools, or
+          included in a report. Each category below can be granted or refused on its own, and
+          changed later if they change their mind.
+        </p>
+      </div>
 
       {notConfigured ? (
         <Card>
