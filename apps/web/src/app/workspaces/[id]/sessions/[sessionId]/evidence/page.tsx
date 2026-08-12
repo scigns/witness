@@ -181,7 +181,7 @@ export default function SessionEvidencePage({
   if (forbidden) {
     return (
       <div className="space-y-4">
-        <ErrorNotice message="You do not have permission to view this session's evidence." />
+        <ErrorNotice message="You do not have permission to view this session's contributions." />
         <Link
           href={`/workspaces/${workspaceId}/sessions/${sessionId}`}
           className="text-sm underline"
@@ -207,7 +207,7 @@ export default function SessionEvidencePage({
 
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          Evidence{session !== null ? ` — ${session.title}` : ''}
+          Contributions{session !== null ? ` — ${session.title}` : ''}
         </h1>
         <p className="mt-1 text-[var(--color-ink-muted)]">
           What was said, observed, proposed, or objected to during this session, captured as it
@@ -218,8 +218,8 @@ export default function SessionEvidencePage({
       {session !== null && !sessionOpen && (
         <p className="text-sm text-[var(--color-ink-muted)]" role="status">
           {session.status === 'closed' || session.status === 'archived'
-            ? 'This session is not open, so new evidence cannot be captured. Existing evidence is still shown below.'
-            : 'Open this session to start capturing evidence.'}
+            ? 'This session is not open, so new contributions cannot be captured. Existing contributions are still shown below.'
+            : 'Open this session to start capturing contributions.'}
         </p>
       )}
 
@@ -276,7 +276,7 @@ export default function SessionEvidencePage({
             {evidenceType === 'other' && (
               <div>
                 <label htmlFor="customEvidenceType" className="mb-1 block text-sm font-medium">
-                  Name this evidence type <span aria-hidden="true">*</span>
+                  Name this type <span aria-hidden="true">*</span>
                   <span className="sr-only">(required)</span>
                 </label>
                 <input
@@ -356,11 +356,11 @@ export default function SessionEvidencePage({
                 (!isSourceless && sourceParticipantId === '')
               }
             >
-              {captureBusy ? 'Capturing…' : 'Capture and submit'}
+              {captureBusy ? 'Sharing…' : 'Share contribution'}
             </Button>
             <p className="text-xs text-[var(--color-ink-muted)]">
               Quick capture submits immediately. To save a draft you can edit later, open the full
-              form from the evidence list below after a first capture.
+              form from the list below after a first contribution.
             </p>
           </form>
         </Card>
@@ -390,7 +390,7 @@ export default function SessionEvidencePage({
       {evidence.length === 0 ? (
         <Card>
           <p className="text-sm text-[var(--color-ink-muted)]">
-            No evidence captured yet{statusFilter !== '' ? ' for this filter' : ''}.
+            No contributions yet{statusFilter !== '' ? ' for this filter' : ''}.
           </p>
         </Card>
       ) : (

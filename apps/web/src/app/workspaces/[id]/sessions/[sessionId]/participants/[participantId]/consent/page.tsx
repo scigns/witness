@@ -38,6 +38,55 @@ const STATUS_LABELS: Record<string, string> = {
   superseded: 'Superseded',
 };
 
+/**
+ * Plain-language framing for the well-known consent categories
+ * (`packages/domain/src/consent-template.ts`'s `CONSENT_CATEGORIES`). A
+ * template may also carry organisation-defined categories outside this set —
+ * `categoryLabel`/`categoryHelp` fall back to the raw code for those, since
+ * this UI cannot know what an organisation-invented category means.
+ */
+const CATEGORY_LABELS: Record<string, string> = {
+  participation: 'Taking part',
+  audio_recording: 'Audio recording',
+  video_recording: 'Video recording',
+  photography: 'Photos',
+  transcription: 'Transcription',
+  ai_processing: 'Processing with local AI tools',
+  attributed_quotation: 'Quoting them by name',
+  anonymous_quotation: 'Quoting them anonymously',
+  internal_use: 'Use within this organisation',
+  external_reporting: 'Sharing in reports outside this organisation',
+  publication: 'Publishing publicly',
+  research_use: 'Use in research',
+  future_reuse: 'Reuse in future programs',
+  knowledge_graph_inclusion: "Linking into Witness's institutional record",
+  follow_up_contact: 'Being contacted again about this',
+};
+
+const CATEGORY_HELP: Record<string, string> = {
+  participation: 'They take part in this session at all.',
+  audio_recording: 'Their voice is recorded during the session.',
+  video_recording: 'They appear on video during the session.',
+  photography: 'Photos are taken that may include them.',
+  transcription: 'A written transcript is made of what they said.',
+  ai_processing:
+    'A local AI tool (never sent off this server) summarises or extracts from what they said.',
+  attributed_quotation: 'What they said can be quoted with their name attached.',
+  anonymous_quotation: 'What they said can be quoted without saying who said it.',
+  internal_use: 'Their contribution can be used inside this organisation.',
+  external_reporting: 'Their contribution can appear in reports shared outside this organisation.',
+  publication: 'Their contribution can be published where the public can see it.',
+  research_use: 'Their contribution can be used for research.',
+  future_reuse: 'Their contribution can be reused in a later program, not just this one.',
+  knowledge_graph_inclusion:
+    "Their contribution becomes part of Witness's longer-term institutional memory.",
+  follow_up_contact: 'Someone from this program can contact them again later.',
+};
+
+function categoryLabel(category: string): string {
+  return CATEGORY_LABELS[category] ?? category.replace(/_/g, ' ');
+}
+
 export default function ParticipantConsentPage({
   params,
 }: {
@@ -245,12 +294,13 @@ export default function ParticipantConsentPage({
       {error !== null && <ErrorNotice message={error} />}
 
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Consent</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          You decide how their contribution can be used.
+        </h1>
         <p className="mt-1 text-[var(--color-ink-muted)]">
-          You decide how this participant&rsquo;s contribution can be used — whether it&rsquo;s
-          attributed to them by name, recorded, transcribed, processed with local AI tools, or
-          included in a report. Each category below can be granted or refused on its own, and
-          changed later if they change their mind.
+          Each choice below is independent — granting one doesn&rsquo;t grant the others, and
+          nothing here is permanent. Any of these can be changed or withdrawn later, at any time,
+          for any reason.
         </p>
       </div>
 
@@ -282,7 +332,7 @@ export default function ParticipantConsentPage({
                   <ul className="mt-2 space-y-1">
                     {active.categoryDecisions.map((decision) => (
                       <li key={decision.category} className="flex items-center justify-between">
-                        <span>{decision.category.replace(/_/g, ' ')}</span>
+                        <span>{categoryLabel(decision.category)}</span>
                         <span
                           className={
                             decision.granted
@@ -303,48 +353,33 @@ export default function ParticipantConsentPage({
               <h2 className="text-lg font-semibold">
                 {active === null ? 'Capture consent' : 'Amend consent'}
               </h2>
-              <div className="space-y-2">
-                {configuration.requiredCategories.map((category) => (
+              <div className="space-y-3">
+                {[
+                  ...configuration.requiredCategories.map((category) => ({
+                    category,
+                    required: true,
+                  })),
+                  ...configuration.optionalCategories.map((category) => ({
+                    category,
+                    required: false,
+                  })),
+                ].map(({ category, required }) => (
                   <div
                     key={category}
-                    className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                    className="flex flex-wrap items-start justify-between gap-2 text-sm"
                   >
-                    <span>
-                      {category.replace(/_/g, ' ')}{' '}
-                      <span className="text-xs text-[var(--color-ink-muted)]">(required)</span>
-                    </span>
-                    <div className="flex gap-3 text-xs">
-                      <label className="flex items-center gap-1">
-                        <input
-                          type="radio"
-                          name={`decision-${category}`}
-                          checked={decisions[category] === true}
-                          onChange={() => setDecisions((d) => ({ ...d, [category]: true }))}
-                        />
-                        Grant
-                      </label>
-                      <label className="flex items-center gap-1">
-                        <input
-                          type="radio"
-                          name={`decision-${category}`}
-                          checked={decisions[category] === false}
-                          onChange={() => setDecisions((d) => ({ ...d, [category]: false }))}
-                        />
-                        Refuse
-                      </label>
+                    <div className="min-w-0 max-w-sm">
+                      <span className="font-medium">{categoryLabel(category)}</span>{' '}
+                      <span className="text-xs text-[var(--color-ink-muted)]">
+                        ({required ? 'required' : 'optional'})
+                      </span>
+                      {CATEGORY_HELP[category] !== undefined && (
+                        <p className="text-xs text-[var(--color-ink-muted)]">
+                          {CATEGORY_HELP[category]}
+                        </p>
+                      )}
                     </div>
-                  </div>
-                ))}
-                {configuration.optionalCategories.map((category) => (
-                  <div
-                    key={category}
-                    className="flex flex-wrap items-center justify-between gap-2 text-sm"
-                  >
-                    <span>
-                      {category.replace(/_/g, ' ')}{' '}
-                      <span className="text-xs text-[var(--color-ink-muted)]">(optional)</span>
-                    </span>
-                    <div className="flex gap-3 text-xs">
+                    <div className="flex shrink-0 gap-3 text-xs">
                       <label className="flex items-center gap-1">
                         <input
                           type="radio"

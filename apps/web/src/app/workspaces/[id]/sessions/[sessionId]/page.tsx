@@ -286,7 +286,7 @@ export default function SessionDetailPage({
             Consent →
           </LinkButton>
           <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/evidence`}>
-            Evidence →
+            Contributions →
           </LinkButton>
           <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/summary`}>
             Summary →

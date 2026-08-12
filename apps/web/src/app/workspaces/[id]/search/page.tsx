@@ -19,7 +19,7 @@ import { Button, Card, ErrorNotice } from '@/components/ui';
 
 const TYPE_LABELS: Record<SearchResultType, string> = {
   session: 'Session',
-  evidence: 'Evidence',
+  evidence: 'Contribution',
   transcript: 'Transcript',
   summary: 'Summary',
   decision: 'Decision',
@@ -84,8 +84,8 @@ export default function WorkspaceSearchPage({ params }: { params: Promise<{ id: 
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Search</h1>
         <p className="mt-1 text-[var(--color-ink-muted)]">
-          Session titles and purposes, evidence, transcripts, summaries, decisions, commitments and
-          actions — everything in this workspace you already have permission to read.
+          Session titles and purposes, contributions, transcripts, summaries, decisions, commitments
+          and actions — everything in this program you already have permission to read.
         </p>
       </div>
 
