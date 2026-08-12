@@ -297,6 +297,9 @@ export default function SessionDetailPage({
           <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/reports`}>
             Reports →
           </LinkButton>
+          <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/recap`}>
+            Recap →
+          </LinkButton>
           {!isArchived && (
             <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>
               {editing ? 'Cancel edit' : 'Edit details'}
