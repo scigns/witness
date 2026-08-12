@@ -13,16 +13,24 @@
  * (`packages/domain/src/workspace-membership.ts`). Filtering the dropdown to
  * only eligible users is a convenience; it is not what makes the rule real —
  * the API would refuse an ineligible user even if this filter had a bug.
+ *
+ * The readiness checklist (Client-Ready Experience overhaul, Phase 19: "Ready
+ * to run") is read-only signal, not a gate — a facilitator can run a session
+ * with an incomplete program if that's genuinely what they need. Each row
+ * links straight to the screen that would resolve it.
  */
 
 import Link from 'next/link';
 import { use, useCallback, useEffect, useState } from 'react';
 
 import type {
+  AgendaItemView,
+  CoDesignSessionSummary,
   MembershipAction,
   MembershipState,
   OrganisationMembershipView,
   OrganisationSummary,
+  ResourceView,
   RoleAssignmentView,
   RoleDefinition,
   WitnessRole,
@@ -39,6 +47,13 @@ import {
   MembershipStateBadge,
   RoleAssignmentControl,
 } from '@/components/ui';
+
+interface ReadinessRow {
+  label: string;
+  ready: boolean;
+  href: string;
+  detail: string;
+}
 
 const ACTION_LABELS: Record<MembershipAction['action'], string> = {
   activate: 'Activate',
@@ -63,16 +78,31 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  const [sessions, setSessions] = useState<CoDesignSessionSummary[]>([]);
+  const [agendaItems, setAgendaItems] = useState<AgendaItemView[]>([]);
+  const [resources, setResources] = useState<ResourceView[]>([]);
+  const [consentConfigured, setConsentConfigured] = useState(false);
+
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
       try {
-        const [workspaceResult, organisationsResult, membershipsResult, rolesResult] =
-          await Promise.all([
-            api.getWorkspace(id, user),
-            api.listOrganisations(user),
-            api.listWorkspaceMemberships(id, user),
-            api.listRoles(user),
-          ]);
+        const [
+          workspaceResult,
+          organisationsResult,
+          membershipsResult,
+          rolesResult,
+          sessionsResult,
+          agendaItemsResult,
+          resourcesResult,
+        ] = await Promise.all([
+          api.getWorkspace(id, user),
+          api.listOrganisations(user),
+          api.listWorkspaceMemberships(id, user),
+          api.listRoles(user),
+          api.listSessions(id, user),
+          api.listAgendaItems(id, user),
+          api.listResources(id, user),
+        ]);
         if (cancelledRef.current) return;
 
         setWorkspace(workspaceResult);
@@ -82,6 +112,20 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
         );
         setMemberships(membershipsResult.memberships);
         setRoles(rolesResult.roles);
+        setSessions(sessionsResult.sessions);
+        setAgendaItems(agendaItemsResult.agendaItems);
+        setResources(resourcesResult.resources);
+
+        const configuredFlags = await Promise.all(
+          sessionsResult.sessions.map((session) =>
+            api
+              .getSessionConsentConfiguration(id, session.id, user)
+              .then(() => true)
+              .catch(() => false),
+          ),
+        );
+        if (cancelledRef.current) return;
+        setConsentConfigured(configuredFlags.some(Boolean));
 
         const assignments = await Promise.all(
           membershipsResult.memberships.map((membership) =>
@@ -188,6 +232,51 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
     );
   }
 
+  const readiness: ReadinessRow[] = [
+    {
+      label: 'Program details',
+      ready: workspace.description !== null && workspace.description.trim() !== '',
+      href: `/workspaces/${id}`,
+      detail: 'A description helps participants understand what this program is for.',
+    },
+    {
+      label: 'People',
+      ready: memberships.length > 0,
+      href: `/workspaces/${id}/manage`,
+      detail: `${memberships.length} member${memberships.length === 1 ? '' : 's'} added.`,
+    },
+    {
+      label: 'Agenda',
+      ready: agendaItems.length > 0,
+      href: `/workspaces/${id}/agenda`,
+      detail: `${agendaItems.length} agenda item${agendaItems.length === 1 ? '' : 's'} added.`,
+    },
+    {
+      label: 'Resources',
+      ready: resources.length > 0,
+      href: `/workspaces/${id}/resources`,
+      detail: `${resources.length} resource${resources.length === 1 ? '' : 's'} shared.`,
+    },
+    {
+      label: 'Consent',
+      ready: consentConfigured,
+      href:
+        sessions[0] !== undefined
+          ? `/workspaces/${id}/sessions/${sessions[0].id}/consent-configuration`
+          : `/workspaces/${id}/sessions`,
+      detail: consentConfigured
+        ? 'At least one session has consent configured.'
+        : 'No session has a consent configuration yet.',
+    },
+    {
+      label: 'Sessions',
+      ready: sessions.length > 0,
+      href: `/workspaces/${id}/sessions`,
+      detail: `${sessions.length} session${sessions.length === 1 ? '' : 's'} created.`,
+    },
+  ];
+  const readyCount = readiness.filter((row) => row.ready).length;
+
   return (
     <div className="space-y-6">
       <Link href={`/workspaces/${id}`} className="inline-block text-sm underline">
@@ -212,6 +301,31 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
           )}
         </p>
       </div>
+
+      <section aria-labelledby="readiness-heading" className="space-y-3">
+        <h2 id="readiness-heading" className="text-lg font-semibold">
+          Ready to run ({readyCount} of {readiness.length})
+        </h2>
+        <Card className="divide-y divide-[var(--color-line)] p-0">
+          {readiness.map((row) => (
+            <Link
+              key={row.label}
+              href={row.href}
+              className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-[var(--color-accent-soft)]"
+            >
+              <div className="min-w-0">
+                <p className="font-medium">
+                  <span aria-hidden="true">{row.ready ? '✓' : '○'}</span> {row.label}
+                </p>
+                <p className="text-sm text-[var(--color-ink-muted)]">{row.detail}</p>
+              </div>
+              <span className="shrink-0 text-sm underline">
+                {row.ready ? 'Review →' : 'Set up →'}
+              </span>
+            </Link>
+          ))}
+        </Card>
+      </section>
 
       <section aria-labelledby="add-member-heading">
         <h2 id="add-member-heading" className="mb-3 text-lg font-semibold">
