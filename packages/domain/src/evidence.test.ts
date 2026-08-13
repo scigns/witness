@@ -224,29 +224,41 @@ describe('assertAttributionCompatibility', () => {
 describe('requiredConsentCategoryForCapture', () => {
   it('is null for sourceless modes', () => {
     expect(
-      requiredConsentCategoryForCapture({
-        attributionMode: 'facilitator_observation',
-        evidenceType: 'quote',
-      }),
+      requiredConsentCategoryForCapture({ attributionMode: 'facilitator_observation' }),
     ).toBeNull();
   });
 
-  it('is null for non-quotation evidence types', () => {
+  it('is null for institutional_source and unattributed, the other sourceless modes', () => {
     expect(
-      requiredConsentCategoryForCapture({ attributionMode: 'attributed', evidenceType: 'idea' }),
+      requiredConsentCategoryForCapture({ attributionMode: 'institutional_source' }),
     ).toBeNull();
+    expect(requiredConsentCategoryForCapture({ attributionMode: 'unattributed' })).toBeNull();
   });
 
-  it('requires attributed_quotation consent for attributed quotes', () => {
-    expect(
-      requiredConsentCategoryForCapture({ attributionMode: 'attributed', evidenceType: 'quote' }),
-    ).toBe('attributed_quotation');
+  // P0 regression guard: this used to also take `evidenceType` and return null
+  // for anything but 'quote', which meant a named participant's explicit
+  // refusal of attributed_quotation consent was bypassed for every other
+  // evidence type ('observation', 'concern', 'risk', ...) even though
+  // attributionMode names them in the record identically either way.
+  // Reproduced live against the pilot on 2026-08-13. There is no longer an
+  // evidenceType parameter — every participant-backed attribution mode
+  // requires its consent category regardless of what kind of evidence it is.
+  it('requires attributed_quotation consent for attributed evidence of any type', () => {
+    expect(requiredConsentCategoryForCapture({ attributionMode: 'attributed' })).toBe(
+      'attributed_quotation',
+    );
   });
 
-  it('requires anonymous_quotation consent for anonymous quotes', () => {
-    expect(
-      requiredConsentCategoryForCapture({ attributionMode: 'anonymous', evidenceType: 'quote' }),
-    ).toBe('anonymous_quotation');
+  it('requires anonymous_quotation consent for anonymous evidence of any type', () => {
+    expect(requiredConsentCategoryForCapture({ attributionMode: 'anonymous' })).toBe(
+      'anonymous_quotation',
+    );
+  });
+
+  it('requires anonymous_quotation consent for pseudonymous evidence of any type', () => {
+    expect(requiredConsentCategoryForCapture({ attributionMode: 'pseudonymous' })).toBe(
+      'anonymous_quotation',
+    );
   });
 });
 

@@ -169,7 +169,6 @@ export class EvidenceService {
         sessionId,
         request.sourceParticipantId,
         request.attributionMode,
-        request.evidenceType,
         now,
       );
     }
@@ -245,7 +244,6 @@ export class EvidenceService {
         sessionId,
         nextSourceParticipantId,
         nextAttributionMode,
-        request.evidenceType ?? evidence.evidenceType,
         now,
       );
     } else if (request.sourceParticipantId === null) {
@@ -317,16 +315,17 @@ export class EvidenceService {
    * runs inside `captureEvidence`/`updateEvidenceDraft` itself; this is the
    * consent half, which needs a database read the domain layer may not
    * perform (ADR-0003). Every participant-backed capture needs
-   * `mayParticipate`; quotation evidence additionally needs the specific
-   * attributed/anonymous quotation category `requiredConsentCategoryForCapture`
-   * names. A refused or missing answer fails closed — `ForbiddenException`,
-   * never a silently-narrowed capture.
+   * `mayParticipate`; an attributed or anonymous/pseudonymous capture
+   * additionally needs the specific category `requiredConsentCategoryForCapture`
+   * names — for every evidence type, not only literal quotes (see that
+   * function's own doc comment for the P0 this closed). A refused or
+   * missing answer fails closed — `ForbiddenException`, never a
+   * silently-narrowed capture.
    */
   private async resolveConsentBasis(
     sessionId: string,
     participantId: string,
     attributionMode: string,
-    evidenceType: string,
     now: Date,
   ): Promise<readonly string[]> {
     const participation = await this.consentPolicy.mayParticipate(sessionId, participantId, now);
@@ -340,7 +339,6 @@ export class EvidenceService {
 
     const category = requiredConsentCategoryForCapture({
       attributionMode: attributionMode as EvidenceAttributionMode,
-      evidenceType,
     });
     if (category === null) return basis;
 
