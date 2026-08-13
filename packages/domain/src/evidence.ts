@@ -123,15 +123,6 @@ export const EVIDENCE_TYPES = [
 export type EvidenceType = (typeof EVIDENCE_TYPES)[number];
 
 /**
- * Evidence types that reproduce a participant's own words rather than
- * describing or interpreting them. These are the types that require
- * quotation consent (attributed or anonymous, per `attributionMode`) — a
- * facilitator's paraphrased observation of what someone said is a different
- * act from quoting them, and the consent categories distinguish the two.
- */
-const QUOTATION_EVIDENCE_TYPES: ReadonlySet<string> = new Set(['quote']);
-
-/**
  * The full review vocabulary. Milestone 5 only *transitions* between
  * `draft`, `submitted` and `withdrawn` — see the file header for why the
  * other four are declared but unreachable from this module.
@@ -418,10 +409,23 @@ export function assertAttributionCompatibility(input: {
 }
 
 /**
- * Which consent category a capture needs, given its attribution mode and
- * evidence type — the question `EvidenceService` asks `ConsentPolicyService`
- * before capture. Exported so the service and this module cannot disagree
- * about it, and so a test can assert the mapping directly.
+ * Which consent category a capture needs, given its attribution mode — the
+ * question `EvidenceService` asks `ConsentPolicyService` before capture.
+ * Exported so the service and this module cannot disagree about it, and so
+ * a test can assert the mapping directly.
+ *
+ * P0 FIX (2026-08-13): this used to also take `evidenceType` and only
+ * require the check when it was exactly `'quote'`, on the reasoning that a
+ * facilitator's paraphrased "observation" is a different act from quoting
+ * someone verbatim. That distinction does not hold: `attributionMode` names
+ * the participant in the record regardless of `evidenceType` — a named,
+ * attributed "observation", "concern" or "risk" entry puts their name next
+ * to that content exactly as visibly as a "quote" does, and the API accepts
+ * any (evidenceType, attributionMode) pair independently of each other.
+ * Reproduced live: a named participant who explicitly refused
+ * `attributed_quotation` consent still had an attributed "observation"
+ * captured against them, because `observation` is not `quote`. This now
+ * applies to every evidence type once a participant is named or quoted.
  *
  * Returns `null` when no participant-specific category applies (a
  * sourceless mode has no participant to have consented to anything).
@@ -431,12 +435,8 @@ export function assertAttributionCompatibility(input: {
  */
 export function requiredConsentCategoryForCapture(input: {
   attributionMode: EvidenceAttributionMode;
-  evidenceType: string;
 }): string | null {
   if (SOURCELESS_MODES.has(input.attributionMode)) return null;
-
-  const isQuotation = QUOTATION_EVIDENCE_TYPES.has(input.evidenceType.trim());
-  if (!isQuotation) return null;
 
   return input.attributionMode === 'attributed' ? 'attributed_quotation' : 'anonymous_quotation';
 }
