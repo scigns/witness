@@ -135,6 +135,28 @@ Afterwards, in this order: `prisma migrate deploy`, then `/ready`, then sign in
 and open one session. An untested backup is a hypothesis — run a restore drill
 into a scratch database quarterly.
 
+## Data portability (tenant export)
+
+Witness's tenancy model is one deployment per customer: `organisation:create`
+is a one-time bootstrap step (`services/api-gateway/prisma/bootstrap.ts`)
+that refuses to run against a database that already holds an organisation, so
+a live deployment never holds more than one customer's data. That makes the
+backup above *also* the tenant-export mechanism — there is no per-organisation
+filtering step to build, because the whole database already is the tenant's
+data, nothing else.
+
+"Your data is yours" is provable, not just claimed: `scripts/ops/backup.sh`'s
+dump can power a second, fully independent Witness instance with zero
+dependency on the original deployment. Verified 2026-08-13 by restoring a
+live pilot dump into an isolated Postgres container on its own Docker
+network, pointing a freshly built `api` image at it (nothing shared with the
+source deployment — different network, different container, different
+Postgres instance), and confirming `GET /api/v1/organisations` and
+`GET /api/v1/workspaces` returned the real, restored organisation and
+program data. A customer moving to their own infrastructure, or Witness
+standing up a dedicated deployment for them, is this same restore procedure
+against a new host.
+
 ## Rollback
 
 Roll the application back, not the database. Migrations in this repository are
