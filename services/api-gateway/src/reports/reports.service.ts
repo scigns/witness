@@ -474,8 +474,13 @@ export class ReportsService {
 
     for (const item of evidenceRows) {
       const consent = await this.resolveConsent(sessionId, item.sourceParticipantId, category, now);
+      // Resolved only for pseudonymous attribution: `projectEvidenceForReport`
+      // re-emits this value verbatim for that mode alone, so a real name for
+      // attributed/anonymous evidence must never reach this call in the first
+      // place — the redaction rule should not be the only thing standing
+      // between a participant's real name and the rendered report.
       const pseudonym =
-        item.sourceParticipantId === null
+        item.sourceParticipantId === null || item.attributionMode !== 'pseudonymous'
           ? null
           : (participantRows.find((p) => p.id === item.sourceParticipantId)?.displayName ?? null);
 
@@ -516,7 +521,8 @@ export class ReportsService {
         now,
       );
       const pseudonym =
-        item.evidence.sourceParticipantId === null
+        item.evidence.sourceParticipantId === null ||
+        item.evidence.attributionMode !== 'pseudonymous'
           ? null
           : (participantRows.find((p) => p.id === item.evidence.sourceParticipantId)?.displayName ??
             null);
