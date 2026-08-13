@@ -32,6 +32,14 @@ import {
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { Button, Card, ErrorNotice, EvidenceReviewStatusBadge } from '@/components/ui';
+import {
+  enqueue,
+  isNetworkFailure,
+  listForSession,
+  remove as removeQueued,
+  updateStatus as updateQueuedStatus,
+  type QueuedContribution,
+} from '@/lib/offline-queue';
 
 const ATTRIBUTION_MODE_LABELS: Record<EvidenceAttributionMode, string> = {
   attributed: 'Attributed — names the participant',
@@ -73,6 +81,7 @@ export default function SessionEvidencePage({
   const [sourceParticipantId, setSourceParticipantId] = useState('');
   const [captureBusy, setCaptureBusy] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [queued, setQueued] = useState<QueuedContribution[]>([]);
 
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
@@ -116,6 +125,70 @@ export default function SessionEvidencePage({
     };
   }, [ready, load]);
 
+  const refreshQueued = useCallback(async () => {
+    setQueued(await listForSession(workspaceId, sessionId));
+  }, [workspaceId, sessionId]);
+
+  /**
+   * Flushes anything the offline queue is still holding for this session.
+   * Runs on mount (covers "closed the tab while offline, reopened later")
+   * and on the browser's `online` event (covers "regained connectivity
+   * mid-session"). `clientRequestId` makes a retry safe even if a previous
+   * attempt actually reached the server before the connection dropped.
+   */
+  const flushQueue = useCallback(async () => {
+    const pending = (await listForSession(workspaceId, sessionId)).filter(
+      (item) => item.status === 'pending' || item.status === 'failed',
+    );
+    for (const item of pending) {
+      await updateQueuedStatus(item.id, 'syncing');
+      await refreshQueued();
+      try {
+        const captured = await api.captureEvidence(workspaceId, sessionId, item.body, user);
+        await removeQueued(item.id);
+        setEvidence((current) =>
+          current.some((e) => e.id === captured.id)
+            ? current
+            : [
+                {
+                  id: captured.id,
+                  sessionId: captured.sessionId,
+                  evidenceType: captured.evidenceType,
+                  title: captured.title,
+                  attributionMode: captured.attributionMode,
+                  identityVisibility: captured.identityVisibility,
+                  reviewStatus: captured.reviewStatus,
+                  verificationStatus: captured.verificationStatus,
+                  tags: captured.tags,
+                  capturedAt: captured.capturedAt,
+                  updatedAt: captured.updatedAt,
+                  withdrawn: captured.withdrawn,
+                  ...(captured.sourceParticipantId !== undefined
+                    ? { sourceParticipantId: captured.sourceParticipantId }
+                    : {}),
+                },
+                ...current,
+              ],
+        );
+      } catch (caught) {
+        // Still offline, or a genuine rejection (consent refused, session
+        // closed since queuing) — either way, leave it queued and visible
+        // rather than silently dropping a participant's words.
+        const message = caught instanceof ApiError ? caught.message : 'Sync failed.';
+        await updateQueuedStatus(item.id, 'failed', message);
+      }
+      await refreshQueued();
+    }
+  }, [workspaceId, sessionId, user, refreshQueued]);
+
+  useEffect(() => {
+    void refreshQueued();
+    void flushQueue();
+    const onOnline = () => void flushQueue();
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [refreshQueued, flushQueue]);
+
   const isSourceless = SOURCELESS_MODES.has(attributionMode);
   const resolvedType = evidenceType === 'other' ? customEvidenceType.trim() : evidenceType;
 
@@ -123,21 +196,25 @@ export default function SessionEvidencePage({
     event.preventDefault();
     setCaptureBusy(true);
     setCaptureError(null);
+
+    const clientRequestId =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`;
+
+    const body = {
+      evidenceType: resolvedType,
+      title: title.trim(),
+      content: content.trim(),
+      attributionMode,
+      sourceParticipantId:
+        isSourceless || sourceParticipantId === '' ? undefined : sourceParticipantId,
+      submitImmediately: true,
+      clientRequestId,
+    };
+
     try {
-      const captured = await api.captureEvidence(
-        workspaceId,
-        sessionId,
-        {
-          evidenceType: resolvedType,
-          title: title.trim(),
-          content: content.trim(),
-          attributionMode,
-          sourceParticipantId:
-            isSourceless || sourceParticipantId === '' ? undefined : sourceParticipantId,
-          submitImmediately: true,
-        },
-        user,
-      );
+      const captured = await api.captureEvidence(workspaceId, sessionId, body, user);
       setEvidence((current) => [
         {
           id: captured.id,
@@ -162,7 +239,24 @@ export default function SessionEvidencePage({
       setContent('');
       setSourceParticipantId('');
     } catch (caught) {
-      if (caught instanceof ApiError && caught.code === 'CONSENT_NOT_GRANTED') {
+      if (isNetworkFailure(caught)) {
+        // No connection right now — queue it locally rather than losing
+        // what was typed. `flushQueue` retries automatically once the
+        // browser's `online` event fires.
+        await enqueue({
+          id: clientRequestId,
+          workspaceId,
+          sessionId,
+          body,
+          status: 'pending',
+          createdAt: Date.now(),
+          lastError: null,
+        });
+        await refreshQueued();
+        setTitle('');
+        setContent('');
+        setSourceParticipantId('');
+      } else if (caught instanceof ApiError && caught.code === 'CONSENT_NOT_GRANTED') {
         setCaptureError(
           `This cannot be captured this way: ${caught.message} Choose a different attribution mode, or check the participant's consent.`,
         );
@@ -364,6 +458,34 @@ export default function SessionEvidencePage({
             </p>
           </form>
         </Card>
+      )}
+
+      {queued.length > 0 && (
+        <div role="status">
+          <Card className="space-y-2 border-[var(--color-accent)] bg-[var(--color-accent-soft)]">
+            <p className="text-sm font-medium">
+              {queued.length} contribution{queued.length === 1 ? '' : 's'} saved on this device,
+              waiting for a connection
+            </p>
+            <ul className="space-y-1 text-sm">
+              {queued.map((item) => (
+                <li key={item.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="truncate">{item.body.title}</span>
+                  <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">
+                    {item.status === 'syncing'
+                      ? 'Syncing…'
+                      : item.status === 'failed'
+                        ? `Couldn't sync yet${item.lastError ? ` — ${item.lastError}` : ''}`
+                        : 'Waiting to sync'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <Button variant="secondary" onClick={() => void flushQueue()}>
+              Try syncing now
+            </Button>
+          </Card>
+        </div>
       )}
 
       <div className="flex flex-wrap items-center gap-3">

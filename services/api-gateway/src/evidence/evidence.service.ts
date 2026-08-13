@@ -80,6 +80,21 @@ export interface EvidenceListFilter {
   evidenceType?: string | undefined;
 }
 
+/**
+ * Prisma's unique-constraint error, recognised structurally rather than by
+ * `instanceof Prisma.PrismaClientKnownRequestError` — the service tests run
+ * against an in-memory double that never constructs a real Prisma error, and
+ * a check the tests cannot exercise is a check nobody has verified.
+ */
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code: unknown }).code === 'P2002'
+  );
+}
+
 @Injectable()
 export class EvidenceService {
   constructor(
@@ -155,6 +170,22 @@ export class EvidenceService {
     const session = await this.requireSessionRow(workspaceId, sessionId);
     const now = new Date();
 
+    // Idempotent retry (low-connectivity Level 3 offline queue): a queued
+    // capture flushed after reconnect may race a response that actually
+    // landed. The same clientRequestId returns the original evidence
+    // instead of creating a duplicate — this must be checked before any
+    // consent read, since a duplicate submission is not a new capture at
+    // all and should not be charged against anything.
+    if (request.clientRequestId !== undefined) {
+      const existing = await this.prisma.evidence.findFirst({
+        where: { sessionId, clientRequestId: request.clientRequestId },
+      });
+      if (existing !== null) {
+        const includeRestricted = await this.canSeeRestricted(principal, workspaceId);
+        return toDetail(existing, session.status as SessionStatus, includeRestricted);
+      }
+    }
+
     let participantIdentityMode: ParticipantIdentityMode | null = null;
     let consentBasis: readonly string[] = [];
 
@@ -199,10 +230,34 @@ export class EvidenceService {
       at: now,
     });
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.evidence.create({ data: toCreateRow(outcome.evidence) });
-      await appendAuditEvent(tx, 'evidence', outcome.evidence.id, outcome.event, now);
-    });
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.evidence.create({
+          data: {
+            ...toCreateRow(outcome.evidence),
+            clientRequestId: request.clientRequestId ?? null,
+          },
+        });
+        await appendAuditEvent(tx, 'evidence', outcome.evidence.id, outcome.event, now);
+      });
+    } catch (error) {
+      // A second concurrent retry of the same queued offline contribution
+      // can lose the race between the idempotency check above and this
+      // insert — the (sessionId, clientRequestId) unique constraint is the
+      // backstop. Resolve to the row the *other* request created rather
+      // than surfacing a 500 for what is, from the client's perspective, a
+      // successful retry.
+      if (request.clientRequestId !== undefined && isUniqueConstraintViolation(error)) {
+        const existing = await this.prisma.evidence.findFirst({
+          where: { sessionId, clientRequestId: request.clientRequestId },
+        });
+        if (existing !== null) {
+          const includeRestricted = await this.canSeeRestricted(principal, workspaceId);
+          return toDetail(existing, session.status as SessionStatus, includeRestricted);
+        }
+      }
+      throw error;
+    }
 
     const includeRestricted = await this.canSeeRestricted(principal, workspaceId);
     const row = await this.requireEvidenceRow(workspaceId, sessionId, outcome.evidence.id);

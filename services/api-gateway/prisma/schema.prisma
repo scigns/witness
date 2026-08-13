@@ -741,6 +741,16 @@ model Evidence {
   content      String  @db.Text
   language     String? @db.VarChar(50)
 
+  /// Client-generated idempotency key for the offline contribution queue
+  /// (Client-Ready Experience overhaul, low-connectivity Level 3): a
+  /// contribution captured while offline is queued locally and retried on
+  /// reconnect, possibly more than once if a retry races a response that
+  /// actually landed. Unique per session, so a repeated submission with the
+  /// same key returns the original evidence instead of creating a
+  /// duplicate. Null for ordinary online captures, which have no queue and
+  /// need no key.
+  clientRequestId String? @map("client_request_id") @db.Uuid
+
   capturedAt           DateTime @map("captured_at") @db.Timestamptz(6)
   sessionOffsetSeconds Int?     @map("session_offset_seconds")
 
@@ -787,6 +797,7 @@ model Evidence {
   clarifications    Clarification[]
   outcomeSupports   OutcomeSupport[]   @relation("OutcomeSupportEvidence")
 
+  @@unique([sessionId, clientRequestId])
   @@index([sessionId])
   @@index([workspaceId])
   @@index([sourceParticipantId])

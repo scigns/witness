@@ -68,6 +68,7 @@ WORKDIR /app
 # public files are not included in it and have to be placed alongside.
 COPY --from=build /repo/apps/web/.next/standalone ./
 COPY --from=build /repo/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build /repo/apps/web/public ./apps/web/public
 
 USER node
 

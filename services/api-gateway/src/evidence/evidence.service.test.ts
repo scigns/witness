@@ -120,6 +120,17 @@ function fakePrisma(sessionStatus = 'open') {
         const row = evidenceRows.find((e) => e['id'] === where.id);
         return row === undefined ? null : { ...row };
       },
+      findFirst: async ({
+        where,
+      }: {
+        where: { sessionId: string; clientRequestId: string | null };
+      }) => {
+        const row = evidenceRows.find(
+          (e) =>
+            e['sessionId'] === where.sessionId && e['clientRequestId'] === where.clientRequestId,
+        );
+        return row === undefined ? null : { ...row };
+      },
       findMany: async ({
         where,
       }: {
@@ -316,6 +327,39 @@ describe('EvidenceService.capture', () => {
     );
     expect(detail.reviewStatus).toBe('draft');
     expect(detail.attributionMode).toBe('facilitator_observation');
+  });
+
+  // Low-connectivity Level 3 (offline contribution queue): a queued capture
+  // retried after reconnect must be safe to submit twice without creating a
+  // duplicate.
+  it('is idempotent for a repeated clientRequestId — a retry returns the original evidence', async () => {
+    const { evidenceService, evidenceRows } = service();
+    const request = captureRequest({ clientRequestId: '99999999-9999-4999-8999-999999999999' });
+
+    const first = await evidenceService.capture(WORKSPACE_1, SESSION_1, request, FACILITATOR);
+    const second = await evidenceService.capture(WORKSPACE_1, SESSION_1, request, FACILITATOR);
+
+    expect(second.id).toBe(first.id);
+    expect(evidenceRows.filter((r) => r['sessionId'] === SESSION_1)).toHaveLength(1);
+  });
+
+  it('two different clientRequestIds create two distinct evidence rows', async () => {
+    const { evidenceService, evidenceRows } = service();
+
+    await evidenceService.capture(
+      WORKSPACE_1,
+      SESSION_1,
+      captureRequest({ clientRequestId: '11111111-9999-4999-8999-000000000001' }),
+      FACILITATOR,
+    );
+    await evidenceService.capture(
+      WORKSPACE_1,
+      SESSION_1,
+      captureRequest({ clientRequestId: '22222222-9999-4999-8999-000000000002' }),
+      FACILITATOR,
+    );
+
+    expect(evidenceRows.filter((r) => r['sessionId'] === SESSION_1)).toHaveLength(2);
   });
 
   it('captures participant-backed evidence when consent is granted, recording consentBasis', async () => {
