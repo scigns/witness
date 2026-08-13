@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
 import { Shell } from '@/components/shell';
+import { ServiceWorkerRegistration } from '@/components/service-worker';
 import { IS_DEVELOPMENT_BUILD } from '@/lib/api';
 import { AuthProvider } from '@/lib/auth';
 import { SessionProvider } from '@/lib/session';
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
+        <ServiceWorkerRegistration />
         <AuthProvider>
           <SessionProvider>
             <Shell>{children}</Shell>

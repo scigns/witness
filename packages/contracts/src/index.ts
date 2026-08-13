@@ -656,6 +656,14 @@ export const captureEvidenceRequestSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
   /** `true` for the quick-capture path — submits immediately rather than saving a draft. */
   submitImmediately: z.boolean().optional(),
+  /**
+   * Client-generated idempotency key for the offline contribution queue
+   * (low-connectivity Level 3): a queued capture retried after reconnect
+   * may race a response that actually landed. Sending the same key on
+   * retry returns the original evidence instead of creating a duplicate.
+   * Omit for an ordinary capture that has no queue behind it.
+   */
+  clientRequestId: z.string().uuid().optional(),
 });
 export type CaptureEvidenceRequest = z.infer<typeof captureEvidenceRequestSchema>;
 
