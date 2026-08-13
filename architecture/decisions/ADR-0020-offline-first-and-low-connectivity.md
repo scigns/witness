@@ -2,10 +2,31 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted (decision) — **not yet implemented** (see Implementation status below) |
 | **Date** | 2026-07-31 |
 | **Deciders** | Frontend Lead, Principal Architect, UX Lead |
 | **Principles engaged** | **P8 (accessible and multilingual by default)** |
+
+## Implementation status (added 2026-08-13)
+
+Verified against the actual repository: no service worker, no PWA manifest, no
+IndexedDB queue, no chunked/resumable upload path exist in `apps/web`. The
+"Compliance and enforcement" section below describes CI gates (bundle-size
+budget, Lighthouse/PWA audits, simulated-network-partition tests) that are
+**not present** in this repository's actual CI configuration — the real gate
+list is lint/format/typecheck, unit+invariant+adversarial tests, build,
+CodeQL, dependency review, license compatibility, and secret scanning. That
+section is aspirational, not current, and should not be read as an active
+guarantee until it is built.
+
+What *is* true today: the web app's initial bundle (~102 KB shared,
+~131–135 KB First Load JS on the heaviest pages) is well inside the 200 KB
+budget this ADR sets, and the whole backend stack (Postgres, Keycloak,
+Ollama, whisper.cpp) runs with zero external network calls in the `sovereign`
+profile — confirmed live via `/ready`'s `externalInferenceEnabled: false`.
+That is Level 1 of a low-connectivity story (usable on a slow link, no
+cloud dependency) but not Levels 2–4 of this ADR's own capture-and-sync
+design, which remain to be built.
 
 ## Context
 
