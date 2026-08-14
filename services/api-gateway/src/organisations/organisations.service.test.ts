@@ -31,18 +31,33 @@ const DEV_PRINCIPAL: Principal = {
   roles: ['admin'],
 };
 
+interface FakeUser {
+  id: string;
+  email: string;
+  displayName: string;
+  accountState: string;
+}
+
 function fakePrisma(options: {
   organisations: { id: string; name: string }[];
   organisationMemberships?: { organisationId: string; userId: string }[];
-  users?: { id: string; email: string }[];
+  users?: FakeUser[];
+  /** Simulates a concurrent create winning the race for this email once. */
+  raceOnEmail?: string;
 }) {
   const memberships = options.organisationMemberships ?? [];
   const organisations = [...options.organisations];
   const users = [...(options.users ?? [])];
   const actors: { id: string; kind: string; displayName: string }[] = [];
-  const roleAssignments: { id: string; organisationId: string; userId: string; role: string }[] =
-    [];
+  const roleAssignments: {
+    id: string;
+    scopeType: string;
+    organisationId: string;
+    userId: string;
+    role: string;
+  }[] = [];
   const auditEvents: { subjectType: string; subjectId: string; action: string }[] = [];
+  let raceOnEmail = options.raceOnEmail ?? null;
 
   const tx = {
     organisation: {
@@ -62,8 +77,15 @@ function fakePrisma(options: {
     user: {
       findUnique: async ({ where }: { where: { email: string } }) =>
         users.find((u) => u.email === where.email) ?? null,
-      create: async ({ data }: { data: { id: string; email: string } }) => {
-        users.push({ id: data.id, email: data.email });
+      create: async ({ data }: { data: FakeUser }) => {
+        // Simulates a second request's insert winning the race for this
+        // email between this test's own findUnique and create.
+        if (raceOnEmail === data.email) {
+          raceOnEmail = null;
+          users.push({ ...data, id: `${data.id}-winner` });
+          throw { code: 'P2002' };
+        }
+        users.push(data);
         return data;
       },
     },
@@ -77,7 +99,13 @@ function fakePrisma(options: {
       create: async ({
         data,
       }: {
-        data: { id: string; organisationId: string; userId: string; role: string };
+        data: {
+          id: string;
+          scopeType: string;
+          organisationId: string;
+          userId: string;
+          role: string;
+        };
       }) => {
         roleAssignments.push(data);
         return data;
@@ -175,7 +203,12 @@ describe('OrganisationsService.create — provisions an administrator', () => {
     );
 
     expect(state.organisations).toEqual([{ id: result.id, name: 'New Institution' }]);
-    expect(state.users.map((u) => u.email)).toEqual(['admin@new-institution.example']);
+    expect(state.users).toHaveLength(1);
+    expect(state.users[0]).toMatchObject({
+      email: 'admin@new-institution.example',
+      displayName: 'New Admin',
+      accountState: 'invited',
+    });
     const invitedUserId = state.users[0]!.id;
     expect(state.memberships).toHaveLength(1);
     expect(state.memberships[0]).toMatchObject({
@@ -184,6 +217,7 @@ describe('OrganisationsService.create — provisions an administrator', () => {
     });
     expect(state.roleAssignments).toHaveLength(1);
     expect(state.roleAssignments[0]).toMatchObject({
+      scopeType: 'organisation',
       organisationId: result.id,
       userId: invitedUserId,
       role: 'admin',
@@ -197,7 +231,14 @@ describe('OrganisationsService.create — provisions an administrator', () => {
   it('reuses an existing user by email rather than creating a duplicate, and adds no second user.invited event', async () => {
     const { prisma, state } = fakePrisma({
       organisations: [],
-      users: [{ id: USER_1, email: 'shared-admin@example.org' }],
+      users: [
+        {
+          id: USER_1,
+          email: 'shared-admin@example.org',
+          displayName: 'Shared Admin',
+          accountState: 'active',
+        },
+      ],
     });
     const service = new OrganisationsService(prisma);
 
@@ -210,6 +251,34 @@ describe('OrganisationsService.create — provisions an administrator', () => {
 
     expect(state.users).toHaveLength(1);
     expect(state.memberships[0]).toMatchObject({ userId: USER_1 });
+    expect(state.auditEvents.map((e) => e.action)).toEqual(['organisation.created']);
+  });
+
+  it('ATTACK — a concurrent create winning the race for the same email is reused instead of failing the request', async () => {
+    // Between this service's own findUnique and create, a P2002 from the
+    // unique index on email means another request got there first — the
+    // fallback re-fetches and continues with that row rather than
+    // surfacing a 500 for something that is not actually a conflict from
+    // the caller's point of view.
+    const { prisma, state } = fakePrisma({
+      organisations: [],
+      raceOnEmail: 'racing-admin@example.org',
+    });
+    const service = new OrganisationsService(prisma);
+
+    const result = await service.create(
+      'Third Org',
+      'racing-admin@example.org',
+      'Racing Admin',
+      SESSION_PRINCIPAL,
+    );
+
+    expect(state.users).toHaveLength(1);
+    const winnerId = state.users[0]!.id;
+    expect(winnerId).toMatch(/-winner$/);
+    expect(state.memberships[0]).toMatchObject({ organisationId: result.id, userId: winnerId });
+    expect(state.roleAssignments[0]).toMatchObject({ organisationId: result.id, userId: winnerId });
+    // The user row that won the race is not this request's to have invited.
     expect(state.auditEvents.map((e) => e.action)).toEqual(['organisation.created']);
   });
 });

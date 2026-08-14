@@ -25,6 +25,21 @@ import { PrismaService } from '../infrastructure/prisma.service.js';
 import { sha256 } from '../infrastructure/hashing.js';
 import type { Principal } from '../authz/authorization.port.js';
 
+/**
+ * Duck-typed rather than `instanceof Prisma.PrismaClientKnownRequestError` —
+ * the service tests run against an in-memory double that never constructs a
+ * real Prisma error, matching evidence.service.ts's own helper of the same
+ * name and shape.
+ */
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code: unknown }).code === 'P2002'
+  );
+}
+
 @Injectable()
 export class OrganisationsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -132,19 +147,33 @@ export class OrganisationsService {
       });
 
       const existingUser = await tx.user.findUnique({ where: { email: administratorEmail } });
-      const userId = existingUser?.id ?? administratorUserId;
+      let userId = existingUser?.id ?? administratorUserId;
+      let createdNewUser = existingUser === null;
 
-      if (existingUser === null) {
-        await tx.user.create({
-          data: {
-            id: userId,
-            email: administratorEmail,
-            displayName: administratorName,
-            accountState: 'invited',
-            createdAt: now,
-            updatedAt: now,
-          },
-        });
+      if (createdNewUser) {
+        try {
+          await tx.user.create({
+            data: {
+              id: userId,
+              email: administratorEmail,
+              displayName: administratorName,
+              accountState: 'invited',
+              createdAt: now,
+              updatedAt: now,
+            },
+          });
+        } catch (error) {
+          // Lost a race with a concurrent organisation:create for the same
+          // administrator email — email is unique, and findUnique above ran
+          // outside any lock. Fall back to the row the other request just
+          // created rather than surfacing a 500 for something that is not
+          // actually a conflict from the caller's point of view.
+          if (!isUniqueConstraintViolation(error)) throw error;
+          const winner = await tx.user.findUnique({ where: { email: administratorEmail } });
+          if (winner === null) throw error;
+          userId = winner.id;
+          createdNewUser = false;
+        }
       }
 
       await tx.organisationMembership.create({
@@ -176,7 +205,7 @@ export class OrganisationsService {
       // organisation) must not overwrite that chain — it gets no separate
       // event of its own here; the organisation.created event above and the
       // membership/role-assignment rows are the record of what happened.
-      if (existingUser === null) {
+      if (createdNewUser) {
         const userEvent = createAuditEvent(
           {
             id: toAuditEventId(randomUUID()),
