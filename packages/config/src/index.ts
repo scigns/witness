@@ -98,6 +98,19 @@ const schema = z.object({
   ALLOW_EXTERNAL_MODEL_EGRESS: booleanish,
 
   TELEMETRY_EXTERNAL_REPORTING: booleanish,
+
+  // S3-compatible object storage (StoragePort — Cloudflare R2 in production,
+  // MinIO in the `full` local dev profile). Also egress-related: empty is
+  // the sovereign default, same shape as EXTERNAL_MODEL_*.
+  S3_ENDPOINT: z.string().optional().default(''),
+  S3_REGION: z.string().optional().default('auto'),
+  S3_ACCESS_KEY_ID: z.string().optional().default(''),
+  S3_SECRET_ACCESS_KEY: z.string().optional().default(''),
+  S3_BUCKET_MEDIA: z.string().optional().default(''),
+  S3_BUCKET_DOCUMENTS: z.string().optional().default(''),
+  S3_FORCE_PATH_STYLE: booleanish,
+  S3_SERVER_SIDE_ENCRYPTION: z.string().optional().default(''),
+  ALLOW_OBJECT_STORAGE_EGRESS: booleanish,
 });
 
 export interface WitnessConfig {
@@ -141,6 +154,18 @@ export interface WitnessConfig {
   readonly maxEvidenceAttachmentMb: number;
   readonly localLlmUrl: string;
   readonly localLlmModel: string;
+  /** True only when the profile permits egress AND S3 credentials and buckets are configured. */
+  readonly objectStorageEnabled: boolean;
+  readonly s3: {
+    readonly endpoint: string;
+    readonly region: string;
+    readonly accessKeyId: string;
+    readonly secretAccessKey: string;
+    readonly bucketMedia: string;
+    readonly bucketDocuments: string;
+    readonly forcePathStyle: boolean;
+    readonly serverSideEncryption: string;
+  };
 }
 
 /**
@@ -223,6 +248,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
     value.EXTERNAL_MODEL_BASE_URL.trim() !== '' ||
     value.EXTERNAL_MODEL_API_KEY.trim() !== '';
 
+  const s3Configured =
+    value.S3_ENDPOINT.trim() !== '' ||
+    value.S3_ACCESS_KEY_ID.trim() !== '' ||
+    value.S3_SECRET_ACCESS_KEY.trim() !== '';
+
   // ── ADR-0009: the sovereign profile makes zero external calls ──────────────
   if (value.WITNESS_DEPLOYMENT_PROFILE === 'sovereign') {
     if (providerConfigured) {
@@ -248,6 +278,36 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
           'Telemetry egress is egress (ADR-0014).',
       );
     }
+
+    if (s3Configured) {
+      problems.push(
+        'WITNESS_DEPLOYMENT_PROFILE=sovereign, but S3 object storage is configured ' +
+          '(S3_ENDPOINT / S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY). Recordings and documents are ' +
+          'institutional content, and the sovereign profile makes zero external calls by ' +
+          'definition (ADR-0009, principle P1) — that applies to where they are stored, not just ' +
+          'to AI inference. Either clear these values or set the profile to `hybrid` — ' +
+          'deliberately.',
+      );
+    }
+
+    if (value.ALLOW_OBJECT_STORAGE_EGRESS) {
+      problems.push(
+        'WITNESS_DEPLOYMENT_PROFILE=sovereign, but ALLOW_OBJECT_STORAGE_EGRESS is true. ' +
+          'These cannot both be correct.',
+      );
+    }
+  }
+
+  if (
+    s3Configured &&
+    (value.S3_BUCKET_MEDIA.trim() === '' || value.S3_BUCKET_DOCUMENTS.trim() === '')
+  ) {
+    problems.push(
+      'S3 object storage has an endpoint and credentials configured but S3_BUCKET_MEDIA or ' +
+        'S3_BUCKET_DOCUMENTS is empty. Both buckets are required once object storage is in use — ' +
+        'audio and documents are kept separate so an operator can apply different retention rules ' +
+        'to each without touching application code.',
+    );
   }
 
   // ── ADR-0013: the development profile is refused in production ─────────────
@@ -324,6 +384,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
     );
   }
 
+  if (
+    value.WITNESS_DEPLOYMENT_PROFILE === 'hybrid' &&
+    s3Configured &&
+    !value.ALLOW_OBJECT_STORAGE_EGRESS
+  ) {
+    problems.push(
+      'WITNESS_DEPLOYMENT_PROFILE=hybrid with S3 object storage configured but ' +
+        'ALLOW_OBJECT_STORAGE_EGRESS=false. Egress requires an explicit opt-in as well as a ' +
+        'permitting profile; refusing to guess which you meant.',
+    );
+  }
+
   const webOrigin =
     value.WITNESS_WEB_ORIGIN.trim() !== ''
       ? value.WITNESS_WEB_ORIGIN.trim()
@@ -388,6 +460,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
     maxEvidenceAttachmentMb: value.WITNESS_MAX_EVIDENCE_ATTACHMENT_MB,
     localLlmUrl: value.WITNESS_LOCAL_LLM_URL,
     localLlmModel: value.WITNESS_LOCAL_LLM_MODEL,
+    objectStorageEnabled:
+      value.WITNESS_DEPLOYMENT_PROFILE !== 'sovereign' &&
+      s3Configured &&
+      value.ALLOW_OBJECT_STORAGE_EGRESS,
+    s3: {
+      endpoint: value.S3_ENDPOINT,
+      region: value.S3_REGION,
+      accessKeyId: value.S3_ACCESS_KEY_ID,
+      secretAccessKey: value.S3_SECRET_ACCESS_KEY,
+      bucketMedia: value.S3_BUCKET_MEDIA,
+      bucketDocuments: value.S3_BUCKET_DOCUMENTS,
+      forcePathStyle: value.S3_FORCE_PATH_STYLE,
+      serverSideEncryption: value.S3_SERVER_SIDE_ENCRYPTION,
+    },
   };
 }
 
@@ -418,5 +504,6 @@ export function publicConfig(config: WitnessConfig): Record<string, string | boo
     profile: config.profile,
     dataResidency: config.dataResidency,
     externalInferenceEnabled: config.externalInferenceEnabled,
+    objectStorageEnabled: config.objectStorageEnabled,
   };
 }

@@ -19,6 +19,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -47,6 +48,8 @@ import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
 import { TranscriptionPort } from '../transcription/transcription.port.js';
+import { StoragePort } from '../storage/storage.port.js';
+import { resolveStoredContent } from '../storage/storage.service.js';
 import type { Principal } from '../authz/authorization.port.js';
 
 const SYSTEM_PRINCIPAL: Principal = {
@@ -81,6 +84,7 @@ export class TranscriptService {
     private readonly prisma: PrismaService,
     private readonly consentPolicy: ConsentPolicyService,
     private readonly transcription: TranscriptionPort,
+    @Inject(StoragePort) private readonly storage: StoragePort | null,
   ) {}
 
   async request(
@@ -241,10 +245,8 @@ export class TranscriptService {
     await this.persist(transcriptId, processing.transcript, processing.event, startedAt);
 
     try {
-      const result = await this.transcription.transcribe(
-        attachment.content,
-        attachment.contentType,
-      );
+      const content = await resolveStoredContent(this.storage, attachment);
+      const result = await this.transcription.transcribe(content, attachment.contentType);
       const now = new Date();
       const outcome = completeTranscription(
         processing.transcript,

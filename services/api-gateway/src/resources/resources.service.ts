@@ -3,14 +3,16 @@
  * and links a facilitator makes available to a program (Client-Ready
  * Experience overhaul, Phase 12).
  *
- * Mirrors `EvidenceAttachmentService`'s file-handling shape (size check,
- * bytes stored directly in Postgres) and `ConsentTemplatesService`'s
+ * Mirrors `EvidenceAttachmentService`'s file-handling shape exactly,
+ * including where the bytes live (`content` in Postgres, or `storageKey` in
+ * an S3-compatible store when `StoragePort` is available — see that file's
+ * doc comment and `storage.port.ts`) and `ConsentTemplatesService`'s
  * read/write shape otherwise. Unlike an evidence attachment, a resource
  * carries no participant consent to check — it is facilitator-authored
  * material, not participant contribution.
  */
 
-import { Injectable, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import {
@@ -33,6 +35,8 @@ import type {
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
+import { StoragePort } from '../storage/storage.port.js';
+import { objectKey, resolveStoredContent } from '../storage/storage.service.js';
 import type { Principal } from '../authz/authorization.port.js';
 
 /** Matches `EvidenceAttachmentService`'s own default cap. */
@@ -57,7 +61,10 @@ type ResourceRow = Awaited<ReturnType<PrismaService['resource']['findFirstOrThro
 
 @Injectable()
 export class ResourcesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(StoragePort) private readonly storage: StoragePort | null,
+  ) {}
 
   async list(workspaceId: string): Promise<ResourceView[]> {
     await this.requireWorkspace(workspaceId);
@@ -120,13 +127,14 @@ export class ResourcesService {
       });
     }
 
-    await this.requireWorkspace(workspaceId);
+    const workspace = await this.requireWorkspace(workspaceId);
     const actor = await resolveActor(this.prisma, principal);
     const userId = await this.requirePrincipalUserId(principal);
     const now = new Date();
+    const id = toResourceId(randomUUID());
 
     const outcome = createResource({
-      id: toResourceId(randomUUID()),
+      id,
       workspaceId: toWorkspaceId(workspaceId),
       sessionId: metadata.sessionId ? toCoDesignSessionId(metadata.sessionId) : null,
       agendaItemId: metadata.agendaItemId ? toAgendaItemId(metadata.agendaItemId) : null,
@@ -144,14 +152,26 @@ export class ResourcesService {
       createdAt: now,
     });
 
-    await this.persist(outcome.resource, outcome.event, now, file.buffer);
+    // Same ordering as EvidenceAttachmentService: written before the
+    // transaction, so a failed put never leaves a committed row pointing at
+    // an object that does not exist.
+    let storageKey: string | null = null;
+    if (this.storage !== null) {
+      storageKey = objectKey({ organisationId: workspace.organisationId, kind: 'resource', id });
+      await this.storage.put(storageKey, file.buffer, file.mimetype);
+    }
+
+    await this.persist(outcome.resource, outcome.event, now, {
+      content: storageKey === null ? file.buffer : null,
+      storageKey,
+    });
     return toView(await this.requireRow(workspaceId, outcome.resource.id));
   }
 
   async content(workspaceId: string, resourceId: string): Promise<ResourceContent> {
     const row = await this.requireRow(workspaceId, resourceId);
 
-    if (row.resourceType !== 'file' || row.content === null) {
+    if (row.resourceType !== 'file' || (row.content === null && row.storageKey === null)) {
       throw new NotFoundException({
         error: {
           code: 'RESOURCE_NOT_A_FILE',
@@ -160,10 +180,22 @@ export class ResourcesService {
       });
     }
 
+    let content: Buffer;
+    try {
+      content = await resolveStoredContent(this.storage, row);
+    } catch (error) {
+      throw new NotFoundException({
+        error: {
+          code: 'RESOURCE_NOT_FOUND',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+
     return {
       filename: row.originalFilename ?? row.title,
       contentType: row.contentType ?? 'application/octet-stream',
-      content: row.content,
+      content,
     };
   }
 
@@ -183,7 +215,7 @@ export class ResourcesService {
     resource: Resource,
     event: PendingAuditEvent,
     at: Date,
-    content?: Buffer,
+    storage?: { content: Buffer | null; storageKey: string | null },
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await tx.resource.create({
@@ -198,7 +230,8 @@ export class ResourcesService {
           originalFilename: resource.originalFilename,
           contentType: resource.contentType,
           sizeBytes: resource.sizeBytes,
-          content: content ?? null,
+          content: storage?.content ?? null,
+          storageKey: storage?.storageKey ?? null,
           externalUrl: resource.externalUrl,
           uploadedById: resource.uploadedById,
           createdAt: resource.createdAt,
@@ -228,17 +261,19 @@ export class ResourcesService {
     return user.id;
   }
 
-  private async requireWorkspace(workspaceId: string): Promise<void> {
-    const exists = await this.prisma.workspace.findUnique({
+  private async requireWorkspace(workspaceId: string): Promise<{ organisationId: string }> {
+    const workspace = await this.prisma.workspace.findUnique({
       where: { id: workspaceId },
-      select: { id: true },
+      select: { organisationId: true },
     });
 
-    if (exists === null) {
+    if (workspace === null) {
       throw new NotFoundException({
         error: { code: 'WORKSPACE_NOT_FOUND', message: `No workspace with id '${workspaceId}'.` },
       });
     }
+
+    return workspace;
   }
 
   private async requireRow(workspaceId: string, resourceId: string): Promise<ResourceRow> {

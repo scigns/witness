@@ -23,6 +23,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../infrastructure/prisma.service.js';
 import type { Principal } from '../authz/authorization.port.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
+import type { StoragePort } from '../storage/storage.port.js';
 import {
   EvidenceAttachmentService,
   type UploadedAttachmentFile,
@@ -37,6 +38,7 @@ const FACILITATOR: Principal = {
 
 const WORKSPACE_1 = '11111111-1111-4111-8111-111111111111';
 const SESSION_1 = '33333333-3333-4333-8333-333333333333';
+const ORGANISATION_1 = '22222222-2222-4222-8222-222222222222';
 const EVIDENCE_UNATTRIBUTED = '55555555-5555-4555-8555-555555555555';
 const EVIDENCE_ATTRIBUTED = '56666666-6666-4666-8666-666666666666';
 const PARTICIPANT_1 = '44444444-4444-4444-8444-444444444444';
@@ -53,12 +55,14 @@ function fakePrisma() {
       id: EVIDENCE_UNATTRIBUTED,
       workspaceId: WORKSPACE_1,
       sessionId: SESSION_1,
+      organisationId: ORGANISATION_1,
       sourceParticipantId: null,
     },
     {
       id: EVIDENCE_ATTRIBUTED,
       workspaceId: WORKSPACE_1,
       sessionId: SESSION_1,
+      organisationId: ORGANISATION_1,
       sourceParticipantId: PARTICIPANT_1,
     },
   ];
@@ -124,11 +128,30 @@ function audioFile(overrides: Partial<UploadedAttachmentFile> = {}): UploadedAtt
   };
 }
 
-function service(options: { allowed?: boolean; maxMb?: number } = {}) {
+function fakeStorage() {
+  const objects = new Map<string, { content: Buffer; contentType: string }>();
+  const storage: StoragePort = {
+    put: async (key, content, contentType) => {
+      objects.set(key, { content, contentType });
+    },
+    get: async (key) => objects.get(key) ?? null,
+    delete: async (key) => {
+      objects.delete(key);
+    },
+  } as unknown as StoragePort;
+  return { storage, objects };
+}
+
+function service(
+  options: { allowed?: boolean; maxMb?: number; storage?: StoragePort | null } = {},
+) {
   const { prisma, attachments, auditEvents } = fakePrisma();
-  const svc = new EvidenceAttachmentService(prisma, fakeConsent(options.allowed ?? true), {
-    maxEvidenceAttachmentMb: options.maxMb ?? 200,
-  } as never);
+  const svc = new EvidenceAttachmentService(
+    prisma,
+    fakeConsent(options.allowed ?? true),
+    { maxEvidenceAttachmentMb: options.maxMb ?? 200 } as never,
+    options.storage ?? null,
+  );
   return { svc, attachments, auditEvents };
 }
 
@@ -238,5 +261,31 @@ describe('EvidenceAttachmentService', () => {
     await expect(svc.content(WORKSPACE_1, SESSION_1, EVIDENCE_UNATTRIBUTED)).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  it('writes to StoragePort and stores no content column when object storage is enabled', async () => {
+    const { storage, objects } = fakeStorage();
+    const { svc, attachments } = service({ storage });
+    const file = audioFile();
+
+    await svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_UNATTRIBUTED, file, FACILITATOR);
+
+    expect(attachments[0]?.['content']).toBeNull();
+    expect(attachments[0]?.['storageKey']).toEqual(expect.any(String));
+    expect(objects.size).toBe(1);
+
+    const downloaded = await svc.content(WORKSPACE_1, SESSION_1, EVIDENCE_UNATTRIBUTED);
+    expect(Buffer.compare(downloaded.content as unknown as Buffer, file.buffer)).toBe(0);
+  });
+
+  it("scopes the storage key by organisation — objectKey()'s isolation guarantee, exercised end to end", async () => {
+    const { storage, objects } = fakeStorage();
+    const { svc } = service({ storage });
+    const file = audioFile();
+
+    await svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_UNATTRIBUTED, file, FACILITATOR);
+
+    const [key] = [...objects.keys()];
+    expect(key).toMatch(new RegExp(`^${ORGANISATION_1}/evidence-attachment/`));
   });
 });

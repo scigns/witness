@@ -44,6 +44,8 @@ import { SessionSummaryController } from './summarization/session-summary.contro
 import { SessionSummaryService } from './summarization/session-summary.service.js';
 import { LocalWhisperAdapter } from './transcription/local-whisper.adapter.js';
 import { TranscriptionPort } from './transcription/transcription.port.js';
+import { S3StorageAdapter } from './storage/s3-storage.adapter.js';
+import { StoragePort } from './storage/storage.port.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
 import { OrganisationInvitationsController } from './organisation-invitations/organisation-invitations.controller.js';
@@ -147,6 +149,16 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     { provide: TranscriptionPort, useClass: LocalWhisperAdapter },
     // Same reasoning, same shape — see summarization/llm.port.ts.
     { provide: LlmPort, useClass: OllamaLlmAdapter },
+    {
+      // `null` (not conditionally omitted) when object storage is not
+      // enabled, so consumers can `@Inject(StoragePort)` unconditionally and
+      // branch on the value — see storage.port.ts's file header for why the
+      // sovereign profile never reaches the `S3StorageAdapter` branch here.
+      provide: StoragePort,
+      inject: [WITNESS_CONFIG],
+      useFactory: (config: WitnessConfig): StoragePort | null =>
+        config.objectStorageEnabled ? new S3StorageAdapter(config.s3) : null,
+    },
     OutcomesService,
     OutcomeSupportService,
     ReportsService,
