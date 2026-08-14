@@ -65,7 +65,21 @@ export class OrganisationsService {
     return memberships.map((m) => m.organisationId);
   }
 
-  async create(name: string, principal: Principal): Promise<OrganisationSummary> {
+  /**
+   * Creates the organisation and invites its administrator in the same
+   * transaction — mirrors prisma/bootstrap.ts's shape for the deployment's
+   * first organisation, so this one is not created with nobody able to sign
+   * in and manage it. The invited administrator activates by signing in
+   * through the identity provider with that verified email, same as
+   * bootstrap: this grants nothing to anyone who cannot already authenticate
+   * as that email.
+   */
+  async create(
+    name: string,
+    administratorEmail: string,
+    administratorName: string,
+    principal: Principal,
+  ): Promise<OrganisationSummary> {
     const actor = await this.resolveActor(principal);
     const now = new Date();
 
@@ -75,6 +89,8 @@ export class OrganisationsService {
       createdBy: actor,
       createdAt: now,
     });
+
+    const administratorUserId = randomUUID();
 
     await this.prisma.$transaction(async (tx) => {
       await tx.organisation.create({
@@ -114,6 +130,81 @@ export class OrganisationsService {
           metadata: event.metadata,
         },
       });
+
+      const existingUser = await tx.user.findUnique({ where: { email: administratorEmail } });
+      const userId = existingUser?.id ?? administratorUserId;
+
+      if (existingUser === null) {
+        await tx.user.create({
+          data: {
+            id: userId,
+            email: administratorEmail,
+            displayName: administratorName,
+            accountState: 'invited',
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+      }
+
+      await tx.organisationMembership.create({
+        data: {
+          id: randomUUID(),
+          organisationId: outcome.organisation.id,
+          userId,
+          state: 'active',
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      await tx.roleAssignment.create({
+        data: {
+          id: randomUUID(),
+          scopeType: 'organisation',
+          organisationId: outcome.organisation.id,
+          userId,
+          role: 'admin',
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      // Only the first event for a brand-new user's own chain starts at
+      // previousHash: null. An organisation:create invite to an email that
+      // already has a user row (a person administering more than one
+      // organisation) must not overwrite that chain — it gets no separate
+      // event of its own here; the organisation.created event above and the
+      // membership/role-assignment rows are the record of what happened.
+      if (existingUser === null) {
+        const userEvent = createAuditEvent(
+          {
+            id: toAuditEventId(randomUUID()),
+            subjectType: 'user',
+            subjectId: userId,
+            action: 'user.invited',
+            actor,
+            occurredAt: now,
+            previousHash: null,
+            metadata: { via: 'organisation:create', role: 'admin' },
+          },
+          sha256,
+        );
+
+        await tx.auditEvent.create({
+          data: {
+            id: userEvent.id,
+            subjectType: userEvent.subjectType,
+            subjectId: userEvent.subjectId,
+            action: userEvent.action,
+            actorId: userEvent.actor.id,
+            occurredAt: userEvent.occurredAt,
+            previousHash: userEvent.previousHash,
+            hash: userEvent.hash,
+            metadata: userEvent.metadata,
+          },
+        });
+      }
     });
 
     return {

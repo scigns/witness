@@ -48,7 +48,12 @@ export class OrganisationsController {
     }
 
     try {
-      return await this.organisations.create(parsed.data.name, request.principal!);
+      return await this.organisations.create(
+        parsed.data.name,
+        parsed.data.administratorEmail,
+        parsed.data.administratorName,
+        request.principal!,
+      );
     } catch (error) {
       if (error instanceof DomainError) {
         throw new BadRequestException({
