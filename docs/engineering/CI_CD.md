@@ -44,6 +44,7 @@ flowchart LR
 |---|---|---|
 | `ci.yml` | PR, push | Lint, typecheck, test, build — the main gate |
 | `security.yml` | PR, push, daily | Secrets, dependencies, licences, container scanning |
+| `deploy.yml` | `CI` success on `main`, manual | Deploy the pilot reference environment (self-hosted runner) |
 | `codeql.yml` | PR, weekly | Static analysis |
 | `adr-governance.yml` | PR | Architectural changes carry an ADR; ADR format is valid |
 | `docs.yml` | PR | Markdown lint, link check, documentation freshness |
@@ -107,9 +108,16 @@ pattern, and it costs contributors a small delay we consider worth it.
 
 ## Deployment
 
-We publish artefacts; **we do not deploy to anyone's infrastructure.** Operators deploy Witness
-themselves. This is a consequence of the sovereignty principle and it means our "CD" ends at a signed,
-verifiable artefact.
+We publish artefacts; **we do not deploy to a customer's infrastructure.** Operators deploy Witness
+themselves. This is a consequence of the sovereignty principle and it means our "CD" for a customer
+deployment ends at a signed, verifiable artefact.
+
+The one exception is our own reference/pilot deployment (`deployments/cloud-managed/`,
+`docs/operations/PILOT_OPERATIONS.md`) — infrastructure we own and operate ourselves, for demos and
+trials, not a customer's box. `deploy.yml` automates build → migrate → health-check → rollback to it,
+the same steps an operator runs by hand on their own infrastructure, run identically here because we
+are the operator of this one instance. It stays synthetic-data-only for the reason below; a real
+institutional engagement gets its own self-hosted instance, not a seat on this one.
 
 | Artefact | Published to |
 |---|---|
