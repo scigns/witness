@@ -146,6 +146,20 @@ services:
       WITNESS_SESSION_TTL_MINUTES: ${WITNESS_SESSION_TTL_MINUTES:-480}
       WITNESS_MAX_EVIDENCE_ATTACHMENT_MB: ${WITNESS_MAX_EVIDENCE_ATTACHMENT_MB:-200}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      # StoragePort (S3-compatible object storage — Cloudflare R2 in
+      # production). Empty is the sovereign default; see
+      # packages/config/src/index.ts's ADR-0009 validation block for why an
+      # empty S3_ENDPOINT here is what keeps the sovereign profile's
+      # zero-external-call guarantee, not an oversight.
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-auto}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_BUCKET_MEDIA: ${S3_BUCKET_MEDIA:-}
+      S3_BUCKET_DOCUMENTS: ${S3_BUCKET_DOCUMENTS:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      S3_SERVER_SIDE_ENCRYPTION: ${S3_SERVER_SIDE_ENCRYPTION:-}
+      ALLOW_OBJECT_STORAGE_EGRESS: ${ALLOW_OBJECT_STORAGE_EGRESS:-false}
     depends_on:
       postgres: { condition: service_healthy }
       keycloak: { condition: service_healthy }
