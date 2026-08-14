@@ -119,6 +119,26 @@ describe('sovereign profile (ADR-0009, principle P1)', () => {
     });
     expect(config.externalInferenceEnabled).toBe(false);
   });
+
+  it('REFUSES TO START with S3 object storage configured — recordings and documents are institutional content too', () => {
+    expect(() =>
+      loadConfig({
+        ...base,
+        WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+        S3_ENDPOINT: 'https://example-r2-endpoint.invalid',
+      }),
+    ).toThrow(/zero external calls/i);
+  });
+
+  it('refuses S3 credentials smuggled in without an endpoint', () => {
+    expect(() =>
+      loadConfig({
+        ...base,
+        WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+        S3_ACCESS_KEY_ID: 'not-a-real-credential',
+      }),
+    ).toThrow(/zero external calls/i);
+  });
 });
 
 describe('OIDC identity provider (ADR-0007)', () => {
@@ -229,6 +249,62 @@ describe('hybrid profile', () => {
       ALLOW_EXTERNAL_MODEL_EGRESS: 'true',
     });
     expect(config.externalInferenceEnabled).toBe(true);
+  });
+
+  // `.invalid` is reserved by RFC 2606 and can never resolve — same reasoning
+  // as the EXTERNAL_MODEL_BASE_URL test above.
+  const s3Env = {
+    S3_ENDPOINT: 'https://example-r2-endpoint.invalid',
+    S3_ACCESS_KEY_ID: 'not-a-real-credential',
+    S3_SECRET_ACCESS_KEY: 'not-a-real-credential-either',
+    S3_BUCKET_MEDIA: 'witness-media',
+    S3_BUCKET_DOCUMENTS: 'witness-documents',
+  } satisfies NodeJS.ProcessEnv;
+
+  it('requires an explicit object-storage egress opt-in as well as a permitting profile', () => {
+    expect(() =>
+      loadConfig({
+        ...base,
+        WITNESS_DEPLOYMENT_PROFILE: 'hybrid',
+        ...s3Env,
+        ALLOW_OBJECT_STORAGE_EGRESS: 'false',
+      }),
+    ).toThrow(/explicit opt-in/i);
+  });
+
+  it('requires both buckets once S3 is configured', () => {
+    expect(() =>
+      loadConfig({
+        ...base,
+        WITNESS_DEPLOYMENT_PROFILE: 'hybrid',
+        S3_ENDPOINT: s3Env.S3_ENDPOINT,
+        S3_ACCESS_KEY_ID: s3Env.S3_ACCESS_KEY_ID,
+        S3_SECRET_ACCESS_KEY: s3Env.S3_SECRET_ACCESS_KEY,
+        ALLOW_OBJECT_STORAGE_EGRESS: 'true',
+        // S3_BUCKET_MEDIA / S3_BUCKET_DOCUMENTS deliberately omitted.
+      }),
+    ).toThrow(/S3_BUCKET_MEDIA or S3_BUCKET_DOCUMENTS is empty/i);
+  });
+
+  it('enables object storage only when profile and opt-in agree', () => {
+    const config = loadConfig({
+      ...oidcBase,
+      WITNESS_DEPLOYMENT_PROFILE: 'hybrid',
+      ...s3Env,
+      ALLOW_OBJECT_STORAGE_EGRESS: 'true',
+    });
+    expect(config.objectStorageEnabled).toBe(true);
+    expect(config.s3.bucketMedia).toBe('witness-media');
+    expect(config.s3.bucketDocuments).toBe('witness-documents');
+  });
+
+  it('object storage stays disabled without the egress opt-in, even fully configured otherwise', () => {
+    const config = loadConfig({
+      ...oidcBase,
+      WITNESS_DEPLOYMENT_PROFILE: 'development',
+      ...s3Env,
+    });
+    expect(config.objectStorageEnabled).toBe(false);
   });
 });
 

@@ -84,12 +84,14 @@ function fakePrisma() {
       id: ATTACHMENT_UNATTRIBUTED,
       evidenceId: EVIDENCE_UNATTRIBUTED,
       content: Buffer.from('x'),
+      storageKey: null,
       contentType: 'audio/wav',
     },
     {
       id: ATTACHMENT_ATTRIBUTED,
       evidenceId: EVIDENCE_ATTRIBUTED,
       content: Buffer.from('x'),
+      storageKey: null,
       contentType: 'audio/wav',
     },
   ];
@@ -165,6 +167,7 @@ function service(options: { allowed?: boolean; transcription?: TranscriptionPort
     prisma,
     fakeConsent(options.allowed ?? true),
     options.transcription ?? fakeTranscription(),
+    null,
   );
   return { svc, transcripts, auditEvents };
 }

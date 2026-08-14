@@ -858,8 +858,11 @@ model EvidenceLink {
 
 /// The source file (an audio recording, to start) backing one piece of
 /// `Evidence` — see `packages/domain/src/evidence-attachment.ts`'s file
-/// header for why the bytes live in this database rather than a separate
-/// store, and why this is capture-once rather than editable.
+/// header for why this is capture-once rather than editable, and
+/// `services/api-gateway/src/storage/storage.port.ts` for why the bytes
+/// live in exactly one of `content` or (via `storageKey`) an S3-compatible
+/// object store, chosen once at write time by the deployment's profile and
+/// never mixed within one deployment.
 ///
 /// One attachment per `Evidence` row for this MVP slice — the unique
 /// constraint on `evidenceId` is what enforces that; a future capability
@@ -876,8 +879,16 @@ model EvidenceAttachment {
   sizeBytes        Int    @map("size_bytes")
   checksumSha256   String @map("checksum_sha256") @db.VarChar(64)
 
-  /// The file itself.
-  content Bytes
+  /// The file itself, when StoragePort is not in use (the `sovereign`
+  /// profile's default — ADR-0009). Exactly one of `content`/`storageKey` is
+  /// set, enforced in the service layer rather than a CHECK constraint: the
+  /// choice is deployment-wide (by profile), not a per-row decision a
+  /// constraint would need to validate against live configuration.
+  content Bytes?
+
+  /// `objectKey()`'s output, when StoragePort is in use. See its own doc
+  /// comment for the tenant-isolation guarantee this key carries.
+  storageKey String? @map("storage_key") @db.VarChar(500)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -1564,11 +1575,14 @@ model AgendaItem {
 
 /// A facilitator-uploaded program resource — presentations, briefing papers,
 /// agendas, images, or an external link (Client-Ready Experience overhaul,
-/// Phase 12). Content is stored as bytes in Postgres for a file resource,
-/// same reasoning as `EvidenceAttachment` (ADR-0011: the database is the
-/// whole system of record, so the existing backup covers this for free) —
-/// `externalUrl` is used instead for a link resource; exactly one of the two
-/// is populated, enforced in the domain.
+/// Phase 12). A file resource's bytes live in exactly one of `content`
+/// (Postgres, the `sovereign` profile's default) or `storageKey` (an
+/// S3-compatible object store), same shape and same reasoning as
+/// `EvidenceAttachment` — see that model's doc comment.
+/// `externalUrl` is used instead for a link resource; exactly one of
+/// `content`/`storageKey`/`externalUrl` is populated, enforced in the domain
+/// for `externalUrl` versus a file, and in the service layer for which of
+/// the two file-storage columns is in use.
 model Resource {
   id          String    @id @db.Uuid
   workspaceId String    @map("workspace_id") @db.Uuid
@@ -1588,6 +1602,7 @@ model Resource {
   contentType      String? @map("content_type") @db.VarChar(100)
   sizeBytes        Int?    @map("size_bytes")
   content          Bytes?
+  storageKey       String? @map("storage_key") @db.VarChar(500)
 
   externalUrl String? @map("external_url") @db.VarChar(2000)
 

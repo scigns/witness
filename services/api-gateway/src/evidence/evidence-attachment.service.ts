@@ -30,6 +30,8 @@ import { PrismaService } from '../infrastructure/prisma.service.js';
 import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
+import { StoragePort } from '../storage/storage.port.js';
+import { objectKey, resolveStoredContent } from '../storage/storage.service.js';
 import { WITNESS_CONFIG } from '../tokens.js';
 import type { Principal } from '../authz/authorization.port.js';
 
@@ -52,6 +54,7 @@ export class EvidenceAttachmentService {
     private readonly prisma: PrismaService,
     private readonly consentPolicy: ConsentPolicyService,
     @Inject(WITNESS_CONFIG) private readonly config: WitnessConfig,
+    @Inject(StoragePort) private readonly storage: StoragePort | null,
   ) {}
 
   async upload(
@@ -123,6 +126,20 @@ export class EvidenceAttachmentService {
       at: now,
     });
 
+    // Written before the transaction, not after: if this put fails, nothing
+    // has touched the database and the request simply fails. The reverse
+    // order risks a committed row pointing at an object that was never
+    // written, which is a broken reference rather than wasted storage.
+    let storageKey: string | null = null;
+    if (this.storage !== null) {
+      storageKey = objectKey({
+        organisationId: evidenceRow.organisationId,
+        kind: 'evidence-attachment',
+        id: outcome.attachment.id,
+      });
+      await this.storage.put(storageKey, file.buffer, file.mimetype);
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.evidenceAttachment.create({
         data: {
@@ -133,7 +150,8 @@ export class EvidenceAttachmentService {
           contentType: outcome.attachment.contentType,
           sizeBytes: outcome.attachment.sizeBytes,
           checksumSha256: outcome.attachment.checksumSha256,
-          content: file.buffer,
+          content: storageKey === null ? file.buffer : null,
+          storageKey,
           createdAt: outcome.attachment.createdAt,
         },
       });
@@ -170,17 +188,39 @@ export class EvidenceAttachmentService {
       });
     }
 
-    return { filename: row.originalFilename, contentType: row.contentType, content: row.content };
+    let content: Buffer;
+    try {
+      content = await resolveStoredContent(this.storage, row);
+    } catch (error) {
+      // Data-integrity states (object storage disabled/missing an object
+      // that a record still points at), not "no attachment exists" — but
+      // surfaced as 404 either way, since there is no content to return
+      // regardless of which is true, and the distinction is an operator
+      // concern, not a caller one.
+      throw new NotFoundException({
+        error: {
+          code: 'ATTACHMENT_NOT_FOUND',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+
+    return { filename: row.originalFilename, contentType: row.contentType, content };
   }
 
   private async requireEvidenceRow(
     workspaceId: string,
     sessionId: string,
     evidenceId: string,
-  ): Promise<{ sourceParticipantId: string | null }> {
+  ): Promise<{ organisationId: string; sourceParticipantId: string | null }> {
     const row = await this.prisma.evidence.findUnique({
       where: { id: evidenceId },
-      select: { workspaceId: true, sessionId: true, sourceParticipantId: true },
+      select: {
+        workspaceId: true,
+        sessionId: true,
+        organisationId: true,
+        sourceParticipantId: true,
+      },
     });
 
     if (row === null || row.workspaceId !== workspaceId || row.sessionId !== sessionId) {
