@@ -12,6 +12,8 @@ export default function NewOrganisationPage() {
   const { user } = useSession();
 
   const [name, setName] = useState('');
+  const [administratorEmail, setAdministratorEmail] = useState('');
+  const [administratorName, setAdministratorName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -21,7 +23,7 @@ export default function NewOrganisationPage() {
     setError(null);
 
     try {
-      await api.createOrganisation({ name }, user);
+      await api.createOrganisation({ name, administratorEmail, administratorName }, user);
       router.push('/organisations');
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
@@ -34,8 +36,9 @@ export default function NewOrganisationPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Create an organisation</h1>
         <p className="mt-1 text-[var(--color-ink-muted)]">
-          Least privilege means this requires the <code className="font-mono">admin</code> role —
-          switch to it above if the request is refused.
+          Onboards a new institution with its own administrator, who activates by signing in with
+          the email below. This requires a platform-operator session — the operator who deployed
+          this instance, not an administrator of any one organisation.
         </p>
       </div>
 
@@ -45,7 +48,7 @@ export default function NewOrganisationPage() {
         <Card className="space-y-4">
           <div>
             <label htmlFor="name" className="mb-1 block text-sm font-medium">
-              Name <span aria-hidden="true">*</span>
+              Organisation name <span aria-hidden="true">*</span>
               <span className="sr-only">(required)</span>
             </label>
             <input
@@ -57,6 +60,43 @@ export default function NewOrganisationPage() {
               placeholder="Eastern Settlements Water Committee"
               className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
             />
+          </div>
+
+          <div>
+            <label htmlFor="administratorName" className="mb-1 block text-sm font-medium">
+              Administrator name <span aria-hidden="true">*</span>
+              <span className="sr-only">(required)</span>
+            </label>
+            <input
+              id="administratorName"
+              required
+              maxLength={200}
+              value={administratorName}
+              onChange={(event) => setAdministratorName(event.target.value)}
+              placeholder="Jane Cakobau"
+              className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="administratorEmail" className="mb-1 block text-sm font-medium">
+              Administrator email <span aria-hidden="true">*</span>
+              <span className="sr-only">(required)</span>
+            </label>
+            <input
+              id="administratorEmail"
+              type="email"
+              required
+              value={administratorEmail}
+              onChange={(event) => setAdministratorEmail(event.target.value)}
+              placeholder="jane@example.org"
+              className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+            />
+            <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+              They become the organisation&apos;s administrator by signing in through the identity
+              provider with this exact, verified email address — this invites them, it does not
+              create a login on their behalf.
+            </p>
           </div>
         </Card>
 

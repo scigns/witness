@@ -12,7 +12,12 @@
  *
  *   • one organisation,
  *   • one user in the `invited` account state, keyed on a verified email,
- *   • that user's organisation membership and `admin` role assignment.
+ *   • that user's organisation membership and `admin` role assignment,
+ *   • that same user's `platform`-scope `admin` role assignment — the one
+ *     mechanism that answers "who may create an organisation from nothing"
+ *     (see `role-resolution.service.ts`'s file header). Whoever bootstraps a
+ *     deployment operates it; there is deliberately no way to grant this to
+ *     anyone else outside this script.
  *
  * It creates no sessions, no participants, no consent records and no evidence.
  * It is not a demo seed — `prisma/seed.ts` is, and it must never run against a
@@ -112,6 +117,17 @@ async function main(): Promise<void> {
         id: randomUUID(),
         scopeType: 'organisation',
         organisationId,
+        userId,
+        role: 'admin',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+
+    await tx.roleAssignment.create({
+      data: {
+        id: randomUUID(),
+        scopeType: 'platform',
         userId,
         role: 'admin',
         createdAt: now,

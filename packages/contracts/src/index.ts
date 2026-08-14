@@ -64,6 +64,11 @@ export type ReviewAction = z.infer<typeof reviewActionSchema>;
 
 export const createOrganisationRequestSchema = z.object({
   name: z.string().trim().min(1, 'A name is required').max(200),
+  // Mirrors prisma/bootstrap.ts's shape: a new organisation invites an
+  // administrator at creation, the same way the deployment's first one was,
+  // rather than being created with nobody able to sign in and manage it.
+  administratorEmail: z.string().trim().toLowerCase().email('A valid email address is required'),
+  administratorName: z.string().trim().min(1, 'A name is required').max(200),
 });
 export type CreateOrganisationRequest = z.infer<typeof createOrganisationRequestSchema>;
 

@@ -337,14 +337,23 @@ model WorkspaceMembership {
 /// `WorkspaceMembership`, which only answer "does this member belong here".
 ///
 /// One row per (user, scope): `organisationId`/`workspaceId` are mutually
-/// exclusive per `scopeType`, enforced by the `role_assignment_scope_check`
-/// CHECK constraint added in this model's migration (Prisma's schema DSL has
-/// no way to express it directly). The two `@@unique` constraints below give
-/// an independent "one row per (organisation, user)" and "one row per
-/// (workspace, user)" without a partial index, because Postgres never treats
-/// NULL as equal to NULL in a unique constraint — multiple workspace-scoped
-/// rows (organisationId = NULL) do not collide with each other, and vice
-/// versa.
+/// exclusive per `scopeType` — `'organisation'`, `'workspace'`, or
+/// `'platform'` (both columns NULL; see `role_assignment_platform_user_key`,
+/// added alongside `'platform'` support) — enforced by the
+/// `role_assignment_scope_check` CHECK constraint added in this model's
+/// migration (Prisma's schema DSL has no way to express it directly). The
+/// two `@@unique` constraints below give an independent "one row per
+/// (organisation, user)" and "one row per (workspace, user)" without a
+/// partial index, because Postgres never treats NULL as equal to NULL in a
+/// unique constraint — multiple workspace-scoped rows (organisationId =
+/// NULL) do not collide with each other, and vice versa.
+///
+/// `'platform'` is deliberately narrow and not part of the general
+/// membership-gated assignment flow (`packages/domain/src/role-assignment.ts`
+/// `assignRole`) — there is no membership concept to check against "no
+/// scope at all". Only `prisma/bootstrap.ts` creates one, for the
+/// deployment's first administrator; see `role-resolution.service.ts`'s
+/// file header for what it unlocks.
 ///
 /// Deliberately does not duplicate membership data (state, timestamps) —
 /// only the identifiers needed to scope and query the assignment itself; the

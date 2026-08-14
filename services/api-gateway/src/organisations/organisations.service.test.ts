@@ -31,16 +31,102 @@ const DEV_PRINCIPAL: Principal = {
   roles: ['admin'],
 };
 
+interface FakeUser {
+  id: string;
+  email: string;
+  displayName: string;
+  accountState: string;
+}
+
 function fakePrisma(options: {
   organisations: { id: string; name: string }[];
   organisationMemberships?: { organisationId: string; userId: string }[];
+  users?: FakeUser[];
+  /** Simulates a concurrent create winning the race for this email once. */
+  raceOnEmail?: string;
 }) {
   const memberships = options.organisationMemberships ?? [];
+  const organisations = [...options.organisations];
+  const users = [...(options.users ?? [])];
+  const actors: { id: string; kind: string; displayName: string }[] = [];
+  const roleAssignments: {
+    id: string;
+    scopeType: string;
+    organisationId: string;
+    userId: string;
+    role: string;
+  }[] = [];
+  const auditEvents: { subjectType: string; subjectId: string; action: string }[] = [];
+  let raceOnEmail = options.raceOnEmail ?? null;
+
+  const tx = {
+    organisation: {
+      create: async ({ data }: { data: { id: string; name: string; createdAt: Date } }) => {
+        organisations.push({ id: data.id, name: data.name });
+        return data;
+      },
+    },
+    actor: {
+      findFirst: async ({ where }: { where: { displayName: string; kind: string } }) =>
+        actors.find((a) => a.displayName === where.displayName && a.kind === where.kind) ?? null,
+      create: async ({ data }: { data: { id: string; kind: string; displayName: string } }) => {
+        actors.push(data);
+        return data;
+      },
+    },
+    user: {
+      findUnique: async ({ where }: { where: { email: string } }) =>
+        users.find((u) => u.email === where.email) ?? null,
+      create: async ({ data }: { data: FakeUser }) => {
+        // Simulates a second request's insert winning the race for this
+        // email between this test's own findUnique and create.
+        if (raceOnEmail === data.email) {
+          raceOnEmail = null;
+          users.push({ ...data, id: `${data.id}-winner` });
+          throw { code: 'P2002' };
+        }
+        users.push(data);
+        return data;
+      },
+    },
+    organisationMembership: {
+      create: async ({ data }: { data: { organisationId: string; userId: string } }) => {
+        memberships.push(data);
+        return data;
+      },
+    },
+    roleAssignment: {
+      create: async ({
+        data,
+      }: {
+        data: {
+          id: string;
+          scopeType: string;
+          organisationId: string;
+          userId: string;
+          role: string;
+        };
+      }) => {
+        roleAssignments.push(data);
+        return data;
+      },
+    },
+    auditEvent: {
+      create: async ({
+        data,
+      }: {
+        data: { subjectType: string; subjectId: string; action: string };
+      }) => {
+        auditEvents.push(data);
+        return data;
+      },
+    },
+  };
 
   const prisma = {
     organisation: {
       findMany: async ({ where }: { where?: { id?: { in: string[] } } }) => {
-        const rows = options.organisations.map((o) => ({ ...o, createdAt: new Date() }));
+        const rows = organisations.map((o) => ({ ...o, createdAt: new Date() }));
         if (where?.id === undefined) return rows;
         return rows.filter((o) => where.id!.in.includes(o.id));
       },
@@ -49,14 +135,19 @@ function fakePrisma(options: {
       findMany: async ({ where }: { where: { userId: string } }) =>
         memberships.filter((m) => m.userId === where.userId),
     },
+    actor: tx.actor,
+    $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(tx),
   };
 
-  return prisma as unknown as PrismaService;
+  return {
+    prisma: prisma as unknown as PrismaService,
+    state: { organisations, users, memberships, roleAssignments, auditEvents },
+  };
 }
 
 describe('OrganisationsService.list — visibility scoping', () => {
   it('a real session only sees organisations it has a membership row in', async () => {
-    const prisma = fakePrisma({
+    const { prisma } = fakePrisma({
       organisations: [
         { id: ORG_1, name: 'Org One' },
         { id: ORG_2, name: 'Org Two' },
@@ -71,7 +162,7 @@ describe('OrganisationsService.list — visibility scoping', () => {
   });
 
   it('a real session with no memberships sees no organisations', async () => {
-    const prisma = fakePrisma({
+    const { prisma } = fakePrisma({
       organisations: [
         { id: ORG_1, name: 'Org One' },
         { id: ORG_2, name: 'Org Two' },
@@ -85,7 +176,7 @@ describe('OrganisationsService.list — visibility scoping', () => {
   });
 
   it('the unverified dev-header path is unscoped, as before', async () => {
-    const prisma = fakePrisma({
+    const { prisma } = fakePrisma({
       organisations: [
         { id: ORG_1, name: 'Org One' },
         { id: ORG_2, name: 'Org Two' },
@@ -96,5 +187,98 @@ describe('OrganisationsService.list — visibility scoping', () => {
     const result = await service.list(DEV_PRINCIPAL);
 
     expect(result.map((o) => o.id).sort()).toEqual([ORG_1, ORG_2].sort());
+  });
+});
+
+describe('OrganisationsService.create — provisions an administrator', () => {
+  it('creates the organisation, invites the administrator, and grants them organisation-scoped admin', async () => {
+    const { prisma, state } = fakePrisma({ organisations: [] });
+    const service = new OrganisationsService(prisma);
+
+    const result = await service.create(
+      'New Institution',
+      'admin@new-institution.example',
+      'New Admin',
+      SESSION_PRINCIPAL,
+    );
+
+    expect(state.organisations).toEqual([{ id: result.id, name: 'New Institution' }]);
+    expect(state.users).toHaveLength(1);
+    expect(state.users[0]).toMatchObject({
+      email: 'admin@new-institution.example',
+      displayName: 'New Admin',
+      accountState: 'invited',
+    });
+    const invitedUserId = state.users[0]!.id;
+    expect(state.memberships).toHaveLength(1);
+    expect(state.memberships[0]).toMatchObject({
+      organisationId: result.id,
+      userId: invitedUserId,
+    });
+    expect(state.roleAssignments).toHaveLength(1);
+    expect(state.roleAssignments[0]).toMatchObject({
+      scopeType: 'organisation',
+      organisationId: result.id,
+      userId: invitedUserId,
+      role: 'admin',
+    });
+    expect(state.auditEvents.map((e) => e.action)).toEqual([
+      'organisation.created',
+      'user.invited',
+    ]);
+  });
+
+  it('reuses an existing user by email rather than creating a duplicate, and adds no second user.invited event', async () => {
+    const { prisma, state } = fakePrisma({
+      organisations: [],
+      users: [
+        {
+          id: USER_1,
+          email: 'shared-admin@example.org',
+          displayName: 'Shared Admin',
+          accountState: 'active',
+        },
+      ],
+    });
+    const service = new OrganisationsService(prisma);
+
+    await service.create(
+      'Second Org',
+      'shared-admin@example.org',
+      'Shared Admin',
+      SESSION_PRINCIPAL,
+    );
+
+    expect(state.users).toHaveLength(1);
+    expect(state.memberships[0]).toMatchObject({ userId: USER_1 });
+    expect(state.auditEvents.map((e) => e.action)).toEqual(['organisation.created']);
+  });
+
+  it('ATTACK — a concurrent create winning the race for the same email is reused instead of failing the request', async () => {
+    // Between this service's own findUnique and create, a P2002 from the
+    // unique index on email means another request got there first — the
+    // fallback re-fetches and continues with that row rather than
+    // surfacing a 500 for something that is not actually a conflict from
+    // the caller's point of view.
+    const { prisma, state } = fakePrisma({
+      organisations: [],
+      raceOnEmail: 'racing-admin@example.org',
+    });
+    const service = new OrganisationsService(prisma);
+
+    const result = await service.create(
+      'Third Org',
+      'racing-admin@example.org',
+      'Racing Admin',
+      SESSION_PRINCIPAL,
+    );
+
+    expect(state.users).toHaveLength(1);
+    const winnerId = state.users[0]!.id;
+    expect(winnerId).toMatch(/-winner$/);
+    expect(state.memberships[0]).toMatchObject({ organisationId: result.id, userId: winnerId });
+    expect(state.roleAssignments[0]).toMatchObject({ organisationId: result.id, userId: winnerId });
+    // The user row that won the race is not this request's to have invited.
+    expect(state.auditEvents.map((e) => e.action)).toEqual(['organisation.created']);
   });
 });

@@ -257,7 +257,7 @@ describe('RoleResolutionService.scopedGrantTiers — workspace scope', () => {
 });
 
 describe('globalGrantTiers', () => {
-  it('never grants the admin tier — organisation:create and user:create stay unreachable', async () => {
+  it('an organisation-scoped admin assignment never grants the global admin tier', async () => {
     const prisma = fakePrisma({
       roleAssignments: [{ role: 'admin', organisationId: ORG_1, workspaceId: null }],
       organisationMemberships: [{ organisationId: ORG_1, state: 'active' }],
@@ -265,6 +265,26 @@ describe('globalGrantTiers', () => {
     const service = new RoleResolutionService(prisma);
 
     expect(await service.globalGrantTiers(USER_1)).not.toContain('admin');
+  });
+
+  it('a platform-scope admin assignment grants the global admin tier — organisation:create and user:create become reachable', async () => {
+    const prisma = fakePrisma({
+      roleAssignments: [{ role: 'admin', organisationId: null, workspaceId: null }],
+    });
+    const service = new RoleResolutionService(prisma);
+
+    expect(await service.globalGrantTiers(USER_1)).toEqual(['admin']);
+  });
+
+  it('a platform-scope admin assignment needs no backing membership — there is no scope to hold membership in', async () => {
+    const prisma = fakePrisma({
+      roleAssignments: [{ role: 'admin', organisationId: null, workspaceId: null }],
+      organisationMemberships: [],
+      workspaceMemberships: [],
+    });
+    const service = new RoleResolutionService(prisma);
+
+    expect(await service.globalGrantTiers(USER_1)).toEqual(['admin']);
   });
 
   it('counts an admin assignment as reader, so an organisation administrator is not locked out of the membership-filtered lists', async () => {

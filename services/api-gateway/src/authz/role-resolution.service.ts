@@ -10,14 +10,18 @@
  *
  * - **Global** ("what can this user do anywhere, unscoped") flattens every
  *   assignment across every organisation and workspace into one tier set,
- *   and deliberately EXCLUDES `admin` — an `admin` `RoleAssignment` means
- *   "administers organisation/workspace X specifically", and must never
- *   grant the *global*, unscoped actions (`organisation:create`,
- *   `user:create`) that have no organisation or workspace to check against.
- *   This is the fail-closed boundary Milestone 1.3 (Authentication)
- *   documented and left for this capability; it is deliberately preserved
- *   here, not resolved, because nothing in the accepted domain model says
- *   who may create an organisation from nothing.
+ *   and excludes `admin` from an *organisation-* or *workspace-scoped*
+ *   `RoleAssignment` — that kind means "administers organisation/workspace X
+ *   specifically", and must never grant the *global*, unscoped actions
+ *   (`organisation:create`, `user:create`) that have no organisation or
+ *   workspace to check against. This was a deliberate fail-closed gap
+ *   ("nothing in the accepted domain model says who may create an
+ *   organisation from nothing") until `'platform'`-scope `RoleAssignment`
+ *   answered that question directly: a `'platform'`-scope `admin` row *does*
+ *   grant the global `admin` tier, because that scope means exactly "may act
+ *   with no organisation or workspace to check against" and nothing else.
+ *   Only `prisma/bootstrap.ts` creates one, for the deployment's first
+ *   administrator.
  *
  * - **Scoped** ("what can this user do in *this specific* organisation or
  *   workspace") looks only at assignments matching that exact scope (a
@@ -63,9 +67,9 @@ export class RoleResolutionService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Every tier this user holds anywhere, `admin` excluded. Used for actions
-   * with no organisation or workspace to scope to
-   * (`record:*`, `user:*`, `role:read`, `organisation:create`).
+   * Every tier this user holds anywhere. Used for actions with no
+   * organisation or workspace to scope to (`record:*`, `user:*`,
+   * `role:read`, `organisation:create`).
    */
   async globalGrantTiers(userId: string): Promise<string[]> {
     const assignments = await this.prisma.roleAssignment.findMany({
@@ -83,11 +87,19 @@ export class RoleResolutionService {
         continue;
       }
       const role = assignment.role as WitnessRole;
-      // Global resolution never grants the admin tier — see the file header,
-      // and `organisation:create`/`user:create` stay unreachable because of it.
-      //
-      // An `admin` assignment still counts as *reader* here, though. Dropping
-      // it entirely left anyone whose only role is an organisation
+      const isPlatformScope = assignment.organisationId === null && assignment.workspaceId === null;
+
+      if (isPlatformScope) {
+        // The one case global resolution grants real `admin` — see the file
+        // header. `role_assignment_scope_check` guarantees a row reaching
+        // here with both ids null has `scopeType = 'platform'`.
+        tiers.add(ROLE_TO_TIER[role]);
+        continue;
+      }
+
+      // An organisation- or workspace-scoped `admin` assignment still counts
+      // as *reader* here, though, rather than being dropped entirely.
+      // Dropping it left anyone whose only role is an organisation
       // administrator holding no global tier at all, which denied them
       // `organisation:read`, `workspace:read` and `record:read` — the
       // membership-filtered list endpoints, and every picker in the UI built
@@ -246,8 +258,10 @@ export class RoleResolutionService {
     goodOrganisations: Set<string>,
     goodWorkspaces: Set<string>,
   ): boolean {
-    return assignment.organisationId !== null
-      ? goodOrganisations.has(assignment.organisationId)
-      : assignment.workspaceId !== null && goodWorkspaces.has(assignment.workspaceId);
+    if (assignment.organisationId !== null) return goodOrganisations.has(assignment.organisationId);
+    if (assignment.workspaceId !== null) return goodWorkspaces.has(assignment.workspaceId);
+    // Both null: platform scope. There is no membership concept to check —
+    // the assignment itself is the entire grant.
+    return true;
   }
 }
