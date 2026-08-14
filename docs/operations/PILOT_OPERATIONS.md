@@ -212,6 +212,19 @@ fails to verify. Exit code mirrors status (0 ok, 1 stale/degraded, 2 none
 found) so it can be scripted into a health check or alert without parsing
 prose.
 
+## Operations status
+
+```bash
+make pilot-status                    # or: WITNESS_PILOT_API_URL=... scripts/ops/status.sh
+```
+
+One view, aggregating what already exists rather than tracking anything new:
+the last automated deploy (`scripts/pilot/deploy.sh`'s history log) and the
+currently-checked-out commit, `/ready`'s component health, `docker compose
+ps`, a count of failed transcription/summary jobs, and backup status. Reach
+for this first when checking whether the pilot is healthy — everything below
+in this document is what to do once it says something isn't.
+
 ## Restore
 
 ```bash

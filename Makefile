@@ -103,6 +103,10 @@ pilot-backup: ## Back up the pilot's Postgres to ~/witness-backups (or $BACKUP_D
 pilot-backup-status: ## Report on the pilot's backups: age, size, checksum validity
 	@bash scripts/ops/backup-status.sh $${BACKUP_DIR:-$$HOME/witness-backups}
 
+.PHONY: pilot-status
+pilot-status: ## One view: deployed commit, component health, containers, failed jobs, backups
+	@bash scripts/ops/status.sh
+
 # ─── Quality gates ────────────────────────────────────────────────────────────
 
 .PHONY: verify
