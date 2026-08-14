@@ -32,8 +32,9 @@ internet-facing one.
 ## Environment variables
 
 Names only — every value comes from the operator's secret store.
-[`.env.example`](../../.env.example) is the full list with commentary; these are
-the ones a deployment cannot start without:
+[`deployments/cloud-managed/.env.example`](../../deployments/cloud-managed/.env.example)
+is the full list scoped to this deployment, with commentary; these are the
+ones it cannot start without:
 
 `WITNESS_DEPLOYMENT_PROFILE`, `NODE_ENV`, `WITNESS_INSTANCE_NAME`,
 `WITNESS_DATA_RESIDENCY`, `DATABASE_URL`, `OIDC_ISSUER`, `KEYCLOAK_CLIENT_ID`,
@@ -140,6 +141,35 @@ anyone who cannot already authenticate.
 Roles: `admin`, `facilitator`, `contributor`, `reviewer`, `participant`,
 `reader`. Adding someone to a *workspace* is done in the application, on the
 workspace page, by an administrator.
+
+## Secrets rotation
+
+`scripts/ops/rotate-secrets.sh <postgres-app|postgres-keycloak|keycloak-admin|all>`
+rotates a live credential in place: generates a new value, applies it through
+the service's own admin interface (`ALTER ROLE` for the two Postgres roles,
+`kcadm.sh` for the Keycloak admin password — an env var change alone does
+nothing for an already-initialised instance, since the compose file's
+`POSTGRES_PASSWORD`/`KEYCLOAK_ADMIN_PASSWORD` are consumed only on first-time
+init), writes the new value into `.env`, restarts whatever consumes it, and
+health-checks before returning. It never prints a generated secret. Run one
+subcommand at a time and confirm health before the next; each is independent
+and the script exits non-zero without overwriting `.env` if a step's health
+check fails.
+
+`WITNESS_REALM_SEED_PASSWORD` only backs the two disposable dev-test accounts
+in the realm import (`witness-dev-tester`, `witness-dev-unknown`) — updating
+it in `.env` is enough; it takes effect on the next fresh init and needs no
+live action for a running instance.
+
+**Not covered by the script** — needs a human with Cloudflare account access:
+the tunnel credentials (`deployments/cloud-managed/cloudflared/credentials.json`).
+Rotating those means issuing new tunnel credentials from the Cloudflare
+dashboard or `cloudflared tunnel token`, which can take the tunnel briefly
+offline if sequenced wrong — do it deliberately, not as part of a routine
+rotation pass.
+
+Real human accounts (anyone onboarded per the section above) hold their own
+password with the identity provider and are unaffected by any of this.
 
 ## Backup
 
