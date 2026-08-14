@@ -23,6 +23,7 @@ import {
   toResourceId,
   toUserId,
   toWorkspaceId,
+  InvariantViolation,
   type PendingAuditEvent,
   type Resource,
 } from '@witness/domain';
@@ -37,6 +38,7 @@ import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { StoragePort } from '../storage/storage.port.js';
 import { objectKey, resolveStoredContent } from '../storage/storage.service.js';
+import { StorageQuotaService } from '../organisations/storage-quota.service.js';
 import type { Principal } from '../authz/authorization.port.js';
 
 /** Matches `EvidenceAttachmentService`'s own default cap. */
@@ -64,6 +66,7 @@ export class ResourcesService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(StoragePort) private readonly storage: StoragePort | null,
+    private readonly storageQuota: StorageQuotaService,
   ) {}
 
   async list(workspaceId: string): Promise<ResourceView[]> {
@@ -128,6 +131,18 @@ export class ResourcesService {
     }
 
     const workspace = await this.requireWorkspace(workspaceId);
+
+    try {
+      await this.storageQuota.checkQuota(workspace.organisationId, file.size);
+    } catch (error) {
+      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
+        throw new PayloadTooLargeException({
+          error: { code: error.code, message: error.message },
+        });
+      }
+      throw error;
+    }
+
     const actor = await resolveActor(this.prisma, principal);
     const userId = await this.requirePrincipalUserId(principal);
     const now = new Date();

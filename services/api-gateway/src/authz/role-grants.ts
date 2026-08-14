@@ -247,6 +247,7 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'record:review',
     'organisation:read',
     'organisation:create',
+    'organisation:update',
     'workspace:read',
     'workspace:create',
     'workspace:update',

@@ -7,22 +7,25 @@
  * (ADR-0003).
  */
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import {
   createActor,
   createAuditEvent,
   createOrganisation,
+  updateStorageQuota,
   toActorId,
   toAuditEventId,
   toOrganisationId,
   type Actor,
 } from '@witness/domain';
-import type { OrganisationSummary } from '@witness/contracts';
+import type { OrganisationStorageUsage, OrganisationSummary } from '@witness/contracts';
 
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { sha256 } from '../infrastructure/hashing.js';
+import { appendAuditEvent } from '../infrastructure/audit.helper.js';
+import { StorageQuotaService } from './storage-quota.service.js';
 import type { Principal } from '../authz/authorization.port.js';
 
 /**
@@ -42,7 +45,10 @@ function isUniqueConstraintViolation(error: unknown): boolean {
 
 @Injectable()
 export class OrganisationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageQuota: StorageQuotaService,
+  ) {}
 
   /**
    * A real, verified session only sees organisations it has a membership
@@ -112,6 +118,7 @@ export class OrganisationsService {
         data: {
           id: outcome.organisation.id,
           name: outcome.organisation.name,
+          storageQuotaBytes: BigInt(outcome.organisation.storageQuotaBytes),
           createdAt: outcome.organisation.createdAt,
         },
       });
@@ -241,6 +248,63 @@ export class OrganisationsService {
       name: outcome.organisation.name,
       createdAt: outcome.organisation.createdAt.toISOString(),
     };
+  }
+
+  /** "STORAGE — X GB of Y GB included used", for an organisation administrator. */
+  async storage(organisationId: string): Promise<OrganisationStorageUsage> {
+    const { usedBytes, quotaBytes } = await this.storageQuota.usage(organisationId);
+    return { usedBytes: usedBytes.toString(), quotaBytes: quotaBytes.toString() };
+  }
+
+  /**
+   * The operator override Flight 1 asks for: preserves existing content and
+   * never deletes anything — this only ever changes the ceiling a future
+   * upload is checked against.
+   */
+  async setStorageQuota(
+    organisationId: string,
+    quotaBytes: number,
+    principal: Principal,
+  ): Promise<OrganisationStorageUsage> {
+    const row = await this.prisma.organisation.findUnique({ where: { id: organisationId } });
+    if (row === null) {
+      throw new NotFoundException({
+        error: {
+          code: 'ORGANISATION_NOT_FOUND',
+          message: `No organisation with id '${organisationId}'.`,
+        },
+      });
+    }
+
+    const actor = await this.resolveActor(principal);
+    const now = new Date();
+    const outcome = updateStorageQuota(
+      {
+        id: toOrganisationId(row.id),
+        name: row.name,
+        storageQuotaBytes: Number(row.storageQuotaBytes),
+        createdAt: row.createdAt,
+      },
+      quotaBytes,
+      actor,
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.organisation.update({
+        where: { id: organisationId },
+        data: { storageQuotaBytes: BigInt(outcome.organisation.storageQuotaBytes) },
+      });
+
+      // The organisation's chain did not start with this event — create()
+      // wrote the first link — so this needs the race-safe tail lookup
+      // appendAuditEvent provides (advisory lock; see its own doc comment
+      // for the live-reproduced concurrent-append bug it fixes), not the
+      // previousHash: null this file's own create() correctly uses for a
+      // subject's first event.
+      await appendAuditEvent(tx, 'organisation', organisationId, outcome.event, now);
+    });
+
+    return this.storage(organisationId);
   }
 
   /** Find or create the Actor row for a principal. */

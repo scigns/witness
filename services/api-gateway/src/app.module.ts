@@ -56,6 +56,7 @@ import { OrganisationRoleAssignmentsController } from './organisation-role-assig
 import { OrganisationRoleAssignmentsService } from './organisation-role-assignments/organisation-role-assignments.service.js';
 import { OrganisationsController } from './organisations/organisations.controller.js';
 import { OrganisationsService } from './organisations/organisations.service.js';
+import { StorageQuotaService } from './organisations/storage-quota.service.js';
 import { OutcomesController } from './outcomes/outcomes.controller.js';
 import { OutcomesService } from './outcomes/outcomes.service.js';
 import { OutcomeSupportService } from './outcomes/outcome-support.service.js';
@@ -120,6 +121,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     PrismaService,
     RecordsService,
     OrganisationsService,
+    StorageQuotaService,
     WorkspacesService,
     UsersService,
     OrganisationInvitationsService,

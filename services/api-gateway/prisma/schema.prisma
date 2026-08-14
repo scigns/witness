@@ -105,7 +105,13 @@ model Record {
 model Organisation {
   id        String   @id @db.Uuid
   name      String   @db.VarChar(200)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Bytes, not GB — avoids float rounding in a number an operator override
+  /// can set to anything. 5 GiB default (packages/domain/src/organisation.ts's
+  /// DEFAULT_STORAGE_QUOTA_BYTES) applied at creation, not here: a schema
+  /// default would silently diverge from the domain constant if either one
+  /// changed without the other.
+  storageQuotaBytes BigInt   @map("storage_quota_bytes")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   workspaces                   Workspace[]
   memberships                  OrganisationMembership[]

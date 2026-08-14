@@ -14,6 +14,7 @@ import { use, useCallback, useEffect, useState, type FormEvent } from 'react';
 import type {
   MembershipAction,
   OrganisationMembershipView,
+  OrganisationStorageUsage,
   OrganisationSummary,
   RoleAssignmentView,
   RoleDefinition,
@@ -43,6 +44,9 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
   const { user, ready } = useSession();
 
   const [organisation, setOrganisation] = useState<OrganisationSummary | null>(null);
+  const [storage, setStorage] = useState<OrganisationStorageUsage | null>(null);
+  const [storageUnavailable, setStorageUnavailable] = useState(false);
+  const [quotaInput, setQuotaInput] = useState('');
   const [memberships, setMemberships] = useState<OrganisationMembershipView[]>([]);
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [usersUnavailable, setUsersUnavailable] = useState(false);
@@ -77,6 +81,17 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
         setOrganisation(organisationsResult.organisations.find((o) => o.id === id) ?? null);
         setMemberships(membershipsResult.memberships);
         setRoles(rolesResult.roles);
+
+        try {
+          const storageResult = await api.getOrganisationStorage(id, user);
+          if (cancelledRef.current) return;
+          setStorage(storageResult);
+          setStorageUnavailable(false);
+        } catch {
+          if (cancelledRef.current) return;
+          setStorage(null);
+          setStorageUnavailable(true);
+        }
 
         try {
           const usersResult = await api.listUsers(user);
@@ -187,6 +202,27 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
     }
   };
 
+  const updateQuota = async (event: FormEvent) => {
+    event.preventDefault();
+    const gib = Number(quotaInput);
+    if (!Number.isFinite(gib) || gib <= 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api.updateStorageQuota(
+        id,
+        { quotaBytes: Math.round(gib * 1024 * 1024 * 1024) },
+        user,
+      );
+      setStorage(result);
+      setQuotaInput('');
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const removeRole = async (membershipId: string) => {
     setBusy(true);
     try {
@@ -226,6 +262,75 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
         <h1 className="text-2xl font-semibold tracking-tight">{organisation.name}</h1>
         <LinkButton href={`/organisations/${id}/consent-templates`}>Consent templates →</LinkButton>
       </div>
+
+      <section aria-labelledby="storage-heading">
+        <h2 id="storage-heading" className="mb-3 text-lg font-semibold">
+          Storage
+        </h2>
+        <Card className="space-y-3">
+          {storageUnavailable ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              Storage usage isn&apos;t available to your role.
+            </p>
+          ) : storage === null ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">Loading…</p>
+          ) : (
+            <>
+              {(() => {
+                const usedGiB = Number(storage.usedBytes) / (1024 * 1024 * 1024);
+                const quotaGiB = Number(storage.quotaBytes) / (1024 * 1024 * 1024);
+                const fraction = quotaGiB > 0 ? Math.min(1, usedGiB / quotaGiB) : 0;
+                return (
+                  <div role="status">
+                    <p className="text-sm">
+                      {usedGiB.toFixed(2)} GB of {quotaGiB.toFixed(0)} GB included used
+                    </p>
+                    <div
+                      className="mt-2 h-2 w-full overflow-hidden rounded bg-[var(--color-line)]"
+                      role="progressbar"
+                      aria-valuenow={Math.round(fraction * 100)}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                    >
+                      <div
+                        className="h-full bg-[var(--color-accent)]"
+                        style={{ width: `${fraction * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+              <form
+                onSubmit={(event) => void updateQuota(event)}
+                className="flex flex-wrap items-end gap-2 pt-2"
+              >
+                <div>
+                  <label htmlFor="quotaInput" className="mb-1 block text-sm font-medium">
+                    Set quota (GB) — operator override
+                  </label>
+                  <input
+                    id="quotaInput"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={quotaInput}
+                    onChange={(event) => setQuotaInput(event.target.value)}
+                    placeholder="5"
+                    className="w-32 rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                  />
+                </div>
+                <Button type="submit" variant="secondary" disabled={busy || quotaInput === ''}>
+                  {busy ? 'Updating…' : 'Update quota'}
+                </Button>
+              </form>
+              <p className="text-xs text-[var(--color-ink-muted)]">
+                Reaching quota blocks new uploads only — existing content is never removed. Export
+                or remove content to free up space, or increase the quota here.
+              </p>
+            </>
+          )}
+        </Card>
+      </section>
 
       <section aria-labelledby="invite-user-heading">
         <h2 id="invite-user-heading" className="mb-3 text-lg font-semibold">

@@ -1190,6 +1190,26 @@ export interface OrganisationSummary {
   createdAt: string;
 }
 
+/**
+ * Bytes as decimal strings, not `number` — Prisma reads `storageQuotaBytes`
+ * and the aggregated usage sum as `bigint`, and a `bigint` does not survive
+ * `JSON.stringify` at all (it throws). Values in Flight 1's actual range
+ * (gigabytes) fit safely in a JS number, but the wire type stays honest
+ * about carrying a bigint rather than silently narrowing it.
+ */
+export interface OrganisationStorageUsage {
+  usedBytes: string;
+  quotaBytes: string;
+}
+
+export const updateStorageQuotaRequestSchema = z.object({
+  quotaBytes: z.coerce
+    .number()
+    .int()
+    .positive('A storage quota must be a positive number of bytes'),
+});
+export type UpdateStorageQuotaRequest = z.infer<typeof updateStorageQuotaRequestSchema>;
+
 export interface WorkspaceSummary {
   id: string;
   name: string;
