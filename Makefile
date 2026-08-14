@@ -95,6 +95,14 @@ reset-data: ## Wipe and re-seed local databases with synthetic fixtures
 pilot-deploy: ## Build, migrate and recreate the pilot deployment, with rollback on failed health check
 	@bash scripts/pilot/deploy.sh
 
+.PHONY: pilot-backup
+pilot-backup: ## Back up the pilot's Postgres to ~/witness-backups (or $BACKUP_DIR)
+	@bash scripts/pilot/backup.sh $(BACKUP_DIR)
+
+.PHONY: pilot-backup-status
+pilot-backup-status: ## Report on the pilot's backups: age, size, checksum validity
+	@bash scripts/ops/backup-status.sh $${BACKUP_DIR:-$$HOME/witness-backups}
+
 # ─── Quality gates ────────────────────────────────────────────────────────────
 
 .PHONY: verify
