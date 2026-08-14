@@ -174,15 +174,43 @@ password with the identity provider and are unaffected by any of this.
 ## Backup
 
 ```bash
-DATABASE_URL=… scripts/ops/backup.sh /var/backups/witness
+make pilot-backup                    # writes to ~/witness-backups by default
+BACKUP_DIR=/path scripts/pilot/backup.sh /path
 ```
+
+`scripts/pilot/backup.sh` is `scripts/ops/backup.sh` adapted for this compose
+topology: Postgres has no published port (reachable only from the compose
+network, by design), so it runs `pg_dump` through `docker compose exec`
+instead of a direct `DATABASE_URL` connection. Output is identical either way
+— a custom-format dump plus a SHA-256 checksum beside it.
 
 Only PostgreSQL is backed up. Under ADR-0011 the graph and search projections
 are rebuildable from the event log; copying them costs storage and buys nothing.
 If the dump restores, Witness restores.
 
-Schedule it daily, keep it off the node it came from, and encrypt it at rest —
-it contains everything anyone said in a session.
+**Schedule it daily** (not yet running as a standing job on the pilot host —
+registering it is an operator action, since it's a persistent addition to the
+host's own crontab):
+
+```cron
+0 3 * * * cd /path/to/witness && make pilot-backup >> ~/witness-backups/backup.log 2>&1
+```
+
+Keep a copy off the node it came from, and encrypt it at rest — it contains
+everything anyone said in a session.
+
+## Backup status
+
+```bash
+make pilot-backup-status             # or: scripts/ops/backup-status.sh <dir> [max-age-hours]
+```
+
+Reports every backup's age, size and checksum validity, and an overall
+`STATUS: OK|STALE|DEGRADED|NONE` — `STALE` if the newest one is older than 25
+hours (a daily cadence plus an hour of grace), `DEGRADED` if any checksum
+fails to verify. Exit code mirrors status (0 ok, 1 stale/degraded, 2 none
+found) so it can be scripted into a health check or alert without parsing
+prose.
 
 ## Restore
 
