@@ -22,7 +22,12 @@ import {
 } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 
-import { captureEvidenceAttachment, toEvidenceAttachmentId, toEvidenceId } from '@witness/domain';
+import {
+  captureEvidenceAttachment,
+  InvariantViolation,
+  toEvidenceAttachmentId,
+  toEvidenceId,
+} from '@witness/domain';
 import type { EvidenceAttachmentView } from '@witness/contracts';
 import type { WitnessConfig } from '@witness/config';
 
@@ -32,6 +37,7 @@ import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
 import { StoragePort } from '../storage/storage.port.js';
 import { objectKey, resolveStoredContent } from '../storage/storage.service.js';
+import { StorageQuotaService } from '../organisations/storage-quota.service.js';
 import { WITNESS_CONFIG } from '../tokens.js';
 import type { Principal } from '../authz/authorization.port.js';
 
@@ -55,6 +61,7 @@ export class EvidenceAttachmentService {
     private readonly consentPolicy: ConsentPolicyService,
     @Inject(WITNESS_CONFIG) private readonly config: WitnessConfig,
     @Inject(StoragePort) private readonly storage: StoragePort | null,
+    private readonly storageQuota: StorageQuotaService,
   ) {}
 
   async upload(
@@ -94,6 +101,17 @@ export class EvidenceAttachmentService {
             'capture a new one to replace it.',
         },
       });
+    }
+
+    try {
+      await this.storageQuota.checkQuota(evidenceRow.organisationId, file.size);
+    } catch (error) {
+      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
+        throw new PayloadTooLargeException({
+          error: { code: error.code, message: error.message },
+        });
+      }
+      throw error;
     }
 
     const now = new Date();

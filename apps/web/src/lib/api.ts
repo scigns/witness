@@ -39,6 +39,7 @@ import type {
   CreateConsentTemplateVersionRequest,
   CreateEvidenceLinkRequest,
   CreateOrganisationRequest,
+  UpdateStorageQuotaRequest,
   CreateRecordRequest,
   CreateUserRequest,
   CreateWorkspaceRequest,
@@ -61,6 +62,7 @@ import type {
   TranscriptVersionRequest,
   TranscriptView,
   OrganisationMembershipView,
+  OrganisationStorageUsage,
   OrganisationSummary,
   OutcomeCandidateJobView,
   ParticipantConsentRecordDetail,
@@ -340,6 +342,26 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  getOrganisationStorage: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<OrganisationStorageUsage> =>
+    request<OrganisationStorageUsage>(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/storage`,
+      user,
+    ),
+
+  updateStorageQuota: (
+    organisationId: string,
+    body: UpdateStorageQuotaRequest,
+    user: ActingUser,
+  ): Promise<OrganisationStorageUsage> =>
+    request<OrganisationStorageUsage>(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/storage-quota`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
 
   listWorkspaces: (user: ActingUser): Promise<{ workspaces: WorkspaceSummary[] }> =>
     request<{ workspaces: WorkspaceSummary[] }>('/api/v1/workspaces', user),

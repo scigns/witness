@@ -31,6 +31,7 @@ export type Action =
   | 'record:review'
   | 'organisation:read'
   | 'organisation:create'
+  | 'organisation:update'
   | 'workspace:read'
   | 'workspace:create'
   | 'workspace:update'

@@ -24,6 +24,7 @@ import type { PrismaService } from '../infrastructure/prisma.service.js';
 import type { Principal } from '../authz/authorization.port.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
 import type { StoragePort } from '../storage/storage.port.js';
+import type { StorageQuotaService } from '../organisations/storage-quota.service.js';
 import {
   EvidenceAttachmentService,
   type UploadedAttachmentFile,
@@ -142,8 +143,18 @@ function fakeStorage() {
   return { storage, objects };
 }
 
+/** Allows by default — quota-rejection tests pass a fake that throws instead. */
+function fakeStorageQuota(checkQuota: StorageQuotaService['checkQuota'] = async () => {}) {
+  return { checkQuota } as unknown as StorageQuotaService;
+}
+
 function service(
-  options: { allowed?: boolean; maxMb?: number; storage?: StoragePort | null } = {},
+  options: {
+    allowed?: boolean;
+    maxMb?: number;
+    storage?: StoragePort | null;
+    storageQuota?: StorageQuotaService;
+  } = {},
 ) {
   const { prisma, attachments, auditEvents } = fakePrisma();
   const svc = new EvidenceAttachmentService(
@@ -151,6 +162,7 @@ function service(
     fakeConsent(options.allowed ?? true),
     { maxEvidenceAttachmentMb: options.maxMb ?? 200 } as never,
     options.storage ?? null,
+    options.storageQuota ?? fakeStorageQuota(),
   );
   return { svc, attachments, auditEvents };
 }
@@ -225,6 +237,28 @@ describe('EvidenceAttachmentService', () => {
         FACILITATOR,
       ),
     ).rejects.toThrow(PayloadTooLargeException);
+  });
+
+  it('rejects an upload that would exceed the organisation storage quota, as a clean 413', async () => {
+    const storageQuota = fakeStorageQuota(async () => {
+      throw new InvariantViolation('would exceed quota', 'STORAGE_QUOTA_EXCEEDED');
+    });
+    const { svc } = service({ storageQuota });
+
+    await expect(
+      svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_UNATTRIBUTED, audioFile(), FACILITATOR),
+    ).rejects.toThrow(PayloadTooLargeException);
+  });
+
+  it('does not translate an unrelated InvariantViolation from the quota check into a 413', async () => {
+    const storageQuota = fakeStorageQuota(async () => {
+      throw new InvariantViolation('something else went wrong', 'SOME_OTHER_CODE');
+    });
+    const { svc } = service({ storageQuota });
+
+    await expect(
+      svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_UNATTRIBUTED, audioFile(), FACILITATOR),
+    ).rejects.toThrow(InvariantViolation);
   });
 
   it('requires a file', async () => {

@@ -246,6 +246,7 @@ p, admin, record:create
 p, admin, record:review
 p, admin, organisation:read
 p, admin, organisation:create
+p, admin, organisation:update
 p, admin, workspace:read
 p, admin, workspace:create
 p, admin, workspace:update

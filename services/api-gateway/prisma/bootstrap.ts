@@ -41,6 +41,13 @@ import { firstAuditEventFor } from './operator-audit.js';
 
 const prisma = new PrismaClient();
 
+// Matches packages/domain/src/organisation.ts's DEFAULT_STORAGE_QUOTA_BYTES
+// exactly (5 GiB) — duplicated rather than imported for the same reason as
+// operator-audit.ts's canonicalisation: this script runs under `tsx` outside
+// the service's module graph, and packages/domain is GPL-3.0 while this is a
+// build-time operator tool (ADR-0002's licensing boundary).
+const DEFAULT_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
+
 /** The three values bootstrap takes. Named as a type so a typo is a compile error. */
 type RequiredVariable =
   | 'WITNESS_BOOTSTRAP_ORGANISATION_NAME'
@@ -87,7 +94,12 @@ async function main(): Promise<void> {
     });
 
     await tx.organisation.create({
-      data: { id: organisationId, name: organisationName, createdAt: now },
+      data: {
+        id: organisationId,
+        name: organisationName,
+        storageQuotaBytes: DEFAULT_STORAGE_QUOTA_BYTES,
+        createdAt: now,
+      },
     });
 
     await tx.user.create({

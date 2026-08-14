@@ -7,11 +7,24 @@
  * and there is no membership set to scope a header nobody has verified to.
  */
 
+import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../infrastructure/prisma.service.js';
 import type { Principal } from '../authz/authorization.port.js';
 import { OrganisationsService } from './organisations.service.js';
+import type { StorageQuotaService } from './storage-quota.service.js';
+
+const DEFAULT_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
+
+function fakeStorageQuota(
+  usage: StorageQuotaService['usage'] = async () => ({
+    usedBytes: 0n,
+    quotaBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
+  }),
+) {
+  return { usage, checkQuota: async () => {} } as unknown as StorageQuotaService;
+}
 
 const ORG_1 = '11111111-1111-4111-8111-111111111111';
 const ORG_2 = '22222222-2222-4222-8222-222222222222';
@@ -46,7 +59,11 @@ function fakePrisma(options: {
   raceOnEmail?: string;
 }) {
   const memberships = options.organisationMemberships ?? [];
-  const organisations = [...options.organisations];
+  const organisations = options.organisations.map((o) => ({
+    ...o,
+    storageQuotaBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
+    createdAt: new Date(),
+  }));
   const users = [...(options.users ?? [])];
   const actors: { id: string; kind: string; displayName: string }[] = [];
   const roleAssignments: {
@@ -59,13 +76,33 @@ function fakePrisma(options: {
   const auditEvents: { subjectType: string; subjectId: string; action: string }[] = [];
   let raceOnEmail = options.raceOnEmail ?? null;
 
-  const tx = {
-    organisation: {
-      create: async ({ data }: { data: { id: string; name: string; createdAt: Date } }) => {
-        organisations.push({ id: data.id, name: data.name });
-        return data;
-      },
+  const organisationOps = {
+    create: async ({
+      data,
+    }: {
+      data: { id: string; name: string; storageQuotaBytes: bigint; createdAt: Date };
+    }) => {
+      organisations.push({ ...data });
+      return data;
     },
+    findUnique: async ({ where }: { where: { id: string } }) =>
+      organisations.find((o) => o.id === where.id) ?? null,
+    update: async ({
+      where,
+      data,
+    }: {
+      where: { id: string };
+      data: { storageQuotaBytes: bigint };
+    }) => {
+      const row = organisations.find((o) => o.id === where.id);
+      if (row === undefined) throw new Error('organisation not found');
+      row.storageQuotaBytes = data.storageQuotaBytes;
+      return row;
+    },
+  };
+
+  const tx = {
+    organisation: organisationOps,
     actor: {
       findFirst: async ({ where }: { where: { displayName: string; kind: string } }) =>
         actors.find((a) => a.displayName === where.displayName && a.kind === where.kind) ?? null,
@@ -112,6 +149,7 @@ function fakePrisma(options: {
       },
     },
     auditEvent: {
+      findFirst: async () => null,
       create: async ({
         data,
       }: {
@@ -126,10 +164,11 @@ function fakePrisma(options: {
   const prisma = {
     organisation: {
       findMany: async ({ where }: { where?: { id?: { in: string[] } } }) => {
-        const rows = organisations.map((o) => ({ ...o, createdAt: new Date() }));
+        const rows = organisations.map((o) => ({ ...o }));
         if (where?.id === undefined) return rows;
         return rows.filter((o) => where.id!.in.includes(o.id));
       },
+      findUnique: organisationOps.findUnique,
     },
     organisationMembership: {
       findMany: async ({ where }: { where: { userId: string } }) =>
@@ -154,7 +193,7 @@ describe('OrganisationsService.list — visibility scoping', () => {
       ],
       organisationMemberships: [{ organisationId: ORG_1, userId: USER_1 }],
     });
-    const service = new OrganisationsService(prisma);
+    const service = new OrganisationsService(prisma, fakeStorageQuota());
 
     const result = await service.list(SESSION_PRINCIPAL);
 
@@ -168,7 +207,7 @@ describe('OrganisationsService.list — visibility scoping', () => {
         { id: ORG_2, name: 'Org Two' },
       ],
     });
-    const service = new OrganisationsService(prisma);
+    const service = new OrganisationsService(prisma, fakeStorageQuota());
 
     const result = await service.list(SESSION_PRINCIPAL);
 
@@ -182,7 +221,7 @@ describe('OrganisationsService.list — visibility scoping', () => {
         { id: ORG_2, name: 'Org Two' },
       ],
     });
-    const service = new OrganisationsService(prisma);
+    const service = new OrganisationsService(prisma, fakeStorageQuota());
 
     const result = await service.list(DEV_PRINCIPAL);
 
@@ -193,7 +232,7 @@ describe('OrganisationsService.list — visibility scoping', () => {
 describe('OrganisationsService.create — provisions an administrator', () => {
   it('creates the organisation, invites the administrator, and grants them organisation-scoped admin', async () => {
     const { prisma, state } = fakePrisma({ organisations: [] });
-    const service = new OrganisationsService(prisma);
+    const service = new OrganisationsService(prisma, fakeStorageQuota());
 
     const result = await service.create(
       'New Institution',
@@ -202,7 +241,12 @@ describe('OrganisationsService.create — provisions an administrator', () => {
       SESSION_PRINCIPAL,
     );
 
-    expect(state.organisations).toEqual([{ id: result.id, name: 'New Institution' }]);
+    expect(state.organisations).toHaveLength(1);
+    expect(state.organisations[0]).toMatchObject({
+      id: result.id,
+      name: 'New Institution',
+      storageQuotaBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
+    });
     expect(state.users).toHaveLength(1);
     expect(state.users[0]).toMatchObject({
       email: 'admin@new-institution.example',
@@ -240,7 +284,7 @@ describe('OrganisationsService.create — provisions an administrator', () => {
         },
       ],
     });
-    const service = new OrganisationsService(prisma);
+    const service = new OrganisationsService(prisma, fakeStorageQuota());
 
     await service.create(
       'Second Org',
@@ -264,7 +308,7 @@ describe('OrganisationsService.create — provisions an administrator', () => {
       organisations: [],
       raceOnEmail: 'racing-admin@example.org',
     });
-    const service = new OrganisationsService(prisma);
+    const service = new OrganisationsService(prisma, fakeStorageQuota());
 
     const result = await service.create(
       'Third Org',
@@ -280,5 +324,61 @@ describe('OrganisationsService.create — provisions an administrator', () => {
     expect(state.roleAssignments[0]).toMatchObject({ organisationId: result.id, userId: winnerId });
     // The user row that won the race is not this request's to have invited.
     expect(state.auditEvents.map((e) => e.action)).toEqual(['organisation.created']);
+  });
+});
+
+describe('OrganisationsService.storage', () => {
+  it('returns usage and quota as decimal strings — bigint does not survive JSON.stringify', async () => {
+    const { prisma } = fakePrisma({ organisations: [{ id: ORG_1, name: 'Org One' }] });
+    const storageQuota = fakeStorageQuota(async () => ({
+      usedBytes: 2_147_483_648n,
+      quotaBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
+    }));
+    const service = new OrganisationsService(prisma, storageQuota);
+
+    const result = await service.storage(ORG_1);
+
+    expect(result).toEqual({
+      usedBytes: '2147483648',
+      quotaBytes: String(DEFAULT_STORAGE_QUOTA_BYTES),
+    });
+  });
+});
+
+describe('OrganisationsService.setStorageQuota', () => {
+  it('replaces the quota, preserves existing content untouched, and records an audit event', async () => {
+    const { prisma, state } = fakePrisma({ organisations: [{ id: ORG_1, name: 'Org One' }] });
+    // Reads the quota back from the same state fakePrisma mutates — setStorageQuota's
+    // final `return this.storage(...)` call goes through this service, and in
+    // production it re-reads the row this method just updated in the same
+    // database, so the fake needs to reflect that instead of a fixed value.
+    const storageQuota = fakeStorageQuota(async () => ({
+      usedBytes: 0n,
+      quotaBytes: state.organisations[0]!.storageQuotaBytes,
+    }));
+    const service = new OrganisationsService(prisma, storageQuota);
+    const newQuota = 10 * 1024 * 1024 * 1024;
+
+    const result = await service.setStorageQuota(ORG_1, newQuota, SESSION_PRINCIPAL);
+
+    expect(result.quotaBytes).toBe(String(newQuota));
+    expect(state.organisations[0]?.storageQuotaBytes).toBe(BigInt(newQuota));
+    expect(state.auditEvents.map((e) => e.action)).toEqual(['organisation.storage_quota_updated']);
+  });
+
+  it('404s for an organisation that does not exist', async () => {
+    const { prisma } = fakePrisma({ organisations: [] });
+    const service = new OrganisationsService(prisma, fakeStorageQuota());
+
+    await expect(service.setStorageQuota(ORG_1, 1024, SESSION_PRINCIPAL)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('rejects a non-positive quota — the domain layer, not the controller, is the one source of truth for this', async () => {
+    const { prisma } = fakePrisma({ organisations: [{ id: ORG_1, name: 'Org One' }] });
+    const service = new OrganisationsService(prisma, fakeStorageQuota());
+
+    await expect(service.setStorageQuota(ORG_1, 0, SESSION_PRINCIPAL)).rejects.toThrow();
   });
 });

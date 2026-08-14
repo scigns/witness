@@ -2,13 +2,15 @@
  * Organisation — the tenant boundary (BUILD_ROADMAP.md, Release 0.2, item 1).
  *
  * An organisation is the outermost scope everything else in Witness sits inside:
- * workspaces, participants, records. This preview only covers creation — there is
- * no rename, archive or transfer operation yet, so the aggregate is deliberately
- * minimal rather than pre-built for change it does not yet support.
+ * workspaces, participants, records. Creation and a narrow storage-quota update
+ * are the only two operations — there is no rename, archive or transfer
+ * operation yet, so the aggregate stays deliberately minimal rather than
+ * pre-built for change it does not yet support.
  *
- * Same shape as `record.ts`: immutable, and creation returns an outcome pairing
- * the aggregate with a `PendingAuditEvent` rather than a persisted audit event,
- * so the application layer supplies the identifier, clock and hash (ADR-0003).
+ * Same shape as `record.ts`: immutable, and every operation returns an
+ * outcome pairing the aggregate with a `PendingAuditEvent` rather than a
+ * persisted audit event, so the application layer supplies the identifier,
+ * clock and hash (ADR-0003).
  */
 
 import { InvariantViolation } from './errors.js';
@@ -19,15 +21,29 @@ import type { OrganisationId } from './ids.js';
 /** The maximum length of an organisation name. */
 const NAME_MAX = 200;
 
+/** 5 GiB — Flight 1's included storage allowance per organisation. */
+export const DEFAULT_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
+
 export interface Organisation {
   readonly id: OrganisationId;
   readonly name: string;
+  readonly storageQuotaBytes: number;
   readonly createdAt: Date;
 }
 
 export interface OrganisationOutcome {
   readonly organisation: Organisation;
   readonly event: PendingAuditEvent;
+}
+
+function assertStorageQuota(bytes: number): number {
+  if (!Number.isInteger(bytes) || bytes <= 0) {
+    throw new InvariantViolation(
+      `A storage quota must be a positive whole number of bytes, received ${bytes}.`,
+      'INVALID_STORAGE_QUOTA',
+    );
+  }
+  return bytes;
 }
 
 function assertName(name: string): string {
@@ -63,10 +79,12 @@ export function createOrganisation(input: {
   name: string;
   createdBy: Actor;
   createdAt: Date;
+  storageQuotaBytes?: number;
 }): OrganisationOutcome {
   const organisation: Organisation = {
     id: input.id,
     name: assertName(input.name),
+    storageQuotaBytes: assertStorageQuota(input.storageQuotaBytes ?? DEFAULT_STORAGE_QUOTA_BYTES),
     createdAt: input.createdAt,
   };
 
@@ -76,6 +94,33 @@ export function createOrganisation(input: {
       action: 'organisation.created',
       actor: input.createdBy,
       metadata: { name: organisation.name },
+    },
+  };
+}
+
+/**
+ * The operator override Flight 1 asks for: quota is per-tenant and
+ * configurable, not a fixed global constant baked into enforcement. Any
+ * positive value is accepted — the domain layer does not second-guess an
+ * operator's judgement about what a specific institution needs, only that
+ * the number itself is coherent.
+ */
+export function updateStorageQuota(
+  organisation: Organisation,
+  storageQuotaBytes: number,
+  updatedBy: Actor,
+): OrganisationOutcome {
+  const validated = assertStorageQuota(storageQuotaBytes);
+
+  return {
+    organisation: { ...organisation, storageQuotaBytes: validated },
+    event: {
+      action: 'organisation.storage_quota_updated',
+      actor: updatedBy,
+      metadata: {
+        from: String(organisation.storageQuotaBytes),
+        to: String(validated),
+      },
     },
   };
 }
