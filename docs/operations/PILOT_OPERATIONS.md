@@ -67,6 +67,41 @@ current source with no migration history and no review.
 Do **not** run `pnpm seed` against a deployed instance. It writes synthetic
 fixtures that read like real institutional decisions.
 
+## Continuous deployment
+
+`make pilot-deploy` (`scripts/pilot/deploy.sh`) does the same steps above plus
+a health check and an automatic rollback of the running containers if it
+fails — it is the one place the deploy sequence is defined, run identically by
+a human or by CI (`docs/engineering/CI_CD.md`'s "no logic in YAML" rule).
+Database migrations are forward-only and are **not** rolled back by this
+script; a failed migration needs manual attention regardless of container
+rollback.
+
+`.github/workflows/deploy.yml` runs it automatically after `CI` passes on
+`main`. It targets a **self-hosted** runner rather than reaching out from a
+GitHub-hosted one, because the pilot host has no inbound port open — only the
+Cloudflare Tunnel — and a polling runner keeps it that way. To activate it on
+a host that doesn't have the runner yet:
+
+```bash
+# On the pilot host itself, one time:
+# 1. GitHub → repo → Settings → Actions → Runners → New self-hosted runner,
+#    label it "witness-pilot" in addition to the default "self-hosted" label.
+# 2. Follow the displayed ./config.sh command, then install as a service:
+./svc.sh install && ./svc.sh start
+```
+
+Until a runner is registered, `deploy.yml` simply has nothing to run on and
+every push to `main` shows the deploy job queued/skipped — CI and merges are
+unaffected either way. Repository variables `WITNESS_PILOT_API_URL` and
+`WITNESS_PILOT_WEB_URL` (Settings → Environments → `pilot`) must be set to the
+public hostnames before the first automated run.
+
+The reference/pilot deployment this targets is Witness's own demo and trial
+environment, operated by us — not a customer's infrastructure. It carries
+synthetic data only (see "Environments" in `docs/engineering/CI_CD.md`); real
+institutional engagements get their own self-hosted instance.
+
 ## First run
 
 Deny-by-default goes all the way down: on a freshly migrated database nobody

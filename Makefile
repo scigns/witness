@@ -91,6 +91,10 @@ logs: .env ## Tail logs from the local stack
 reset-data: ## Wipe and re-seed local databases with synthetic fixtures
 	@bash scripts/dev/reset-data.sh
 
+.PHONY: pilot-deploy
+pilot-deploy: ## Build, migrate and recreate the pilot deployment, with rollback on failed health check
+	@bash scripts/pilot/deploy.sh
+
 # ─── Quality gates ────────────────────────────────────────────────────────────
 
 .PHONY: verify

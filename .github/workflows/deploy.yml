@@ -1,0 +1,46 @@
+# Deploys main to the pilot reference deployment after CI passes.
+#
+# Runs on a self-hosted runner registered on the pilot host itself
+# (docs/operations/PILOT_OPERATIONS.md) rather than reaching out to it from a
+# GitHub-hosted runner: the host has no inbound port open (Cloudflare Tunnel
+# only, ADR on Cloudflare architecture), and a polling runner keeps it that
+# way — nothing GitHub-hosted needs SSH credentials or a public port to reach.
+#
+# All deploy logic lives in scripts/pilot/deploy.sh (docs/engineering/CI_CD.md
+# principle: no logic in YAML). This workflow only decides when to run it and
+# reports the outcome; run `make pilot-deploy` locally to do the identical
+# thing by hand.
+
+name: Deploy pilot
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-pilot
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: [self-hosted, witness-pilot]
+    environment: pilot
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - name: Deploy
+        env:
+          WITNESS_PILOT_API_URL: ${{ vars.WITNESS_PILOT_API_URL }}
+          WITNESS_PILOT_WEB_URL: ${{ vars.WITNESS_PILOT_WEB_URL }}
+        run: bash scripts/pilot/deploy.sh
