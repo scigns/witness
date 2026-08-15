@@ -91,6 +91,16 @@ const schema = z.object({
   WITNESS_LOCAL_LLM_URL: z.string().optional().default('http://ollama:11434'),
   WITNESS_LOCAL_LLM_MODEL: z.string().optional().default('qwen2.5:1.5b'),
 
+  // How many transcription/summarisation/candidate-extraction jobs may run
+  // their local model at once. This is a single-node deployment (ADR-0013)
+  // with no worker pool — every job runs in this same process, competing for
+  // the same CPU whisper.cpp and Ollama both need, so an unbounded fan-out
+  // (e.g. several recordings uploaded back to back) degrades every
+  // in-flight job's latency together rather than one at a time. 2 is
+  // conservative for the pilot host's core count; raise it once real load
+  // data justifies more.
+  WITNESS_LOCAL_INFERENCE_CONCURRENCY: z.coerce.number().int().min(1).default(2),
+
   // Egress-related. Empty is the sovereign default.
   EXTERNAL_MODEL_PROVIDER: z.string().optional().default(''),
   EXTERNAL_MODEL_API_KEY: z.string().optional().default(''),
@@ -154,6 +164,8 @@ export interface WitnessConfig {
   readonly maxEvidenceAttachmentMb: number;
   readonly localLlmUrl: string;
   readonly localLlmModel: string;
+  /** Caps simultaneous local-inference jobs (whisper.cpp transcription, Ollama summarisation/candidate extraction) sharing this node's CPU. */
+  readonly localInferenceConcurrency: number;
   /** True only when the profile permits egress AND S3 credentials and buckets are configured. */
   readonly objectStorageEnabled: boolean;
   readonly s3: {
@@ -460,6 +472,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
     maxEvidenceAttachmentMb: value.WITNESS_MAX_EVIDENCE_ATTACHMENT_MB,
     localLlmUrl: value.WITNESS_LOCAL_LLM_URL,
     localLlmModel: value.WITNESS_LOCAL_LLM_MODEL,
+    localInferenceConcurrency: value.WITNESS_LOCAL_INFERENCE_CONCURRENCY,
     objectStorageEnabled:
       value.WITNESS_DEPLOYMENT_PROFILE !== 'sovereign' &&
       s3Configured &&

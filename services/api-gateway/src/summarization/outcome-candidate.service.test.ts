@@ -9,6 +9,7 @@ import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../infrastructure/prisma.service.js';
+import { ConcurrencyLimiter } from '../infrastructure/concurrency-limiter.js';
 import type { ConsentPolicyService } from '../consent/consent-policy.service.js';
 import type { LlmCompletionResult, LlmPort } from './llm.port.js';
 import { OutcomeCandidateService } from './outcome-candidate.service.js';
@@ -67,7 +68,12 @@ function fakePrisma() {
 }
 
 function service(llmText: string | (() => Promise<string>)) {
-  return new OutcomeCandidateService(fakePrisma(), fakeConsent(), fakeLlm(llmText));
+  return new OutcomeCandidateService(
+    fakePrisma(),
+    fakeConsent(),
+    fakeLlm(llmText),
+    new ConcurrencyLimiter(2),
+  );
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 10));

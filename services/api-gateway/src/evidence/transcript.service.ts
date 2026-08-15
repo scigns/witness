@@ -46,6 +46,7 @@ import type { EditTranscriptRequest, TranscriptView } from '@witness/contracts';
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
+import { ConcurrencyLimiter } from '../infrastructure/concurrency-limiter.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
 import { TranscriptionPort } from '../transcription/transcription.port.js';
 import { StoragePort } from '../storage/storage.port.js';
@@ -85,6 +86,7 @@ export class TranscriptService {
     private readonly consentPolicy: ConsentPolicyService,
     private readonly transcription: TranscriptionPort,
     @Inject(StoragePort) private readonly storage: StoragePort | null,
+    private readonly localInference: ConcurrencyLimiter,
   ) {}
 
   async request(
@@ -246,7 +248,9 @@ export class TranscriptService {
 
     try {
       const content = await resolveStoredContent(this.storage, attachment);
-      const result = await this.transcription.transcribe(content, attachment.contentType);
+      const result = await this.localInference.run(() =>
+        this.transcription.transcribe(content, attachment.contentType),
+      );
       const now = new Date();
       const outcome = completeTranscription(
         processing.transcript,
@@ -361,7 +365,7 @@ function toCreateRow(transcript: Transcript) {
   };
 }
 
-function toUpdateRow(transcript: Transcript) {
+export function toUpdateRow(transcript: Transcript) {
   return {
     status: transcript.status,
     generatedText: transcript.generatedText,
