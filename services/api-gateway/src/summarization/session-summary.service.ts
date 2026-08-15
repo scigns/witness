@@ -42,6 +42,7 @@ import type { EditSummaryRequest, SessionSummaryView } from '@witness/contracts'
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
+import { ConcurrencyLimiter } from '../infrastructure/concurrency-limiter.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
 import { LlmPort } from './llm.port.js';
 import { assembleSessionSource } from './source-assembly.helper.js';
@@ -79,6 +80,7 @@ export class SessionSummaryService {
     private readonly prisma: PrismaService,
     private readonly consentPolicy: ConsentPolicyService,
     private readonly llm: LlmPort,
+    private readonly localInference: ConcurrencyLimiter,
   ) {}
 
   async request(
@@ -237,7 +239,7 @@ export class SessionSummaryService {
         'information that is not present in the text, and do not add commentary about the ' +
         'summary itself.\n\n' +
         sourceText;
-      const result = await this.llm.complete(prompt);
+      const result = await this.localInference.run(() => this.llm.complete(prompt));
       const now = new Date();
       const outcome = completeSummary(processing.summary, result, systemActor, now);
       await this.persist(summaryId, outcome.summary, outcome.event, now);
@@ -330,7 +332,7 @@ function toCreateRow(summary: SessionSummary) {
   };
 }
 
-function toUpdateRow(summary: SessionSummary) {
+export function toUpdateRow(summary: SessionSummary) {
   return {
     status: summary.status,
     sourceEvidenceIds: [...summary.sourceEvidenceIds],

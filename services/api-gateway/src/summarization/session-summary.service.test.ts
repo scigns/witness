@@ -8,6 +8,7 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../infrastructure/prisma.service.js';
+import { ConcurrencyLimiter } from '../infrastructure/concurrency-limiter.js';
 import type { Principal } from '../authz/authorization.port.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
 import type { LlmCompletionResult, LlmPort } from './llm.port.js';
@@ -160,6 +161,7 @@ function service(options: { allowed?: boolean; llm?: LlmPort } = {}) {
     prisma,
     fakeConsent(options.allowed ?? true),
     options.llm ?? fakeLlm(),
+    new ConcurrencyLimiter(2),
   );
   return { svc, summaries, auditEvents };
 }

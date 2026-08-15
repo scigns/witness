@@ -34,6 +34,7 @@ import type {
 } from '@witness/contracts';
 
 import { PrismaService } from '../infrastructure/prisma.service.js';
+import { ConcurrencyLimiter } from '../infrastructure/concurrency-limiter.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
 import { LlmPort } from './llm.port.js';
 import { assembleSessionSource, type SourceItem } from './source-assembly.helper.js';
@@ -131,6 +132,7 @@ export class OutcomeCandidateService {
     private readonly prisma: PrismaService,
     private readonly consentPolicy: ConsentPolicyService,
     private readonly llm: LlmPort,
+    private readonly localInference: ConcurrencyLimiter,
   ) {}
 
   async request(workspaceId: string, sessionId: string): Promise<{ jobId: string }> {
@@ -179,7 +181,7 @@ export class OutcomeCandidateService {
         return;
       }
 
-      const result = await this.llm.complete(buildPrompt(items));
+      const result = await this.localInference.run(() => this.llm.complete(buildPrompt(items)));
       const parsed = parseCandidates(result.text);
 
       const candidates: OutcomeCandidateView[] = parsed.map((candidate) => {

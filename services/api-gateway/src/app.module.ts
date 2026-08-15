@@ -47,6 +47,8 @@ import { TranscriptionPort } from './transcription/transcription.port.js';
 import { S3StorageAdapter } from './storage/s3-storage.adapter.js';
 import { StoragePort } from './storage/storage.port.js';
 import { HealthController } from './health/health.controller.js';
+import { ConcurrencyLimiter } from './infrastructure/concurrency-limiter.js';
+import { JobRecoveryService } from './infrastructure/job-recovery.service.js';
 import { PrismaService } from './infrastructure/prisma.service.js';
 import { OrganisationInvitationsController } from './organisation-invitations/organisation-invitations.controller.js';
 import { OrganisationInvitationsService } from './organisation-invitations/organisation-invitations.service.js';
@@ -119,6 +121,13 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
   ],
   providers: [
     PrismaService,
+    JobRecoveryService,
+    {
+      provide: ConcurrencyLimiter,
+      inject: [WITNESS_CONFIG],
+      useFactory: (config: WitnessConfig): ConcurrencyLimiter =>
+        new ConcurrencyLimiter(config.localInferenceConcurrency),
+    },
     RecordsService,
     OrganisationsService,
     StorageQuotaService,

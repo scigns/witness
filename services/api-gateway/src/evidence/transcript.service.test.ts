@@ -15,6 +15,7 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../infrastructure/prisma.service.js';
+import { ConcurrencyLimiter } from '../infrastructure/concurrency-limiter.js';
 import type { Principal } from '../authz/authorization.port.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
 import type {
@@ -168,6 +169,7 @@ function service(options: { allowed?: boolean; transcription?: TranscriptionPort
     fakeConsent(options.allowed ?? true),
     options.transcription ?? fakeTranscription(),
     null,
+    new ConcurrencyLimiter(2),
   );
   return { svc, transcripts, auditEvents };
 }
