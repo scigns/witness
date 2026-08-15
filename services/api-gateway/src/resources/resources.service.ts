@@ -220,6 +220,15 @@ export class ResourcesService {
     const event = removeResource(toDomain(row), actor);
     const now = new Date();
 
+    // Deleted before the transaction, mirroring createFile's own ordering
+    // rationale in reverse: a failed object delete must leave the DB row
+    // intact (safe to retry) rather than committing a row-gone state while
+    // the object silently survives in R2 forever — the orphan this file
+    // shipped with until a live pilot upload proved it (see PR history).
+    if (row.storageKey !== null && this.storage !== null) {
+      await this.storage.delete(row.storageKey);
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.resource.delete({ where: { id: resourceId } });
       await appendAuditEvent(tx, 'resource', resourceId, event, now);
