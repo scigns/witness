@@ -7,13 +7,20 @@
  * and there is no membership set to scope a header nobody has verified to.
  */
 
-import { NotFoundException } from '@nestjs/common';
-import { describe, expect, it } from 'vitest';
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../infrastructure/prisma.service.js';
 import type { Principal } from '../authz/authorization.port.js';
 import { OrganisationsService } from './organisations.service.js';
 import type { StorageQuotaService } from './storage-quota.service.js';
+import type { ConsentTemplatesService } from '../consent-templates/consent-templates.service.js';
+
+function fakeConsentTemplates(): ConsentTemplatesService & { create: ReturnType<typeof vi.fn> } {
+  return { create: vi.fn().mockResolvedValue(undefined) } as unknown as ConsentTemplatesService & {
+    create: ReturnType<typeof vi.fn>;
+  };
+}
 
 const DEFAULT_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
 
@@ -62,6 +69,7 @@ function fakePrisma(options: {
   const organisations = options.organisations.map((o) => ({
     ...o,
     storageQuotaBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
+    profile: 'general',
     createdAt: new Date(),
   }));
   const users = [...(options.users ?? [])];
@@ -80,8 +88,17 @@ function fakePrisma(options: {
     create: async ({
       data,
     }: {
-      data: { id: string; name: string; storageQuotaBytes: bigint; createdAt: Date };
+      data: {
+        id: string;
+        name: string;
+        storageQuotaBytes: bigint;
+        profile: string;
+        createdAt: Date;
+      };
     }) => {
+      if (organisations.some((o) => o.name === data.name)) {
+        throw { code: 'P2002' };
+      }
       organisations.push({ ...data });
       return data;
     },
@@ -193,7 +210,7 @@ describe('OrganisationsService.list — visibility scoping', () => {
       ],
       organisationMemberships: [{ organisationId: ORG_1, userId: USER_1 }],
     });
-    const service = new OrganisationsService(prisma, fakeStorageQuota());
+    const service = new OrganisationsService(prisma, fakeStorageQuota(), fakeConsentTemplates());
 
     const result = await service.list(SESSION_PRINCIPAL);
 
@@ -207,7 +224,7 @@ describe('OrganisationsService.list — visibility scoping', () => {
         { id: ORG_2, name: 'Org Two' },
       ],
     });
-    const service = new OrganisationsService(prisma, fakeStorageQuota());
+    const service = new OrganisationsService(prisma, fakeStorageQuota(), fakeConsentTemplates());
 
     const result = await service.list(SESSION_PRINCIPAL);
 
@@ -221,7 +238,7 @@ describe('OrganisationsService.list — visibility scoping', () => {
         { id: ORG_2, name: 'Org Two' },
       ],
     });
-    const service = new OrganisationsService(prisma, fakeStorageQuota());
+    const service = new OrganisationsService(prisma, fakeStorageQuota(), fakeConsentTemplates());
 
     const result = await service.list(DEV_PRINCIPAL);
 
@@ -232,7 +249,7 @@ describe('OrganisationsService.list — visibility scoping', () => {
 describe('OrganisationsService.create — provisions an administrator', () => {
   it('creates the organisation, invites the administrator, and grants them organisation-scoped admin', async () => {
     const { prisma, state } = fakePrisma({ organisations: [] });
-    const service = new OrganisationsService(prisma, fakeStorageQuota());
+    const service = new OrganisationsService(prisma, fakeStorageQuota(), fakeConsentTemplates());
 
     const result = await service.create(
       'New Institution',
@@ -272,6 +289,79 @@ describe('OrganisationsService.create — provisions an administrator', () => {
     ]);
   });
 
+  it('defaults to the general profile and never seeds a starter consent template for it', async () => {
+    const { prisma } = fakePrisma({ organisations: [] });
+    const consentTemplates = fakeConsentTemplates();
+    const service = new OrganisationsService(prisma, fakeStorageQuota(), consentTemplates);
+
+    const result = await service.create(
+      'General Institution',
+      'admin@general.example',
+      'Admin',
+      SESSION_PRINCIPAL,
+    );
+
+    expect(result.profile).toBe('general');
+    expect(consentTemplates.create).not.toHaveBeenCalled();
+  });
+
+  it("accepts an explicit profile and quota, and seeds that profile's starter consent template", async () => {
+    const { prisma, state } = fakePrisma({ organisations: [] });
+    const consentTemplates = fakeConsentTemplates();
+    const service = new OrganisationsService(prisma, fakeStorageQuota(), consentTemplates);
+    const tenGb = 10 * 1024 * 1024 * 1024;
+
+    const result = await service.create(
+      'Church Institution',
+      'admin@church.example',
+      'Admin',
+      SESSION_PRINCIPAL,
+      'church',
+      tenGb,
+    );
+
+    expect(result.profile).toBe('church');
+    expect(state.organisations[0]).toMatchObject({
+      profile: 'church',
+      storageQuotaBytes: BigInt(tenGb),
+    });
+    expect(consentTemplates.create).toHaveBeenCalledTimes(1);
+    expect(consentTemplates.create).toHaveBeenCalledWith(
+      result.id,
+      expect.objectContaining({ name: expect.stringContaining('Congregational') }),
+      SESSION_PRINCIPAL,
+    );
+  });
+
+  it('does not fail organisation creation when starter consent template seeding fails', async () => {
+    const { prisma } = fakePrisma({ organisations: [] });
+    const consentTemplates = fakeConsentTemplates();
+    consentTemplates.create.mockRejectedValueOnce(new Error('seeding failed'));
+    const service = new OrganisationsService(prisma, fakeStorageQuota(), consentTemplates);
+
+    const result = await service.create(
+      'Resilient Institution',
+      'admin@resilient.example',
+      'Admin',
+      SESSION_PRINCIPAL,
+      'spc',
+    );
+
+    expect(result.id).toBeDefined();
+    expect(result.profile).toBe('spc');
+  });
+
+  it('rejects a duplicate organisation name with a clean conflict, not a 500', async () => {
+    const { prisma } = fakePrisma({
+      organisations: [{ id: ORG_1, name: 'Existing Institution' }],
+    });
+    const service = new OrganisationsService(prisma, fakeStorageQuota(), fakeConsentTemplates());
+
+    await expect(
+      service.create('Existing Institution', 'admin@dup.example', 'Admin', SESSION_PRINCIPAL),
+    ).rejects.toThrow(ConflictException);
+  });
+
   it('reuses an existing user by email rather than creating a duplicate, and adds no second user.invited event', async () => {
     const { prisma, state } = fakePrisma({
       organisations: [],
@@ -284,7 +374,7 @@ describe('OrganisationsService.create — provisions an administrator', () => {
         },
       ],
     });
-    const service = new OrganisationsService(prisma, fakeStorageQuota());
+    const service = new OrganisationsService(prisma, fakeStorageQuota(), fakeConsentTemplates());
 
     await service.create(
       'Second Org',
@@ -308,7 +398,7 @@ describe('OrganisationsService.create — provisions an administrator', () => {
       organisations: [],
       raceOnEmail: 'racing-admin@example.org',
     });
-    const service = new OrganisationsService(prisma, fakeStorageQuota());
+    const service = new OrganisationsService(prisma, fakeStorageQuota(), fakeConsentTemplates());
 
     const result = await service.create(
       'Third Org',
@@ -334,7 +424,7 @@ describe('OrganisationsService.storage', () => {
       usedBytes: 2_147_483_648n,
       quotaBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
     }));
-    const service = new OrganisationsService(prisma, storageQuota);
+    const service = new OrganisationsService(prisma, storageQuota, fakeConsentTemplates());
 
     const result = await service.storage(ORG_1);
 
@@ -356,7 +446,7 @@ describe('OrganisationsService.setStorageQuota', () => {
       usedBytes: 0n,
       quotaBytes: state.organisations[0]!.storageQuotaBytes,
     }));
-    const service = new OrganisationsService(prisma, storageQuota);
+    const service = new OrganisationsService(prisma, storageQuota, fakeConsentTemplates());
     const newQuota = 10 * 1024 * 1024 * 1024;
 
     const result = await service.setStorageQuota(ORG_1, newQuota, SESSION_PRINCIPAL);
@@ -368,7 +458,7 @@ describe('OrganisationsService.setStorageQuota', () => {
 
   it('404s for an organisation that does not exist', async () => {
     const { prisma } = fakePrisma({ organisations: [] });
-    const service = new OrganisationsService(prisma, fakeStorageQuota());
+    const service = new OrganisationsService(prisma, fakeStorageQuota(), fakeConsentTemplates());
 
     await expect(service.setStorageQuota(ORG_1, 1024, SESSION_PRINCIPAL)).rejects.toThrow(
       NotFoundException,
@@ -377,7 +467,7 @@ describe('OrganisationsService.setStorageQuota', () => {
 
   it('rejects a non-positive quota — the domain layer, not the controller, is the one source of truth for this', async () => {
     const { prisma } = fakePrisma({ organisations: [{ id: ORG_1, name: 'Org One' }] });
-    const service = new OrganisationsService(prisma, fakeStorageQuota());
+    const service = new OrganisationsService(prisma, fakeStorageQuota(), fakeConsentTemplates());
 
     await expect(service.setStorageQuota(ORG_1, 0, SESSION_PRINCIPAL)).rejects.toThrow();
   });

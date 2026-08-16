@@ -62,6 +62,11 @@ export const reviewActionSchema = z.discriminatedUnion('action', [
 ]);
 export type ReviewAction = z.infer<typeof reviewActionSchema>;
 
+// Mirrors @witness/domain's INSTITUTIONAL_PROFILES — declared here rather
+// than imported, the same reasoning this file already applies to other
+// unions shared with the domain layer (see the file header).
+export const institutionalProfileSchema = z.enum(['general', 'spc', 'fta', 'moj', 'church']);
+
 export const createOrganisationRequestSchema = z.object({
   name: z.string().trim().min(1, 'A name is required').max(200),
   // Mirrors prisma/bootstrap.ts's shape: a new organisation invites an
@@ -69,6 +74,12 @@ export const createOrganisationRequestSchema = z.object({
   // rather than being created with nobody able to sign in and manage it.
   administratorEmail: z.string().trim().toLowerCase().email('A valid email address is required'),
   administratorName: z.string().trim().min(1, 'A name is required').max(200),
+  profile: institutionalProfileSchema.optional(),
+  // Gigabytes in the request, converted to bytes at the application layer —
+  // the same unit the operator override on an existing organisation's quota
+  // already uses in the web form, matching what an operator actually thinks
+  // in.
+  storageQuotaGb: z.coerce.number().positive().optional(),
 });
 export type CreateOrganisationRequest = z.infer<typeof createOrganisationRequestSchema>;
 
@@ -1187,6 +1198,7 @@ export interface RecordDetail extends RecordSummary {
 export interface OrganisationSummary {
   id: string;
   name: string;
+  profile: string;
   createdAt: string;
 }
 
