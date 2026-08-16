@@ -68,9 +68,12 @@ function csvField(value: string | number | null | undefined): string {
   return `"${guarded.replace(/"/g, '""')}"`;
 }
 
-function attributionLabel(evidence: RenderedEvidence): string {
-  const base = ATTRIBUTION_LABELS[evidence.attribution];
-  return evidence.pseudonym !== undefined ? `${base}: ${evidence.pseudonym}` : base;
+function attributionLabel(item: {
+  attribution: RenderedEvidence['attribution'];
+  pseudonym?: string;
+}): string {
+  const base = ATTRIBUTION_LABELS[item.attribution];
+  return item.pseudonym !== undefined ? `${base}: ${item.pseudonym}` : base;
 }
 
 function slug(value: string): string {
@@ -92,6 +95,16 @@ export function renderHtml(report: RenderedReport): string {
       (item) => `      <li>
         <p class="title">${escapeHtml(item.title)}</p>
         <p class="meta">${escapeHtml(item.evidenceType)} · ${escapeHtml(attributionLabel(item))}</p>
+        <p class="${item.quotable ? 'quote' : 'withheld'}">${escapeHtml(item.content ?? WITHHELD)}</p>
+      </li>`,
+    )
+    .join('\n');
+
+  const transcriptHtml = report.transcripts
+    .map(
+      (item) => `      <li>
+        <p class="title">${escapeHtml(item.evidenceTitle)}</p>
+        <p class="meta">${escapeHtml(attributionLabel(item))}</p>
         <p class="${item.quotable ? 'quote' : 'withheld'}">${escapeHtml(item.content ?? WITHHELD)}</p>
       </li>`,
     )
@@ -139,6 +152,7 @@ export function renderHtml(report: RenderedReport): string {
 </head>
 <body>
   <h1>${escapeHtml(meta.title)}</h1>
+  <p class="meta">${escapeHtml(report.organisationName)} · ${escapeHtml(report.workspaceName)}</p>
   <p class="meta">${escapeHtml(session.title)} · ${escapeHtml(session.sessionType)}${session.scheduledStart !== null ? ` · ${escapeHtml(session.scheduledStart.slice(0, 10))}` : ''}${session.location !== null ? ` · ${escapeHtml(session.location)}` : ''}</p>
   <p class="meta">Revision ${meta.revision} · ${escapeHtml(meta.status.replace(/_/g, ' '))} · ${escapeHtml(meta.audience)} audience</p>
 ${meta.purpose !== null ? `  <section><h2>Purpose</h2><p>${escapeHtml(meta.purpose)}</p></section>` : ''}
@@ -153,6 +167,13 @@ ${meta.purpose !== null ? `  <section><h2>Purpose</h2><p>${escapeHtml(meta.purpo
 ${evidenceHtml}
     </ul>
   </section>
+  <section>
+    <h2>Transcripts</h2>
+    <ul>
+${transcriptHtml}
+    </ul>
+  </section>
+${report.sessionSummary !== null ? `  <section><h2>Session summary</h2><p class="synthesis-note">Local AI-generated, with any human edits applied.</p><p>${escapeHtml(report.sessionSummary.content)}</p></section>` : ''}
   <section><h2>Decisions</h2><ul>
 ${outcomeHtml(report.decisions)}
   </ul></section>
@@ -178,6 +199,7 @@ export function renderMarkdown(report: RenderedReport): string {
   const lines: string[] = [];
 
   lines.push(`# ${meta.title}`, '');
+  lines.push(`${report.organisationName} · ${report.workspaceName}`, '');
   lines.push(
     `${session.title} · ${session.sessionType}${session.scheduledStart !== null ? ` · ${session.scheduledStart.slice(0, 10)}` : ''}`,
   );
@@ -199,6 +221,19 @@ export function renderMarkdown(report: RenderedReport): string {
     lines.push(`### ${item.title}`, '');
     lines.push(`_${item.evidenceType} · ${attributionLabel(item)}_`, '');
     lines.push(item.quotable ? `> ${item.content ?? ''}` : `_${WITHHELD}_`, '');
+  }
+
+  lines.push('## Transcripts', '');
+  for (const item of report.transcripts) {
+    lines.push(`### ${item.evidenceTitle}`, '');
+    lines.push(`_${attributionLabel(item)}_`, '');
+    lines.push(item.quotable ? `> ${item.content ?? ''}` : `_${WITHHELD}_`, '');
+  }
+
+  if (report.sessionSummary !== null) {
+    lines.push('## Session summary', '');
+    lines.push('_Local AI-generated, with any human edits applied._', '');
+    lines.push(report.sessionSummary.content, '');
   }
 
   const outcomeSection = (heading: string, items: RenderedOutcome[]): void => {
@@ -263,6 +298,34 @@ export function renderCsv(report: RenderedReport): string {
         csvField(''),
         csvField(''),
         csvField(item.quotable ? (item.content ?? '') : WITHHELD),
+      ].join(','),
+    );
+  }
+
+  for (const item of report.transcripts) {
+    rows.push(
+      [
+        csvField('transcript'),
+        csvField(item.evidenceId),
+        csvField(item.evidenceTitle),
+        csvField(attributionLabel(item)),
+        csvField(''),
+        csvField(''),
+        csvField(item.quotable ? (item.content ?? '') : WITHHELD),
+      ].join(','),
+    );
+  }
+
+  if (report.sessionSummary !== null) {
+    rows.push(
+      [
+        csvField('session_summary'),
+        csvField(''),
+        csvField('Session summary'),
+        csvField(''),
+        csvField(''),
+        csvField(''),
+        csvField(report.sessionSummary.content),
       ].join(','),
     );
   }

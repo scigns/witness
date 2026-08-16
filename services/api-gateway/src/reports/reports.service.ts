@@ -437,6 +437,7 @@ export class ReportsService {
       sources.filter((source) => source.sourceType === type).map((source) => source.sourceId);
 
     const [
+      workspaceRow,
       evidenceRows,
       decisionRows,
       commitmentRows,
@@ -445,6 +446,10 @@ export class ReportsService {
       transcriptRows,
       summaryRows,
     ] = await Promise.all([
+      this.prisma.workspace.findUniqueOrThrow({
+        where: { id: workspaceId },
+        select: { name: true, organisation: { select: { name: true } } },
+      }),
       this.prisma.evidence.findMany({ where: { id: { in: sourceIds('evidence') } } }),
       this.prisma.decision.findMany({ where: { id: { in: sourceIds('decision') } } }),
       this.prisma.commitment.findMany({ where: { id: { in: sourceIds('commitment') } } }),
@@ -569,6 +574,8 @@ export class ReportsService {
 
     return {
       report: detail,
+      organisationName: workspaceRow.organisation.name,
+      workspaceName: workspaceRow.name,
       session: {
         title: session.title,
         sessionType: session.sessionType,
