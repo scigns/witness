@@ -36,6 +36,18 @@ body:
     validations:
       required: true
   - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: |
+        P0 — data loss, a security/consent boundary was crossed, or the platform is unusable for everyone.
+        P1 — a core workflow (capture, review, export) is broken or blocked with no workaround.
+        P2 — a real defect with a workaround, or affects one workflow/role.
+        P3 — cosmetic, or an enhancement request.
+      options: [P0, P1, P2, P3, unsure]
+    validations:
+      required: true
+  - type: dropdown
     id: profile
     attributes:
       label: Deployment profile
