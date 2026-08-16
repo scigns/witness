@@ -37,7 +37,7 @@ latest_mtime=0
 
 echo "Backups in ${DESTINATION}:"
 for dump in "${dumps[@]}"; do
-  mtime="$(stat -f %m "${dump}" 2>/dev/null || stat -c %Y "${dump}")"
+  mtime="$(stat -c %Y "${dump}" 2>/dev/null || stat -f %m "${dump}")"
   size="$(du -h "${dump}" | cut -f1)"
   if [[ -f "${dump}.sha256" ]] && (cd "$(dirname "${dump}")" && sha256sum -c "$(basename "${dump}").sha256" >/dev/null 2>&1); then
     checksum_status="checksum ok"
