@@ -570,7 +570,5 @@ TESTED BY: ____________________
 DATE: ____________________
 NOTES: ____________________
 
-------------------------------------------------------------
 Once this is filled in, send it back and engineering will pick up from
 there — either closing out the release, or fixing whatever this surfaced.
-------------------------------------------------------------

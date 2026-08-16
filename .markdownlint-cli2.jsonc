@@ -46,6 +46,11 @@
     "CHANGELOG.md",
     "LICENSE",
     "sdk/LICENSE",
-    "packages/contracts/LICENSE"
+    "packages/contracts/LICENSE",
+
+    // A plain-text email body kept verbatim as the durable copy of what was
+    // actually sent — ASCII section dividers and bare URLs are deliberate,
+    // matching what renders in a mail client, not a markdown-style gap.
+    "docs/release/WITNESS_HUMAN_UAT_HANDOFF.md"
   ]
 }
