@@ -165,6 +165,12 @@ function fakePrisma(sessionStatus = 'closed') {
         return row === undefined ? null : { ...row };
       },
     },
+    workspace: {
+      findUniqueOrThrow: async ({ where }: { where: { id: string } }) => ({
+        name: where.id === OTHER_WORKSPACE ? 'Elsewhere Program' : 'Eastern Footpath Program',
+        organisation: { name: 'Test Institution' },
+      }),
+    },
     sessionParticipant: table(participants),
     evidence: table(evidenceRows),
     decision: table(decisions),
@@ -933,6 +939,31 @@ describe('Report exports', () => {
     for (const format of ['html', 'markdown', 'csv'] as const) {
       expect(renderExport(rendered, format).body).toMatch(/withheld/i);
     }
+  });
+
+  it('includes organisation/program names, transcripts and the session summary in every export format', async () => {
+    const fixture = services();
+    const evidenceId = seedEvidence(fixture, {
+      attributionMode: 'facilitator_observation',
+      sourceParticipantId: null,
+    });
+    seedTranscript(fixture, evidenceId, { editedText: 'A human-corrected transcript.' });
+    seedSummary(fixture, { editedText: 'A human-edited session summary.' });
+    seedDecision(fixture);
+
+    const report = await published(fixture);
+    const rendered = await fixture.reportsService.render(WORKSPACE, SESSION, report.id);
+
+    expect(rendered.organisationName).toBe('Test Institution');
+    expect(rendered.workspaceName).toBe('Eastern Footpath Program');
+
+    for (const format of ['html', 'markdown', 'csv'] as const) {
+      const body = renderExport(rendered, format).body;
+      expect(body).toContain('A human-corrected transcript.');
+      expect(body).toContain('A human-edited session summary.');
+    }
+    expect(renderHtml(rendered)).toContain('Test Institution');
+    expect(renderMarkdown(rendered)).toContain('Test Institution');
   });
 
   it('escapes HTML rather than emitting caller-supplied markup', async () => {

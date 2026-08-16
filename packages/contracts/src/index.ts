@@ -2027,6 +2027,8 @@ export interface RenderedSessionSummary {
  */
 export interface RenderedReport {
   report: ReportDetail;
+  organisationName: string;
+  workspaceName: string;
   session: {
     title: string;
     sessionType: string;
