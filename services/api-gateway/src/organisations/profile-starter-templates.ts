@@ -24,6 +24,7 @@ export const PROFILE_STARTER_CONSENT_TEMPLATES: Partial<
       'what we may use your contribution for.',
     supportedLanguages: ['en'],
     categories: [
+      { category: 'participation', required: true },
       { category: 'audio_recording', required: false },
       { category: 'transcription', required: false },
       { category: 'ai_processing', required: false },
@@ -38,6 +39,7 @@ export const PROFILE_STARTER_CONSENT_TEMPLATES: Partial<
       'it for follow-up. Nothing leaves this device.',
     supportedLanguages: ['en'],
     categories: [
+      { category: 'participation', required: true },
       { category: 'audio_recording', required: false },
       { category: 'transcription', required: false },
       { category: 'ai_processing', required: false },
@@ -52,6 +54,7 @@ export const PROFILE_STARTER_CONSENT_TEMPLATES: Partial<
       'authorised to review this matter.',
     supportedLanguages: ['en'],
     categories: [
+      { category: 'participation', required: true },
       { category: 'audio_recording', required: true },
       { category: 'transcription', required: true },
       { category: 'internal_organisational_use', required: false },
@@ -66,6 +69,7 @@ export const PROFILE_STARTER_CONSENT_TEMPLATES: Partial<
       'could not attend. Nothing leaves this device.',
     supportedLanguages: ['en'],
     categories: [
+      { category: 'participation', required: true },
       { category: 'audio_recording', required: false },
       { category: 'transcription', required: false },
       { category: 'ai_processing', required: false },
