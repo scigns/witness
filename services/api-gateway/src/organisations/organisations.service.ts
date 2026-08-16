@@ -7,7 +7,7 @@
  * (ADR-0003).
  */
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import {
@@ -19,6 +19,7 @@ import {
   toAuditEventId,
   toOrganisationId,
   type Actor,
+  type InstitutionalProfile,
 } from '@witness/domain';
 import type { OrganisationStorageUsage, OrganisationSummary } from '@witness/contracts';
 
@@ -26,6 +27,8 @@ import { PrismaService } from '../infrastructure/prisma.service.js';
 import { sha256 } from '../infrastructure/hashing.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { StorageQuotaService } from './storage-quota.service.js';
+import { PROFILE_STARTER_CONSENT_TEMPLATES } from './profile-starter-templates.js';
+import { ConsentTemplatesService } from '../consent-templates/consent-templates.service.js';
 import type { Principal } from '../authz/authorization.port.js';
 
 /**
@@ -45,9 +48,12 @@ function isUniqueConstraintViolation(error: unknown): boolean {
 
 @Injectable()
 export class OrganisationsService {
+  private readonly logger = new Logger(OrganisationsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageQuota: StorageQuotaService,
+    private readonly consentTemplates: ConsentTemplatesService,
   ) {}
 
   /**
@@ -70,6 +76,7 @@ export class OrganisationsService {
     return rows.map((row) => ({
       id: row.id,
       name: row.name,
+      profile: row.profile,
       createdAt: row.createdAt.toISOString(),
     }));
   }
@@ -100,6 +107,8 @@ export class OrganisationsService {
     administratorEmail: string,
     administratorName: string,
     principal: Principal,
+    profile?: InstitutionalProfile,
+    storageQuotaBytes?: number,
   ): Promise<OrganisationSummary> {
     const actor = await this.resolveActor(principal);
     const now = new Date();
@@ -109,143 +118,177 @@ export class OrganisationsService {
       name,
       createdBy: actor,
       createdAt: now,
+      ...(profile !== undefined ? { profile } : {}),
+      ...(storageQuotaBytes !== undefined ? { storageQuotaBytes } : {}),
     });
 
     const administratorUserId = randomUUID();
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.organisation.create({
-        data: {
-          id: outcome.organisation.id,
-          name: outcome.organisation.name,
-          storageQuotaBytes: BigInt(outcome.organisation.storageQuotaBytes),
-          createdAt: outcome.organisation.createdAt,
-        },
-      });
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.organisation.create({
+          data: {
+            id: outcome.organisation.id,
+            name: outcome.organisation.name,
+            storageQuotaBytes: BigInt(outcome.organisation.storageQuotaBytes),
+            profile: outcome.organisation.profile,
+            createdAt: outcome.organisation.createdAt,
+          },
+        });
 
-      const event = createAuditEvent(
-        {
-          id: toAuditEventId(randomUUID()),
-          subjectType: 'organisation',
-          subjectId: outcome.organisation.id,
-          action: outcome.event.action,
-          actor: outcome.event.actor,
-          occurredAt: now,
-          // The organisation's own chain starts here — nothing can precede the
-          // event that brought the subject itself into existence.
-          previousHash: null,
-          metadata: { ...outcome.event.metadata },
-        },
-        sha256,
-      );
-
-      await tx.auditEvent.create({
-        data: {
-          id: event.id,
-          subjectType: event.subjectType,
-          subjectId: event.subjectId,
-          action: event.action,
-          actorId: event.actor.id,
-          occurredAt: event.occurredAt,
-          previousHash: event.previousHash,
-          hash: event.hash,
-          metadata: event.metadata,
-        },
-      });
-
-      const existingUser = await tx.user.findUnique({ where: { email: administratorEmail } });
-      let userId = existingUser?.id ?? administratorUserId;
-      let createdNewUser = existingUser === null;
-
-      if (createdNewUser) {
-        try {
-          await tx.user.create({
-            data: {
-              id: userId,
-              email: administratorEmail,
-              displayName: administratorName,
-              accountState: 'invited',
-              createdAt: now,
-              updatedAt: now,
-            },
-          });
-        } catch (error) {
-          // Lost a race with a concurrent organisation:create for the same
-          // administrator email — email is unique, and findUnique above ran
-          // outside any lock. Fall back to the row the other request just
-          // created rather than surfacing a 500 for something that is not
-          // actually a conflict from the caller's point of view.
-          if (!isUniqueConstraintViolation(error)) throw error;
-          const winner = await tx.user.findUnique({ where: { email: administratorEmail } });
-          if (winner === null) throw error;
-          userId = winner.id;
-          createdNewUser = false;
-        }
-      }
-
-      await tx.organisationMembership.create({
-        data: {
-          id: randomUUID(),
-          organisationId: outcome.organisation.id,
-          userId,
-          state: 'active',
-          createdAt: now,
-          updatedAt: now,
-        },
-      });
-
-      await tx.roleAssignment.create({
-        data: {
-          id: randomUUID(),
-          scopeType: 'organisation',
-          organisationId: outcome.organisation.id,
-          userId,
-          role: 'admin',
-          createdAt: now,
-          updatedAt: now,
-        },
-      });
-
-      // Only the first event for a brand-new user's own chain starts at
-      // previousHash: null. An organisation:create invite to an email that
-      // already has a user row (a person administering more than one
-      // organisation) must not overwrite that chain — it gets no separate
-      // event of its own here; the organisation.created event above and the
-      // membership/role-assignment rows are the record of what happened.
-      if (createdNewUser) {
-        const userEvent = createAuditEvent(
+        const event = createAuditEvent(
           {
             id: toAuditEventId(randomUUID()),
-            subjectType: 'user',
-            subjectId: userId,
-            action: 'user.invited',
-            actor,
+            subjectType: 'organisation',
+            subjectId: outcome.organisation.id,
+            action: outcome.event.action,
+            actor: outcome.event.actor,
             occurredAt: now,
+            // The organisation's own chain starts here — nothing can precede the
+            // event that brought the subject itself into existence.
             previousHash: null,
-            metadata: { via: 'organisation:create', role: 'admin' },
+            metadata: { ...outcome.event.metadata },
           },
           sha256,
         );
 
         await tx.auditEvent.create({
           data: {
-            id: userEvent.id,
-            subjectType: userEvent.subjectType,
-            subjectId: userEvent.subjectId,
-            action: userEvent.action,
-            actorId: userEvent.actor.id,
-            occurredAt: userEvent.occurredAt,
-            previousHash: userEvent.previousHash,
-            hash: userEvent.hash,
-            metadata: userEvent.metadata,
+            id: event.id,
+            subjectType: event.subjectType,
+            subjectId: event.subjectId,
+            action: event.action,
+            actorId: event.actor.id,
+            occurredAt: event.occurredAt,
+            previousHash: event.previousHash,
+            hash: event.hash,
+            metadata: event.metadata,
+          },
+        });
+
+        const existingUser = await tx.user.findUnique({ where: { email: administratorEmail } });
+        let userId = existingUser?.id ?? administratorUserId;
+        let createdNewUser = existingUser === null;
+
+        if (createdNewUser) {
+          try {
+            await tx.user.create({
+              data: {
+                id: userId,
+                email: administratorEmail,
+                displayName: administratorName,
+                accountState: 'invited',
+                createdAt: now,
+                updatedAt: now,
+              },
+            });
+          } catch (error) {
+            // Lost a race with a concurrent organisation:create for the same
+            // administrator email — email is unique, and findUnique above ran
+            // outside any lock. Fall back to the row the other request just
+            // created rather than surfacing a 500 for something that is not
+            // actually a conflict from the caller's point of view.
+            if (!isUniqueConstraintViolation(error)) throw error;
+            const winner = await tx.user.findUnique({ where: { email: administratorEmail } });
+            if (winner === null) throw error;
+            userId = winner.id;
+            createdNewUser = false;
+          }
+        }
+
+        await tx.organisationMembership.create({
+          data: {
+            id: randomUUID(),
+            organisationId: outcome.organisation.id,
+            userId,
+            state: 'active',
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+
+        await tx.roleAssignment.create({
+          data: {
+            id: randomUUID(),
+            scopeType: 'organisation',
+            organisationId: outcome.organisation.id,
+            userId,
+            role: 'admin',
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+
+        // Only the first event for a brand-new user's own chain starts at
+        // previousHash: null. An organisation:create invite to an email that
+        // already has a user row (a person administering more than one
+        // organisation) must not overwrite that chain — it gets no separate
+        // event of its own here; the organisation.created event above and the
+        // membership/role-assignment rows are the record of what happened.
+        if (createdNewUser) {
+          const userEvent = createAuditEvent(
+            {
+              id: toAuditEventId(randomUUID()),
+              subjectType: 'user',
+              subjectId: userId,
+              action: 'user.invited',
+              actor,
+              occurredAt: now,
+              previousHash: null,
+              metadata: { via: 'organisation:create', role: 'admin' },
+            },
+            sha256,
+          );
+
+          await tx.auditEvent.create({
+            data: {
+              id: userEvent.id,
+              subjectType: userEvent.subjectType,
+              subjectId: userEvent.subjectId,
+              action: userEvent.action,
+              actorId: userEvent.actor.id,
+              occurredAt: userEvent.occurredAt,
+              previousHash: userEvent.previousHash,
+              hash: userEvent.hash,
+              metadata: userEvent.metadata,
+            },
+          });
+        }
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        throw new ConflictException({
+          error: {
+            code: 'ORGANISATION_NAME_TAKEN',
+            message: `An organisation named '${name}' already exists. Choose a different name.`,
           },
         });
       }
-    });
+      throw error;
+    }
+
+    // Best-effort: seeds one starter consent template for the chosen
+    // profile (profile-starter-templates.ts) — a facilitator's editable
+    // starting point, not a requirement for the organisation to exist. A
+    // seeding failure is logged, not surfaced, so a template-service issue
+    // never undoes an organisation that was otherwise created successfully.
+    const starter = PROFILE_STARTER_CONSENT_TEMPLATES[outcome.organisation.profile];
+    if (starter !== undefined) {
+      try {
+        await this.consentTemplates.create(outcome.organisation.id, starter, principal);
+      } catch (error) {
+        this.logger.warn(
+          `Failed to seed the '${outcome.organisation.profile}' starter consent template for ` +
+            `organisation '${outcome.organisation.id}': ` +
+            (error instanceof Error ? error.message : String(error)),
+        );
+      }
+    }
 
     return {
       id: outcome.organisation.id,
       name: outcome.organisation.name,
+      profile: outcome.organisation.profile,
       createdAt: outcome.organisation.createdAt.toISOString(),
     };
   }
@@ -283,6 +326,7 @@ export class OrganisationsService {
         id: toOrganisationId(row.id),
         name: row.name,
         storageQuotaBytes: Number(row.storageQuotaBytes),
+        profile: row.profile as InstitutionalProfile,
         createdAt: row.createdAt,
       },
       quotaBytes,

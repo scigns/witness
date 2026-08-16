@@ -64,6 +64,42 @@ describe('createOrganisation', () => {
       }),
     ).toThrow(/must have a name/i);
   });
+
+  it('defaults the profile to "general"', () => {
+    const outcome = createOrganisation({
+      id: toOrganisationId('22222222-2222-4222-8222-222222222222'),
+      name: 'Test Institution',
+      createdBy: ACTOR,
+      createdAt: NOW,
+    });
+
+    expect(outcome.organisation.profile).toBe('general');
+  });
+
+  it('accepts a recognised institutional profile', () => {
+    const outcome = createOrganisation({
+      id: toOrganisationId('22222222-2222-4222-8222-222222222222'),
+      name: 'Test Institution',
+      createdBy: ACTOR,
+      createdAt: NOW,
+      profile: 'church',
+    });
+
+    expect(outcome.organisation.profile).toBe('church');
+    expect(outcome.event.metadata).toMatchObject({ profile: 'church' });
+  });
+
+  it('rejects an unrecognised profile', () => {
+    expect(() =>
+      createOrganisation({
+        id: toOrganisationId('22222222-2222-4222-8222-222222222222'),
+        name: 'Test Institution',
+        createdBy: ACTOR,
+        createdAt: NOW,
+        profile: 'not-a-real-profile',
+      }),
+    ).toThrow(InvariantViolation);
+  });
 });
 
 describe('updateStorageQuota', () => {
@@ -71,6 +107,7 @@ describe('updateStorageQuota', () => {
     id: toOrganisationId('22222222-2222-4222-8222-222222222222'),
     name: 'Test Institution',
     storageQuotaBytes: DEFAULT_STORAGE_QUOTA_BYTES,
+    profile: 'general',
     createdAt: NOW,
   };
 

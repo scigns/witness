@@ -24,10 +24,22 @@ const NAME_MAX = 200;
 /** 5 GiB — Flight 1's included storage allowance per organisation. */
 export const DEFAULT_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
 
+/**
+ * A profile is a starting point, not a fork: it configures which sensible
+ * defaults an organisation gets at creation (e.g. the starter consent
+ * template `prisma/bootstrap.ts`-style seeding picks — see
+ * `organisations.service.ts`), never a different code path or a different
+ * deployment. `general` is the unopinionated default for an institution
+ * that does not match one of the named ones.
+ */
+export const INSTITUTIONAL_PROFILES = ['general', 'spc', 'fta', 'moj', 'church'] as const;
+export type InstitutionalProfile = (typeof INSTITUTIONAL_PROFILES)[number];
+
 export interface Organisation {
   readonly id: OrganisationId;
   readonly name: string;
   readonly storageQuotaBytes: number;
+  readonly profile: InstitutionalProfile;
   readonly createdAt: Date;
 }
 
@@ -44,6 +56,16 @@ function assertStorageQuota(bytes: number): number {
     );
   }
   return bytes;
+}
+
+function assertProfile(profile: string): InstitutionalProfile {
+  if (!(INSTITUTIONAL_PROFILES as readonly string[]).includes(profile)) {
+    throw new InvariantViolation(
+      `'${profile}' is not a recognised institutional profile. Choose one of: ${INSTITUTIONAL_PROFILES.join(', ')}.`,
+      'INVALID_PROFILE',
+    );
+  }
+  return profile as InstitutionalProfile;
 }
 
 function assertName(name: string): string {
@@ -80,11 +102,13 @@ export function createOrganisation(input: {
   createdBy: Actor;
   createdAt: Date;
   storageQuotaBytes?: number;
+  profile?: string;
 }): OrganisationOutcome {
   const organisation: Organisation = {
     id: input.id,
     name: assertName(input.name),
     storageQuotaBytes: assertStorageQuota(input.storageQuotaBytes ?? DEFAULT_STORAGE_QUOTA_BYTES),
+    profile: assertProfile(input.profile ?? 'general'),
     createdAt: input.createdAt,
   };
 
@@ -93,7 +117,7 @@ export function createOrganisation(input: {
     event: {
       action: 'organisation.created',
       actor: input.createdBy,
-      metadata: { name: organisation.name },
+      metadata: { name: organisation.name, profile: organisation.profile },
     },
   };
 }

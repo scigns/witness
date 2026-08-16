@@ -397,6 +397,7 @@ export class AuthenticationService {
           .map((m) => ({
             id: m.organisation.id,
             name: m.organisation.name,
+            profile: m.organisation.profile,
             createdAt: m.organisation.createdAt.toISOString(),
             role: roleByOrganisation.get(m.organisation.id) ?? null,
           })),

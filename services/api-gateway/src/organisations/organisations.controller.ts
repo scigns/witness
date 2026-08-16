@@ -68,6 +68,10 @@ export class OrganisationsController {
         parsed.data.administratorEmail,
         parsed.data.administratorName,
         request.principal!,
+        parsed.data.profile,
+        parsed.data.storageQuotaGb !== undefined
+          ? Math.round(parsed.data.storageQuotaGb * 1024 * 1024 * 1024)
+          : undefined,
       );
     } catch (error) {
       if (error instanceof DomainError) {
