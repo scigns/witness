@@ -12,6 +12,58 @@ own subsection, regardless of size — those changes carry obligations for opera
 
 ---
 
+## [0.2.0] — 2026-08-16 — Controlled Pilot
+
+> **Witness Controlled Pilot — real institutional use under supervision.**
+>
+> Authenticated, role- and tenant-scoped, with consent enforcement, local transcription and AI
+> summarisation, object storage with per-organisation quota, and report export. Not yet a general
+> release: no multi-browser human UAT for the Reviewer/Observer roles, no genuine Fijian/iTaukei
+> transcription evidence, and no offline/air-gapped install bundle.
+
+Converts the engineering-complete build into an operationally supportable pilot: a verified
+release candidate, a full production flight (login journey, role and tenant regression, backup and
+independent restore, rollback procedure), production secret hygiene review, and a pilot support
+path via GitHub Issues.
+
+### Added
+
+- Institutional onboarding: create an organisation with a starting profile (SPC, FTA, MOJ, Church),
+  a storage quota, and a first administrator, in one step
+- Per-organisation usage metering (storage, members, participants, sessions, transcription and AI
+  jobs, exports)
+- PWA installability (manifest, icons, `apple-mobile-web-app` metadata)
+- A severity field (P0–P3) on the bug report template, for pilot-support triage
+
+### Fixed
+
+- Starter consent templates for the SPC/FTA/MOJ/Church profiles were missing the required
+  `participation` category, which the domain layer rejects — new organisations created from these
+  profiles would have failed to seed a usable starter template
+- Report export (HTML, Markdown, CSV) silently omitted the organisation and program name, and
+  dropped transcripts and the session summary entirely from three of four export formats — an
+  operator exporting a session's record for an institution's own archive was not getting the whole
+  record
+- `scripts/ops/backup-status.sh` crashed with an unbound-variable error on the production host
+  (Linux); it tried the BSD `stat` flag first, which is a different, non-erroring flag on GNU stat
+
+### Operations
+
+- First verified backup → independent restore drill against this release, using the documented
+  `scripts/pilot/backup.sh` / `scripts/ops/restore.sh` path
+- Rollback procedure confirmed: no schema migration in this release, so rollback is `git checkout`
+  the previous known-good commit, rebuild, and recreate the affected containers
+- Confirmed no leftover placeholder or example credentials in the production `.env`; tightened
+  permissions on the UAT test-account password file
+
+### Known limitations
+
+- Reviewer and Observer role boundaries are proven at the API/authorization-policy level, not yet
+  via a live authenticated browser session — passwords are never entered into a browser or an API
+  call by the engineering agent, by design
+- No genuine Fijian/iTaukei audio has been supplied to verify transcription in that language
+- Safari/iPhone and Firefox have not been manually checked
+
 ## [0.1.0] — 2026-08-01 — Developer Preview
 
 > **Witness Developer Preview — foundational institutional-memory workflow.**
