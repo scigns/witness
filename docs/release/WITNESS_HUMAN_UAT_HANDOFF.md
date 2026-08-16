@@ -1,5 +1,8 @@
 # Witness — Human UAT Handoff (v0.2.0, Controlled Pilot)
 
+**Status:** Active
+**Owner:** Release Manager
+
 This is the human acceptance testing package for the Witness v0.2.0
 controlled-pilot release. A Gmail draft with this same content was prepared
 for koto@dreamers-media.com; this copy is kept in the repository as the
