@@ -63,6 +63,7 @@ import type {
   TranscriptView,
   OrganisationMembershipView,
   OrganisationStorageUsage,
+  OrganisationUsage,
   OrganisationSummary,
   OutcomeCandidateJobView,
   ParticipantConsentRecordDetail,
@@ -349,6 +350,12 @@ export const api = {
   ): Promise<OrganisationStorageUsage> =>
     request<OrganisationStorageUsage>(
       `/api/v1/organisations/${encodeURIComponent(organisationId)}/storage`,
+      user,
+    ),
+
+  getOrganisationUsage: (organisationId: string, user: ActingUser): Promise<OrganisationUsage> =>
+    request<OrganisationUsage>(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/usage`,
       user,
     ),
 

@@ -1214,6 +1214,23 @@ export interface OrganisationStorageUsage {
   quotaBytes: string;
 }
 
+/**
+ * Per-organisation usage metering — server-derived counts only, never a
+ * client assertion, and never participant/evidence content, only counts of
+ * it. Not billing: no rate, no currency.
+ */
+export interface OrganisationUsage {
+  storageBytes: string;
+  storageQuotaBytes: string;
+  userCount: number;
+  participantCount: number;
+  programCount: number;
+  sessionCount: number;
+  transcriptionJobCount: number;
+  aiProcessingJobCount: number;
+  exportCount: number;
+}
+
 export const updateStorageQuotaRequestSchema = z.object({
   quotaBytes: z.coerce
     .number()

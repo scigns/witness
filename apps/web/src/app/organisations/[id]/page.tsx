@@ -16,6 +16,7 @@ import type {
   OrganisationMembershipView,
   OrganisationStorageUsage,
   OrganisationSummary,
+  OrganisationUsage,
   RoleAssignmentView,
   RoleDefinition,
   UserSummary,
@@ -46,6 +47,8 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
   const [organisation, setOrganisation] = useState<OrganisationSummary | null>(null);
   const [storage, setStorage] = useState<OrganisationStorageUsage | null>(null);
   const [storageUnavailable, setStorageUnavailable] = useState(false);
+  const [usage, setUsage] = useState<OrganisationUsage | null>(null);
+  const [usageUnavailable, setUsageUnavailable] = useState(false);
   const [quotaInput, setQuotaInput] = useState('');
   const [memberships, setMemberships] = useState<OrganisationMembershipView[]>([]);
   const [users, setUsers] = useState<UserSummary[]>([]);
@@ -91,6 +94,17 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
           if (cancelledRef.current) return;
           setStorage(null);
           setStorageUnavailable(true);
+        }
+
+        try {
+          const usageResult = await api.getOrganisationUsage(id, user);
+          if (cancelledRef.current) return;
+          setUsage(usageResult);
+          setUsageUnavailable(false);
+        } catch {
+          if (cancelledRef.current) return;
+          setUsage(null);
+          setUsageUnavailable(true);
         }
 
         try {
@@ -328,6 +342,38 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
                 or remove content to free up space, or increase the quota here.
               </p>
             </>
+          )}
+        </Card>
+      </section>
+
+      <section aria-labelledby="usage-heading">
+        <h2 id="usage-heading" className="mb-3 text-lg font-semibold">
+          Usage
+        </h2>
+        <Card>
+          {usageUnavailable ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              Usage isn&apos;t available to your role.
+            </p>
+          ) : usage === null ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">Loading…</p>
+          ) : (
+            <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+              {[
+                ['Members', usage.userCount],
+                ['Participants', usage.participantCount],
+                ['Programs', usage.programCount],
+                ['Sessions', usage.sessionCount],
+                ['Transcription jobs', usage.transcriptionJobCount],
+                ['AI processing jobs', usage.aiProcessingJobCount],
+                ['Exports', usage.exportCount],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-[var(--color-ink-muted)]">{label}</dt>
+                  <dd className="text-base font-medium">{value}</dd>
+                </div>
+              ))}
+            </dl>
           )}
         </Card>
       </section>

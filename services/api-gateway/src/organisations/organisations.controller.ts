@@ -21,6 +21,7 @@ import {
   updateStorageQuotaRequestSchema,
   type OrganisationStorageUsage,
   type OrganisationSummary,
+  type OrganisationUsage,
 } from '@witness/contracts';
 import { DomainError } from '@witness/domain';
 
@@ -30,11 +31,15 @@ import {
   type RequestWithPrincipal,
 } from '../authz/authorization.guard.js';
 import { OrganisationsService } from './organisations.service.js';
+import { OrganisationUsageService } from './organisation-usage.service.js';
 
 @Controller('api/v1/organisations')
 @UseGuards(AuthorizationGuard)
 export class OrganisationsController {
-  constructor(private readonly organisations: OrganisationsService) {}
+  constructor(
+    private readonly organisations: OrganisationsService,
+    private readonly organisationUsage: OrganisationUsageService,
+  ) {}
 
   @Get()
   @Requires('organisation:read')
@@ -89,6 +94,12 @@ export class OrganisationsController {
     @Param('organisationId') organisationId: string,
   ): Promise<OrganisationStorageUsage> {
     return this.organisations.storage(organisationId);
+  }
+
+  @Get(':organisationId/usage')
+  @Requires('organisation:read')
+  async usage(@Param('organisationId') organisationId: string): Promise<OrganisationUsage> {
+    return this.organisationUsage.usage(organisationId);
   }
 
   @Patch(':organisationId/storage-quota')
