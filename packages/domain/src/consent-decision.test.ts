@@ -27,6 +27,7 @@ import {
   mayRecordVideo,
   mayReportExternally,
   mayReuseInFuture,
+  maySubmitEvidence,
   mayTranscribe,
   mayUseCategory,
   mayUseForResearch,
@@ -56,6 +57,7 @@ const OPTIONAL = [
   'audio_recording',
   'video_recording',
   'photography',
+  'evidence_submission',
   'transcription',
   'ai_processing',
   'attributed_quotation',
@@ -190,7 +192,7 @@ describe('category questions are gated on participation', () => {
   });
 });
 
-describe('each of the fourteen dependent category questions', () => {
+describe('each of the fifteen dependent category questions', () => {
   const fullyGranted = record({
     categoryDecisions: [
       { category: 'participation', granted: true },
@@ -206,6 +208,7 @@ describe('each of the fourteen dependent category questions', () => {
     ['audio_recording', mayRecordAudio],
     ['video_recording', mayRecordVideo],
     ['photography', mayPhotograph],
+    ['evidence_submission', maySubmitEvidence],
     ['transcription', mayTranscribe],
     ['ai_processing', mayProcessWithAi],
     ['attributed_quotation', mayAttributeQuotation],
@@ -222,8 +225,88 @@ describe('each of the fourteen dependent category questions', () => {
   });
 });
 
+describe('maySubmitEvidence', () => {
+  it('ATTACK — photography being granted does not substitute for evidence_submission', () => {
+    const r = record({
+      categoryDecisions: [
+        { category: 'participation', granted: true },
+        { category: 'photography', granted: true },
+      ],
+    });
+    const answer = maySubmitEvidence(contextFor([r]));
+    expect(answer.allowed).toBe(false);
+    expect(answer.reason).toMatch(/never decided/i);
+  });
+
+  it('ATTACK — ai_processing being granted does not substitute for evidence_submission', () => {
+    const r = record({
+      categoryDecisions: [
+        { category: 'participation', granted: true },
+        { category: 'ai_processing', granted: true },
+      ],
+    });
+    expect(maySubmitEvidence(contextFor([r])).allowed).toBe(false);
+  });
+
+  it('ATTACK — evidence_submission being granted does not itself grant photography', () => {
+    const r = record({
+      categoryDecisions: [
+        { category: 'participation', granted: true },
+        { category: 'evidence_submission', granted: true },
+      ],
+    });
+    expect(mayPhotograph(contextFor([r])).allowed).toBe(false);
+  });
+
+  it('is allowed once both participation and evidence_submission are granted', () => {
+    const r = record({
+      categoryDecisions: [
+        { category: 'participation', granted: true },
+        { category: 'evidence_submission', granted: true },
+      ],
+    });
+    expect(maySubmitEvidence(contextFor([r])).allowed).toBe(true);
+  });
+
+  it('fails closed when evidence_submission was refused', () => {
+    const r = record({
+      categoryDecisions: [
+        { category: 'participation', granted: true },
+        { category: 'evidence_submission', granted: false },
+      ],
+    });
+    expect(maySubmitEvidence(contextFor([r])).allowed).toBe(false);
+  });
+
+  it('fails closed when evidence_submission was revoked (withdrawn record)', () => {
+    const r = record({
+      categoryDecisions: [
+        { category: 'participation', granted: true },
+        { category: 'evidence_submission', granted: true },
+      ],
+    });
+    const withdrawn = withdrawParticipantConsent(r, HUMAN, null, LATER).record;
+    expect(maySubmitEvidence(contextFor([withdrawn], LATER)).allowed).toBe(false);
+  });
+
+  it('fails closed when the active record has expired', () => {
+    const r = record({
+      categoryDecisions: [
+        { category: 'participation', granted: true },
+        { category: 'evidence_submission', granted: true },
+      ],
+      expiresAt: NOW,
+    });
+    expect(maySubmitEvidence(contextFor([r], LATER)).allowed).toBe(false);
+  });
+
+  it('fails closed when no consent record exists at all', () => {
+    expect(maySubmitEvidence(contextFor([])).allowed).toBe(false);
+  });
+});
+
 describe('mayUseCategory', () => {
-  it('answers for an organisation-defined category beyond the well-known fifteen', () => {
+  it('answers for an organisation-defined category beyond the well-known sixteen', () => {
     const r = record({
       categoryDecisions: [
         { category: 'participation', granted: true },

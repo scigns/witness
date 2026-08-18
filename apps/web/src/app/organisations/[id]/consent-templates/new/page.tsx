@@ -26,6 +26,7 @@ const CATEGORY_LABELS: Record<(typeof WELL_KNOWN_CONSENT_CATEGORIES)[number], st
   audio_recording: 'Audio recording',
   video_recording: 'Video recording',
   photography: 'Photography',
+  evidence_submission: 'Submitting a document or photo as evidence',
   transcription: 'Transcription',
   ai_processing: 'AI processing',
   attributed_quotation: 'Attributed quotation',

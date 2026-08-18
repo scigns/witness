@@ -124,6 +124,20 @@ export function mayPhotograph(context: ConsentDecisionContext): ConsentAnswer {
   return dependentOnParticipation(context, 'photography' satisfies ConsentCategory);
 }
 
+/**
+ * A participant's own document, image, or other supported non-recording
+ * artefact, submitted as evidence. Deliberately a distinct category from
+ * `photography` (permission for Witness/the operator to photograph a
+ * person or scene) and from `ai_processing`/`transcription`/`publication`/
+ * etc. (what may be done with the artefact afterwards) — this category
+ * answers only "did the submitter agree to hand this artefact to Witness as
+ * evidence", nothing else, and does not establish permission on behalf of
+ * any third party the artefact's content may identify.
+ */
+export function maySubmitEvidence(context: ConsentDecisionContext): ConsentAnswer {
+  return dependentOnParticipation(context, 'evidence_submission' satisfies ConsentCategory);
+}
+
 export function mayTranscribe(context: ConsentDecisionContext): ConsentAnswer {
   return dependentOnParticipation(context, 'transcription' satisfies ConsentCategory);
 }

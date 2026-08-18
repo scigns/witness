@@ -448,6 +448,7 @@ export const WELL_KNOWN_CONSENT_CATEGORIES = [
   'audio_recording',
   'video_recording',
   'photography',
+  'evidence_submission',
   'transcription',
   'ai_processing',
   'attributed_quotation',
@@ -1706,7 +1707,7 @@ export const editSummaryRequestSchema = z.object({
 });
 export type EditSummaryRequest = z.infer<typeof editSummaryRequestSchema>;
 
-export const EVIDENCE_ATTACHMENT_KINDS = ['audio'] as const;
+export const EVIDENCE_ATTACHMENT_KINDS = ['audio', 'document', 'image'] as const;
 export type EvidenceAttachmentKind = (typeof EVIDENCE_ATTACHMENT_KINDS)[number];
 
 /**

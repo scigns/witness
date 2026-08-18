@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Actor } from './actor.js';
 import { InvariantViolation } from './errors.js';
-import { captureEvidenceAttachment } from './evidence-attachment.js';
+import { captureEvidenceAttachment, inferAttachmentKind } from './evidence-attachment.js';
 import { toActorId, toEvidenceAttachmentId, toEvidenceId } from './ids.js';
 
 const ACTOR: Actor = {
@@ -63,5 +63,51 @@ describe('captureEvidenceAttachment', () => {
     });
 
     expect(outcome.attachment.originalFilename).toBe('session-recording.mp3');
+  });
+
+  it('captures a supported document', () => {
+    const outcome = captureEvidenceAttachment({
+      ...baseInput(),
+      kind: 'document',
+      originalFilename: 'exhibit-a.pdf',
+      contentType: 'application/pdf',
+    });
+
+    expect(outcome.attachment.kind).toBe('document');
+  });
+
+  it('captures a supported image', () => {
+    const outcome = captureEvidenceAttachment({
+      ...baseInput(),
+      kind: 'image',
+      originalFilename: 'poster.jpg',
+      contentType: 'image/jpeg',
+    });
+
+    expect(outcome.attachment.kind).toBe('image');
+  });
+
+  it('rejects a document content type submitted as an image', () => {
+    expect(() =>
+      captureEvidenceAttachment({ ...baseInput(), kind: 'image', contentType: 'application/pdf' }),
+    ).toThrow(InvariantViolation);
+  });
+});
+
+describe('inferAttachmentKind', () => {
+  it('maps an audio content type to audio', () => {
+    expect(inferAttachmentKind('audio/mpeg')).toBe('audio');
+  });
+
+  it('maps a PDF to document', () => {
+    expect(inferAttachmentKind('application/pdf')).toBe('document');
+  });
+
+  it('maps a JPEG to image', () => {
+    expect(inferAttachmentKind('image/jpeg')).toBe('image');
+  });
+
+  it('returns null for an unsupported content type', () => {
+    expect(inferAttachmentKind('application/zip')).toBeNull();
   });
 });

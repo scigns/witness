@@ -1,15 +1,15 @@
 /**
- * EvidenceAttachment — the source file (an audio recording, to start) backing
- * one piece of `Evidence`.
+ * EvidenceAttachment — the source file (audio, a document, or an image)
+ * backing one piece of `Evidence`.
  *
  * `Evidence.content` is a plain, human-authored text field (see
  * `evidence.ts`'s file header) — it has never had anywhere to put the actual
- * audio a facilitator captured during a session. This is that place: a
- * separate aggregate, one per `Evidence` row, immutable once captured. There
- * is no edit or replace here, on purpose — the underlying recording is
- * source material, not a draft; if it was captured wrong, the fix is
- * withdrawing the `Evidence` it belongs to, not silently swapping the file
- * an audit trail already points at.
+ * audio a facilitator captured during a session, or a document/image a
+ * participant submits. This is that place: a separate aggregate, one per
+ * `Evidence` row, immutable once captured. There is no edit or replace here,
+ * on purpose — the underlying file is source material, not a draft; if it
+ * was captured wrong, the fix is withdrawing the `Evidence` it belongs to,
+ * not silently swapping the file an audit trail already points at.
  *
  * Bytes live in the same Postgres database as everything else (ADR-0011):
  * the system of record is one thing, `scripts/ops/backup.sh` already backs
@@ -18,6 +18,15 @@
  * out. Content-type and size are validated here so nothing arrives at
  * storage that the product does not yet know how to play back or that could
  * exhaust it.
+ *
+ * `kind` also decides which consent question the application layer must ask
+ * before accepting the file (`evidence-attachment.service.ts`): `audio` asks
+ * `ConsentPolicyService.mayRecordAudio`, `document`/`image` ask
+ * `mayRecordAudio`'s sibling `maySubmitEvidence` — a participant consenting
+ * to be recorded is a different question from a participant consenting to
+ * hand over a document or photo they already have. `inferAttachmentKind`
+ * below is the single place a content type is mapped to a kind, so the two
+ * layers cannot silently disagree about which file goes through which gate.
  */
 
 import { InvariantViolation } from './errors.js';
@@ -25,13 +34,15 @@ import type { Actor } from './actor.js';
 import type { PendingAuditEvent } from './audit.js';
 import type { EvidenceAttachmentId, EvidenceId } from './ids.js';
 
-export const ATTACHMENT_KINDS = ['audio'] as const;
+export const ATTACHMENT_KINDS = ['audio', 'document', 'image'] as const;
 export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
 
 /**
- * Deliberately narrow — one well-supported container/codec combination per
- * kind that a browser's own `<audio>` element can play back with no
- * transcoding step, rather than accepting anything a recorder might produce.
+ * Deliberately narrow — one well-supported format per kind that a browser
+ * can play back or render natively with no transcoding step, rather than
+ * accepting anything a recorder or a file picker might produce. `document`
+ * is PDF only for the same reason: it is the one document format every
+ * supported browser can render in place without a plugin.
  */
 const ALLOWED_CONTENT_TYPES: Readonly<Record<AttachmentKind, readonly string[]>> = Object.freeze({
   audio: [
@@ -43,7 +54,22 @@ const ALLOWED_CONTENT_TYPES: Readonly<Record<AttachmentKind, readonly string[]>>
     'audio/webm',
     'audio/ogg',
   ],
+  document: ['application/pdf'],
+  image: ['image/jpeg', 'image/png', 'image/webp'],
 });
+
+/**
+ * Maps an uploaded file's content type to the attachment kind it belongs to,
+ * or `null` if it matches none of the supported formats for any kind — the
+ * caller's signal to refuse the upload before asking any consent question at
+ * all, since there is nothing a consent grant could authorise here.
+ */
+export function inferAttachmentKind(contentType: string): AttachmentKind | null {
+  for (const kind of ATTACHMENT_KINDS) {
+    if (ALLOWED_CONTENT_TYPES[kind].includes(contentType)) return kind;
+  }
+  return null;
+}
 
 const ORIGINAL_FILENAME_MAX = 300;
 

@@ -103,14 +103,20 @@ you want it asserted rather than eyeballed.
 
 ## 6. Verify storage
 
-Capture one piece of evidence with an audio attachment (attach a file, or
-record in browser) as a `contributor`/`facilitator` and confirm:
+Capture one piece of evidence with an attachment (audio — attach a file or
+record in browser — or a document/image) as a `contributor`/`facilitator`
+and confirm:
 
 - It uploads and appears on the session.
 - `GET /api/v1/organisations/<id>/usage` (or the organisation's usage page)
   reflects the new usage against the 5 GB quota.
 - Deleting it releases the quota back (see `01d8014` — the R2 object is
   deleted with the resource, not orphaned).
+- For a document or image specifically: attaching it to evidence with a
+  named source participant requires that participant's `evidence_submission`
+  consent granted — try it once denied (confirm a clear refusal, nothing
+  written) and once granted (confirm it attaches), per
+  `CLIENT_ROLLOUT_PROFILES.md`'s note on the category.
 
 ## 7. Run the first synthetic test
 

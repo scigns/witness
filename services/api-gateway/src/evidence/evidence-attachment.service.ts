@@ -1,14 +1,21 @@
 /**
- * Application layer for evidence attachments — the audio recording backing
- * one piece of `Evidence`.
+ * Application layer for evidence attachments — the audio, document, or image
+ * file backing one piece of `Evidence`.
  *
  * Same consent posture as `EvidenceService.resolveConsentBasis`: a refused
  * or missing consent answer throws `ForbiddenException` before anything is
- * written, and this service never re-derives that decision itself — it asks
- * `ConsentPolicyService.mayRecordAudio`, the same question capture already
- * asks for the `attributed`/`anonymous` quotation categories. Evidence with
- * no source participant (institutional-source, unattributed) has no consent
- * to check, same as capture.
+ * written, and this service never re-derives that decision itself. Which
+ * question it asks depends on the file's kind (`inferAttachmentKind`,
+ * `evidence-attachment.ts`'s file header): `audio` asks
+ * `ConsentPolicyService.mayRecordAudio`; `document`/`image` ask
+ * `maySubmitEvidence` — a participant consenting to be recorded is not the
+ * same question as a participant consenting to hand over an existing
+ * document or photo. Neither question says anything about a third party the
+ * file's content may identify, or about what may be done with it afterwards
+ * (transcription, AI processing, publication, ... — each its own category,
+ * asked elsewhere, unaffected by this one). Evidence with no source
+ * participant (institutional-source, unattributed) has no consent to check,
+ * same as capture.
  */
 
 import {
@@ -24,6 +31,7 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import {
   captureEvidenceAttachment,
+  inferAttachmentKind,
   InvariantViolation,
   toEvidenceAttachmentId,
   toEvidenceId,
@@ -89,6 +97,16 @@ export class EvidenceAttachmentService {
       });
     }
 
+    const kind = inferAttachmentKind(file.mimetype);
+    if (kind === null) {
+      throw new BadRequestException({
+        error: {
+          code: 'UNSUPPORTED_CONTENT_TYPE',
+          message: `'${file.mimetype}' is not a supported evidence attachment format.`,
+        },
+      });
+    }
+
     const evidenceRow = await this.requireEvidenceRow(workspaceId, sessionId, evidenceId);
 
     const existing = await this.prisma.evidenceAttachment.findUnique({ where: { evidenceId } });
@@ -103,6 +121,28 @@ export class EvidenceAttachmentService {
       });
     }
 
+    const now = new Date();
+
+    // Consent is checked — and can refuse the request — before the quota
+    // check or anything is written. A denied submission must cost the
+    // organisation nothing: no DB row, no object storage write, no quota
+    // consumed.
+    if (evidenceRow.sourceParticipantId !== null) {
+      const consent =
+        kind === 'audio'
+          ? await this.consentPolicy.mayRecordAudio(sessionId, evidenceRow.sourceParticipantId, now)
+          : await this.consentPolicy.maySubmitEvidence(
+              sessionId,
+              evidenceRow.sourceParticipantId,
+              now,
+            );
+      if (!consent.allowed) {
+        throw new ForbiddenException({
+          error: { code: 'CONSENT_NOT_GRANTED', message: consent.reason },
+        });
+      }
+    }
+
     try {
       await this.storageQuota.checkQuota(evidenceRow.organisationId, file.size);
     } catch (error) {
@@ -114,28 +154,13 @@ export class EvidenceAttachmentService {
       throw error;
     }
 
-    const now = new Date();
-
-    if (evidenceRow.sourceParticipantId !== null) {
-      const consent = await this.consentPolicy.mayRecordAudio(
-        sessionId,
-        evidenceRow.sourceParticipantId,
-        now,
-      );
-      if (!consent.allowed) {
-        throw new ForbiddenException({
-          error: { code: 'CONSENT_NOT_GRANTED', message: consent.reason },
-        });
-      }
-    }
-
     const actor = await resolveActor(this.prisma, principal);
     const checksumSha256 = createHash('sha256').update(file.buffer).digest('hex');
 
     const outcome = captureEvidenceAttachment({
       id: toEvidenceAttachmentId(randomUUID()),
       evidenceId: toEvidenceId(evidenceId),
-      kind: 'audio',
+      kind,
       originalFilename: file.originalname,
       contentType: file.mimetype,
       sizeBytes: file.size,

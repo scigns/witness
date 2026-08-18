@@ -51,6 +51,7 @@ export const CONSENT_CATEGORIES = [
   'audio_recording',
   'video_recording',
   'photography',
+  'evidence_submission',
   'transcription',
   'ai_processing',
   'attributed_quotation',
