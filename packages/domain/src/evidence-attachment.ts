@@ -88,19 +88,37 @@ export function inferAttachmentKind(contentType: string): AttachmentKind | null 
  * the same way), and this is a fail-closed *addition*, not a replacement
  * for `assertSupportedContentType`.
  */
-const FILE_SIGNATURES: Readonly<Partial<Record<string, (buffer: Buffer) => boolean>>> = {
-  'image/jpeg': (buffer) =>
-    buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff,
-  'image/png': (buffer) =>
-    buffer.length >= 8 &&
-    buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
-  'image/webp': (buffer) =>
-    buffer.length >= 12 &&
-    buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
-    buffer.subarray(8, 12).toString('ascii') === 'WEBP',
-  'application/pdf': (buffer) =>
-    buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-',
-};
+// A `Map`, not a plain object: `contentType` is attacker-controlled (the
+// caller's declared `Content-Type`), and an `object[contentType]` lookup
+// keyed by arbitrary user input risks resolving to an inherited
+// `Object.prototype` member (`toString`, `hasOwnProperty`, ...) instead of
+// `undefined` for an unrecognised key. A `Map`'s `get` has no prototype
+// chain to collide with, so an unrecognised content type is always exactly
+// `undefined`, never a surprise function.
+const FILE_SIGNATURES = new Map<string, (buffer: Buffer) => boolean>([
+  [
+    'image/jpeg',
+    (buffer) =>
+      buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff,
+  ],
+  [
+    'image/png',
+    (buffer) =>
+      buffer.length >= 8 &&
+      buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+  ],
+  [
+    'image/webp',
+    (buffer) =>
+      buffer.length >= 12 &&
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP',
+  ],
+  [
+    'application/pdf',
+    (buffer) => buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-',
+  ],
+]);
 
 /**
  * `true` if the bytes match what `contentType` claims, for the kinds this
@@ -110,7 +128,7 @@ const FILE_SIGNATURES: Readonly<Partial<Record<string, (buffer: Buffer) => boole
  * only ever asserts the latter.
  */
 export function matchesDeclaredContentType(contentType: string, buffer: Buffer): boolean {
-  const check = FILE_SIGNATURES[contentType];
+  const check = FILE_SIGNATURES.get(contentType);
   return check === undefined ? true : check(buffer);
 }
 
