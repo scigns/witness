@@ -242,7 +242,12 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
     {
       label: 'People',
       ready: memberships.length > 0,
-      href: `/workspaces/${id}/manage`,
+      // Membership management lives further down this same page (the
+      // "Members" section below), not on a separate route — an href back to
+      // `/workspaces/${id}/manage` was a self-link that looked like it did
+      // nothing when clicked. An in-page anchor actually takes the
+      // facilitator to the section this row describes.
+      href: '#members-heading',
       detail: `${memberships.length} member${memberships.length === 1 ? '' : 's'} added.`,
     },
     {

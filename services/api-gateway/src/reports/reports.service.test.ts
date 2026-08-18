@@ -287,7 +287,10 @@ function fakePrisma(sessionStatus = 'closed') {
           .filter(
             (e) => e['subjectType'] === where.subjectType && e['subjectId'] === where.subjectId,
           )
-          .map((e) => ({ ...e })),
+          .map((e) => ({
+            ...e,
+            actor: actors.find((a) => a['id'] === e['actorId']) ?? { displayName: 'unknown' },
+          })),
       create: async ({ data }: { data: Record<string, unknown> }) => {
         auditEvents.push({ ...data } as Row);
         return { ...data };
@@ -631,6 +634,15 @@ describe('ReportsService — lifecycle', () => {
       'report.submitted',
       'report.approved',
       'report.published',
+    ]);
+    // Surfaced to end users on the report page (P3 UAT fix) — the copy there
+    // says exports are recorded "with... who took it", so the actor must
+    // actually be resolved, not just the raw actor id.
+    expect(history.map((event) => event.actorDisplayName)).toEqual([
+      'A Facilitator',
+      'A Facilitator',
+      'An Approver',
+      'An Approver',
     ]);
   });
 

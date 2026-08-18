@@ -119,6 +119,12 @@ function fakePrisma(hasConfiguration = true) {
           )
           .map((r) => ({ ...r })),
       create: async ({ data }: { data: Record<string, unknown> }) => {
+        const amendsId = data['amendsRecordId'];
+        if (typeof amendsId === 'string' && !records.some((r) => r['id'] === amendsId)) {
+          throw new Error(
+            `simulated foreign key violation: amends_record_id '${amendsId}' does not exist yet`,
+          );
+        }
         records.push({ ...data });
         return { ...data };
       },
@@ -129,6 +135,17 @@ function fakePrisma(hasConfiguration = true) {
         where: { id: string; version: number };
         data: Record<string, unknown>;
       }) => {
+        // Mirrors the real, non-deferrable foreign key on
+        // `superseded_by_record_id` — see `ParticipantConsentRecordsService.amend`'s
+        // comment on why the replacement record must already exist before this
+        // write can point at it. A wrong write order here reached production
+        // silently once already; this check is what would have caught it.
+        const supersededBy = data['supersededByRecordId'];
+        if (typeof supersededBy === 'string' && !records.some((r) => r['id'] === supersededBy)) {
+          throw new Error(
+            `simulated foreign key violation: superseded_by_record_id '${supersededBy}' does not exist yet`,
+          );
+        }
         const row = records.find((r) => r['id'] === where.id && r['version'] === where.version);
         if (row === undefined) return { count: 0 };
         Object.assign(row, data);
@@ -358,6 +375,103 @@ describe('ParticipantConsentRecordsService.amend', () => {
     await expect(
       service.amend(WORKSPACE_1, SESSION_1, PARTICIPANT_1, captureRequest(), FACILITATOR),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  // Regression — UAT found `amend` throwing an uncaught 500 in production: the
+  // transaction pointed the old record's `supersededByRecordId` at the new
+  // record's id before the new row existed, tripping the (correct,
+  // non-deferrable) foreign key. `fakePrisma`'s `updateMany`/`create` above
+  // now simulate that constraint, so this reproduces the failure directly
+  // against the real write order rather than only against the previously
+  // blind in-memory double.
+  it('does not throw a foreign key violation — the replacement record is written before the old one is superseded', async () => {
+    const { prisma } = fakePrisma();
+    const service = new ParticipantConsentRecordsService(prisma, fakePolicyEnforcement(true));
+    await service.capture(WORKSPACE_1, SESSION_1, PARTICIPANT_1, captureRequest(), FACILITATOR);
+
+    await expect(
+      service.amend(
+        WORKSPACE_1,
+        SESSION_1,
+        PARTICIPANT_1,
+        captureRequest({
+          categoryDecisions: [
+            { category: 'participation', granted: true },
+            { category: 'audio_recording', granted: false },
+          ],
+        }),
+        FACILITATOR,
+      ),
+    ).resolves.toBeDefined();
+  });
+
+  it('an amendment failure leaves the original consent record exactly as it was before the attempt', async () => {
+    const { prisma, records } = fakePrisma();
+    const service = new ParticipantConsentRecordsService(prisma, fakePolicyEnforcement(true));
+    const original = await service.capture(
+      WORKSPACE_1,
+      SESSION_1,
+      PARTICIPANT_1,
+      captureRequest(),
+      FACILITATOR,
+    );
+    const beforeAttempt = { ...records.find((r) => r['id'] === original.id)! };
+
+    // A category outside the session's configured set fails domain
+    // validation (`InvariantViolation`, a `DomainError`) before the
+    // transaction ever opens — no write of any kind should have happened.
+    await expect(
+      service.amend(
+        WORKSPACE_1,
+        SESSION_1,
+        PARTICIPANT_1,
+        captureRequest({
+          categoryDecisions: [{ category: 'video_recording', granted: true }],
+        }),
+        FACILITATOR,
+      ),
+    ).rejects.toThrow();
+
+    const afterAttempt = records.find((r) => r['id'] === original.id)!;
+    expect(afterAttempt).toEqual(beforeAttempt);
+    expect(records).toHaveLength(1);
+
+    const stillActive = await service.getActive(WORKSPACE_1, SESSION_1, PARTICIPANT_1, FACILITATOR);
+    expect(stillActive.id).toBe(original.id);
+    expect(stillActive.status).toBe('granted');
+  });
+
+  it('an amendment that fails after the replacement record is written rolls back — no orphaned record survives', async () => {
+    const { prisma, records } = fakePrisma();
+    const service = new ParticipantConsentRecordsService(prisma, fakePolicyEnforcement(true));
+    const original = await service.capture(
+      WORKSPACE_1,
+      SESSION_1,
+      PARTICIPANT_1,
+      captureRequest(),
+      FACILITATOR,
+    );
+
+    // Simulate a second request's amendment landing between this attempt's
+    // read of `active` and its write: bump the row's version at the moment
+    // the replacement record is created (which now happens first), so the
+    // `updateMany` that follows — matching on the version this attempt
+    // originally read — finds no row and hits its STALE_VERSION guard.
+    const realCreate = prisma.participantConsentRecord.create;
+    prisma.participantConsentRecord.create = (async (args: { data: Record<string, unknown> }) => {
+      const row = records.find((r) => r['id'] === original.id)!;
+      row['version'] = (row['version'] as number) + 1;
+      return realCreate(args);
+    }) as typeof realCreate;
+
+    await expect(
+      service.amend(WORKSPACE_1, SESSION_1, PARTICIPANT_1, captureRequest(), FACILITATOR),
+    ).rejects.toThrow(ConflictException);
+
+    // The transaction's catch-and-rollback (see `fakePrisma`'s `$transaction`)
+    // must discard the replacement record created earlier in the same
+    // attempt — the participant must not end up with two live-looking rows.
+    expect(records).toHaveLength(1);
   });
 });
 

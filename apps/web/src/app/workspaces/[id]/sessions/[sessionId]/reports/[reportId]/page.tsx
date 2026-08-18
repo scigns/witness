@@ -46,6 +46,22 @@ const ACTION_LABELS: Record<ReportTransitionRequest['action'], string> = {
   revise: 'Start a revision',
 };
 
+/** Plain-language labels for the audit action codes `getReportHistory` returns. */
+const HISTORY_ACTION_LABELS: Record<string, string> = {
+  'report.created': 'Created',
+  'report.updated': 'Edited',
+  'report.submitted': 'Submitted for review',
+  'report.changes_requested': 'Changes requested',
+  'report.approved': 'Approved',
+  'report.published': 'Published internally',
+  'report.exported': 'Exported',
+  'report.revised': 'Revision started',
+};
+
+function historyActionLabel(action: string): string {
+  return HISTORY_ACTION_LABELS[action] ?? action.replace(/^report\./, '').replace(/_/g, ' ');
+}
+
 /** Actions the server requires a reason for. */
 const REASON_REQUIRED: ReadonlySet<string> = new Set(['request_changes', 'revise']);
 
@@ -86,6 +102,16 @@ export default function ReportDetailPage({
   const [reason, setReason] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const [history, setHistory] = useState<
+    {
+      id: string;
+      action: string;
+      occurredAt: string;
+      actorDisplayName: string;
+      metadata: Record<string, string>;
+    }[]
+  >([]);
+
   /**
    * Take a copy: fetch with the session attached, then save from memory.
    * See this file's header for why this cannot be a link.
@@ -93,27 +119,42 @@ export default function ReportDetailPage({
   const takeCopy = async (format: ReportExportFormat): Promise<void> => {
     setExporting(format);
     setError(null);
+
+    let download: { blob: Blob; filename: string };
     try {
-      const { blob, filename } = await api.downloadReportExport(
-        workspaceId,
-        sessionId,
-        reportId,
-        format,
-        user,
-      );
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = objectUrl;
-      anchor.download = filename;
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      // Revoked on the next tick rather than immediately: Chromium starts the
-      // download asynchronously and a URL revoked in the same task can be gone
-      // before it is read.
-      setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      download = await api.downloadReportExport(workspaceId, sessionId, reportId, format, user);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'The export failed.');
+      setExporting(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(download.blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = download.filename;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    // Revoked on the next tick rather than immediately: Chromium starts the
+    // download asynchronously and a URL revoked in the same task can be gone
+    // before it is read.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+
+    // The download above already succeeded and cannot be undone by anything
+    // below — the server also records this export (both in the report's
+    // history and on the report itself, e.g. status/canExport). Refreshing
+    // both is best-effort display freshness, not part of "did the export
+    // work", so a failure here must never surface as "The export failed".
+    try {
+      const [historyResult, detailResult] = await Promise.all([
+        api.getReportHistory(workspaceId, sessionId, reportId, user),
+        api.getReport(workspaceId, sessionId, reportId, user),
+      ]);
+      setHistory(historyResult.events);
+      setDetail(detailResult);
+    } catch {
+      // Best-effort refresh — the export itself already succeeded.
     } finally {
       setExporting(null);
     }
@@ -122,14 +163,17 @@ export default function ReportDetailPage({
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
       // Independent: a caller who may read the report but not compose it
-      // should still see its metadata and its citations.
-      const [detailResult, renderedResult] = await Promise.allSettled([
+      // should still see its metadata and its citations. History is loaded
+      // the same way — a failure there narrows the page, it doesn't break it.
+      const [detailResult, renderedResult, historyResult] = await Promise.allSettled([
         api.getReport(workspaceId, sessionId, reportId, user),
         api.getRenderedReport(workspaceId, sessionId, reportId, user),
+        api.getReportHistory(workspaceId, sessionId, reportId, user),
       ]);
       if (cancelledRef.current) return;
 
       if (renderedResult.status === 'fulfilled') setRendered(renderedResult.value);
+      if (historyResult.status === 'fulfilled') setHistory(historyResult.value.events);
 
       if (detailResult.status === 'fulfilled') {
         setDetail(detailResult.value);
@@ -676,28 +720,50 @@ export default function ReportDetailPage({
           {rendered.actions.length > 0 && (
             <RenderedOutcomeSection title="Actions" items={rendered.actions} />
           )}
+        </Card>
+      )}
 
-          {detail.canExport && (
-            <div className="border-t border-[var(--color-line)] pt-4">
-              <h3 className="font-medium">Take a copy</h3>
-              <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
-                Redaction is applied by the server, and every export is recorded in this
-                report&rsquo;s history with its format and who took it.
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {REPORT_EXPORT_FORMATS.map((format) => (
-                  <Button
-                    key={format}
-                    variant="secondary"
-                    disabled={exporting !== null}
-                    onClick={() => void takeCopy(format)}
-                  >
-                    {exporting === format ? `${format.toUpperCase()}…` : format.toUpperCase()}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
+      {detail.canExport && (
+        <Card className="space-y-2">
+          <h3 className="font-medium">Take a copy</h3>
+          <p className="text-xs text-[var(--color-ink-muted)]">
+            Redaction is applied by the server, and every export is recorded in this report&rsquo;s
+            history with its format and who took it.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {REPORT_EXPORT_FORMATS.map((format) => (
+              <Button
+                key={format}
+                variant="secondary"
+                disabled={exporting !== null}
+                onClick={() => void takeCopy(format)}
+              >
+                {exporting === format ? `${format.toUpperCase()}…` : format.toUpperCase()}
+              </Button>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {history.length > 0 && (
+        <Card className="space-y-2">
+          <h3 className="font-medium">Activity</h3>
+          <ol className="space-y-1 text-sm">
+            {[...history].reverse().map((event) => (
+              <li key={event.id} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <span>
+                  {historyActionLabel(event.action)}
+                  {event.action === 'report.exported' && event.metadata['format'] !== undefined
+                    ? ` (${event.metadata['format'].toUpperCase()})`
+                    : ''}{' '}
+                  by {event.actorDisplayName}
+                </span>
+                <span className="text-xs text-[var(--color-ink-muted)]">
+                  {new Date(event.occurredAt).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ol>
         </Card>
       )}
     </div>
