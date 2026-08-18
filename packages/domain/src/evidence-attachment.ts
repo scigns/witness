@@ -88,48 +88,59 @@ export function inferAttachmentKind(contentType: string): AttachmentKind | null 
  * the same way), and this is a fail-closed *addition*, not a replacement
  * for `assertSupportedContentType`.
  */
-// A `Map`, not a plain object: `contentType` is attacker-controlled (the
-// caller's declared `Content-Type`), and an `object[contentType]` lookup
-// keyed by arbitrary user input risks resolving to an inherited
-// `Object.prototype` member (`toString`, `hasOwnProperty`, ...) instead of
-// `undefined` for an unrecognised key. A `Map`'s `get` has no prototype
-// chain to collide with, so an unrecognised content type is always exactly
-// `undefined`, never a surprise function.
-const FILE_SIGNATURES = new Map<string, (buffer: Buffer) => boolean>([
-  [
-    'image/jpeg',
-    (buffer) =>
-      buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff,
-  ],
-  [
-    'image/png',
-    (buffer) =>
-      buffer.length >= 8 &&
-      buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
-  ],
-  [
-    'image/webp',
-    (buffer) =>
-      buffer.length >= 12 &&
-      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
-      buffer.subarray(8, 12).toString('ascii') === 'WEBP',
-  ],
-  [
-    'application/pdf',
-    (buffer) => buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-',
-  ],
-]);
+function isJpegSignature(buffer: Buffer): boolean {
+  return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+}
+
+function isPngSignature(buffer: Buffer): boolean {
+  return (
+    buffer.length >= 8 &&
+    buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  );
+}
+
+function isWebpSignature(buffer: Buffer): boolean {
+  return (
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+  );
+}
+
+function isPdfSignature(buffer: Buffer): boolean {
+  return buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-';
+}
 
 /**
  * `true` if the bytes match what `contentType` claims, for the kinds this
- * is checked for at all (`document`/`image` — see `FILE_SIGNATURES`'s
- * header). Returns `true` for anything not in that map, `audio` included —
- * "not checked" and "verified" are different claims, and this function
- * only ever asserts the latter.
+ * is checked for at all (`document`/`image`). Returns `true` for any other
+ * content type, `audio` included — "not checked" and "verified" are
+ * different claims, and this function only ever asserts the latter.
+ *
+ * A `switch` on the literal string, not a lookup table keyed by
+ * `contentType` (a `Record`/`Map` from content type to check function):
+ * `contentType` is attacker-controlled (the caller's declared
+ * `Content-Type`), and selecting *which function to call* from a
+ * structure indexed by tainted input is exactly the shape
+ * `js/unvalidated-dynamic-method-call` flags, regardless of which
+ * collection type backs it. A `switch` has no such indirection — each
+ * branch calls one fixed, named function; `contentType` only ever
+ * decides *which already-fixed branch runs*, never *which value is
+ * treated as callable*.
  */
 export function matchesDeclaredContentType(contentType: string, buffer: Buffer): boolean {
-  const check = FILE_SIGNATURES.get(contentType);
-  return check === undefined ? true : check(buffer);
+  switch (contentType) {
+    case 'image/jpeg':
+      return isJpegSignature(buffer);
+    case 'image/png':
+      return isPngSignature(buffer);
+    case 'image/webp':
+      return isWebpSignature(buffer);
+    case 'application/pdf':
+      return isPdfSignature(buffer);
+    default:
+      return true;
+  }
 }
 
 const ORIGINAL_FILENAME_MAX = 300;
