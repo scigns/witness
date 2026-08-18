@@ -119,32 +119,42 @@ export default function ReportDetailPage({
   const takeCopy = async (format: ReportExportFormat): Promise<void> => {
     setExporting(format);
     setError(null);
+
+    let download: { blob: Blob; filename: string };
     try {
-      const { blob, filename } = await api.downloadReportExport(
-        workspaceId,
-        sessionId,
-        reportId,
-        format,
-        user,
-      );
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = objectUrl;
-      anchor.download = filename;
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      // Revoked on the next tick rather than immediately: Chromium starts the
-      // download asynchronously and a URL revoked in the same task can be gone
-      // before it is read.
-      setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
-      // The server records this export in the report's history as it
-      // happens — refetch so the "Activity" list below reflects it without
-      // needing a page reload.
-      const historyResult = await api.getReportHistory(workspaceId, sessionId, reportId, user);
-      setHistory(historyResult.events);
+      download = await api.downloadReportExport(workspaceId, sessionId, reportId, format, user);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'The export failed.');
+      setExporting(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(download.blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = download.filename;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    // Revoked on the next tick rather than immediately: Chromium starts the
+    // download asynchronously and a URL revoked in the same task can be gone
+    // before it is read.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+
+    // The download above already succeeded and cannot be undone by anything
+    // below — the server also records this export (both in the report's
+    // history and on the report itself, e.g. status/canExport). Refreshing
+    // both is best-effort display freshness, not part of "did the export
+    // work", so a failure here must never surface as "The export failed".
+    try {
+      const [historyResult, detailResult] = await Promise.all([
+        api.getReportHistory(workspaceId, sessionId, reportId, user),
+        api.getReport(workspaceId, sessionId, reportId, user),
+      ]);
+      setHistory(historyResult.events);
+      setDetail(detailResult);
+    } catch {
+      // Best-effort refresh — the export itself already succeeded.
     } finally {
       setExporting(null);
     }
@@ -710,53 +720,50 @@ export default function ReportDetailPage({
           {rendered.actions.length > 0 && (
             <RenderedOutcomeSection title="Actions" items={rendered.actions} />
           )}
+        </Card>
+      )}
 
-          {detail.canExport && (
-            <div className="border-t border-[var(--color-line)] pt-4">
-              <h3 className="font-medium">Take a copy</h3>
-              <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
-                Redaction is applied by the server, and every export is recorded in this
-                report&rsquo;s history with its format and who took it.
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {REPORT_EXPORT_FORMATS.map((format) => (
-                  <Button
-                    key={format}
-                    variant="secondary"
-                    disabled={exporting !== null}
-                    onClick={() => void takeCopy(format)}
-                  >
-                    {exporting === format ? `${format.toUpperCase()}…` : format.toUpperCase()}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
+      {detail.canExport && (
+        <Card className="space-y-2">
+          <h3 className="font-medium">Take a copy</h3>
+          <p className="text-xs text-[var(--color-ink-muted)]">
+            Redaction is applied by the server, and every export is recorded in this report&rsquo;s
+            history with its format and who took it.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {REPORT_EXPORT_FORMATS.map((format) => (
+              <Button
+                key={format}
+                variant="secondary"
+                disabled={exporting !== null}
+                onClick={() => void takeCopy(format)}
+              >
+                {exporting === format ? `${format.toUpperCase()}…` : format.toUpperCase()}
+              </Button>
+            ))}
+          </div>
+        </Card>
+      )}
 
-          {history.length > 0 && (
-            <div className="border-t border-[var(--color-line)] pt-4">
-              <h3 className="font-medium">Activity</h3>
-              <ol className="mt-2 space-y-1 text-sm">
-                {[...history].reverse().map((event) => (
-                  <li
-                    key={event.id}
-                    className="flex flex-wrap items-baseline justify-between gap-x-3"
-                  >
-                    <span>
-                      {historyActionLabel(event.action)}
-                      {event.action === 'report.exported' && event.metadata['format'] !== undefined
-                        ? ` (${event.metadata['format'].toUpperCase()})`
-                        : ''}{' '}
-                      by {event.actorDisplayName}
-                    </span>
-                    <span className="text-xs text-[var(--color-ink-muted)]">
-                      {new Date(event.occurredAt).toLocaleString()}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
+      {history.length > 0 && (
+        <Card className="space-y-2">
+          <h3 className="font-medium">Activity</h3>
+          <ol className="space-y-1 text-sm">
+            {[...history].reverse().map((event) => (
+              <li key={event.id} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <span>
+                  {historyActionLabel(event.action)}
+                  {event.action === 'report.exported' && event.metadata['format'] !== undefined
+                    ? ` (${event.metadata['format'].toUpperCase()})`
+                    : ''}{' '}
+                  by {event.actorDisplayName}
+                </span>
+                <span className="text-xs text-[var(--color-ink-muted)]">
+                  {new Date(event.occurredAt).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ol>
         </Card>
       )}
     </div>
