@@ -103,8 +103,8 @@ you want it asserted rather than eyeballed.
 
 ## 6. Verify storage
 
-Capture one piece of evidence (audio, document, or photo) as a
-`contributor`/`facilitator` and confirm:
+Capture one piece of evidence with an audio attachment (attach a file, or
+record in browser) as a `contributor`/`facilitator` and confirm:
 
 - It uploads and appears on the session.
 - `GET /api/v1/organisations/<id>/usage` (or the organisation's usage page)

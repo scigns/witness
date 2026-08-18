@@ -15,6 +15,22 @@ The application is not forked per client. Every row below is the same
 Witness build, configured differently at organisation creation and in the
 first program/session an admin sets up.
 
+**Current limitation, all profiles:** as of this build, only audio is
+supported as a participant-attributed, consent-checked evidence attachment
+(see the API's own `/ready` `notImplemented` list — "Document and image
+evidence storage"). Facilitator-authored reference material (briefing
+papers, agendas, photos of a poster or map) can go through **Resources**
+(program-level, no participant consent attached — it is explicitly not a
+participant contribution). A **participant's own** document or photo —
+something submitted as testimony or an exhibit, that ought to carry the
+same consent and provenance treatment audio does — cannot yet be captured
+that way. This is a real, tracked gap, not a documentation gap: the
+attachment kind and the consent check it goes through are both hard-coded
+to audio in `evidence-attachment.service.ts`, and closing it properly means
+deciding what consent category a document/image submission should require
+— a product/legal decision, not a mechanical wiring task, so it has not
+been done speculatively. It matters most for **MOJ**, below.
+
 Each real institutional engagement gets **its own deployment** (its own
 host, its own database) — not a shared multi-tenant instance. The pilot
 instance currently holds several organisations at once for controlled
@@ -35,7 +51,7 @@ makes tenant data provably exportable.
 | **Default quota** | 5 GB (raise via `storageQuotaGb` at org creation if multiple communities will contribute concurrently) |
 | **First program structure** | One program per consultation initiative; one workspace per community or region under it |
 | **First session structure** | One session per community visit/meeting; named, pseudonymous and anonymous participants as the community requires |
-| **Expected evidence types** | Audio recordings, facilitator notes, photos of physical artefacts (posters, maps) |
+| **Expected evidence types** | Audio recordings (attach or record in browser), facilitator notes (text evidence, no attachment needed); photos of a poster or map go through Resources, not as participant evidence — see the limitation above |
 | **Expected outputs** | Session summary per community, cross-community synthesis report, HTML/Markdown export for community feedback |
 | **Onboarding notes** | Consent is opt-in by category by design — do not pre-check recording/transcription for communities that have not agreed |
 | **Risk notes** | Multi-community data may carry different consent bases per community; do not merge two communities into one workspace |
@@ -71,10 +87,10 @@ makes tenant data provably exportable.
 | **Default quota** | 5 GB; raise proactively if proceedings run long or include large exhibits |
 | **First program structure** | One program per matter/case |
 | **First session structure** | One session per sitting/hearing |
-| **Expected evidence types** | Recorded proceedings, submitted documents, exhibits |
+| **Expected evidence types** | Recorded proceedings (audio, attach or record in browser). **Submitted documents and exhibits are not yet supported as consent-checked participant evidence** — see the limitation above. Do not route a real exhibit through Resources as a workaround: that path explicitly carries no participant consent or chain-of-custody framing, and using it for something a party submitted would misrepresent its provenance. Treat document/exhibit submission as blocked for MOJ until this is built properly, not as an acceptable substitution |
 | **Expected outputs** | Formal transcript, decision/outcome record, audited export (JSON/CSV for downstream systems, HTML/Markdown for the record) |
 | **Onboarding notes** | Because recording and transcription are required (not optional) for this profile, confirm the legal basis for that is settled with the institution before the first real matter — this is a policy question, not a technical one |
-| **Risk notes** | Highest formality — role security and the audit chain matter most here; verify tenant isolation and role security explicitly before go-live (see the onboarding runbook's step 8) |
+| **Risk notes** | Highest formality — role security and the audit chain matter most here; verify tenant isolation and role security explicitly before go-live (see the onboarding runbook's step 8). Document/exhibit evidence not yet being consent-checked (above) is a rollout blocker specifically for matters that involve submitted documents, not a minor gap |
 | **Low-bandwidth considerations** | Same local-inference posture; do not rely on connectivity during a sitting |
 | **Human acceptance items** | Legal/compliance sign-off on the consent basis; a `reviewer` walks through validate/approve/publish end to end before the first real matter |
 
