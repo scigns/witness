@@ -23,7 +23,7 @@
  */
 
 import Link from 'next/link';
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   EVIDENCE_CORRECTION_TYPES,
@@ -113,6 +113,23 @@ export default function EvidenceDetailPage({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [attachmentAudioUrl, setAttachmentAudioUrl] = useState<string | null>(null);
   const [attachmentLoadingAudio, setAttachmentLoadingAudio] = useState(false);
+
+  // Browser recording — an alternative to picking a file, producing the same
+  // kind of File the existing upload path already accepts (MediaRecorder's
+  // default output, audio/webm, is already in the file input's `accept`
+  // list above). Feature-detected rather than assumed: Safari's support is
+  // inconsistent, and a missing MediaRecorder should silently fall back to
+  // the file input rather than show a broken control.
+  const [recordingSupported, setRecordingSupported] = useState(false);
+  const [recordingConsentConfirmed, setRecordingConsentConfirmed] = useState(false);
+  const [recordingStatus, setRecordingStatus] = useState<'idle' | 'recording' | 'paused'>('idle');
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [transcript, setTranscript] = useState<TranscriptView | null>(null);
   const [transcriptBusy, setTranscriptBusy] = useState(false);
@@ -254,12 +271,138 @@ export default function EvidenceDetailPage({
       );
       setEvidence((current) => (current === null ? current : { ...current, attachment: uploaded }));
       setAttachmentFile(null);
+      if (recordedUrl !== null) {
+        URL.revokeObjectURL(recordedUrl);
+        setRecordedUrl(null);
+      }
+      setRecordingStatus('idle');
+      setRecordingConsentConfirmed(false);
     } catch (caught) {
       setAttachmentError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
       setAttachmentBusy(false);
     }
   };
+
+  // MediaRecorder exists but is unreliable to feature-detect via `'MediaRecorder' in window`
+  // alone in older Safari; checking getUserMedia too avoids offering a control that would
+  // fail immediately on start.
+  useEffect(() => {
+    setRecordingSupported(
+      typeof window !== 'undefined' &&
+        'MediaRecorder' in window &&
+        typeof navigator !== 'undefined' &&
+        navigator.mediaDevices?.getUserMedia !== undefined,
+    );
+  }, []);
+
+  // Release the microphone and stop the elapsed timer on unmount, and if the
+  // user navigates away mid-recording — a stream a component no longer
+  // controls must not keep the mic light on.
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current !== null) clearInterval(recordingTimerRef.current);
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (recordedUrl !== null) URL.revokeObjectURL(recordedUrl);
+    };
+  }, [recordedUrl]);
+
+  function pickRecordingMimeType(): string | undefined {
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg;codecs=opus',
+      'audio/mp4',
+    ];
+    if (
+      typeof MediaRecorder === 'undefined' ||
+      typeof MediaRecorder.isTypeSupported !== 'function'
+    ) {
+      return undefined;
+    }
+    return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate));
+  }
+
+  const startRecording = async () => {
+    if (!recordingConsentConfirmed) return;
+    setRecordingError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      recordedChunksRef.current = [];
+      const mimeType = pickRecordingMimeType();
+      const recorder = new MediaRecorder(stream, mimeType !== undefined ? { mimeType } : undefined);
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recordedChunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, {
+          type: recorder.mimeType || 'audio/webm',
+        });
+        const extension =
+          (recorder.mimeType || 'audio/webm').split(';')[0]?.split('/')[1] ?? 'webm';
+        const file = new File([blob], `recording-${new Date().toISOString()}.${extension}`, {
+          type: blob.type,
+        });
+        setAttachmentFile(file);
+        setRecordedUrl(URL.createObjectURL(blob));
+        mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setRecordingStatus('recording');
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((seconds) => seconds + 1);
+      }, 1000);
+    } catch (caught) {
+      setRecordingError(
+        caught instanceof Error
+          ? `Could not start recording: ${caught.message}`
+          : 'Could not start recording. Check microphone permission and try again, or upload a file instead.',
+      );
+    }
+  };
+
+  const pauseRecording = () => {
+    mediaRecorderRef.current?.pause();
+    if (recordingTimerRef.current !== null) clearInterval(recordingTimerRef.current);
+    setRecordingStatus('paused');
+  };
+
+  const resumeRecording = () => {
+    mediaRecorderRef.current?.resume();
+    recordingTimerRef.current = setInterval(() => {
+      setRecordingSeconds((seconds) => seconds + 1);
+    }, 1000);
+    setRecordingStatus('recording');
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    if (recordingTimerRef.current !== null) clearInterval(recordingTimerRef.current);
+    setRecordingStatus('idle');
+  };
+
+  const discardRecording = () => {
+    if (recordedUrl !== null) URL.revokeObjectURL(recordedUrl);
+    setRecordedUrl(null);
+    setAttachmentFile(null);
+    setRecordingSeconds(0);
+    setRecordingConsentConfirmed(false);
+  };
+
+  function formatElapsed(totalSeconds: number): string {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
 
   const loadAttachmentAudio = async () => {
     setAttachmentLoadingAudio(true);
@@ -836,25 +979,117 @@ export default function EvidenceDetailPage({
               <p className="text-sm text-[var(--color-ink-muted)]">
                 No audio has been attached to this evidence yet.
               </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <label htmlFor="attachmentFile" className="sr-only">
-                  Audio file
-                </label>
-                <input
-                  id="attachmentFile"
-                  type="file"
-                  accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/x-wav,audio/webm,audio/ogg"
-                  onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
-                  className="text-sm"
-                />
-                <Button
-                  variant="primary"
-                  disabled={attachmentBusy || attachmentFile === null}
-                  onClick={() => void uploadAttachment()}
-                >
-                  {attachmentBusy ? 'Uploading…' : 'Attach recording'}
-                </Button>
-              </div>
+
+              {recordingSupported && recordedUrl === null && recordingStatus === 'idle' && (
+                <div className="space-y-2 rounded border border-[var(--color-line)] p-3">
+                  <p className="text-sm font-medium">Record in browser</p>
+                  {recordingError !== null && <ErrorNotice message={recordingError} />}
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={recordingConsentConfirmed}
+                      onChange={(event) => setRecordingConsentConfirmed(event.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      I confirm consent for audio recording has been captured for this
+                      session&apos;s participant(s).
+                    </span>
+                  </label>
+                  <Button
+                    variant="primary"
+                    disabled={!recordingConsentConfirmed}
+                    onClick={() => void startRecording()}
+                  >
+                    Start recording
+                  </Button>
+                </div>
+              )}
+
+              {recordingSupported &&
+                (recordingStatus === 'recording' || recordingStatus === 'paused') && (
+                  <div
+                    className="space-y-2 rounded border border-[var(--color-line)] p-3"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <p className="flex items-center gap-2 text-sm font-medium">
+                      {recordingStatus === 'recording' ? (
+                        <>
+                          <span
+                            className="h-2 w-2 animate-pulse rounded-full bg-red-600"
+                            aria-hidden="true"
+                          />
+                          Recording — {formatElapsed(recordingSeconds)}
+                        </>
+                      ) : (
+                        <>Paused — {formatElapsed(recordingSeconds)}</>
+                      )}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {recordingStatus === 'recording' ? (
+                        <Button variant="secondary" onClick={pauseRecording}>
+                          Pause
+                        </Button>
+                      ) : (
+                        <Button variant="secondary" onClick={resumeRecording}>
+                          Resume
+                        </Button>
+                      )}
+                      <Button variant="danger" onClick={stopRecording}>
+                        Stop
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+              {recordedUrl !== null && (
+                <div className="space-y-2 rounded border border-[var(--color-line)] p-3">
+                  <p className="text-sm font-medium">Recording ready to attach</p>
+                  <audio controls src={recordedUrl} className="w-full">
+                    <track kind="captions" />
+                  </audio>
+                  {attachmentError !== null && <ErrorNotice message={attachmentError} />}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="primary"
+                      disabled={attachmentBusy || attachmentFile === null}
+                      onClick={() => void uploadAttachment()}
+                    >
+                      {attachmentBusy ? 'Uploading…' : 'Attach recording'}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={attachmentBusy}
+                      onClick={discardRecording}
+                    >
+                      Discard and re-record
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {recordedUrl === null && recordingStatus === 'idle' && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <label htmlFor="attachmentFile" className="sr-only">
+                    Audio file
+                  </label>
+                  <input
+                    id="attachmentFile"
+                    type="file"
+                    accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/x-wav,audio/webm,audio/ogg"
+                    onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
+                    className="text-sm"
+                  />
+                  <Button
+                    variant="primary"
+                    disabled={attachmentBusy || attachmentFile === null}
+                    onClick={() => void uploadAttachment()}
+                  >
+                    {attachmentBusy ? 'Uploading…' : 'Attach recording'}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </Card>
