@@ -5,6 +5,31 @@ Version: 1.0
 Purpose: Binary release gate for real co-design testing
 **Owner:** Founder / Product Lead with Engineering and QA  
 
+**2026-08-18 status note:** the per-item entries below reflect each item's status
+*when its milestone shipped*, and several have since fallen behind current `main` —
+"PR not yet merged" now reads as merged, and a few items marked NOT THIS MILESTONE
+were subsequently built as separate milestones. Verified against current code and
+the v0.2.0 controlled-pilot release (see `docs/release/INTERNAL_PILOT_RELEASE.md`,
+`CHANGELOG.md`), the following have superseding current status and should not be
+rediscovered as gaps:
+
+- **Agenda items** (line ~259, "NOT THIS MILESTONE") — READY. `packages/domain/src/agenda-item.ts`,
+  `services/api-gateway/src/agenda-items/`, `/workspaces/[id]/agenda`.
+- **Evidence Capture — Upload** (section E, "remain unchecked until Media Upload is built") — READY.
+  Audio/document/image upload, progress, retry, checksum integrity, R2 storage all shipped
+  (`services/api-gateway/src/evidence/evidence-attachment.service.ts`, `CHANGELOG.md` 0.2.0).
+- **Evidence Capture — Recording** (section E, "Browser recording…") — READY as of PR #79. No
+  documented decision to stay upload-only was ever found (`docs/PRODUCT_ROADMAP.md` poses it as an
+  open question, not a resolved one); implemented as a `MediaRecorder`-based control on the existing
+  attachment step, feature-detected with the file-upload path kept as a fallback.
+- **Low-connectivity / offline queue** — READY, though not itemised as its own section here.
+  `apps/web/src/lib/offline-queue.ts` plus `clientRequestId`-based idempotent retry
+  (`services/api-gateway/src/evidence/evidence.service.ts`) cover queued local drafts, safe retry,
+  and duplicate-submission prevention.
+
+Everything not listed above should still be verified against current code before being treated as
+either done or missing — this note corrects known stale entries, it is not a full re-audit.
+
 How to Use This Checklist
 
 Check an item only when it works on the current deployable version.
