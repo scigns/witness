@@ -135,11 +135,13 @@ export class ReportsService {
     const events = await this.prisma.auditEvent.findMany({
       where: { subjectType: 'report', subjectId: reportId },
       orderBy: { occurredAt: 'asc' },
+      include: { actor: { select: { displayName: true } } },
     });
     return events.map((event) => ({
       id: event.id,
       action: event.action,
       occurredAt: event.occurredAt.toISOString(),
+      actorDisplayName: event.actor.displayName,
       metadata: (event.metadata ?? {}) as Record<string, string>,
     }));
   }

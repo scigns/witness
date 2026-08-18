@@ -46,6 +46,22 @@ const ACTION_LABELS: Record<ReportTransitionRequest['action'], string> = {
   revise: 'Start a revision',
 };
 
+/** Plain-language labels for the audit action codes `getReportHistory` returns. */
+const HISTORY_ACTION_LABELS: Record<string, string> = {
+  'report.created': 'Created',
+  'report.updated': 'Edited',
+  'report.submitted': 'Submitted for review',
+  'report.changes_requested': 'Changes requested',
+  'report.approved': 'Approved',
+  'report.published': 'Published internally',
+  'report.exported': 'Exported',
+  'report.revised': 'Revision started',
+};
+
+function historyActionLabel(action: string): string {
+  return HISTORY_ACTION_LABELS[action] ?? action.replace(/^report\./, '').replace(/_/g, ' ');
+}
+
 /** Actions the server requires a reason for. */
 const REASON_REQUIRED: ReadonlySet<string> = new Set(['request_changes', 'revise']);
 
@@ -86,6 +102,16 @@ export default function ReportDetailPage({
   const [reason, setReason] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const [history, setHistory] = useState<
+    {
+      id: string;
+      action: string;
+      occurredAt: string;
+      actorDisplayName: string;
+      metadata: Record<string, string>;
+    }[]
+  >([]);
+
   /**
    * Take a copy: fetch with the session attached, then save from memory.
    * See this file's header for why this cannot be a link.
@@ -112,6 +138,11 @@ export default function ReportDetailPage({
       // download asynchronously and a URL revoked in the same task can be gone
       // before it is read.
       setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      // The server records this export in the report's history as it
+      // happens — refetch so the "Activity" list below reflects it without
+      // needing a page reload.
+      const historyResult = await api.getReportHistory(workspaceId, sessionId, reportId, user);
+      setHistory(historyResult.events);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'The export failed.');
     } finally {
@@ -122,14 +153,17 @@ export default function ReportDetailPage({
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
       // Independent: a caller who may read the report but not compose it
-      // should still see its metadata and its citations.
-      const [detailResult, renderedResult] = await Promise.allSettled([
+      // should still see its metadata and its citations. History is loaded
+      // the same way — a failure there narrows the page, it doesn't break it.
+      const [detailResult, renderedResult, historyResult] = await Promise.allSettled([
         api.getReport(workspaceId, sessionId, reportId, user),
         api.getRenderedReport(workspaceId, sessionId, reportId, user),
+        api.getReportHistory(workspaceId, sessionId, reportId, user),
       ]);
       if (cancelledRef.current) return;
 
       if (renderedResult.status === 'fulfilled') setRendered(renderedResult.value);
+      if (historyResult.status === 'fulfilled') setHistory(historyResult.value.events);
 
       if (detailResult.status === 'fulfilled') {
         setDetail(detailResult.value);
@@ -696,6 +730,31 @@ export default function ReportDetailPage({
                   </Button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {history.length > 0 && (
+            <div className="border-t border-[var(--color-line)] pt-4">
+              <h3 className="font-medium">Activity</h3>
+              <ol className="mt-2 space-y-1 text-sm">
+                {[...history].reverse().map((event) => (
+                  <li
+                    key={event.id}
+                    className="flex flex-wrap items-baseline justify-between gap-x-3"
+                  >
+                    <span>
+                      {historyActionLabel(event.action)}
+                      {event.action === 'report.exported' && event.metadata['format'] !== undefined
+                        ? ` (${event.metadata['format'].toUpperCase()})`
+                        : ''}{' '}
+                      by {event.actorDisplayName}
+                    </span>
+                    <span className="text-xs text-[var(--color-ink-muted)]">
+                      {new Date(event.occurredAt).toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+              </ol>
             </div>
           )}
         </Card>

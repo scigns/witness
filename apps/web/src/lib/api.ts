@@ -1581,7 +1581,13 @@ export const api = {
     reportId: string,
     user: ActingUser,
   ): Promise<{
-    events: { id: string; action: string; occurredAt: string; metadata: Record<string, string> }[];
+    events: {
+      id: string;
+      action: string;
+      occurredAt: string;
+      actorDisplayName: string;
+      metadata: Record<string, string>;
+    }[];
   }> =>
     request(`${reportPath(workspaceId, sessionId)}/${encodeURIComponent(reportId)}/history`, user),
 

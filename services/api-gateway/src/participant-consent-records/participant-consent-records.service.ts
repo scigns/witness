@@ -273,6 +273,22 @@ export class ParticipantConsentRecordsService {
     });
 
     await this.prisma.$transaction(async (tx) => {
+      // The replacement record must exist before the old one can be pointed at
+      // it — `superseded_by_record_id`'s foreign key is checked immediately,
+      // not deferred, so updating the old record first (to reference a row
+      // that doesn't exist yet) fails with a foreign key violation. Creating
+      // the new record first satisfies the constraint on both writes: this
+      // create's own `amends_record_id` points at the *old* record, which
+      // already exists from a prior request.
+      await tx.participantConsentRecord.create({ data: toCreateRow(captureOutcome.record) });
+      await appendAuditEvent(
+        tx,
+        'participant_consent_record',
+        captureOutcome.record.id,
+        captureOutcome.event,
+        now,
+      );
+
       const result = await tx.participantConsentRecord.updateMany({
         where: { id: active.id, version: active.version },
         data: toUpdateRow(supersedeOutcome.record),
@@ -292,15 +308,6 @@ export class ParticipantConsentRecordsService {
         'participant_consent_record',
         active.id,
         supersedeOutcome.event,
-        now,
-      );
-
-      await tx.participantConsentRecord.create({ data: toCreateRow(captureOutcome.record) });
-      await appendAuditEvent(
-        tx,
-        'participant_consent_record',
-        captureOutcome.record.id,
-        captureOutcome.event,
         now,
       );
 

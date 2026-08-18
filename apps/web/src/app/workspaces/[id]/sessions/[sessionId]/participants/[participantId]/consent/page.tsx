@@ -113,6 +113,9 @@ export default function ParticipantConsentPage({
   const [captureMethod, setCaptureMethod] = useState('in-person verbal');
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawReason, setWithdrawReason] = useState('');
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const [justSaved, setJustSaved] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
@@ -208,7 +211,8 @@ export default function ParticipantConsentPage({
   const submitCapture = async () => {
     if (configuration === null) return;
     setBusy(true);
-    setError(null);
+    setCaptureError(null);
+    setJustSaved(false);
 
     const categoryDecisions = Object.entries(decisions).map(([category, granted]) => ({
       category,
@@ -217,6 +221,11 @@ export default function ParticipantConsentPage({
     const body = { categoryDecisions, captureMethod };
 
     try {
+      // `result` is only trusted, and `active`/`justSaved` only updated, once
+      // this has resolved — a rejected promise leaves the on-screen state
+      // exactly as it was before the attempt, and `captureError` (rendered
+      // beside the button that was just pressed, not just at the top of the
+      // page) is what tells the facilitator it did not save.
       const result =
         active === null
           ? await api.captureParticipantConsent(workspaceId, sessionId, participantId, body, user)
@@ -229,8 +238,13 @@ export default function ParticipantConsentPage({
         user,
       );
       setHistory(historyResult.records);
+      setJustSaved(true);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+      setCaptureError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'This did not save. Nothing was changed — try again.',
+      );
     } finally {
       setBusy(false);
     }
@@ -239,7 +253,7 @@ export default function ParticipantConsentPage({
   const submitWithdraw = async () => {
     if (active === null) return;
     setBusy(true);
-    setError(null);
+    setWithdrawError(null);
 
     try {
       await api.withdrawParticipantConsent(
@@ -252,6 +266,10 @@ export default function ParticipantConsentPage({
         },
         user,
       );
+      // Only cleared once the server has confirmed the withdrawal — on
+      // failure `active` stays exactly as it was, so the page keeps showing
+      // the still-current consent state rather than a state the server
+      // never committed.
       setActive(null);
       setWithdrawing(false);
       setWithdrawReason('');
@@ -263,7 +281,11 @@ export default function ParticipantConsentPage({
       );
       setHistory(historyResult.records);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+      setWithdrawError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'This did not save. Consent was not withdrawn — try again.',
+      );
     } finally {
       setBusy(false);
     }
@@ -390,7 +412,10 @@ export default function ParticipantConsentPage({
                           type="radio"
                           name={`decision-${category}`}
                           checked={decisions[category] === true}
-                          onChange={() => setDecisions((d) => ({ ...d, [category]: true }))}
+                          onChange={() => {
+                            setDecisions((d) => ({ ...d, [category]: true }));
+                            setJustSaved(false);
+                          }}
                         />
                         Grant
                       </label>
@@ -399,7 +424,10 @@ export default function ParticipantConsentPage({
                           type="radio"
                           name={`decision-${category}`}
                           checked={decisions[category] === false}
-                          onChange={() => setDecisions((d) => ({ ...d, [category]: false }))}
+                          onChange={() => {
+                            setDecisions((d) => ({ ...d, [category]: false }));
+                            setJustSaved(false);
+                          }}
                         />
                         Refuse
                       </label>
@@ -424,13 +452,20 @@ export default function ParticipantConsentPage({
                 />
               </div>
 
-              <Button
-                variant="primary"
-                disabled={busy || captureMethod.trim() === ''}
-                onClick={() => void submitCapture()}
-              >
-                {busy ? 'Saving…' : active === null ? 'Capture consent' : 'Save amendment'}
-              </Button>
+              {captureError !== null && <ErrorNotice message={captureError} />}
+
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="primary"
+                  disabled={busy || captureMethod.trim() === ''}
+                  onClick={() => void submitCapture()}
+                >
+                  {busy ? 'Saving…' : active === null ? 'Capture consent' : 'Save amendment'}
+                </Button>
+                {justSaved && (
+                  <span className="text-sm text-emerald-700 dark:text-emerald-400">✓ Saved</span>
+                )}
+              </div>
             </Card>
 
             {active !== null && (
@@ -447,6 +482,7 @@ export default function ParticipantConsentPage({
                       onChange={(event) => setWithdrawReason(event.target.value)}
                       className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
                     />
+                    {withdrawError !== null && <ErrorNotice message={withdrawError} />}
                     <div className="flex gap-2">
                       <Button
                         variant="danger"
@@ -458,7 +494,10 @@ export default function ParticipantConsentPage({
                       <Button
                         variant="secondary"
                         disabled={busy}
-                        onClick={() => setWithdrawing(false)}
+                        onClick={() => {
+                          setWithdrawing(false);
+                          setWithdrawError(null);
+                        }}
                       >
                         Cancel
                       </Button>

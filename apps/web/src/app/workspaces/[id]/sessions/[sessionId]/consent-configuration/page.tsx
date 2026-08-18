@@ -21,7 +21,19 @@
 import Link from 'next/link';
 import { use, useCallback, useEffect, useState } from 'react';
 
-import type { ConsentTemplateSummary, SessionConsentConfigurationView } from '@witness/contracts';
+import type {
+  ConsentTemplateSummary,
+  SessionConsentConfigurationView,
+  SessionStatus,
+} from '@witness/contracts';
+
+const SESSION_STATUS_LABELS: Record<SessionStatus, string> = {
+  draft: 'draft',
+  scheduled: 'scheduled',
+  open: 'open',
+  closed: 'closed',
+  archived: 'archived',
+};
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
@@ -36,6 +48,7 @@ export default function SessionConsentConfigurationPage({
   const { user, ready } = useSession();
 
   const [organisationId, setOrganisationId] = useState<string | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<SessionStatus | null>(null);
   const [configuration, setConfiguration] = useState<SessionConsentConfigurationView | null>(null);
   const [templates, setTemplates] = useState<ConsentTemplateSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +74,7 @@ export default function SessionConsentConfigurationPage({
         const session = await api.getSession(workspaceId, sessionId, user);
         if (cancelledRef.current) return;
         setOrganisationId(session.organisationId);
+        setSessionStatus(session.status);
 
         const templatesResult = await api.listConsentTemplates(session.organisationId, user);
         if (cancelledRef.current) return;
@@ -216,7 +230,14 @@ export default function SessionConsentConfigurationPage({
     );
   }
 
-  const canSubmit = !busy && selectedTemplateId !== '' && requiredCategories.has('participation');
+  // Mirrors the domain rule in `session-consent-configuration.ts`'s
+  // `assertConfigurable` — configuring or reconfiguring consent is only
+  // permitted while the session is `draft` or `scheduled`. Showing an
+  // active Save button past that point would let a facilitator submit a
+  // change the server can never legally accept.
+  const configurable = sessionStatus === 'draft' || sessionStatus === 'scheduled';
+  const canSubmit =
+    configurable && !busy && selectedTemplateId !== '' && requiredCategories.has('participation');
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -238,6 +259,23 @@ export default function SessionConsentConfigurationPage({
           <Button variant="secondary" onClick={reload}>
             Reload
           </Button>
+        </div>
+      )}
+
+      {!configurable && sessionStatus !== null && (
+        <div
+          role="status"
+          className="rounded border border-[var(--color-line)] bg-[var(--color-paper-raised)] p-4 text-sm"
+        >
+          <p className="font-medium">
+            Read-only — this session is {SESSION_STATUS_LABELS[sessionStatus]}.
+          </p>
+          <p className="mt-1 text-[var(--color-ink-muted)]">
+            Consent can only be configured while a session is draft or scheduled. Changing what
+            consent is asked for after the session opens would invalidate decisions participants
+            already made against the current configuration, so this is shown for reference only and
+            cannot be saved.
+          </p>
         </div>
       )}
 
@@ -265,125 +303,131 @@ export default function SessionConsentConfigurationPage({
         </Card>
       ) : (
         <Card className="space-y-4">
-          <div>
-            <label htmlFor="template" className="mb-1 block text-sm font-medium">
-              Consent template <span aria-hidden="true">*</span>
-              <span className="sr-only">(required)</span>
-            </label>
-            <select
-              id="template"
-              required
-              value={selectedTemplateId}
-              onChange={(event) => setSelectedTemplateId(event.target.value)}
-              className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
-            >
-              <option value="">Choose a template…</option>
-              {templates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name} (v{template.version})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {templateCategories.length > 0 && (
-            <fieldset>
-              <legend className="mb-2 block text-sm font-medium">
-                Categories for this session
-              </legend>
-              <div className="space-y-2">
-                {templateCategories.map((category) => (
-                  <div
-                    key={category.category}
-                    className="flex flex-wrap items-center justify-between gap-2 text-sm"
-                  >
-                    <span>{category.category.replace(/_/g, ' ')}</span>
-                    {category.category === 'participation' ? (
-                      <span className="text-xs text-[var(--color-ink-muted)]">Always required</span>
-                    ) : (
-                      <div className="flex gap-3 text-xs">
-                        <label className="flex items-center gap-1">
-                          <input
-                            type="radio"
-                            name={`category-${category.category}`}
-                            checked={requiredCategories.has(category.category)}
-                            onChange={() => toggleCategory(category.category, 'required')}
-                          />
-                          Required
-                        </label>
-                        <label className="flex items-center gap-1">
-                          <input
-                            type="radio"
-                            name={`category-${category.category}`}
-                            checked={optionalCategories.has(category.category)}
-                            onChange={() => toggleCategory(category.category, 'optional')}
-                          />
-                          Optional
-                        </label>
-                        <label className="flex items-center gap-1">
-                          <input
-                            type="radio"
-                            name={`category-${category.category}`}
-                            checked={
-                              !requiredCategories.has(category.category) &&
-                              !optionalCategories.has(category.category)
-                            }
-                            onChange={() => {
-                              setRequiredCategories((c) => {
-                                const n = new Set(c);
-                                n.delete(category.category);
-                                return n;
-                              });
-                              setOptionalCategories((c) => {
-                                const n = new Set(c);
-                                n.delete(category.category);
-                                return n;
-                              });
-                            }}
-                          />
-                          Not asked
-                        </label>
-                      </div>
-                    )}
-                  </div>
+          <fieldset disabled={!configurable} className="contents">
+            <div>
+              <label htmlFor="template" className="mb-1 block text-sm font-medium">
+                Consent template <span aria-hidden="true">*</span>
+                <span className="sr-only">(required)</span>
+              </label>
+              <select
+                id="template"
+                required
+                value={selectedTemplateId}
+                onChange={(event) => setSelectedTemplateId(event.target.value)}
+                className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+              >
+                <option value="">Choose a template…</option>
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} (v{template.version})
+                  </option>
                 ))}
-              </div>
-            </fieldset>
+              </select>
+            </div>
+
+            {templateCategories.length > 0 && (
+              <fieldset>
+                <legend className="mb-2 block text-sm font-medium">
+                  Categories for this session
+                </legend>
+                <div className="space-y-2">
+                  {templateCategories.map((category) => (
+                    <div
+                      key={category.category}
+                      className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                    >
+                      <span>{category.category.replace(/_/g, ' ')}</span>
+                      {category.category === 'participation' ? (
+                        <span className="text-xs text-[var(--color-ink-muted)]">
+                          Always required
+                        </span>
+                      ) : (
+                        <div className="flex gap-3 text-xs">
+                          <label className="flex items-center gap-1">
+                            <input
+                              type="radio"
+                              name={`category-${category.category}`}
+                              checked={requiredCategories.has(category.category)}
+                              onChange={() => toggleCategory(category.category, 'required')}
+                            />
+                            Required
+                          </label>
+                          <label className="flex items-center gap-1">
+                            <input
+                              type="radio"
+                              name={`category-${category.category}`}
+                              checked={optionalCategories.has(category.category)}
+                              onChange={() => toggleCategory(category.category, 'optional')}
+                            />
+                            Optional
+                          </label>
+                          <label className="flex items-center gap-1">
+                            <input
+                              type="radio"
+                              name={`category-${category.category}`}
+                              checked={
+                                !requiredCategories.has(category.category) &&
+                                !optionalCategories.has(category.category)
+                              }
+                              onChange={() => {
+                                setRequiredCategories((c) => {
+                                  const n = new Set(c);
+                                  n.delete(category.category);
+                                  return n;
+                                });
+                                setOptionalCategories((c) => {
+                                  const n = new Set(c);
+                                  n.delete(category.category);
+                                  return n;
+                                });
+                              }}
+                            />
+                            Not asked
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </fieldset>
+            )}
+
+            <div>
+              <label htmlFor="participantIntroduction" className="mb-1 block text-sm font-medium">
+                Participant-facing introduction
+              </label>
+              <textarea
+                id="participantIntroduction"
+                maxLength={5000}
+                rows={3}
+                value={participantIntroduction}
+                onChange={(event) => setParticipantIntroduction(event.target.value)}
+                placeholder="Before we begin, we'd like to ask a few questions about how you're comfortable with us using what you share today."
+                className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="facilitatorInstructions" className="mb-1 block text-sm font-medium">
+                Facilitator instructions
+              </label>
+              <textarea
+                id="facilitatorInstructions"
+                maxLength={5000}
+                rows={3}
+                value={facilitatorInstructions}
+                onChange={(event) => setFacilitatorInstructions(event.target.value)}
+                placeholder="Read the introduction aloud, then capture each participant's decisions before the session opens."
+                className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+              />
+            </div>
+          </fieldset>
+
+          {configurable && (
+            <Button variant="primary" disabled={!canSubmit} onClick={() => void submit()}>
+              {busy ? 'Saving…' : configuration === null ? 'Configure consent' : 'Save changes'}
+            </Button>
           )}
-
-          <div>
-            <label htmlFor="participantIntroduction" className="mb-1 block text-sm font-medium">
-              Participant-facing introduction
-            </label>
-            <textarea
-              id="participantIntroduction"
-              maxLength={5000}
-              rows={3}
-              value={participantIntroduction}
-              onChange={(event) => setParticipantIntroduction(event.target.value)}
-              placeholder="Before we begin, we'd like to ask a few questions about how you're comfortable with us using what you share today."
-              className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="facilitatorInstructions" className="mb-1 block text-sm font-medium">
-              Facilitator instructions
-            </label>
-            <textarea
-              id="facilitatorInstructions"
-              maxLength={5000}
-              rows={3}
-              value={facilitatorInstructions}
-              onChange={(event) => setFacilitatorInstructions(event.target.value)}
-              placeholder="Read the introduction aloud, then capture each participant's decisions before the session opens."
-              className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
-            />
-          </div>
-
-          <Button variant="primary" disabled={!canSubmit} onClick={() => void submit()}>
-            {busy ? 'Saving…' : configuration === null ? 'Configure consent' : 'Save changes'}
-          </Button>
         </Card>
       )}
     </div>
