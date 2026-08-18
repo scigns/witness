@@ -186,7 +186,26 @@ instead of a direct `DATABASE_URL` connection. Output is identical either way
 
 Only PostgreSQL is backed up. Under ADR-0011 the graph and search projections
 are rebuildable from the event log; copying them costs storage and buys nothing.
-If the dump restores, Witness restores.
+
+That reasoning does **not** extend to evidence attachments (audio, document
+and image bytes): they live in R2/S3-compatible object storage, not
+Postgres, and are original source content — not a rebuildable projection.
+The Postgres dump carries each attachment's key and SHA-256 checksum, which
+lets a restore *verify* the object storage side still holds the right
+bytes; it does not itself contain those bytes. Restoring the dump onto a
+fresh instance without also having the original bucket (or a copy of it)
+available leaves every evidence attachment 404ing.
+
+R2 itself is redundant across multiple facilities as part of the service
+Cloudflare provides — this is not the same failure mode a self-hosted disk
+has, and is why this pilot has not needed its own object-level backup job.
+The operator action that remains, and needs a human with Cloudflare account
+access (the same access already needed for tunnel-credential rotation,
+above): turn on **bucket versioning** (or Object Lock, if the compliance
+posture of a given client — MOJ in particular — calls for it) on the
+production bucket before onboarding real institutional data, so a
+credential compromise or an operator mistake that deletes or overwrites an
+object is recoverable rather than final.
 
 **Schedule it daily**, registered as a standing job on the pilot host's own
 crontab. Call the script directly rather than through `make` — a minimal
