@@ -127,6 +127,35 @@ describe('ConsentPolicyService fail-closed', () => {
     const answer = await service.mayPublish(SESSION_1, PARTICIPANT_1);
     expect(answer.allowed).toBe(false);
   });
+
+  it('maySubmitEvidence denies when evidence_submission was never decided, even though photography was granted', async () => {
+    const records = [
+      baseRecord({
+        categoryDecisions: [
+          { category: 'participation', granted: true },
+          { category: 'photography', granted: true },
+        ],
+      }),
+    ];
+    const service = new ConsentPolicyService(fakePrisma(records, ['participation']));
+    const answer = await service.maySubmitEvidence(SESSION_1, PARTICIPANT_1);
+    expect(answer.allowed).toBe(false);
+  });
+
+  it('maySubmitEvidence denies once the record has been withdrawn', async () => {
+    const records = [
+      baseRecord({
+        categoryDecisions: [
+          { category: 'participation', granted: true },
+          { category: 'evidence_submission', granted: true },
+        ],
+        withdrawnAt: new Date('2026-04-01T11:00:00Z'),
+      }),
+    ];
+    const service = new ConsentPolicyService(fakePrisma(records, ['participation']));
+    const answer = await service.maySubmitEvidence(SESSION_1, PARTICIPANT_1);
+    expect(answer.allowed).toBe(false);
+  });
 });
 
 describe('ConsentPolicyService granted answers', () => {
@@ -137,7 +166,21 @@ describe('ConsentPolicyService granted answers', () => {
     expect(answer.allowed).toBe(true);
   });
 
-  it('mayUseCategory answers for an organisation-defined category beyond the well-known fifteen', async () => {
+  it('maySubmitEvidence allows when both participation and evidence_submission were granted', async () => {
+    const records = [
+      baseRecord({
+        categoryDecisions: [
+          { category: 'participation', granted: true },
+          { category: 'evidence_submission', granted: true },
+        ],
+      }),
+    ];
+    const service = new ConsentPolicyService(fakePrisma(records, ['participation']));
+    const answer = await service.maySubmitEvidence(SESSION_1, PARTICIPANT_1);
+    expect(answer.allowed).toBe(true);
+  });
+
+  it('mayUseCategory answers for an organisation-defined category beyond the well-known sixteen', async () => {
     const records = [
       baseRecord({
         categoryDecisions: [

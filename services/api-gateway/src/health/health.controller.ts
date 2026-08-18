@@ -37,8 +37,6 @@ import { WITNESS_CONFIG } from '../tokens.js';
 const NOT_IMPLEMENTED: readonly string[] = [
   'Speaker diarisation — transcription itself is local and working; ' +
     'per-speaker attribution within one recording is deferred (Phase 3)',
-  'Document and image evidence storage — audio attachments are implemented; ' +
-    'other file types are not yet (Phase 5)',
   'Knowledge graph projection (Phase 4)',
   'Event-driven projection rebuild (Phase 4)',
   'Hybrid/vector search — plain scoped text search across sessions, evidence, ' +

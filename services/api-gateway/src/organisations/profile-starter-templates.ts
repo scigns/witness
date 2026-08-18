@@ -26,6 +26,7 @@ export const PROFILE_STARTER_CONSENT_TEMPLATES: Partial<
     categories: [
       { category: 'participation', required: true },
       { category: 'audio_recording', required: false },
+      { category: 'evidence_submission', required: false },
       { category: 'transcription', required: false },
       { category: 'ai_processing', required: false },
       { category: 'internal_organisational_use', required: false },
@@ -41,6 +42,7 @@ export const PROFILE_STARTER_CONSENT_TEMPLATES: Partial<
     categories: [
       { category: 'participation', required: true },
       { category: 'audio_recording', required: false },
+      { category: 'evidence_submission', required: false },
       { category: 'transcription', required: false },
       { category: 'ai_processing', required: false },
     ],
@@ -56,6 +58,7 @@ export const PROFILE_STARTER_CONSENT_TEMPLATES: Partial<
     categories: [
       { category: 'participation', required: true },
       { category: 'audio_recording', required: true },
+      { category: 'evidence_submission', required: false },
       { category: 'transcription', required: true },
       { category: 'internal_organisational_use', required: false },
     ],
@@ -71,6 +74,7 @@ export const PROFILE_STARTER_CONSENT_TEMPLATES: Partial<
     categories: [
       { category: 'participation', required: true },
       { category: 'audio_recording', required: false },
+      { category: 'evidence_submission', required: false },
       { category: 'transcription', required: false },
       { category: 'ai_processing', required: false },
       { category: 'internal_organisational_use', required: false },

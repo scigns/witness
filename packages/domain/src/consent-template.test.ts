@@ -5,6 +5,7 @@ import type { Actor } from './actor.js';
 import { InvariantViolation } from './errors.js';
 import {
   activateConsentTemplate,
+  CONSENT_CATEGORIES,
   createConsentTemplate,
   createNewTemplateVersion,
   retireConsentTemplate,
@@ -50,7 +51,31 @@ function activeTemplate(): ConsentTemplate {
   return activateConsentTemplate(draftTemplate(), HUMAN, LATER).template;
 }
 
+describe('CONSENT_CATEGORIES', () => {
+  it('recognises evidence_submission as a well-known category', () => {
+    expect(CONSENT_CATEGORIES).toContain('evidence_submission');
+  });
+});
+
 describe('createConsentTemplate', () => {
+  it('can declare evidence_submission as an optional category, independently of participation', () => {
+    const { template } = createConsentTemplate({
+      ...baseInput(),
+      categories: categories(
+        { category: 'audio_recording', required: false },
+        { category: 'evidence_submission', required: false },
+      ),
+    });
+
+    const participation = template.categories.find((c) => c.category === 'participation');
+    const evidenceSubmission = template.categories.find(
+      (c) => c.category === 'evidence_submission',
+    );
+
+    expect(participation).toMatchObject({ required: true });
+    expect(evidenceSubmission).toMatchObject({ required: false });
+  });
+
   it('creates version 1 as a draft', () => {
     const { template, event } = createConsentTemplate(baseInput());
     expect(template.version).toBe(1);

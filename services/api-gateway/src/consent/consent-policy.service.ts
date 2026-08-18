@@ -10,7 +10,7 @@
  *
  * Every method is a thin, named wrapper around one domain question function,
  * deliberately not a single generic `ask(question, ...)` dispatcher — the
- * domain module itself enumerates fifteen named questions rather than one
+ * domain module itself enumerates sixteen named questions rather than one
  * generic one (`mayUseCategory` is the sole exception, for organisation-
  * defined categories), and this service mirrors that shape so a future
  * caller (Milestone 5, Structured Evidence Capture) reads a call like
@@ -33,6 +33,7 @@ import {
   mayRecordVideo as domainMayRecordVideo,
   mayReportExternally as domainMayReportExternally,
   mayReuseInFuture as domainMayReuseInFuture,
+  maySubmitEvidence as domainMaySubmitEvidence,
   mayTranscribe as domainMayTranscribe,
   mayUseCategory as domainMayUseCategory,
   mayUseForResearch as domainMayUseForResearch,
@@ -87,6 +88,14 @@ export class ConsentPolicyService {
     now: Date = new Date(),
   ): Promise<ConsentAnswer> {
     return domainMayPhotograph(await this.context(sessionId, participantId, now));
+  }
+
+  async maySubmitEvidence(
+    sessionId: string,
+    participantId: string,
+    now: Date = new Date(),
+  ): Promise<ConsentAnswer> {
+    return domainMaySubmitEvidence(await this.context(sessionId, participantId, now));
   }
 
   async mayTranscribe(
@@ -177,7 +186,7 @@ export class ConsentPolicyService {
     return domainMayFollowUp(await this.context(sessionId, participantId, now));
   }
 
-  /** Generic form for an organisation-defined category beyond the well-known fifteen. */
+  /** Generic form for an organisation-defined category beyond the well-known sixteen. */
   async mayUseCategory(
     sessionId: string,
     participantId: string,

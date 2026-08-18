@@ -50,6 +50,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   audio_recording: 'Audio recording',
   video_recording: 'Video recording',
   photography: 'Photos',
+  evidence_submission: 'Submitting a document or photo as evidence',
   transcription: 'Transcription',
   ai_processing: 'Processing with local AI tools',
   attributed_quotation: 'Quoting them by name',
@@ -68,6 +69,10 @@ const CATEGORY_HELP: Record<string, string> = {
   audio_recording: 'Their voice is recorded during the session.',
   video_recording: 'They appear on video during the session.',
   photography: 'Photos are taken that may include them.',
+  evidence_submission:
+    'A document or photo they hand over is kept by Witness as part of the record. This is ' +
+    'separate from recording or photographing them, and does not by itself allow anything ' +
+    'further to be done with it.',
   transcription: 'A written transcript is made of what they said.',
   ai_processing:
     'A local AI tool (never sent off this server) summarises or extracts from what they said.',

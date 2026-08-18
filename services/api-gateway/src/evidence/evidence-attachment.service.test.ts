@@ -44,9 +44,16 @@ const EVIDENCE_UNATTRIBUTED = '55555555-5555-4555-8555-555555555555';
 const EVIDENCE_ATTRIBUTED = '56666666-6666-4666-8666-666666666666';
 const PARTICIPANT_1 = '44444444-4444-4444-8444-444444444444';
 
-function fakeConsent(allowed: boolean): ConsentPolicyService {
+function fakeConsent(
+  allowed: boolean | { audio?: boolean; evidenceSubmission?: boolean } = true,
+): ConsentPolicyService {
+  const resolved =
+    typeof allowed === 'boolean' ? { audio: allowed, evidenceSubmission: allowed } : allowed;
   return {
-    mayRecordAudio: vi.fn().mockResolvedValue({ allowed, reason: 'test' }),
+    mayRecordAudio: vi.fn().mockResolvedValue({ allowed: resolved.audio ?? true, reason: 'test' }),
+    maySubmitEvidence: vi
+      .fn()
+      .mockResolvedValue({ allowed: resolved.evidenceSubmission ?? true, reason: 'test' }),
   } as unknown as ConsentPolicyService;
 }
 
@@ -129,6 +136,35 @@ function audioFile(overrides: Partial<UploadedAttachmentFile> = {}): UploadedAtt
   };
 }
 
+// Real magic bytes, not just a plausible-looking buffer — evidence-attachment.service.ts now
+// verifies document/image content against their declared type, so a fake buffer with the wrong
+// signature would be rejected before ever reaching the assertions these helpers exist for.
+const PDF_SIGNATURE = Buffer.from('%PDF-1.4\nfake pdf bytes');
+const JPEG_SIGNATURE = Buffer.concat([
+  Buffer.from([0xff, 0xd8, 0xff]),
+  Buffer.from('fake image bytes'),
+]);
+
+function documentFile(overrides: Partial<UploadedAttachmentFile> = {}): UploadedAttachmentFile {
+  return {
+    originalname: 'exhibit-a.pdf',
+    mimetype: 'application/pdf',
+    size: 1024,
+    buffer: PDF_SIGNATURE,
+    ...overrides,
+  };
+}
+
+function imageFile(overrides: Partial<UploadedAttachmentFile> = {}): UploadedAttachmentFile {
+  return {
+    originalname: 'poster.jpg',
+    mimetype: 'image/jpeg',
+    size: 1024,
+    buffer: JPEG_SIGNATURE,
+    ...overrides,
+  };
+}
+
 function fakeStorage() {
   const objects = new Map<string, { content: Buffer; contentType: string }>();
   const storage: StoragePort = {
@@ -150,21 +186,22 @@ function fakeStorageQuota(checkQuota: StorageQuotaService['checkQuota'] = async 
 
 function service(
   options: {
-    allowed?: boolean;
+    allowed?: boolean | { audio?: boolean; evidenceSubmission?: boolean };
     maxMb?: number;
     storage?: StoragePort | null;
     storageQuota?: StorageQuotaService;
   } = {},
 ) {
   const { prisma, attachments, auditEvents } = fakePrisma();
+  const consent = fakeConsent(options.allowed ?? true);
   const svc = new EvidenceAttachmentService(
     prisma,
-    fakeConsent(options.allowed ?? true),
+    consent,
     { maxEvidenceAttachmentMb: options.maxMb ?? 200 } as never,
     options.storage ?? null,
     options.storageQuota ?? fakeStorageQuota(),
   );
-  return { svc, attachments, auditEvents };
+  return { svc, attachments, auditEvents, consent };
 }
 
 describe('EvidenceAttachmentService', () => {
@@ -211,8 +248,8 @@ describe('EvidenceAttachmentService', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects an unsupported content type', async () => {
-    const { svc } = service();
+  it('rejects a content type that matches no supported kind at all, before any consent check', async () => {
+    const { svc, consent } = service();
 
     await expect(
       svc.upload(
@@ -222,7 +259,9 @@ describe('EvidenceAttachmentService', () => {
         audioFile({ mimetype: 'video/mp4' }),
         FACILITATOR,
       ),
-    ).rejects.toThrow(InvariantViolation);
+    ).rejects.toThrow(BadRequestException);
+    expect(consent.mayRecordAudio).not.toHaveBeenCalled();
+    expect(consent.maySubmitEvidence).not.toHaveBeenCalled();
   });
 
   it('rejects a file over the configured limit', async () => {
@@ -321,5 +360,179 @@ describe('EvidenceAttachmentService', () => {
 
     const [key] = [...objects.keys()];
     expect(key).toMatch(new RegExp(`^${ORGANISATION_1}/evidence-attachment/`));
+  });
+});
+
+describe('document and image evidence — the evidence_submission consent gate', () => {
+  it('accepts a document when evidence_submission is granted, asking that question and not mayRecordAudio', async () => {
+    const { svc, attachments, consent } = service({
+      allowed: { evidenceSubmission: true },
+    });
+
+    const result = await svc.upload(
+      WORKSPACE_1,
+      SESSION_1,
+      EVIDENCE_ATTRIBUTED,
+      documentFile(),
+      FACILITATOR,
+    );
+
+    expect(result.kind).toBe('document');
+    expect(attachments).toHaveLength(1);
+    expect(consent.maySubmitEvidence).toHaveBeenCalledWith(
+      SESSION_1,
+      PARTICIPANT_1,
+      expect.any(Date),
+    );
+    expect(consent.mayRecordAudio).not.toHaveBeenCalled();
+  });
+
+  it('accepts an image when evidence_submission is granted', async () => {
+    const { svc, attachments } = service({ allowed: { evidenceSubmission: true } });
+
+    const result = await svc.upload(
+      WORKSPACE_1,
+      SESSION_1,
+      EVIDENCE_ATTRIBUTED,
+      imageFile(),
+      FACILITATOR,
+    );
+
+    expect(result.kind).toBe('image');
+    expect(attachments).toHaveLength(1);
+  });
+
+  it('denies a document submission when evidence_submission is missing/refused, even if audio_recording is granted', async () => {
+    const { svc, attachments } = service({
+      allowed: { audio: true, evidenceSubmission: false },
+    });
+
+    await expect(
+      svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_ATTRIBUTED, documentFile(), FACILITATOR),
+    ).rejects.toThrow(ForbiddenException);
+    expect(attachments).toHaveLength(0);
+  });
+
+  it('denies an image submission when evidence_submission is missing/refused', async () => {
+    const { svc, attachments } = service({ allowed: { evidenceSubmission: false } });
+
+    await expect(
+      svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_ATTRIBUTED, imageFile(), FACILITATOR),
+    ).rejects.toThrow(ForbiddenException);
+    expect(attachments).toHaveLength(0);
+  });
+
+  it('a denied document submission writes no R2 object and leaves quota unchecked', async () => {
+    const { storage, objects } = fakeStorage();
+    const checkQuota = vi.fn().mockResolvedValue(undefined);
+    const { svc } = service({
+      allowed: { evidenceSubmission: false },
+      storage,
+      storageQuota: fakeStorageQuota(checkQuota),
+    });
+
+    await expect(
+      svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_ATTRIBUTED, documentFile(), FACILITATOR),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(objects.size).toBe(0);
+    expect(checkQuota).not.toHaveBeenCalled();
+  });
+
+  it('a permitted document submission writes exactly one R2 object and checks quota exactly once', async () => {
+    const { storage, objects } = fakeStorage();
+    const checkQuota = vi.fn().mockResolvedValue(undefined);
+    const { svc } = service({
+      allowed: { evidenceSubmission: true },
+      storage,
+      storageQuota: fakeStorageQuota(checkQuota),
+    });
+
+    await svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_ATTRIBUTED, documentFile(), FACILITATOR);
+
+    expect(objects.size).toBe(1);
+    expect(checkQuota).toHaveBeenCalledTimes(1);
+  });
+
+  it('a second attempt against the same evidence after a denial still gets ATTACHMENT_EXISTS-free 403 (no partial state to conflict with)', async () => {
+    const { svc, attachments } = service({ allowed: { evidenceSubmission: false } });
+
+    await expect(
+      svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_ATTRIBUTED, documentFile(), FACILITATOR),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_ATTRIBUTED, documentFile(), FACILITATOR),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(attachments).toHaveLength(0);
+  });
+
+  it('rejects a document claiming application/pdf whose bytes are not actually a PDF, before any consent check', async () => {
+    const { svc, consent } = service({ allowed: { evidenceSubmission: true } });
+
+    await expect(
+      svc.upload(
+        WORKSPACE_1,
+        SESSION_1,
+        EVIDENCE_ATTRIBUTED,
+        documentFile({ buffer: Buffer.from('not actually a pdf') }),
+        FACILITATOR,
+      ),
+    ).rejects.toThrow(BadRequestException);
+    expect(consent.maySubmitEvidence).not.toHaveBeenCalled();
+  });
+
+  it('rejects an image claiming image/jpeg whose bytes are not actually a JPEG', async () => {
+    const { svc } = service({ allowed: { evidenceSubmission: true } });
+
+    await expect(
+      svc.upload(
+        WORKSPACE_1,
+        SESSION_1,
+        EVIDENCE_ATTRIBUTED,
+        imageFile({ buffer: Buffer.from('not actually a jpeg') }),
+        FACILITATOR,
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects bytes that are a real JPEG but declared as application/pdf — the signature must match the declared type, not just be a known one', async () => {
+    const { svc } = service({ allowed: { evidenceSubmission: true } });
+
+    await expect(
+      svc.upload(
+        WORKSPACE_1,
+        SESSION_1,
+        EVIDENCE_ATTRIBUTED,
+        documentFile({ buffer: JPEG_SIGNATURE }),
+        FACILITATOR,
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('accepts a real PNG declared as image/png', async () => {
+    const pngSignature = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from('fake png bytes'),
+    ]);
+    const { svc, attachments } = service({ allowed: { evidenceSubmission: true } });
+
+    await svc.upload(
+      WORKSPACE_1,
+      SESSION_1,
+      EVIDENCE_ATTRIBUTED,
+      imageFile({ mimetype: 'image/png', originalname: 'poster.png', buffer: pngSignature }),
+      FACILITATOR,
+    );
+
+    expect(attachments).toHaveLength(1);
+  });
+
+  it('404s a document upload aimed at an evidence row outside the given workspace/session regardless of consent', async () => {
+    const { svc } = service({ allowed: { evidenceSubmission: true } });
+
+    await expect(
+      svc.upload('does-not-exist', SESSION_1, EVIDENCE_ATTRIBUTED, documentFile(), FACILITATOR),
+    ).rejects.toThrow(NotFoundException);
   });
 });
