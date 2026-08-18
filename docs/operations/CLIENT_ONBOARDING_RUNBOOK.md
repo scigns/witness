@@ -83,8 +83,8 @@ docker compose … run --rm \
   api pnpm invite
 ```
 
-3. They sign in once through the identity provider to activate the account.
-4. An administrator adds them to the relevant workspace, with a role, on the
+1. They sign in once through the identity provider to activate the account.
+2. An administrator adds them to the relevant workspace, with a role, on the
    workspace page — see `CLIENT_ROLLOUT_PROFILES.md` for the recommended
    roles per profile.
 
