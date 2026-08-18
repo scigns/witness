@@ -1,6 +1,6 @@
 # Witness — Human UAT Handoff (v0.2.0, Controlled Pilot)
 
-**Status:** Active
+**Status:** Active — PRODUCT BUILD FROZEN at commit `e000f4e`
 **Owner:** Release Manager
 
 This is the human acceptance testing package for the Witness v0.2.0
@@ -8,6 +8,15 @@ controlled-pilot release. A Gmail draft with this same content was prepared
 for koto@dreamers-media.com; this copy is kept in the repository as the
 durable record. It was not automatically sent — no outbound-mail capability
 is authorised for this project, by design.
+
+**Updated 2026-08-18** for the frozen release (previously b49c114): adds
+browser audio recording (UAT-07a) and document/image evidence with the
+`evidence_submission` consent gate (UAT-07b), both built and deployed since
+this package was first issued, and folds both into the golden path
+(UAT-08). Nothing else below changed in substance — the five UAT accounts,
+credential mechanism, and every other test are unchanged and still
+verified against the live account/role data on production as of this
+update.
 
 ---
 
@@ -17,7 +26,7 @@ Subject: WITNESS — Final Human UAT Instructions & Release Acceptance
 RELEASE STATUS
 ============================================================
 
-Witness engineering build is complete.
+Witness engineering build is complete and the product build is FROZEN.
 
 Engineering verification:
 - P0: 0
@@ -37,11 +46,18 @@ Engineering verification:
 - backup/restore: PASS
 - rollback/reboot: PASS
 - institutional profiles (SPC/FTA/MOJ/Church): PASS
+- browser audio recording: PASS (engineering-verified; human microphone test
+  is UAT-07a below)
+- document/image evidence with `evidence_submission` consent: PASS
+  (engineering-verified — consent fails closed, zero writes on denial,
+  tenant isolation holds; human click-through is UAT-07b below)
 
 Everything remaining below is HUMAN ACCEPTANCE TESTING only — no more
-engineering work is planned before this. The objective is to determine
-whether a real person experiences the application as behaving correctly in
-the supported browsers, roles and workflows.
+engineering work is planned before this. The build is frozen: no further
+feature, architecture, or refactoring changes are in scope unless this UAT
+finds a P0, P1, or a genuine release-blocking P2. The objective is to
+determine whether a real person experiences the application as behaving
+correctly in the supported browsers, roles and workflows.
 
 ============================================================
 RELEASE INFORMATION
@@ -50,11 +66,14 @@ RELEASE INFORMATION
 WITNESS VERSION / RELEASE TAG:
 v0.2.0
 
-MAIN SHA:
-b49c114644edf0044ed92b909f1c063ba5faaf4d
+STATUS:
+PRODUCT BUILD FROZEN
 
-DEPLOYED SHA:
-b49c114644edf0044ed92b909f1c063ba5faaf4d
+MAIN SHA:
+e000f4ecd3f6377857f7837b1a84266d50057ac7
+
+DEPLOYED / RELEASE SHA:
+e000f4ecd3f6377857f7837b1a84266d50057ac7
 
 APPLICATION URL:
 https://witness-prod-web.pacificdigitalconsultancy.org
@@ -63,10 +82,20 @@ SIGN-IN URL:
 https://witness-prod-web.pacificdigitalconsultancy.org/signin
 
 DATE:
-2026-08-16
+2026-08-18
 
 TEST ENVIRONMENT:
 Production, using SYNTHETIC UAT DATA ONLY.
+
+DATA:
+SYNTHETIC ONLY.
+
+REAL CLIENT DATA:
+NOT APPROVED — pending this Human UAT passing, AND a separate, unrelated
+storage-protection action (R2 bucket versioning/Object Lock) that a human
+with Cloudflare account access still needs to complete. See
+`docs/operations/PILOT_OPERATIONS.md`'s "Backup" section. A pass on this
+UAT does not by itself approve real client data.
 
 DO NOT enter real confidential client information during this UAT. Every
 account and organisation below is synthetic and clearly labelled as such.
@@ -419,6 +448,160 @@ PASS CONDITION: the PWA installs and launches correctly, without exposing
 or caching sensitive information improperly.
 
 ============================================================
+UAT-07a — BROWSER AUDIO RECORDING (NEEDS A MICROPHONE)
+============================================================
+Account: uat-facilitator@witness-uat.example
+Browser: Chrome or another browser with microphone access. Skip this test
+(mark N/A) if your device has no working microphone.
+
+Engineering has verified this control's code paths (consent gate, upload
+reuse, feature-detected fallback) but not a live microphone recording —
+that needs a human and real hardware, which is what this test is for.
+
+1. Sign in and open a synthetic session's evidence capture screen, on a
+   piece of evidence with no attachment yet.
+   EXPECTED: an attachment section is visible, offering both "Record in
+   browser" and a file picker.
+   [ ] PASS  [ ] FAIL
+
+2. Before checking the consent box, confirm "Start recording" is disabled.
+   EXPECTED: the button cannot be pressed until you check the consent
+   confirmation box.
+   [ ] PASS  [ ] FAIL
+
+3. Check the consent confirmation box, then click Start recording.
+   EXPECTED: the browser asks for microphone permission (first time only);
+   after granting it, recording begins.
+   [ ] PASS  [ ] FAIL
+
+4. Confirm a visible recording indicator is shown (e.g. a pulsing dot and
+   "Recording").
+   [ ] PASS  [ ] FAIL
+
+5. Confirm an elapsed-time counter is visible and counting up.
+   [ ] PASS  [ ] FAIL
+
+6. Click Pause. Confirm the indicator changes to "Paused" and the timer
+   stops.
+   [ ] PASS  [ ] FAIL
+
+7. Click Resume. Confirm recording continues and the timer keeps counting
+   from where it paused.
+   [ ] PASS  [ ] FAIL
+
+8. Click Stop.
+   EXPECTED: recording stops and a preview player appears with what you
+   just recorded.
+   [ ] PASS  [ ] FAIL
+
+9. Play back the preview. Confirm it is audible and is actually what you
+   recorded (say something distinctive while recording, e.g. today's date,
+   to make this easy to verify).
+   [ ] PASS  [ ] FAIL
+
+10. Click "Discard and re-record". Confirm the recording is discarded and
+    you can start a fresh one (repeat steps 3–8 once more, briefly).
+    [ ] PASS  [ ] FAIL
+
+11. This time, click "Attach recording" instead of discarding.
+    EXPECTED: an "Uploading…" state appears, then the attachment shows up
+    with a filename, size, and content type.
+    [ ] PASS  [ ] FAIL
+
+12. Confirm a "Transcribe recording" option is now offered, and starting it
+    moves to a processing/queued state.
+    [ ] PASS  [ ] FAIL
+
+13. Wait for transcription to finish (or come back to this after UAT-07's
+    iTaukei test, which exercises the same pipeline).
+    EXPECTED: status moves from processing to a completed transcript.
+    [ ] PASS  [ ] FAIL
+
+14. On a fresh piece of evidence, click "Start recording" with the consent
+    box checked, then deny the browser's microphone permission prompt.
+    EXPECTED: a clear error message appears (not a silent failure or a
+    frozen button), and the existing file-upload option is still available
+    as a fallback.
+    [ ] PASS  [ ] FAIL
+
+15. Confirm nothing was silently lost at any point above — every state
+    change (recording/paused/stopped/uploading/attached) was visibly
+    reflected in the UI, not something you had to guess at.
+    [ ] PASS  [ ] FAIL
+
+FINAL BROWSER RECORDING RESULT: [ ] PASS  [ ] FAIL  [ ] N/A (no microphone)
+PASS CONDITION: every step above behaves as described; a denied
+permission fails clearly rather than silently.
+
+============================================================
+UAT-07b — DOCUMENT / IMAGE EVIDENCE AND THE evidence_submission CONSENT GATE
+============================================================
+Account: uat-facilitator@witness-uat.example (capture), plus
+uat-participant@witness-uat.example (to grant/refuse consent as the source
+participant)
+Files needed: one small synthetic PDF and one small synthetic JPEG/PNG —
+anything non-confidential works (a one-page test document, a stock photo).
+
+This is new since document/image evidence didn't exist when this package
+was first written. Engineering has verified the consent gate, the
+zero-writes-on-denial behaviour, and tenant isolation at the API level
+(26 automated tests) — this is the human click-through confirmation.
+
+CASE A — evidence_submission GRANTED
+1. As the participant, complete session consent with "Submitting a
+   document or photo as evidence" (evidence_submission) granted.
+   [ ] PASS  [ ] FAIL
+2. As the facilitator, capture a new piece of evidence attributed to that
+   participant, then attach the synthetic PDF via the file picker.
+   EXPECTED: upload succeeds.
+   [ ] PASS  [ ] FAIL
+3. Confirm the attachment section now shows a "Load and download" control
+   for the PDF, and it actually opens/downloads the right file.
+   [ ] PASS  [ ] FAIL
+4. Confirm no "Transcript" section appears for this document (transcription
+   is audio-only).
+   [ ] PASS  [ ] FAIL
+5. Repeat steps 2–3 on a second piece of evidence with the synthetic image
+   instead. Confirm the image preview renders inline (not a download link).
+   [ ] PASS  [ ] FAIL
+6. Check the organisation's storage usage page. Confirm it increased by
+   roughly the size of both files, once each (no duplicate counting).
+   [ ] PASS  [ ] FAIL
+
+CASE B — evidence_submission REFUSED or never decided
+7. As the participant, either refuse evidence_submission specifically, or
+   use a session/participant where it was never asked.
+   [ ] PASS  [ ] FAIL
+8. As the facilitator, attempt to attach a synthetic document or image to
+   evidence attributed to that participant.
+   EXPECTED: the upload is denied with a plain-language message about
+   permission — not a raw error code, and not a silent failure.
+   [ ] PASS  [ ] FAIL
+9. Confirm nothing appears attached afterward — no partial upload, no
+   attachment shown, storage usage unchanged.
+   [ ] PASS  [ ] FAIL
+
+CASE C — valid consent, wrong role
+10. Sign in as uat-observer@witness-uat.example (read-only). Attempt to
+    reach the same attach-evidence control.
+    EXPECTED: denied or not offered, regardless of any participant's
+    consent state.
+    [ ] PASS  [ ] FAIL
+
+CASE D — cross-tenant
+11. Sign in as uat-tenantb-admin@witness-uat.example (Tenant B UAT).
+    Attempt to view or act on the Case A evidence from Witness Production
+    (e.g. by trying its URL directly, if you can construct one from
+    testing above).
+    EXPECTED: denied — Tenant B has no access to Witness Production's
+    evidence no matter what consent exists on it.
+    [ ] PASS  [ ] FAIL
+
+FINAL DOCUMENT/IMAGE CONSENT RESULT: [ ] PASS  [ ] FAIL
+PASS CONDITION: Case A succeeds cleanly; Cases B/C/D are all denied, with
+B specifically giving an understandable, non-technical refusal message.
+
+============================================================
 UAT-07 — iTAUKEI / FIJIAN TRANSCRIPTION
 ============================================================
 This is the one test that needs a genuine recording — engineering has not
@@ -470,15 +653,19 @@ Label everything you create with "UAT" in the title.
    PASS CRITERIA: program visible and open-able.
    [ ] PASS  [ ] FAIL
 
-3. ACTION: Create a new session inside that program.
-   EXPECTED: Session is created.
-   PASS CRITERIA: session appears with correct details.
+3. ACTION: Create a new session inside that program, setting a purpose and
+   adding at least one agenda item.
+   EXPECTED: Session is created with the purpose and agenda item saved.
+   PASS CRITERIA: session appears with correct details, purpose, and
+   agenda.
    [ ] PASS  [ ] FAIL
 
 4. ACTION: Add a participant to the session (or switch to
-   uat-facilitator@witness-uat.example to do this).
-   EXPECTED: Participant is added.
-   PASS CRITERIA: participant appears in the session's participant list.
+   uat-facilitator@witness-uat.example to do this), recording a language
+   preference or accessibility need on the participant.
+   EXPECTED: Participant is added with that information saved.
+   PASS CRITERIA: participant appears in the session's participant list,
+   with the language/accessibility field visible.
    [ ] PASS  [ ] FAIL
 
 5. ACTION: Sign in as uat-participant@witness-uat.example (separate
@@ -488,14 +675,25 @@ Label everything you create with "UAT" in the title.
    [ ] PASS  [ ] FAIL
 
 6. ACTION: As the participant, submit a contribution (text is fine; try an
-   audio upload too if convenient).
+   audio upload too if convenient — or record it in the browser, see
+   UAT-07a for the detailed steps).
    EXPECTED: Contribution is captured.
    PASS CRITERIA: it appears in the session for the facilitator/reviewer.
    [ ] PASS  [ ] FAIL
 
-7. ACTION: If you uploaded audio, wait for transcription to complete.
-   EXPECTED: Transcript appears against the contribution.
-   PASS CRITERIA: status moves from processing to completed.
+6a. ACTION: With evidence_submission consent granted for this participant
+    (see UAT-07b if not already done), attach a synthetic document or
+    image to a piece of evidence.
+    EXPECTED: attachment succeeds and renders/downloads correctly.
+    PASS CRITERIA: same as UAT-07b, Case A.
+    [ ] PASS  [ ] FAIL
+
+7. ACTION: If you uploaded audio, wait for transcription to complete, then
+   make one small correction to the transcript.
+   EXPECTED: Transcript appears against the contribution, and your
+   correction saves.
+   PASS CRITERIA: status moves from processing to completed; the corrected
+   text persists after a refresh.
    [ ] PASS  [ ] FAIL
 
 8. ACTION: Sign in as uat-reviewer@witness-uat.example and review the
@@ -520,9 +718,11 @@ Label everything you create with "UAT" in the title.
     [ ] PASS  [ ] FAIL
 
 12. ACTION: Search for the contribution you added (by a distinctive word
-    from its content).
-    EXPECTED: It is found.
-    PASS CRITERIA: search returns the correct result.
+    from its content), then open the search result.
+    EXPECTED: It is found, and opening it takes you to the original
+    evidence/session it came from.
+    PASS CRITERIA: search returns the correct result, and you can trace it
+    back to its source.
     [ ] PASS  [ ] FAIL
 
 13. ACTION: Export the session's report (try more than one format if you
@@ -556,13 +756,22 @@ Firefox:                         [ ] PASS  [ ] FAIL
 Safari:                          [ ] PASS  [ ] FAIL
 iPhone:                          [ ] PASS  [ ] FAIL
 PWA:                             [ ] PASS  [ ] FAIL
+Browser audio recording:         [ ] PASS  [ ] FAIL  [ ] N/A
+Document/image consent:          [ ] PASS  [ ] FAIL
 iTaukei/Fijian transcription:    [ ] PASS  [ ] PASS WITH LIMITATIONS
                                   [ ] FAIL  [ ] NOT TESTED
 Full human golden path:          [ ] PASS  [ ] FAIL
 
 P0 defects discovered: _____
 P1 defects discovered: _____
+P2 defects discovered: _____
+P3 defects discovered: _____
 Other findings: _____
+
+Even a full PASS above does NOT by itself approve real client data — see
+"REAL CLIENT DATA" in RELEASE INFORMATION at the top of this document. The
+outstanding R2 storage-protection action is separate from this UAT and is
+tracked in `docs/operations/PILOT_OPERATIONS.md`.
 
 FINAL HUMAN ACCEPTANCE:
 [ ] APPROVED FOR CONTROLLED PILOT
