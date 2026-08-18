@@ -188,12 +188,13 @@ Only PostgreSQL is backed up. Under ADR-0011 the graph and search projections
 are rebuildable from the event log; copying them costs storage and buys nothing.
 If the dump restores, Witness restores.
 
-**Schedule it daily** (not yet running as a standing job on the pilot host —
-registering it is an operator action, since it's a persistent addition to the
-host's own crontab):
+**Schedule it daily**, registered as a standing job on the pilot host's own
+crontab. Call the script directly rather than through `make` — a minimal
+pilot host has no `make` binary, and cron's own environment is too sparse to
+find one on `$PATH` even where it is installed:
 
 ```cron
-0 3 * * * cd /path/to/witness && make pilot-backup >> ~/witness-backups/backup.log 2>&1
+0 3 * * * cd /path/to/witness && /usr/bin/env bash scripts/pilot/backup.sh >> ~/witness-backups/backup.log 2>&1
 ```
 
 Keep a copy off the node it came from, and encrypt it at rest — it contains
