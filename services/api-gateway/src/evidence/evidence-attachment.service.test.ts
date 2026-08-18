@@ -136,12 +136,21 @@ function audioFile(overrides: Partial<UploadedAttachmentFile> = {}): UploadedAtt
   };
 }
 
+// Real magic bytes, not just a plausible-looking buffer — evidence-attachment.service.ts now
+// verifies document/image content against their declared type, so a fake buffer with the wrong
+// signature would be rejected before ever reaching the assertions these helpers exist for.
+const PDF_SIGNATURE = Buffer.from('%PDF-1.4\nfake pdf bytes');
+const JPEG_SIGNATURE = Buffer.concat([
+  Buffer.from([0xff, 0xd8, 0xff]),
+  Buffer.from('fake image bytes'),
+]);
+
 function documentFile(overrides: Partial<UploadedAttachmentFile> = {}): UploadedAttachmentFile {
   return {
     originalname: 'exhibit-a.pdf',
     mimetype: 'application/pdf',
     size: 1024,
-    buffer: Buffer.from('fake pdf bytes'),
+    buffer: PDF_SIGNATURE,
     ...overrides,
   };
 }
@@ -151,7 +160,7 @@ function imageFile(overrides: Partial<UploadedAttachmentFile> = {}): UploadedAtt
     originalname: 'poster.jpg',
     mimetype: 'image/jpeg',
     size: 1024,
-    buffer: Buffer.from('fake image bytes'),
+    buffer: JPEG_SIGNATURE,
     ...overrides,
   };
 }
@@ -456,6 +465,67 @@ describe('document and image evidence — the evidence_submission consent gate',
     ).rejects.toThrow(ForbiddenException);
 
     expect(attachments).toHaveLength(0);
+  });
+
+  it('rejects a document claiming application/pdf whose bytes are not actually a PDF, before any consent check', async () => {
+    const { svc, consent } = service({ allowed: { evidenceSubmission: true } });
+
+    await expect(
+      svc.upload(
+        WORKSPACE_1,
+        SESSION_1,
+        EVIDENCE_ATTRIBUTED,
+        documentFile({ buffer: Buffer.from('not actually a pdf') }),
+        FACILITATOR,
+      ),
+    ).rejects.toThrow(BadRequestException);
+    expect(consent.maySubmitEvidence).not.toHaveBeenCalled();
+  });
+
+  it('rejects an image claiming image/jpeg whose bytes are not actually a JPEG', async () => {
+    const { svc } = service({ allowed: { evidenceSubmission: true } });
+
+    await expect(
+      svc.upload(
+        WORKSPACE_1,
+        SESSION_1,
+        EVIDENCE_ATTRIBUTED,
+        imageFile({ buffer: Buffer.from('not actually a jpeg') }),
+        FACILITATOR,
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects bytes that are a real JPEG but declared as application/pdf — the signature must match the declared type, not just be a known one', async () => {
+    const { svc } = service({ allowed: { evidenceSubmission: true } });
+
+    await expect(
+      svc.upload(
+        WORKSPACE_1,
+        SESSION_1,
+        EVIDENCE_ATTRIBUTED,
+        documentFile({ buffer: JPEG_SIGNATURE }),
+        FACILITATOR,
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('accepts a real PNG declared as image/png', async () => {
+    const pngSignature = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from('fake png bytes'),
+    ]);
+    const { svc, attachments } = service({ allowed: { evidenceSubmission: true } });
+
+    await svc.upload(
+      WORKSPACE_1,
+      SESSION_1,
+      EVIDENCE_ATTRIBUTED,
+      imageFile({ mimetype: 'image/png', originalname: 'poster.png', buffer: pngSignature }),
+      FACILITATOR,
+    );
+
+    expect(attachments).toHaveLength(1);
   });
 
   it('404s a document upload aimed at an evidence row outside the given workspace/session regardless of consent', async () => {

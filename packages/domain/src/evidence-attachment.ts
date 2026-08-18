@@ -71,6 +71,49 @@ export function inferAttachmentKind(contentType: string): AttachmentKind | null 
   return null;
 }
 
+/**
+ * A multipart upload's declared content type is whatever the caller's
+ * `Content-Type` field says, unverified — trusting it alone would let
+ * arbitrary bytes be stored and later served back as `image/jpeg` or
+ * `application/pdf` (`<img>`/download in the browser), which is a real
+ * content-type-confusion risk `inferAttachmentKind` and
+ * `assertSupportedContentType` alone do not close. Checked here, against
+ * the actual bytes, for `document`/`image` only: those are the two kinds
+ * this build renders or serves for direct download in a browser, so a
+ * mismatch is the one that matters. `audio` is not checked — every
+ * supported audio container's own byte signature is far less uniform
+ * across the browsers and devices that can produce one (a real recording
+ * is played back through an `<audio>` element, not rendered as another
+ * content type, so the risk this closes for document/image does not apply
+ * the same way), and this is a fail-closed *addition*, not a replacement
+ * for `assertSupportedContentType`.
+ */
+const FILE_SIGNATURES: Readonly<Partial<Record<string, (buffer: Buffer) => boolean>>> = {
+  'image/jpeg': (buffer) =>
+    buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff,
+  'image/png': (buffer) =>
+    buffer.length >= 8 &&
+    buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+  'image/webp': (buffer) =>
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    buffer.subarray(8, 12).toString('ascii') === 'WEBP',
+  'application/pdf': (buffer) =>
+    buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-',
+};
+
+/**
+ * `true` if the bytes match what `contentType` claims, for the kinds this
+ * is checked for at all (`document`/`image` — see `FILE_SIGNATURES`'s
+ * header). Returns `true` for anything not in that map, `audio` included —
+ * "not checked" and "verified" are different claims, and this function
+ * only ever asserts the latter.
+ */
+export function matchesDeclaredContentType(contentType: string, buffer: Buffer): boolean {
+  const check = FILE_SIGNATURES[contentType];
+  return check === undefined ? true : check(buffer);
+}
+
 const ORIGINAL_FILENAME_MAX = 300;
 
 export interface EvidenceAttachment {

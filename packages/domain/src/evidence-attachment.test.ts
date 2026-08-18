@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { Actor } from './actor.js';
 import { InvariantViolation } from './errors.js';
-import { captureEvidenceAttachment, inferAttachmentKind } from './evidence-attachment.js';
+import {
+  captureEvidenceAttachment,
+  inferAttachmentKind,
+  matchesDeclaredContentType,
+} from './evidence-attachment.js';
 import { toActorId, toEvidenceAttachmentId, toEvidenceId } from './ids.js';
 
 const ACTOR: Actor = {
@@ -109,5 +113,44 @@ describe('inferAttachmentKind', () => {
 
   it('returns null for an unsupported content type', () => {
     expect(inferAttachmentKind('application/zip')).toBeNull();
+  });
+});
+
+describe('matchesDeclaredContentType', () => {
+  const PDF = Buffer.from('%PDF-1.4\n...');
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0x00, 0x01]);
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+  const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.from([0, 0, 0, 0]), Buffer.from('WEBP')]);
+
+  it('accepts a real PDF declared as application/pdf', () => {
+    expect(matchesDeclaredContentType('application/pdf', PDF)).toBe(true);
+  });
+
+  it('accepts a real JPEG declared as image/jpeg', () => {
+    expect(matchesDeclaredContentType('image/jpeg', JPEG)).toBe(true);
+  });
+
+  it('accepts a real PNG declared as image/png', () => {
+    expect(matchesDeclaredContentType('image/png', PNG)).toBe(true);
+  });
+
+  it('accepts a real WebP declared as image/webp', () => {
+    expect(matchesDeclaredContentType('image/webp', WEBP)).toBe(true);
+  });
+
+  it('rejects arbitrary bytes declared as application/pdf', () => {
+    expect(matchesDeclaredContentType('application/pdf', Buffer.from('not a pdf'))).toBe(false);
+  });
+
+  it('rejects a real JPEG declared as application/pdf — the signature must match the declared type', () => {
+    expect(matchesDeclaredContentType('application/pdf', JPEG)).toBe(false);
+  });
+
+  it('rejects a truncated buffer shorter than the signature it claims', () => {
+    expect(matchesDeclaredContentType('image/png', Buffer.from([0x89, 0x50]))).toBe(false);
+  });
+
+  it('is not checked for content types with no registered signature (audio) — returns true', () => {
+    expect(matchesDeclaredContentType('audio/mpeg', Buffer.from('anything at all'))).toBe(true);
   });
 });

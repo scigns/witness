@@ -16,6 +16,13 @@
  * asked elsewhere, unaffected by this one). Evidence with no source
  * participant (institutional-source, unattributed) has no consent to check,
  * same as capture.
+ *
+ * The declared content type is also checked against the file's actual bytes
+ * (`matchesDeclaredContentType`) before any of that, for `document`/`image`
+ * — the two kinds this build serves back for direct browser rendering or
+ * download. Trusting the caller-supplied `Content-Type` alone would let
+ * arbitrary bytes be stored and later served back as if they were a real
+ * PDF or image.
  */
 
 import {
@@ -33,6 +40,7 @@ import {
   captureEvidenceAttachment,
   inferAttachmentKind,
   InvariantViolation,
+  matchesDeclaredContentType,
   toEvidenceAttachmentId,
   toEvidenceId,
 } from '@witness/domain';
@@ -103,6 +111,15 @@ export class EvidenceAttachmentService {
         error: {
           code: 'UNSUPPORTED_CONTENT_TYPE',
           message: `'${file.mimetype}' is not a supported evidence attachment format.`,
+        },
+      });
+    }
+
+    if (!matchesDeclaredContentType(file.mimetype, file.buffer)) {
+      throw new BadRequestException({
+        error: {
+          code: 'CONTENT_TYPE_MISMATCH',
+          message: `This file's contents do not look like '${file.mimetype}'.`,
         },
       });
     }
