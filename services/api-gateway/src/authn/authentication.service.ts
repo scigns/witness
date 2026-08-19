@@ -384,6 +384,26 @@ export class AuthenticationService {
         .map((a) => [a.workspaceId as string, a.role as WitnessRole]),
     );
 
+    // Organisations this user is a member of in good standing — the second
+    // of the two conditions (alongside holding a role there at all)
+    // `tiersForWorkspace` requires before letting an organisation-scoped
+    // assignment cascade to a workspace. A `RoleAssignment` row can outlive
+    // its backing membership being suspended or revoked (nothing deletes
+    // it), so `roleByOrganisation` alone is not enough to know whether that
+    // assignment is actually live — every fallback to it below must also
+    // check this set, exactly as the real authorization decision does.
+    const goodStandingOrganisationIds = new Set(
+      organisationMemberships
+        .filter((m) => isInGoodStanding(m.state as MembershipState))
+        .map((m) => m.organisation.id),
+    );
+
+    /** The org-scoped role for `organisationId`, or `null` if there is none or its membership isn't live. */
+    const cascadedRoleFor = (organisationId: string): WitnessRole | null =>
+      goodStandingOrganisationIds.has(organisationId)
+        ? (roleByOrganisation.get(organisationId) ?? null)
+        : null;
+
     const explicitWorkspaces = workspaceMemberships
       .filter((m) => isInGoodStanding(m.state as MembershipState))
       .map((m) => ({
@@ -399,17 +419,12 @@ export class AuthenticationService {
         // the workspaces under their organisation). A workspace-scoped
         // assignment takes precedence when both exist, matching that same
         // method's union.
-        role:
-          roleByWorkspace.get(m.workspace.id) ??
-          roleByOrganisation.get(m.workspace.organisationId) ??
-          null,
+        role: roleByWorkspace.get(m.workspace.id) ?? cascadedRoleFor(m.workspace.organisationId),
       }));
     const explicitWorkspaceIds = new Set(explicitWorkspaces.map((w) => w.id));
 
     // Every organisation this user holds a role in AND is a member of in
-    // good standing — the same two conditions `tiersForWorkspace` checks
-    // before letting an organisation-scoped assignment cascade to a
-    // workspace. Without this, a user whose only foothold is an
+    // good standing. Without this, a user whose only foothold is an
     // organisation-level role (no individual `WorkspaceMembership` row for
     // any specific workspace) would see an empty `workspaces` list here even
     // though the real authorization decision — computed by that same
@@ -417,9 +432,7 @@ export class AuthenticationService {
     // every workspace under that organisation. The UI's own permission
     // picture must not be narrower than what the server actually enforces.
     const cascadeOrganisationIds = [...roleByOrganisation.keys()].filter((organisationId) =>
-      organisationMemberships.some(
-        (m) => m.organisation.id === organisationId && isInGoodStanding(m.state as MembershipState),
-      ),
+      goodStandingOrganisationIds.has(organisationId),
     );
 
     const cascadedWorkspaceRows =
@@ -437,7 +450,7 @@ export class AuthenticationService {
         organisationId: w.organisationId,
         description: w.description,
         createdAt: w.createdAt.toISOString(),
-        role: roleByOrganisation.get(w.organisationId) ?? null,
+        role: cascadedRoleFor(w.organisationId),
       }));
 
     return {

@@ -33,7 +33,7 @@ export const REQUIRED_ACTION = 'witness:required-action';
  * One constant, centrally, rather than each of the dozens of `@Requires(...)`
  * routes inventing its own user-facing copy.
  */
-const FORBIDDEN_USER_MESSAGE =
+export const FORBIDDEN_USER_MESSAGE =
   "You don't have permission to do that. Ask an organisation or workspace administrator to check your access.";
 
 /** Declare the action a route requires. Absence means the route is denied. */

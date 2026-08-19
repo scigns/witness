@@ -567,6 +567,47 @@ describe('AuthenticationService — sign-in and user mapping', () => {
     expect(current.view.workspaces).toEqual([]);
   });
 
+  it("getCurrentUser does not apply a suspended organisation's role as the fallback on an otherwise-active workspace membership", async () => {
+    const { prisma, organisationMemberships, workspaceMemberships, roleAssignments } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    // The `RoleAssignment` row outlives the organisation membership being
+    // suspended — nothing deletes it. `tiersForWorkspace` would refuse to
+    // let it cascade (it requires the organisation membership to be in good
+    // standing, not merely a role assignment to exist), so this workspace's
+    // role must resolve to null too, even though the *workspace* membership
+    // itself is perfectly active.
+    organisationMemberships.push({
+      userId: INVITED_USER,
+      state: 'suspended',
+      organisation: { id: 'org-1', name: 'Org One', createdAt: new Date() },
+    });
+    workspaceMemberships.push({
+      userId: INVITED_USER,
+      state: 'active',
+      workspace: {
+        id: 'workspace-1',
+        name: 'Workspace One',
+        organisationId: 'org-1',
+        createdAt: new Date(),
+      },
+    });
+    roleAssignments.push({
+      userId: INVITED_USER,
+      role: 'admin',
+      organisationId: 'org-1',
+      workspaceId: null,
+    });
+
+    const current = await service.getCurrentUser(INVITED_USER);
+    if (current.status !== 'ok') throw new Error(`expected 'ok', got '${current.status}'`);
+    expect(current.view.workspaces).toEqual([
+      expect.objectContaining({ id: 'workspace-1', role: null }),
+    ]);
+  });
+
   it("getCurrentUser does not leak a different organisation's workspaces from an unrelated organisation-scoped role", async () => {
     const { prisma, organisationMemberships, roleAssignments, workspaces } = fakePrisma();
     const idp = new StubIdentityProvider();

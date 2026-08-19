@@ -9,7 +9,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AuthorizationPort, Principal } from './authorization.port.js';
-import { AuthorizationGuard } from './authorization.guard.js';
+import { AuthorizationGuard, FORBIDDEN_USER_MESSAGE } from './authorization.guard.js';
 import type { PolicyEnforcementService } from './policy-enforcement.service.js';
 import type { SessionAuthenticator } from './session-authenticator.js';
 
@@ -157,7 +157,7 @@ describe('AuthorizationGuard — denial response shape', () => {
       response: {
         error: expect.objectContaining({
           code: 'FORBIDDEN',
-          message: expect.not.stringContaining('no role in'),
+          message: FORBIDDEN_USER_MESSAGE,
           details: rawReason,
         }),
       },
