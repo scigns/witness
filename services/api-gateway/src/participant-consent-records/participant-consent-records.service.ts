@@ -45,6 +45,7 @@ import {
 } from '@witness/domain';
 import type {
   CaptureParticipantConsentRequest,
+  ConsentCategoryDecisionView,
   ConsentDashboardParticipantView,
   ConsentFacilitatorDashboardView,
   ParticipantConsentRecordDetail,
@@ -119,10 +120,11 @@ export class ParticipantConsentRecordsService {
   async dashboard(
     workspaceId: string,
     sessionId: string,
+    principal: Principal,
   ): Promise<ConsentFacilitatorDashboardView> {
     await this.requireSessionRow(workspaceId, sessionId);
 
-    const [configurationRow, participantRows, recordRows] = await Promise.all([
+    const [configurationRow, participantRows, recordRows, includeRestricted] = await Promise.all([
       this.prisma.sessionConsentConfiguration.findUnique({ where: { sessionId } }),
       this.prisma.sessionParticipant.findMany({
         where: { sessionId },
@@ -130,6 +132,7 @@ export class ParticipantConsentRecordsService {
         take: 500,
       }),
       this.prisma.participantConsentRecord.findMany({ where: { sessionId } }),
+      this.canSeeRestricted(principal, workspaceId),
     ]);
 
     const now = new Date();
@@ -150,6 +153,9 @@ export class ParticipantConsentRecordsService {
         displayName: participant.displayName,
         status: statusSummary(records, requiredCategories, now),
         updatedAt: active?.updatedAt.toISOString() ?? null,
+        ...(includeRestricted && active !== null
+          ? { categoryDecisions: active.categoryDecisions as ConsentCategoryDecisionView[] }
+          : {}),
       };
     });
 
@@ -157,6 +163,7 @@ export class ParticipantConsentRecordsService {
       sessionId,
       configuration: configurationRow === null ? null : toConfigurationView(configurationRow),
       participants,
+      canSeeCategoryDecisions: includeRestricted,
     };
   }
 
@@ -595,7 +602,7 @@ function toDetail(
     version: record.version,
     ...(includeRestricted
       ? {
-          categoryDecisions: record.categoryDecisions as { category: string; granted: boolean }[],
+          categoryDecisions: record.categoryDecisions as ConsentCategoryDecisionView[],
           withdrawalReason: record.withdrawalReason,
         }
       : {}),

@@ -133,7 +133,7 @@ export default function WorkspaceSearchPage({ params }: { params: Promise<{ id: 
                       )}
                       {result.status !== null && (
                         <span className="text-xs text-[var(--color-ink-muted)]">
-                          {result.status}
+                          {result.status.replace(/_/g, ' ')}
                         </span>
                       )}
                     </div>

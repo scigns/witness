@@ -18,7 +18,7 @@ import type { SessionLifecycleEventView, SessionStatus } from '@witness/contract
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { Button, Card, ErrorNotice, LinkButton, SessionStatusBadge } from '@/components/ui';
+import { Button, Card, ErrorNotice, SessionStatusBadge } from '@/components/ui';
 
 type SessionDetailState = Awaited<ReturnType<typeof api.getSession>>;
 
@@ -38,6 +38,55 @@ const TRANSITION_LABELS: Partial<Record<SessionStatus, string>> = {
   archived: 'Archive',
   draft: 'Move back to draft',
 };
+
+/**
+ * The session workspace's own navigation — one entry per stage of
+ * `docs`'s prepare → consent → capture → process → review → decide → act →
+ * report hierarchy that this session actually has a page for. `href` is
+ * appended to `/workspaces/:id/sessions/:sessionId`.
+ */
+const SESSION_WORKSPACE_LINKS: { href: string; label: string; description: string }[] = [
+  {
+    href: '/participants',
+    label: 'People',
+    description: 'Who is expected, who attended, and their roles in this session.',
+  },
+  {
+    href: '/consent-configuration',
+    label: 'Consent',
+    description: 'Which categories of consent this session asks for, and from whom.',
+  },
+  {
+    href: '/consent-dashboard',
+    label: 'Consent dashboard',
+    description: "Every participant's consent decisions at a glance.",
+  },
+  {
+    href: '/evidence',
+    label: 'Capture & evidence',
+    description: 'Record, upload, and review what was said, shown, or handed over.',
+  },
+  {
+    href: '/summary',
+    label: 'Summary',
+    description: 'A local AI-drafted summary of the session, for a human to confirm.',
+  },
+  {
+    href: '/outcomes',
+    label: 'Outcomes',
+    description: 'Decisions, commitments, and actions this session produced.',
+  },
+  {
+    href: '/reports',
+    label: 'Reports',
+    description: 'Compose, review, and export a written account of this session.',
+  },
+  {
+    href: '/recap',
+    label: 'Recap',
+    description: 'What happened, for anyone who took part to read back.',
+  },
+];
 
 export default function SessionDetailPage({
   params,
@@ -67,6 +116,22 @@ export default function SessionDetailPage({
   const [reopening, setReopening] = useState(false);
   const [reopenReason, setReopenReason] = useState('');
 
+  /**
+   * A concise operating picture, not a second source of truth — every count
+   * here is a plain read of a list this build already exposes elsewhere
+   * (Participants, Contributions, Outcomes). Loaded separately from the
+   * session/history load above and allowed to fail independently: a
+   * facilitator who can see the session but, say, not evidence yet should
+   * still see the page, just with that one figure omitted rather than the
+   * whole page failing.
+   */
+  const [sessionMap, setSessionMap] = useState<{
+    participants: number | null;
+    evidence: number | null;
+    decisionsConfirmed: number | null;
+    actionsOpen: number | null;
+  } | null>(null);
+
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
       try {
@@ -92,6 +157,38 @@ export default function SessionDetailPage({
       } finally {
         if (!cancelledRef.current) setLoading(false);
       }
+
+      const [participantsResult, evidenceResult, decisionsResult, actionsResult] =
+        await Promise.allSettled([
+          api.listParticipants(workspaceId, sessionId, user),
+          api.listEvidence(workspaceId, sessionId, user),
+          api.listDecisions(workspaceId, sessionId, user),
+          api.listActionItems(workspaceId, sessionId, user),
+        ]);
+      if (cancelledRef.current) return;
+      // `null` for a failed request, not `0` — a real zero and "we don't know"
+      // must render differently (the `?? '—'` below), especially for open
+      // actions: a failed count silently reading as zero would hide real
+      // follow-up work from a facilitator, exactly the silent-failure shape
+      // this whole pass exists to eliminate.
+      setSessionMap({
+        participants:
+          participantsResult.status === 'fulfilled'
+            ? participantsResult.value.participants.filter((p) => !p.withdrawn).length
+            : null,
+        evidence:
+          evidenceResult.status === 'fulfilled' ? evidenceResult.value.evidence.length : null,
+        decisionsConfirmed:
+          decisionsResult.status === 'fulfilled'
+            ? decisionsResult.value.decisions.filter((d) => d.status === 'confirmed').length
+            : null,
+        actionsOpen:
+          actionsResult.status === 'fulfilled'
+            ? actionsResult.value.actions.filter(
+                (a) => a.status === 'open' || a.status === 'in_progress',
+              ).length
+            : null,
+      });
     },
     [workspaceId, sessionId, user],
   );
@@ -268,6 +365,7 @@ export default function SessionDetailPage({
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
+          <p className="text-sm text-[var(--color-ink-muted)]">Session</p>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">{session.title}</h1>
             <SessionStatusBadge status={session.status} />
@@ -276,36 +374,11 @@ export default function SessionDetailPage({
             {session.sessionType} · {session.deliveryMode.replace('_', ' ')}
           </p>
         </div>
-        <div className="flex gap-2">
-          <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/participants`}>
-            Participants →
-          </LinkButton>
-          <LinkButton
-            href={`/workspaces/${workspaceId}/sessions/${sessionId}/consent-configuration`}
-          >
-            Consent →
-          </LinkButton>
-          <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/evidence`}>
-            Contributions →
-          </LinkButton>
-          <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/summary`}>
-            Summary →
-          </LinkButton>
-          <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/outcomes`}>
-            Outcomes →
-          </LinkButton>
-          <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/reports`}>
-            Reports →
-          </LinkButton>
-          <LinkButton href={`/workspaces/${workspaceId}/sessions/${sessionId}/recap`}>
-            Recap →
-          </LinkButton>
-          {!isArchived && (
-            <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>
-              {editing ? 'Cancel edit' : 'Edit details'}
-            </Button>
-          )}
-        </div>
+        {!isArchived && (
+          <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>
+            {editing ? 'Cancel edit' : 'Edit details'}
+          </Button>
+        )}
       </div>
 
       {isArchived && (
@@ -313,6 +386,70 @@ export default function SessionDetailPage({
           This session is archived and read-only.
         </p>
       )}
+
+      {/*
+        The operating picture — what's true right now, in numbers a
+        facilitator would otherwise have to open five separate pages to add
+        up. `NEXT_STEP_LABELS` below turns the same status into "what should
+        I do next", so a facilitator lands here and immediately knows both
+        where things stand and what to do about it.
+      */}
+      <Card>
+        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div>
+            <dt className="text-xs text-[var(--color-ink-muted)]">Consent</dt>
+            <dd className="mt-0.5 font-medium">
+              {session.consentConfigurationState === 'configured' ? 'Configured' : 'Not configured'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-[var(--color-ink-muted)]">Participants</dt>
+            <dd className="mt-0.5 font-medium">{sessionMap?.participants ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-[var(--color-ink-muted)]">Contributions</dt>
+            <dd className="mt-0.5 font-medium">{sessionMap?.evidence ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-[var(--color-ink-muted)]">Decisions confirmed</dt>
+            <dd className="mt-0.5 font-medium">{sessionMap?.decisionsConfirmed ?? '—'}</dd>
+          </div>
+        </dl>
+        {sessionMap !== null && sessionMap.actionsOpen !== null && sessionMap.actionsOpen > 0 && (
+          <p className="mt-4 border-t border-[var(--color-line)] pt-3 text-sm">
+            <span className="font-medium text-amber-700 dark:text-amber-400">
+              {sessionMap.actionsOpen} open action{sessionMap.actionsOpen === 1 ? '' : 's'}
+            </span>{' '}
+            still need follow-up.{' '}
+            <Link
+              href={`/workspaces/${workspaceId}/sessions/${sessionId}/outcomes`}
+              className="underline"
+            >
+              Review outcomes →
+            </Link>
+          </p>
+        )}
+      </Card>
+
+      <section aria-labelledby="workspace-nav-heading">
+        <h2 id="workspace-nav-heading" className="mb-3 text-lg font-semibold">
+          Session workspace
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {SESSION_WORKSPACE_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={`/workspaces/${workspaceId}/sessions/${sessionId}${link.href}`}
+              className="block rounded-lg focus-visible:outline-none"
+            >
+              <Card className="h-full transition-colors hover:bg-[var(--color-accent-soft)]">
+                <p className="font-medium">{link.label}</p>
+                <p className="mt-1 text-sm text-[var(--color-ink-muted)]">{link.description}</p>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       {editing ? (
         <Card className="space-y-4">

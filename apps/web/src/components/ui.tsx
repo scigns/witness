@@ -362,6 +362,66 @@ export function ReportStatusBadge({ status }: { status: ReportStatus }) {
   );
 }
 
+/**
+ * Plain-language framing for the well-known consent categories
+ * (`packages/domain/src/consent-template.ts`'s `CONSENT_CATEGORIES`). A
+ * template may also carry organisation-defined categories outside this set —
+ * `categoryLabel`/`categoryHelp` fall back to the raw code for those, since
+ * this UI cannot know what an organisation-invented category means. Shared
+ * here (not duplicated per page) so the participant consent form and the
+ * facilitator consent matrix describe the same category the same way.
+ */
+const CATEGORY_LABELS: Record<string, string> = {
+  participation: 'Taking part',
+  audio_recording: 'Audio recording',
+  video_recording: 'Video recording',
+  photography: 'Photos',
+  evidence_submission: 'Submitting a document or photo as evidence',
+  transcription: 'Transcription',
+  ai_processing: 'Processing with local AI tools',
+  attributed_quotation: 'Quoting them by name',
+  anonymous_quotation: 'Quoting them anonymously',
+  internal_use: 'Use within this organisation',
+  external_reporting: 'Sharing in reports outside this organisation',
+  publication: 'Publishing publicly',
+  research_use: 'Use in research',
+  future_reuse: 'Reuse in future programs',
+  knowledge_graph_inclusion: "Linking into Witness's institutional record",
+  follow_up_contact: 'Being contacted again about this',
+};
+
+const CATEGORY_HELP: Record<string, string> = {
+  participation: 'They take part in this session at all.',
+  audio_recording: 'Their voice is recorded during the session.',
+  video_recording: 'They appear on video during the session.',
+  photography: 'Photos are taken that may include them.',
+  evidence_submission:
+    'A document or photo they hand over is kept by Witness as part of the record. This is ' +
+    'separate from recording or photographing them, and does not by itself allow anything ' +
+    'further to be done with it.',
+  transcription: 'A written transcript is made of what they said.',
+  ai_processing:
+    'A local AI tool (never sent off this server) summarises or extracts from what they said.',
+  attributed_quotation: 'What they said can be quoted with their name attached.',
+  anonymous_quotation: 'What they said can be quoted without saying who said it.',
+  internal_use: 'Their contribution can be used inside this organisation.',
+  external_reporting: 'Their contribution can appear in reports shared outside this organisation.',
+  publication: 'Their contribution can be published where the public can see it.',
+  research_use: 'Their contribution can be used for research.',
+  future_reuse: 'Their contribution can be reused in a later program, not just this one.',
+  knowledge_graph_inclusion:
+    "Their contribution becomes part of Witness's longer-term institutional memory.",
+  follow_up_contact: 'Someone from this program can contact them again later.',
+};
+
+export function categoryLabel(category: string): string {
+  return CATEGORY_LABELS[category] ?? category.replace(/_/g, ' ');
+}
+
+export function categoryHelp(category: string): string | undefined {
+  return CATEGORY_HELP[category];
+}
+
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <div

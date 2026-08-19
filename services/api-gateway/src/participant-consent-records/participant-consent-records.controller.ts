@@ -48,8 +48,9 @@ export class ParticipantConsentRecordsController {
   async dashboard(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Req() request: RequestWithPrincipal,
   ): Promise<ConsentFacilitatorDashboardView> {
-    return this.records.dashboard(workspaceId, sessionId);
+    return this.records.dashboard(workspaceId, sessionId, request.principal!);
   }
 
   @Get('participants/:participantId/consent')
