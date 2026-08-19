@@ -258,16 +258,29 @@ export default function ResourcesPage({ params }: { params: Promise<{ id: string
               maxLength={300}
               className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
             />
-            <label htmlFor="file-input" className="sr-only">
-              File to upload
-            </label>
-            <input
-              id="file-input"
-              ref={fileInputRef}
-              type="file"
-              onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
-              className="w-full min-w-0 truncate text-sm text-[var(--color-ink-muted)] file:mr-3 file:cursor-pointer file:rounded file:border file:border-[var(--color-line)] file:bg-[var(--color-paper)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-[var(--color-ink)] hover:file:bg-[var(--color-accent-soft)]"
-            />
+            {/* Visually hidden, not display:none, so it stays focusable and in the tab
+                order — the native control's own rendered width and internal text are
+                browser-native and were not reliably constrainable by CSS on iOS Safari.
+                The associated <label> below opens the file picker natively on click/tap;
+                the filename is drawn from `selectedFile` state instead. */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <label
+                htmlFor="file-input"
+                className="inline-flex w-full shrink-0 cursor-pointer items-center justify-center rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-accent-soft)] sm:w-auto"
+              >
+                Choose file
+              </label>
+              <input
+                id="file-input"
+                ref={fileInputRef}
+                type="file"
+                onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+                className="sr-only"
+              />
+              <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-ink-muted)]">
+                {selectedFile?.name ?? 'No file chosen'}
+              </span>
+            </div>
             <label htmlFor="file-description" className="sr-only">
               File description
             </label>
