@@ -62,7 +62,9 @@ export default function UsersPage() {
 
       {loading ? (
         <Card>
-          <p className="text-[var(--color-ink-muted)]">Loading…</p>
+          <p role="status" className="text-[var(--color-ink-muted)]">
+            Loading…
+          </p>
         </Card>
       ) : users.length === 0 ? (
         <Card>

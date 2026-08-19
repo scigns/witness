@@ -1606,6 +1606,10 @@ export interface EvidenceSummary {
   withdrawn: boolean;
   /** Present only when `attributionMode` is `attributed`. */
   sourceParticipantId?: string;
+  /** Absent when no file has been attached to this evidence yet. */
+  attachmentKind?: EvidenceAttachmentKind;
+  /** Absent when the attachment has no transcript (not audio, or never requested). */
+  transcriptStatus?: TranscriptStatus;
 }
 
 export interface EvidenceDetail extends EvidenceSummary {

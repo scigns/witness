@@ -61,7 +61,9 @@ export default function RecordsPage() {
 
       {loading ? (
         <Card>
-          <p className="text-[var(--color-ink-muted)]">Loading…</p>
+          <p role="status" className="text-[var(--color-ink-muted)]">
+            Loading…
+          </p>
         </Card>
       ) : records.length === 0 ? (
         <Card>

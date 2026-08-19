@@ -30,8 +30,9 @@ import {
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
-import { Button, Card, ErrorNotice, EvidenceReviewStatusBadge } from '@/components/ui';
+import { Button, Card, EmptyState, ErrorNotice, EvidenceReviewStatusBadge } from '@/components/ui';
 import {
   enqueue,
   isNetworkFailure,
@@ -56,6 +57,30 @@ const SOURCELESS_MODES: ReadonlySet<EvidenceAttributionMode> = new Set([
   'unattributed',
 ]);
 
+/** Plain labels for the register's "Attachment" column — never the raw MIME type. */
+const ATTACHMENT_KIND_LABELS: Record<string, string> = {
+  audio: 'Audio',
+  document: 'Document',
+  image: 'Image',
+};
+
+const TRANSCRIPT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Transcription pending',
+  processing: 'Transcribing…',
+  completed: 'Transcribed',
+  failed: 'Transcription failed',
+};
+
+/** Short attribution label for the register's "Source" column, distinct from the full quick-capture option text. */
+const SOURCE_LABELS: Record<EvidenceAttributionMode, string> = {
+  attributed: 'Named',
+  pseudonymous: 'Pseudonym',
+  anonymous: 'Anonymous',
+  facilitator_observation: "Facilitator's observation",
+  institutional_source: 'Institutional source',
+  unattributed: 'Unattributed',
+};
+
 export default function SessionEvidencePage({
   params,
 }: {
@@ -63,6 +88,13 @@ export default function SessionEvidencePage({
 }) {
   const { id: workspaceId, sessionId } = use(params);
   const { user, ready } = useSession();
+  const { currentUser } = useAuth();
+  // Observer (`reader`) is calm read-access by design — the quick-capture
+  // form is hidden rather than shown-then-403'd. Every other role may
+  // genuinely have a reason to submit (a participant their own contribution,
+  // a facilitator/admin running the session); the API remains the real
+  // gate for all of them.
+  const isObserver = currentUser?.workspaces.find((w) => w.id === workspaceId)?.role === 'reader';
 
   const [session, setSession] = useState<CoDesignSessionDetail | null>(null);
   const [evidence, setEvidence] = useState<EvidenceSummary[]>([]);
@@ -71,6 +103,7 @@ export default function SessionEvidencePage({
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
+  const [attachmentFilter, setAttachmentFilter] = useState('');
 
   const [evidenceType, setEvidenceType] = useState<string>('observation');
   const [customEvidenceType, setCustomEvidenceType] = useState('');
@@ -269,7 +302,11 @@ export default function SessionEvidencePage({
   };
 
   if (loading) {
-    return <p className="text-[var(--color-ink-muted)]">Loading…</p>;
+    return (
+      <p role="status" className="text-[var(--color-ink-muted)]">
+        Loading…
+      </p>
+    );
   }
 
   if (forbidden) {
@@ -317,7 +354,7 @@ export default function SessionEvidencePage({
         </p>
       )}
 
-      {sessionOpen && (
+      {sessionOpen && !isObserver && (
         <Card className="space-y-4">
           <h2 className="text-lg font-semibold">Quick capture</h2>
           {captureError !== null && <ErrorNotice message={captureError} />}
@@ -488,9 +525,79 @@ export default function SessionEvidencePage({
         </div>
       )}
 
+      <EvidenceRegister
+        workspaceId={workspaceId}
+        sessionId={sessionId}
+        evidence={evidence}
+        participants={participants}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        attachmentFilter={attachmentFilter}
+        setAttachmentFilter={setAttachmentFilter}
+      />
+    </div>
+  );
+}
+
+/**
+ * Evidence Register — a professional table on desktop (source, attachment
+ * type, processing/review state, provenance link), the same information as
+ * a stacked-card list below `md` (a wide table doesn't survive a narrow
+ * viewport intact; see the consent matrix for the identical pattern).
+ *
+ * `attachmentFilter` is computed and applied client-side, not server-side —
+ * the session's full evidence list is already loaded (up to 1000 items,
+ * same limit the existing status filter works within), and adding a second
+ * network round-trip for a filter over data already in memory would be
+ * strictly worse, not more correct.
+ */
+function EvidenceRegister({
+  workspaceId,
+  sessionId,
+  evidence,
+  participants,
+  statusFilter,
+  setStatusFilter,
+  attachmentFilter,
+  setAttachmentFilter,
+}: {
+  workspaceId: string;
+  sessionId: string;
+  evidence: EvidenceSummary[];
+  participants: SessionParticipantSummary[];
+  statusFilter: string;
+  setStatusFilter: (value: string) => void;
+  attachmentFilter: string;
+  setAttachmentFilter: (value: string) => void;
+}) {
+  const participantName = (id: string): string =>
+    participants.find((p) => p.id === id)?.displayName ?? 'Unknown participant';
+
+  const filtered = evidence.filter((item) => {
+    if (attachmentFilter === '') return true;
+    if (attachmentFilter === 'none') return item.attachmentKind === undefined;
+    return item.attachmentKind === attachmentFilter;
+  });
+
+  const sourceLabel = (item: EvidenceSummary): string =>
+    item.attributionMode === 'attributed' && item.sourceParticipantId !== undefined
+      ? participantName(item.sourceParticipantId)
+      : SOURCE_LABELS[item.attributionMode];
+
+  const consentLabel = (item: EvidenceSummary): string =>
+    SOURCELESS_MODES.has(item.attributionMode) ? '—' : 'Confirmed at capture';
+
+  const processingLabel = (item: EvidenceSummary): string => {
+    if (item.attachmentKind === undefined) return '—';
+    if (item.transcriptStatus === undefined) return ATTACHMENT_KIND_LABELS[item.attachmentKind]!;
+    return TRANSCRIPT_STATUS_LABELS[item.transcriptStatus] ?? item.transcriptStatus;
+  };
+
+  return (
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <label htmlFor="statusFilter" className="text-sm font-medium">
-          Filter by status
+          Status
         </label>
         <select
           id="statusFilter"
@@ -507,43 +614,133 @@ export default function SessionEvidencePage({
           <option value="rejected">Rejected</option>
           <option value="withdrawn">Withdrawn</option>
         </select>
+
+        <label htmlFor="attachmentFilter" className="text-sm font-medium">
+          Attachment
+        </label>
+        <select
+          id="attachmentFilter"
+          value={attachmentFilter}
+          onChange={(event) => setAttachmentFilter(event.target.value)}
+          className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm"
+        >
+          <option value="">All</option>
+          <option value="audio">Audio</option>
+          <option value="document">Document</option>
+          <option value="image">Image</option>
+          <option value="none">No attachment</option>
+        </select>
       </div>
 
-      {evidence.length === 0 ? (
-        <Card>
-          <p className="text-sm text-[var(--color-ink-muted)]">
-            No contributions yet{statusFilter !== '' ? ' for this filter' : ''}.
-          </p>
-        </Card>
+      {filtered.length === 0 ? (
+        <EmptyState
+          title="No evidence yet"
+          body={
+            evidence.length === 0
+              ? 'No evidence has been captured for this session yet. Use Quick capture above once the session is open.'
+              : 'No evidence matches the current filters.'
+          }
+        />
       ) : (
-        <ul className="space-y-3">
-          {evidence.map((item) => (
-            <li key={item.id}>
-              <Card className="space-y-1">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Link
-                    href={`/workspaces/${workspaceId}/sessions/${sessionId}/evidence/${item.id}`}
-                    className="font-medium hover:underline"
-                  >
-                    {item.title}
-                  </Link>
-                  <EvidenceReviewStatusBadge status={item.reviewStatus} />
-                </div>
-                <p className="text-xs text-[var(--color-ink-muted)]">
-                  {item.evidenceType.replace(/_/g, ' ')} ·{' '}
-                  {ATTRIBUTION_MODE_LABELS[item.attributionMode]}
-                  {' · '}
-                  {new Date(item.capturedAt).toLocaleString()}
-                </p>
-                {item.tags.length > 0 && (
+        <>
+          {/* Desktop / tablet: a real register. */}
+          <div className="hidden overflow-x-auto rounded-lg border border-[var(--color-line)] md:block">
+            <table className="w-full min-w-max border-collapse text-left text-sm">
+              <caption className="sr-only">
+                Evidence register — every contribution and its attachment, source, and review state
+              </caption>
+              <thead>
+                <tr className="border-b border-[var(--color-line)] bg-[var(--color-paper-raised)]">
+                  <th scope="col" className="py-2 pl-4 pr-4 font-medium">
+                    Evidence
+                  </th>
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Source
+                  </th>
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Consent
+                  </th>
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Processing
+                  </th>
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Review
+                  </th>
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Captured
+                  </th>
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item) => (
+                  <tr key={item.id} className="border-b border-[var(--color-line)] last:border-0">
+                    <th scope="row" className="py-3 pl-4 pr-4 font-normal">
+                      <Link
+                        href={`/workspaces/${workspaceId}/sessions/${sessionId}/evidence/${item.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {item.title}
+                      </Link>
+                      <p className="text-xs text-[var(--color-ink-muted)]">
+                        {item.evidenceType.replace(/_/g, ' ')}
+                      </p>
+                    </th>
+                    <td className="py-3 pr-4 whitespace-nowrap">{sourceLabel(item)}</td>
+                    <td className="py-3 pr-4 whitespace-nowrap text-[var(--color-ink-muted)]">
+                      {consentLabel(item)}
+                    </td>
+                    <td className="py-3 pr-4 whitespace-nowrap">{processingLabel(item)}</td>
+                    <td className="py-3 pr-4">
+                      <EvidenceReviewStatusBadge status={item.reviewStatus} />
+                    </td>
+                    <td className="py-3 pr-4 whitespace-nowrap text-[var(--color-ink-muted)]">
+                      {new Date(item.capturedAt).toLocaleDateString()}
+                    </td>
+                    <td className="py-3 pr-4 whitespace-nowrap">
+                      <Link
+                        href={`/workspaces/${workspaceId}/sessions/${sessionId}/evidence/${item.id}`}
+                        className="text-xs underline"
+                      >
+                        View provenance
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: the same information, stacked. */}
+          <ul className="space-y-3 md:hidden">
+            {filtered.map((item) => (
+              <li key={item.id}>
+                <Card className="space-y-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Link
+                      href={`/workspaces/${workspaceId}/sessions/${sessionId}/evidence/${item.id}`}
+                      className="font-medium hover:underline"
+                    >
+                      {item.title}
+                    </Link>
+                    <EvidenceReviewStatusBadge status={item.reviewStatus} />
+                  </div>
                   <p className="text-xs text-[var(--color-ink-muted)]">
-                    Tags: {item.tags.join(', ')}
+                    {item.evidenceType.replace(/_/g, ' ')} · {sourceLabel(item)}
                   </p>
-                )}
-              </Card>
-            </li>
-          ))}
-        </ul>
+                  <p className="text-xs text-[var(--color-ink-muted)]">
+                    {consentLabel(item)} · {processingLabel(item)}
+                  </p>
+                  <p className="text-xs text-[var(--color-ink-muted)]">
+                    {new Date(item.capturedAt).toLocaleDateString()}
+                  </p>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );

@@ -80,7 +80,11 @@ export default function RecordPage({ params }: { params: Promise<{ id: string }>
   }
 
   if (record === null) {
-    return <p className="text-[var(--color-ink-muted)]">Loading…</p>;
+    return (
+      <p role="status" className="text-[var(--color-ink-muted)]">
+        Loading…
+      </p>
+    );
   }
 
   return (

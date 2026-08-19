@@ -117,7 +117,12 @@ export default function SessionReportsPage({
     }
   };
 
-  if (loading) return <p className="text-[var(--color-ink-muted)]">Loading…</p>;
+  if (loading)
+    return (
+      <p role="status" className="text-[var(--color-ink-muted)]">
+        Loading…
+      </p>
+    );
 
   if (forbidden) {
     return (

@@ -90,7 +90,11 @@ export default function PeoplePage({ params }: { params: Promise<{ id: string }>
   const others = visible.filter((m) => roleAssignments[m.id]?.role !== 'facilitator');
 
   if (loading) {
-    return <p className="text-[var(--color-ink-muted)]">Loading…</p>;
+    return (
+      <p role="status" className="text-[var(--color-ink-muted)]">
+        Loading…
+      </p>
+    );
   }
 
   if (workspace === null) {
