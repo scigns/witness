@@ -266,7 +266,7 @@ export default function ResourcesPage({ params }: { params: Promise<{ id: string
               ref={fileInputRef}
               type="file"
               onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
-              className="w-full text-sm"
+              className="w-full min-w-0 truncate text-sm text-[var(--color-ink-muted)] file:mr-3 file:cursor-pointer file:rounded file:border file:border-[var(--color-line)] file:bg-[var(--color-paper)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-[var(--color-ink)] hover:file:bg-[var(--color-accent-soft)]"
             />
             <label htmlFor="file-description" className="sr-only">
               File description
