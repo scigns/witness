@@ -21,7 +21,7 @@ import type {
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { Card, ErrorNotice } from '@/components/ui';
+import { Card, categoryLabel, ErrorNotice } from '@/components/ui';
 
 const STATUS_LABELS: Record<ParticipantConsentStatusSummary, string> = {
   not_configured: 'Session not configured',
@@ -50,6 +50,40 @@ function StatusBadge({ status }: { status: ParticipantConsentStatusSummary }) {
     >
       {STATUS_LABELS[status]}
     </span>
+  );
+}
+
+/**
+ * One matrix cell — a category decision resolved to plain language, never a
+ * raw `true`/`false`. `rowStatus` covers the cases a single category
+ * decision can't: a withdrawn or expired record's original per-category
+ * decisions no longer describe the participant's current position (see
+ * `participant-consent-record.ts`'s `participantConsentRecordStatus`), so
+ * every cell in that row shows the row-level state instead of a stale grant.
+ */
+function MatrixCell({
+  decision,
+  rowStatus,
+}: {
+  decision: boolean | undefined;
+  rowStatus: ParticipantConsentStatusSummary;
+}) {
+  if (rowStatus === 'not_requested' || rowStatus === 'not_configured') {
+    return <span className="text-[var(--color-ink-muted)]">Not yet requested</span>;
+  }
+  if (rowStatus === 'withdrawn') {
+    return <span className="text-red-700 dark:text-red-400">Withdrawn</span>;
+  }
+  if (rowStatus === 'expired') {
+    return <span className="text-amber-700 dark:text-amber-400">Expired</span>;
+  }
+  if (decision === undefined) {
+    return <span className="text-[var(--color-ink-muted)]">Not asked</span>;
+  }
+  return decision ? (
+    <span className="text-emerald-700 dark:text-emerald-400">Granted</span>
+  ) : (
+    <span className="text-red-700 dark:text-red-400">Refused</span>
   );
 }
 
@@ -173,28 +207,105 @@ export default function ConsentDashboardPage({
           </p>
         </Card>
       ) : (
-        <ul className="space-y-3">
-          {dashboard.participants.map((participant) => (
-            <li key={participant.participantId}>
-              <Link
-                href={`/workspaces/${workspaceId}/sessions/${sessionId}/participants/${participant.participantId}/consent`}
-                className="block"
-              >
-                <Card className="flex flex-wrap items-center justify-between gap-3 transition-colors hover:bg-[var(--color-accent-soft)]">
-                  <div>
-                    <p className="font-medium">{participant.displayName}</p>
-                    {participant.updatedAt !== null && (
-                      <p className="text-xs text-[var(--color-ink-muted)]">
-                        Last updated {new Date(participant.updatedAt).toLocaleString()}
-                      </p>
-                    )}
-                  </div>
-                  <StatusBadge status={participant.status} />
-                </Card>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          {/*
+            Consent is a trust-critical governance control, not decoration —
+            the matrix below is the primary view once there's more than one
+            category to reason about, with the per-participant status list as
+            both the mobile fallback (a wide table doesn't survive a narrow
+            viewport intact) and the view for a caller who can't see
+            category-level decisions at all (`canSeeCategoryDecisions`
+            false — matches `participant_consent:manage_restricted`).
+          */}
+          <ul className={dashboard.canSeeCategoryDecisions ? 'space-y-3 md:hidden' : 'space-y-3'}>
+            {dashboard.participants.map((participant) => (
+              <li key={participant.participantId}>
+                <Link
+                  href={`/workspaces/${workspaceId}/sessions/${sessionId}/participants/${participant.participantId}/consent`}
+                  className="block"
+                >
+                  <Card className="flex flex-wrap items-center justify-between gap-3 transition-colors hover:bg-[var(--color-accent-soft)]">
+                    <div>
+                      <p className="font-medium">{participant.displayName}</p>
+                      {participant.updatedAt !== null && (
+                        <p className="text-xs text-[var(--color-ink-muted)]">
+                          Last updated {new Date(participant.updatedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    <StatusBadge status={participant.status} />
+                  </Card>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          {dashboard.canSeeCategoryDecisions && dashboard.configuration !== null && (
+            <div className="hidden overflow-x-auto rounded-lg border border-[var(--color-line)] md:block">
+              <table className="w-full min-w-max border-collapse text-left text-sm">
+                <caption className="sr-only">
+                  Consent matrix — each participant's decision for each configured category
+                </caption>
+                <thead>
+                  <tr className="border-b border-[var(--color-line)] bg-[var(--color-paper-raised)]">
+                    <th
+                      scope="col"
+                      className="sticky left-0 bg-[var(--color-paper-raised)] py-2 pl-4 pr-4 font-medium"
+                    >
+                      Participant
+                    </th>
+                    {[
+                      ...dashboard.configuration.requiredCategories,
+                      ...dashboard.configuration.optionalCategories,
+                    ].map((category) => (
+                      <th
+                        key={category}
+                        scope="col"
+                        className="py-2 pr-4 font-medium whitespace-nowrap"
+                      >
+                        {categoryLabel(category)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {dashboard.participants.map((participant) => (
+                    <tr
+                      key={participant.participantId}
+                      className="border-b border-[var(--color-line)] last:border-0"
+                    >
+                      <th
+                        scope="row"
+                        className="sticky left-0 bg-[var(--color-paper)] py-3 pl-4 pr-4 font-normal"
+                      >
+                        <Link
+                          href={`/workspaces/${workspaceId}/sessions/${sessionId}/participants/${participant.participantId}/consent`}
+                          className="font-medium hover:underline"
+                        >
+                          {participant.displayName}
+                        </Link>
+                      </th>
+                      {[
+                        ...dashboard.configuration!.requiredCategories,
+                        ...dashboard.configuration!.optionalCategories,
+                      ].map((category) => (
+                        <td key={category} className="py-3 pr-4 whitespace-nowrap">
+                          <MatrixCell
+                            decision={
+                              participant.categoryDecisions?.find((d) => d.category === category)
+                                ?.granted
+                            }
+                            rowStatus={participant.status}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

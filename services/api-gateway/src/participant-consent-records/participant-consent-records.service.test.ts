@@ -712,7 +712,7 @@ describe('ParticipantConsentRecordsService.dashboard', () => {
     const service = new ParticipantConsentRecordsService(prisma, fakePolicyEnforcement(true));
     await service.capture(WORKSPACE_1, SESSION_1, PARTICIPANT_1, captureRequest(), FACILITATOR);
 
-    const dashboard = await service.dashboard(WORKSPACE_1, SESSION_1);
+    const dashboard = await service.dashboard(WORKSPACE_1, SESSION_1, FACILITATOR);
 
     expect(dashboard.participants).toHaveLength(2);
     const p1 = dashboard.participants.find((p) => p.participantId === PARTICIPANT_1)!;
@@ -725,9 +725,42 @@ describe('ParticipantConsentRecordsService.dashboard', () => {
     const { prisma } = fakePrisma(false);
     const service = new ParticipantConsentRecordsService(prisma, fakePolicyEnforcement(true));
 
-    const dashboard = await service.dashboard(WORKSPACE_1, SESSION_1);
+    const dashboard = await service.dashboard(WORKSPACE_1, SESSION_1, FACILITATOR);
 
     expect(dashboard.configuration).toBeNull();
     expect(dashboard.participants.every((p) => p.status === 'not_configured')).toBe(true);
+  });
+
+  // Backs the consent matrix (Professional Product Experience pass) — the
+  // matrix needs per-category decisions, not just the rolled-up status this
+  // endpoint used to return. Gated on the same `manage_restricted` check as
+  // `ParticipantConsentRecordDetail.categoryDecisions`, not a new privacy rule.
+  it('includes per-category decisions for a caller with manage_restricted', async () => {
+    const { prisma } = fakePrisma();
+    const service = new ParticipantConsentRecordsService(prisma, fakePolicyEnforcement(true));
+    await service.capture(WORKSPACE_1, SESSION_1, PARTICIPANT_1, captureRequest(), FACILITATOR);
+
+    const dashboard = await service.dashboard(WORKSPACE_1, SESSION_1, FACILITATOR);
+
+    const p1 = dashboard.participants.find((p) => p.participantId === PARTICIPANT_1)!;
+    const p2 = dashboard.participants.find((p) => p.participantId === PARTICIPANT_2)!;
+    expect(p1.categoryDecisions).toEqual([
+      { category: 'participation', granted: true },
+      { category: 'audio_recording', granted: true },
+    ]);
+    // No active record — nothing to report decisions for, even though the
+    // caller can see restricted fields.
+    expect(p2.categoryDecisions).toBeUndefined();
+  });
+
+  it('omits per-category decisions for a caller without manage_restricted', async () => {
+    const { prisma } = fakePrisma();
+    const service = new ParticipantConsentRecordsService(prisma, fakePolicyEnforcement(false));
+    await service.capture(WORKSPACE_1, SESSION_1, PARTICIPANT_1, captureRequest(), FACILITATOR);
+
+    const dashboard = await service.dashboard(WORKSPACE_1, SESSION_1, FACILITATOR);
+
+    const p1 = dashboard.participants.find((p) => p.participantId === PARTICIPANT_1)!;
+    expect(p1.categoryDecisions).toBeUndefined();
   });
 });

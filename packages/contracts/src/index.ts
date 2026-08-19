@@ -1558,6 +1558,14 @@ export interface ConsentDashboardParticipantView {
   displayName: string;
   status: ParticipantConsentStatusSummary;
   updatedAt: string | null;
+  /**
+   * The active record's per-category decisions — omitted unless the caller
+   * holds `participant_consent:manage_restricted`, the same gate
+   * `ParticipantConsentRecordDetail.categoryDecisions` uses. Absent (not an
+   * empty array) both when the caller lacks that permission and when there
+   * is no active record to report decisions for.
+   */
+  categoryDecisions?: { category: string; granted: boolean }[];
 }
 
 /** The view backing the facilitator dashboard's per-session consent overview. */
@@ -1565,6 +1573,14 @@ export interface ConsentFacilitatorDashboardView {
   sessionId: string;
   configuration: SessionConsentConfigurationView | null;
   participants: ConsentDashboardParticipantView[];
+  /**
+   * Whether the caller holds `participant_consent:manage_restricted` and
+   * would therefore see `categoryDecisions` on a participant that has one —
+   * told explicitly rather than left for the UI to infer from whether any
+   * given participant happens to have an active record, since "no active
+   * record" and "lacks permission" both leave `categoryDecisions` absent.
+   */
+  canSeeCategoryDecisions: boolean;
 }
 
 /**
