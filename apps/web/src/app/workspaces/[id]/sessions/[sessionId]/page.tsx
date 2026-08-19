@@ -126,10 +126,10 @@ export default function SessionDetailPage({
    * whole page failing.
    */
   const [sessionMap, setSessionMap] = useState<{
-    participants: number;
-    evidence: number;
-    decisionsConfirmed: number;
-    actionsOpen: number;
+    participants: number | null;
+    evidence: number | null;
+    decisionsConfirmed: number | null;
+    actionsOpen: number | null;
   } | null>(null);
 
   const load = useCallback(
@@ -166,22 +166,28 @@ export default function SessionDetailPage({
           api.listActionItems(workspaceId, sessionId, user),
         ]);
       if (cancelledRef.current) return;
+      // `null` for a failed request, not `0` — a real zero and "we don't know"
+      // must render differently (the `?? '—'` below), especially for open
+      // actions: a failed count silently reading as zero would hide real
+      // follow-up work from a facilitator, exactly the silent-failure shape
+      // this whole pass exists to eliminate.
       setSessionMap({
         participants:
           participantsResult.status === 'fulfilled'
             ? participantsResult.value.participants.filter((p) => !p.withdrawn).length
-            : 0,
-        evidence: evidenceResult.status === 'fulfilled' ? evidenceResult.value.evidence.length : 0,
+            : null,
+        evidence:
+          evidenceResult.status === 'fulfilled' ? evidenceResult.value.evidence.length : null,
         decisionsConfirmed:
           decisionsResult.status === 'fulfilled'
             ? decisionsResult.value.decisions.filter((d) => d.status === 'confirmed').length
-            : 0,
+            : null,
         actionsOpen:
           actionsResult.status === 'fulfilled'
             ? actionsResult.value.actions.filter(
                 (a) => a.status === 'open' || a.status === 'in_progress',
               ).length
-            : 0,
+            : null,
       });
     },
     [workspaceId, sessionId, user],
@@ -409,7 +415,7 @@ export default function SessionDetailPage({
             <dd className="mt-0.5 font-medium">{sessionMap?.decisionsConfirmed ?? '—'}</dd>
           </div>
         </dl>
-        {sessionMap !== null && sessionMap.actionsOpen > 0 && (
+        {sessionMap !== null && sessionMap.actionsOpen !== null && sessionMap.actionsOpen > 0 && (
           <p className="mt-4 border-t border-[var(--color-line)] pt-3 text-sm">
             <span className="font-medium text-amber-700 dark:text-amber-400">
               {sessionMap.actionsOpen} open action{sessionMap.actionsOpen === 1 ? '' : 's'}

@@ -1565,7 +1565,7 @@ export interface ConsentDashboardParticipantView {
    * empty array) both when the caller lacks that permission and when there
    * is no active record to report decisions for.
    */
-  categoryDecisions?: { category: string; granted: boolean }[];
+  categoryDecisions?: ConsentCategoryDecisionView[];
 }
 
 /** The view backing the facilitator dashboard's per-session consent overview. */

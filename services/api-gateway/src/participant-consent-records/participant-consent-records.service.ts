@@ -45,6 +45,7 @@ import {
 } from '@witness/domain';
 import type {
   CaptureParticipantConsentRequest,
+  ConsentCategoryDecisionView,
   ConsentDashboardParticipantView,
   ConsentFacilitatorDashboardView,
   ParticipantConsentRecordDetail,
@@ -153,12 +154,7 @@ export class ParticipantConsentRecordsService {
         status: statusSummary(records, requiredCategories, now),
         updatedAt: active?.updatedAt.toISOString() ?? null,
         ...(includeRestricted && active !== null
-          ? {
-              categoryDecisions: active.categoryDecisions as {
-                category: string;
-                granted: boolean;
-              }[],
-            }
+          ? { categoryDecisions: active.categoryDecisions as ConsentCategoryDecisionView[] }
           : {}),
       };
     });
@@ -606,7 +602,7 @@ function toDetail(
     version: record.version,
     ...(includeRestricted
       ? {
-          categoryDecisions: record.categoryDecisions as { category: string; granted: boolean }[],
+          categoryDecisions: record.categoryDecisions as ConsentCategoryDecisionView[],
           withdrawalReason: record.withdrawalReason,
         }
       : {}),
