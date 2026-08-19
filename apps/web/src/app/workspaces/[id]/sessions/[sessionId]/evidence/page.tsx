@@ -677,7 +677,7 @@ function EvidenceRegister({
               <tbody>
                 {filtered.map((item) => (
                   <tr key={item.id} className="border-b border-[var(--color-line)] last:border-0">
-                    <td className="py-3 pl-4 pr-4">
+                    <th scope="row" className="py-3 pl-4 pr-4 font-normal">
                       <Link
                         href={`/workspaces/${workspaceId}/sessions/${sessionId}/evidence/${item.id}`}
                         className="font-medium hover:underline"
@@ -687,7 +687,7 @@ function EvidenceRegister({
                       <p className="text-xs text-[var(--color-ink-muted)]">
                         {item.evidenceType.replace(/_/g, ' ')}
                       </p>
-                    </td>
+                    </th>
                     <td className="py-3 pr-4 whitespace-nowrap">{sourceLabel(item)}</td>
                     <td className="py-3 pr-4 whitespace-nowrap text-[var(--color-ink-muted)]">
                       {consentLabel(item)}
