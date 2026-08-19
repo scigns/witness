@@ -2246,5 +2246,12 @@ export interface ApiError {
     message: string;
     /** Field-level detail for validation failures. */
     fields?: Record<string, string[]>;
+    /**
+     * Diagnostic detail not meant for direct display — e.g. the raw
+     * policy-engine reason behind a `FORBIDDEN` denial. The same detail is
+     * always logged server-side too; this field exists for an operator or a
+     * developer's console, not for a normal user-facing error message.
+     */
+    details?: string;
   };
 }

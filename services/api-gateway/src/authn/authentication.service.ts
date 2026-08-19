@@ -384,6 +384,62 @@ export class AuthenticationService {
         .map((a) => [a.workspaceId as string, a.role as WitnessRole]),
     );
 
+    const explicitWorkspaces = workspaceMemberships
+      .filter((m) => isInGoodStanding(m.state as MembershipState))
+      .map((m) => ({
+        id: m.workspace.id,
+        name: m.workspace.name,
+        organisationId: m.workspace.organisationId,
+        description: m.workspace.description,
+        createdAt: m.workspace.createdAt.toISOString(),
+        // An organisation-scoped `RoleAssignment` grants its holder every
+        // action the same tier would grant in any workspace under that
+        // organisation (`RoleResolutionService.tiersForWorkspace` — an
+        // organisation administrator's, or facilitator's, remit extends to
+        // the workspaces under their organisation). A workspace-scoped
+        // assignment takes precedence when both exist, matching that same
+        // method's union.
+        role:
+          roleByWorkspace.get(m.workspace.id) ??
+          roleByOrganisation.get(m.workspace.organisationId) ??
+          null,
+      }));
+    const explicitWorkspaceIds = new Set(explicitWorkspaces.map((w) => w.id));
+
+    // Every organisation this user holds a role in AND is a member of in
+    // good standing — the same two conditions `tiersForWorkspace` checks
+    // before letting an organisation-scoped assignment cascade to a
+    // workspace. Without this, a user whose only foothold is an
+    // organisation-level role (no individual `WorkspaceMembership` row for
+    // any specific workspace) would see an empty `workspaces` list here even
+    // though the real authorization decision — computed by that same
+    // service, for the exact same role data — already lets them act on
+    // every workspace under that organisation. The UI's own permission
+    // picture must not be narrower than what the server actually enforces.
+    const cascadeOrganisationIds = [...roleByOrganisation.keys()].filter((organisationId) =>
+      organisationMemberships.some(
+        (m) => m.organisation.id === organisationId && isInGoodStanding(m.state as MembershipState),
+      ),
+    );
+
+    const cascadedWorkspaceRows =
+      cascadeOrganisationIds.length === 0
+        ? []
+        : await this.prisma.workspace.findMany({
+            where: { organisationId: { in: cascadeOrganisationIds } },
+          });
+
+    const cascadedWorkspaces = cascadedWorkspaceRows
+      .filter((w) => !explicitWorkspaceIds.has(w.id))
+      .map((w) => ({
+        id: w.id,
+        name: w.name,
+        organisationId: w.organisationId,
+        description: w.description,
+        createdAt: w.createdAt.toISOString(),
+        role: roleByOrganisation.get(w.organisationId) ?? null,
+      }));
+
     return {
       status: 'ok',
       view: {
@@ -401,16 +457,7 @@ export class AuthenticationService {
             createdAt: m.organisation.createdAt.toISOString(),
             role: roleByOrganisation.get(m.organisation.id) ?? null,
           })),
-        workspaces: workspaceMemberships
-          .filter((m) => isInGoodStanding(m.state as MembershipState))
-          .map((m) => ({
-            id: m.workspace.id,
-            name: m.workspace.name,
-            organisationId: m.workspace.organisationId,
-            description: m.workspace.description,
-            createdAt: m.workspace.createdAt.toISOString(),
-            role: roleByWorkspace.get(m.workspace.id) ?? null,
-          })),
+        workspaces: [...explicitWorkspaces, ...cascadedWorkspaces],
       },
     };
   }

@@ -66,6 +66,7 @@ function fakePrisma() {
   const organisationMemberships: Record<string, unknown>[] = [];
   const workspaceMemberships: Record<string, unknown>[] = [];
   const roleAssignments: Record<string, unknown>[] = [];
+  const workspaces: Record<string, unknown>[] = [];
 
   const prisma = {
     authLoginAttempt: {
@@ -189,6 +190,10 @@ function fakePrisma() {
       findMany: async ({ where }: { where: { userId: string } }) =>
         roleAssignments.filter((a) => a['userId'] === where.userId),
     },
+    workspace: {
+      findMany: async ({ where }: { where: { organisationId: { in: string[] } } }) =>
+        workspaces.filter((w) => where.organisationId.in.includes(w['organisationId'] as string)),
+    },
     $transaction: async <T>(fn: (tx: typeof prisma) => Promise<T>) => fn(prisma),
   };
 
@@ -202,6 +207,7 @@ function fakePrisma() {
     organisationMemberships,
     workspaceMemberships,
     roleAssignments,
+    workspaces,
   };
 }
 
@@ -406,7 +412,7 @@ describe('AuthenticationService — sign-in and user mapping', () => {
     expect(current.view.email).toBe('invited@example.com');
   });
 
-  it('getCurrentUser reports the role held in each organisation and workspace, and null where none is assigned yet', async () => {
+  it('getCurrentUser reports the organisation role on a workspace that has no workspace-scoped assignment of its own', async () => {
     const { prisma, organisationMemberships, workspaceMemberships, roleAssignments } = fakePrisma();
     const idp = new StubIdentityProvider();
     const sessions = new SessionService(prisma);
@@ -429,6 +435,15 @@ describe('AuthenticationService — sign-in and user mapping', () => {
     });
     // A role assignment for the organisation only — the workspace membership
     // predates its role assignment, exactly as Milestone 1.2 allows.
+    //
+    // This must resolve to 'admin' on the workspace, not null:
+    // `RoleResolutionService.tiersForWorkspace` already honours an
+    // organisation-scoped assignment for every workspace under that
+    // organisation when deciding real authorization — an organisation
+    // administrator's remit extends to their organisation's workspaces. The
+    // identity view this test checks must report the same effective role the
+    // server will actually enforce, not a narrower one derived only from
+    // `WorkspaceMembership` rows.
     roleAssignments.push({
       userId: INVITED_USER,
       role: 'admin',
@@ -442,8 +457,145 @@ describe('AuthenticationService — sign-in and user mapping', () => {
       expect.objectContaining({ id: 'org-1', role: 'admin' }),
     ]);
     expect(current.view.workspaces).toEqual([
-      expect.objectContaining({ id: 'workspace-1', role: null }),
+      expect.objectContaining({ id: 'workspace-1', role: 'admin' }),
     ]);
+  });
+
+  it('getCurrentUser lists a workspace the user has no membership row for at all, when an organisation-scoped role cascades to it', async () => {
+    const { prisma, organisationMemberships, roleAssignments, workspaces } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    organisationMemberships.push({
+      userId: INVITED_USER,
+      state: 'active',
+      organisation: { id: 'org-1', name: 'Org One', createdAt: new Date() },
+    });
+    roleAssignments.push({
+      userId: INVITED_USER,
+      role: 'facilitator',
+      organisationId: 'org-1',
+      workspaceId: null,
+    });
+    // No `WorkspaceMembership` row for this user anywhere — the exact
+    // production shape that left an organisation-scoped facilitator able to
+    // create a session (server-side authorization already cascades) but
+    // unable to see the button to open it (the identity view reported no
+    // workspaces at all).
+    workspaces.push({
+      id: 'workspace-1',
+      name: 'Workspace One',
+      organisationId: 'org-1',
+      description: null,
+      createdAt: new Date(),
+    });
+
+    const current = await service.getCurrentUser(INVITED_USER);
+    if (current.status !== 'ok') throw new Error(`expected 'ok', got '${current.status}'`);
+    expect(current.view.workspaces).toEqual([
+      expect.objectContaining({ id: 'workspace-1', role: 'facilitator' }),
+    ]);
+  });
+
+  it('getCurrentUser prefers a workspace-scoped role over a cascaded organisation-scoped role when both exist', async () => {
+    const { prisma, organisationMemberships, workspaceMemberships, roleAssignments } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    organisationMemberships.push({
+      userId: INVITED_USER,
+      state: 'active',
+      organisation: { id: 'org-1', name: 'Org One', createdAt: new Date() },
+    });
+    workspaceMemberships.push({
+      userId: INVITED_USER,
+      state: 'active',
+      workspace: {
+        id: 'workspace-1',
+        name: 'Workspace One',
+        organisationId: 'org-1',
+        createdAt: new Date(),
+      },
+    });
+    roleAssignments.push(
+      { userId: INVITED_USER, role: 'reviewer', organisationId: 'org-1', workspaceId: null },
+      {
+        userId: INVITED_USER,
+        role: 'facilitator',
+        organisationId: null,
+        workspaceId: 'workspace-1',
+      },
+    );
+
+    const current = await service.getCurrentUser(INVITED_USER);
+    if (current.status !== 'ok') throw new Error(`expected 'ok', got '${current.status}'`);
+    expect(current.view.workspaces).toEqual([
+      expect.objectContaining({ id: 'workspace-1', role: 'facilitator' }),
+    ]);
+  });
+
+  it('getCurrentUser does not cascade an organisation-scoped role while the organisation membership itself is not in good standing', async () => {
+    const { prisma, organisationMemberships, roleAssignments, workspaces } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    organisationMemberships.push({
+      userId: INVITED_USER,
+      state: 'suspended',
+      organisation: { id: 'org-1', name: 'Org One', createdAt: new Date() },
+    });
+    roleAssignments.push({
+      userId: INVITED_USER,
+      role: 'facilitator',
+      organisationId: 'org-1',
+      workspaceId: null,
+    });
+    workspaces.push({
+      id: 'workspace-1',
+      name: 'Workspace One',
+      organisationId: 'org-1',
+      description: null,
+      createdAt: new Date(),
+    });
+
+    const current = await service.getCurrentUser(INVITED_USER);
+    if (current.status !== 'ok') throw new Error(`expected 'ok', got '${current.status}'`);
+    expect(current.view.organisations).toEqual([]);
+    expect(current.view.workspaces).toEqual([]);
+  });
+
+  it("getCurrentUser does not leak a different organisation's workspaces from an unrelated organisation-scoped role", async () => {
+    const { prisma, organisationMemberships, roleAssignments, workspaces } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    organisationMemberships.push({
+      userId: INVITED_USER,
+      state: 'active',
+      organisation: { id: 'org-1', name: 'Org One', createdAt: new Date() },
+    });
+    roleAssignments.push({
+      userId: INVITED_USER,
+      role: 'facilitator',
+      organisationId: 'org-1',
+      workspaceId: null,
+    });
+    // A workspace under a different organisation the user holds no role in.
+    workspaces.push({
+      id: 'workspace-other-org',
+      name: 'Someone Else’s Workspace',
+      organisationId: 'org-2',
+      description: null,
+      createdAt: new Date(),
+    });
+
+    const current = await service.getCurrentUser(INVITED_USER);
+    if (current.status !== 'ok') throw new Error(`expected 'ok', got '${current.status}'`);
+    expect(current.view.workspaces).toEqual([]);
   });
 
   it('getCurrentUser reports not_found for an unknown user id', async () => {

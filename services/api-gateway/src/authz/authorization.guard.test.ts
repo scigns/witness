@@ -121,3 +121,46 @@ describe('AuthorizationGuard — session precedence over the development header'
     expect(request.principal).toEqual(devPrincipal);
   });
 });
+
+describe('AuthorizationGuard — denial response shape', () => {
+  it('shows a plain-language message and keeps the raw policy-engine reason out of it', async () => {
+    const sessionPrincipal: Principal = {
+      subject: 'user:reader-1',
+      displayName: 'Reader User',
+      kind: 'human',
+      roles: ['reader'],
+    };
+    const sessionAuthenticator = {
+      authenticate: vi.fn().mockResolvedValue(sessionPrincipal),
+    } as unknown as SessionAuthenticator;
+    const authorization = {
+      authenticate: vi.fn().mockResolvedValue(null),
+    } as unknown as AuthorizationPort;
+    const rawReason = "no role in [reader] grants 'workspace_membership:read' in workspace 'ws-1'";
+    const policyEnforcement = {
+      decide: vi.fn().mockResolvedValue({ allowed: false, reason: rawReason }),
+    } as unknown as PolicyEnforcementService;
+
+    const guard = new AuthorizationGuard(
+      fakeReflector('workspace_membership:read'),
+      authorization,
+      sessionAuthenticator,
+      policyEnforcement,
+    );
+
+    const request: RequestWithPrincipal = {
+      headers: { authorization: 'Bearer token' },
+      params: { workspaceId: 'ws-1' },
+    };
+
+    await expect(guard.canActivate(fakeContext(request))).rejects.toMatchObject({
+      response: {
+        error: expect.objectContaining({
+          code: 'FORBIDDEN',
+          message: expect.not.stringContaining('no role in'),
+          details: rawReason,
+        }),
+      },
+    });
+  });
+});
