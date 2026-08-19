@@ -1108,7 +1108,7 @@ export default function EvidenceDetailPage({
 
               {recordedUrl === null && recordingStatus === 'idle' && (
                 <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <label htmlFor="attachmentFile" className="sr-only">
                       Audio, document, or image file
                     </label>
@@ -1117,7 +1117,12 @@ export default function EvidenceDetailPage({
                       type="file"
                       accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/x-wav,audio/webm,audio/ogg,application/pdf,image/jpeg,image/png,image/webp"
                       onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
-                      className="text-sm"
+                      // The native control has no button styling of its own — on a dark theme it
+                      // reads as plain text next to "No file chosen", not as something to tap.
+                      // `file:*` styles only the browser-generated button part, matching the
+                      // app's own secondary-button look; the row stacks on narrow viewports so
+                      // the filename text truncates instead of pushing the row off-screen.
+                      className="w-full min-w-0 truncate text-sm text-[var(--color-ink-muted)] file:mr-3 file:cursor-pointer file:rounded file:border file:border-[var(--color-line)] file:bg-[var(--color-paper)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-[var(--color-ink)] hover:file:bg-[var(--color-accent-soft)] sm:w-auto"
                     />
                     <Button
                       variant="primary"
