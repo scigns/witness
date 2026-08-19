@@ -35,9 +35,18 @@ jobs:
     environment: pilot
     timeout-minutes: 20
     steps:
+      # `clean: false` — the pilot host's `.env` (real secrets: DB
+      # credentials, OIDC client secret, etc.) lives untracked in this
+      # runner's own persistent workspace, not in the repo. The default
+      # `clean: true` runs `git clean -ffdx` before checkout, which deletes
+      # untracked files including gitignored ones — that would erase `.env`
+      # on every run. Checkout still fetches and resets tracked files to
+      # `ref` correctly; this only skips the destructive untracked-file
+      # sweep.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
+          clean: false
 
       - name: Deploy
         env:
