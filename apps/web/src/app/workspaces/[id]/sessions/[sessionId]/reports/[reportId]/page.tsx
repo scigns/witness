@@ -779,7 +779,7 @@ function RenderedOutcomeSection({ title, items }: { title: string; items: Render
           <li key={item.id} className="border-l-2 border-[var(--color-line)] pl-3">
             <p className="text-sm font-medium">{item.title}</p>
             <p className="text-xs text-[var(--color-ink-muted)]">
-              {item.status}
+              {item.status.replace(/_/g, ' ')}
               {item.owner !== undefined ? ` · ${item.owner}` : ''}
               {item.dueDate !== undefined
                 ? ` · due ${new Date(item.dueDate).toLocaleDateString()}`
