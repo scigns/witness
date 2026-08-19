@@ -24,6 +24,18 @@ import { SessionAuthenticator } from './session-authenticator.js';
 
 export const REQUIRED_ACTION = 'witness:required-action';
 
+/**
+ * `decision.reason` (e.g. `no role in [reader] grants 'workspace_membership:read'
+ * in workspace '<uuid>'`) is precise and useful to an operator, and stays
+ * exactly that precise in the log line below and in `details` here — but it
+ * is an internal policy-engine string, not something a co-design facilitator
+ * or participant should ever read as the reason their own screen didn't load.
+ * One constant, centrally, rather than each of the dozens of `@Requires(...)`
+ * routes inventing its own user-facing copy.
+ */
+export const FORBIDDEN_USER_MESSAGE =
+  "You don't have permission to do that. Ask an organisation or workspace administrator to check your access.";
+
 /** Declare the action a route requires. Absence means the route is denied. */
 export const Requires = (action: Action) => SetMetadata(REQUIRED_ACTION, action);
 
@@ -120,7 +132,7 @@ export class AuthorizationGuard implements CanActivate {
     if (!decision.allowed) {
       this.logger.warn(`Denied ${principal.subject} → ${required}: ${decision.reason}`);
       throw new ForbiddenException({
-        error: { code: 'FORBIDDEN', message: decision.reason },
+        error: { code: 'FORBIDDEN', message: FORBIDDEN_USER_MESSAGE, details: decision.reason },
       });
     }
 
