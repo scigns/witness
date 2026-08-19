@@ -26,6 +26,7 @@ import {
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { useAuth } from '@/lib/auth';
 import { Button, Card, ErrorNotice } from '@/components/ui';
 
 const GOOD_STANDING: ReadonlySet<MembershipState> = new Set<MembershipState>(['invited', 'active']);
@@ -55,9 +56,18 @@ export default function NewSessionPage({ params }: { params: Promise<{ id: strin
   const { id: workspaceId } = use(params);
   const router = useRouter();
   const { user, ready } = useSession();
+  const { currentUser } = useAuth();
 
   const [members, setMembers] = useState<WorkspaceMembershipView[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
+  // `workspace_membership:read` is admin-only (least privilege, see
+  // `role-grants.ts`) — a facilitator (`contributor`) creating their own
+  // session legitimately can't list the full workspace roster. That must
+  // not block them from creating a session at all: they fall back to
+  // naming themselves as facilitator, which `SessionsService` independently
+  // validates server-side regardless of what this picker shows (see the
+  // file header comment).
+  const [membersForbidden, setMembersForbidden] = useState(false);
 
   const [title, setTitle] = useState('');
   const [purpose, setPurpose] = useState('');
@@ -83,10 +93,13 @@ export default function NewSessionPage({ params }: { params: Promise<{ id: strin
         if (cancelled) return;
         const eligible = result.memberships.filter((member) => GOOD_STANDING.has(member.state));
         setMembers(eligible);
+        setMembersForbidden(false);
         setPrimaryFacilitatorId((current) => current || (eligible[0]?.userId ?? ''));
-      } catch (caught) {
+      } catch {
         if (cancelled) return;
-        setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+        setMembers([]);
+        setMembersForbidden(true);
+        setPrimaryFacilitatorId((current) => current || (currentUser?.id ?? ''));
       } finally {
         if (!cancelled) setLoadingMembers(false);
       }
@@ -95,7 +108,7 @@ export default function NewSessionPage({ params }: { params: Promise<{ id: strin
     return () => {
       cancelled = true;
     };
-  }, [ready, workspaceId, user]);
+  }, [ready, workspaceId, user, currentUser]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -138,7 +151,7 @@ export default function NewSessionPage({ params }: { params: Promise<{ id: strin
 
       {error !== null && <ErrorNotice message={error} />}
 
-      {!loadingMembers && members.length === 0 ? (
+      {!loadingMembers && members.length === 0 && (!membersForbidden || currentUser === null) ? (
         <Card>
           <p className="font-medium">No members in this workspace yet.</p>
           <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
@@ -252,21 +265,28 @@ export default function NewSessionPage({ params }: { params: Promise<{ id: strin
                 Primary facilitator <span aria-hidden="true">*</span>
                 <span className="sr-only">(required)</span>
               </label>
-              <select
-                id="primaryFacilitatorId"
-                required
-                disabled={loadingMembers}
-                value={primaryFacilitatorId}
-                onChange={(event) => setPrimaryFacilitatorId(event.target.value)}
-                className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
-              >
-                {loadingMembers && <option value="">Loading…</option>}
-                {members.map((member) => (
-                  <option key={member.userId} value={member.userId}>
-                    {member.userDisplayName} ({member.userEmail})
-                  </option>
-                ))}
-              </select>
+              {membersForbidden && currentUser !== null ? (
+                <p className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm">
+                  You don't have permission to browse this program's roster, so you'll be set as the
+                  primary facilitator ({currentUser.displayName}).
+                </p>
+              ) : (
+                <select
+                  id="primaryFacilitatorId"
+                  required
+                  disabled={loadingMembers}
+                  value={primaryFacilitatorId}
+                  onChange={(event) => setPrimaryFacilitatorId(event.target.value)}
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                >
+                  {loadingMembers && <option value="">Loading…</option>}
+                  {members.map((member) => (
+                    <option key={member.userId} value={member.userId}>
+                      {member.userDisplayName} ({member.userEmail})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>

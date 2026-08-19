@@ -70,6 +70,12 @@ export default function NewParticipantPage({
 
   const [members, setMembers] = useState<WorkspaceMembershipView[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
+  // `workspace_membership:read` is admin-only (least privilege, see
+  // `role-grants.ts`) — most roles adding a participant here legitimately
+  // can't list the roster. That only affects the optional "link an
+  // existing registered user" path; a non-registered participant can still
+  // be added normally, so this must not surface as a page-level error.
+  const [membersForbidden, setMembersForbidden] = useState(false);
 
   const [isRegistered, setIsRegistered] = useState(false);
   const [linkedUserId, setLinkedUserId] = useState('');
@@ -98,9 +104,11 @@ export default function NewParticipantPage({
         const result = await api.listWorkspaceMemberships(workspaceId, user);
         if (cancelled) return;
         setMembers(result.memberships.filter((member) => GOOD_STANDING.has(member.state)));
-      } catch (caught) {
+        setMembersForbidden(false);
+      } catch {
         if (cancelled) return;
-        setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+        setMembers([]);
+        setMembersForbidden(true);
       } finally {
         if (!cancelled) setLoadingMembers(false);
       }
@@ -186,7 +194,7 @@ export default function NewParticipantPage({
                   type="radio"
                   name="registration"
                   checked={isRegistered}
-                  disabled={isAnonymous}
+                  disabled={isAnonymous || membersForbidden}
                   onChange={() => setIsRegistered(true)}
                 />
                 Registered Witness user
@@ -195,6 +203,13 @@ export default function NewParticipantPage({
             {isAnonymous && (
               <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
                 Anonymous participation cannot be linked to a registered account.
+              </p>
+            )}
+            {!isAnonymous && membersForbidden && (
+              <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
+                You don't have permission to browse this program's roster, so this participant will
+                be added as non-registered. Ask an organisation admin to link an existing account if
+                needed.
               </p>
             )}
           </fieldset>

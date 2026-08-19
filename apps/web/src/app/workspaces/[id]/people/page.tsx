@@ -30,33 +30,46 @@ export default function PeoplePage({ params }: { params: Promise<{ id: string }>
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Distinct from "no one has joined yet" — `workspace_membership:read` is
+  // admin-only (least privilege, see `role-grants.ts`), so most roles get a
+  // 403 here rather than a genuinely empty list. Telling a facilitator or
+  // reviewer "no one has joined yet" when the program plainly has people in
+  // it would be actively misleading.
+  const [membersForbidden, setMembersForbidden] = useState(false);
 
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
       try {
-        const [workspaceResult, membershipsResult] = await Promise.all([
-          api.getWorkspace(id, user),
-          api.listWorkspaceMemberships(id, user),
-        ]);
+        const workspaceResult = await api.getWorkspace(id, user);
         if (cancelledRef.current) return;
-
         setWorkspace(workspaceResult);
-        setMembers(membershipsResult.memberships);
-
-        const assignments = await Promise.all(
-          membershipsResult.memberships.map((membership) =>
-            api.getWorkspaceRoleAssignment(id, membership.id, user).catch(() => null),
-          ),
-        );
-        if (cancelledRef.current) return;
-        setRoleAssignments(
-          Object.fromEntries(
-            assignments
-              .filter((a): a is RoleAssignmentView => a !== null)
-              .map((a) => [a.membershipId, a]),
-          ),
-        );
         setError(null);
+
+        try {
+          const membershipsResult = await api.listWorkspaceMemberships(id, user);
+          if (cancelledRef.current) return;
+          setMembers(membershipsResult.memberships);
+          setMembersForbidden(false);
+
+          const assignments = await Promise.all(
+            membershipsResult.memberships.map((membership) =>
+              api.getWorkspaceRoleAssignment(id, membership.id, user).catch(() => null),
+            ),
+          );
+          if (cancelledRef.current) return;
+          setRoleAssignments(
+            Object.fromEntries(
+              assignments
+                .filter((a): a is RoleAssignmentView => a !== null)
+                .map((a) => [a.membershipId, a]),
+            ),
+          );
+        } catch {
+          if (cancelledRef.current) return;
+          setMembers([]);
+          setRoleAssignments({});
+          setMembersForbidden(true);
+        }
       } catch (caught) {
         if (cancelledRef.current) return;
         setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
@@ -139,7 +152,12 @@ export default function PeoplePage({ params }: { params: Promise<{ id: string }>
         </div>
       )}
 
-      {members.length === 0 ? (
+      {membersForbidden ? (
+        <EmptyState
+          title="You don't have permission to view the people list"
+          body="Ask a program facilitator or organisation admin if you need to know who's taking part."
+        />
+      ) : members.length === 0 ? (
         <EmptyState
           title="No one has joined yet"
           body="Invite the people who will take part in this co-design from the manage-program screen."
