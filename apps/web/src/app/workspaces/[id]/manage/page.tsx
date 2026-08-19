@@ -77,6 +77,13 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  // `workspace_membership:read`/`organisation_membership:read` are
+  // admin-only (least privilege, see `role-grants.ts`) — a facilitator
+  // (`contributor`) genuinely can't manage membership here even though the
+  // rest of this page (readiness checklist, agenda, resources) is theirs to
+  // use. Degrading just the membership sections, rather than failing the
+  // whole page, keeps this page usable for the role it's documented for.
+  const [membershipsForbidden, setMembershipsForbidden] = useState(false);
 
   const [sessions, setSessions] = useState<CoDesignSessionSummary[]>([]);
   const [agendaItems, setAgendaItems] = useState<AgendaItemView[]>([]);
@@ -89,7 +96,6 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
         const [
           workspaceResult,
           organisationsResult,
-          membershipsResult,
           rolesResult,
           sessionsResult,
           agendaItemsResult,
@@ -97,7 +103,6 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
         ] = await Promise.all([
           api.getWorkspace(id, user),
           api.listOrganisations(user),
-          api.listWorkspaceMemberships(id, user),
           api.listRoles(user),
           api.listSessions(id, user),
           api.listAgendaItems(id, user),
@@ -110,11 +115,11 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
           organisationsResult.organisations.find((o) => o.id === workspaceResult.organisationId) ??
             null,
         );
-        setMemberships(membershipsResult.memberships);
         setRoles(rolesResult.roles);
         setSessions(sessionsResult.sessions);
         setAgendaItems(agendaItemsResult.agendaItems);
         setResources(resourcesResult.resources);
+        setError(null);
 
         const configuredFlags = await Promise.all(
           sessionsResult.sessions.map((session) =>
@@ -127,22 +132,43 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
         if (cancelledRef.current) return;
         setConsentConfigured(configuredFlags.some(Boolean));
 
-        const assignments = await Promise.all(
-          membershipsResult.memberships.map((membership) =>
-            api.getWorkspaceRoleAssignment(id, membership.id, user),
-          ),
-        );
-        if (cancelledRef.current) return;
-        setRoleAssignments(Object.fromEntries(assignments.map((a) => [a.membershipId, a])));
+        try {
+          const membershipsResult = await api.listWorkspaceMemberships(id, user);
+          if (cancelledRef.current) return;
+          setMemberships(membershipsResult.memberships);
 
-        const orgMembersResult = await api.listOrganisationMemberships(
-          workspaceResult.organisationId,
-          user,
-        );
-        if (cancelledRef.current) return;
-        setOrganisationMembers(orgMembersResult.memberships);
-
-        setError(null);
+          const [assignments, orgMembersResult] = await Promise.all([
+            Promise.all(
+              membershipsResult.memberships.map((membership) =>
+                api.getWorkspaceRoleAssignment(id, membership.id, user),
+              ),
+            ),
+            api.listOrganisationMemberships(workspaceResult.organisationId, user),
+          ]);
+          if (cancelledRef.current) return;
+          setRoleAssignments(Object.fromEntries(assignments.map((a) => [a.membershipId, a])));
+          setOrganisationMembers(orgMembersResult.memberships);
+          setMembershipsForbidden(false);
+        } catch (membershipsCaught) {
+          if (cancelledRef.current) return;
+          setMemberships([]);
+          setRoleAssignments({});
+          setOrganisationMembers([]);
+          // A 403 is the expected, silent case for every non-admin role —
+          // anything else (network failure, timeout, a real server error)
+          // is not the same as "you can't manage this" and must still
+          // surface as a real error, not the permission empty-state.
+          if (membershipsCaught instanceof ApiError && membershipsCaught.status === 403) {
+            setMembershipsForbidden(true);
+          } else {
+            setMembershipsForbidden(false);
+            setError(
+              membershipsCaught instanceof ApiError
+                ? membershipsCaught.message
+                : "Couldn't load this program's membership.",
+            );
+          }
+        }
       } catch (caught) {
         if (cancelledRef.current) return;
         setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
@@ -245,14 +271,19 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
     },
     {
       label: 'People',
-      ready: memberships.length > 0,
+      // `membershipsForbidden` means "unknown", not "zero" — reporting
+      // not-ready here would claim no one has joined when the truth is
+      // this viewer simply can't see the roster.
+      ready: membershipsForbidden || memberships.length > 0,
       // Membership management lives further down this same page (the
       // "Members" section below), not on a separate route — an href back to
       // `/workspaces/${id}/manage` was a self-link that looked like it did
       // nothing when clicked. An in-page anchor actually takes the
       // facilitator to the section this row describes.
       href: '#members-heading',
-      detail: `${memberships.length} member${memberships.length === 1 ? '' : 's'} added.`,
+      detail: membershipsForbidden
+        ? "You don't have permission to see who's added."
+        : `${memberships.length} member${memberships.length === 1 ? '' : 's'} added.`,
     },
     {
       label: 'Agenda',
@@ -341,7 +372,11 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
           Invite an organisation member to this program
         </h2>
         <Card className="space-y-3">
-          {eligibleOrganisationMembers.length === 0 ? (
+          {membershipsForbidden ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              You don't have permission to manage program membership. Ask an organisation admin.
+            </p>
+          ) : eligibleOrganisationMembers.length === 0 ? (
             <p className="text-sm text-[var(--color-ink-muted)]">
               No eligible organisation members. A user must be an invited or active member of{' '}
               {organisation?.name ?? 'this program’s organisation'} before they can be added here.
@@ -380,7 +415,13 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
         <h2 id="members-heading" className="mb-3 text-lg font-semibold">
           Members
         </h2>
-        {memberships.length === 0 ? (
+        {membershipsForbidden ? (
+          <Card>
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              You don't have permission to view program membership. Ask an organisation admin.
+            </p>
+          </Card>
+        ) : memberships.length === 0 ? (
           <Card>
             <p className="text-sm text-[var(--color-ink-muted)]">No members yet.</p>
           </Card>

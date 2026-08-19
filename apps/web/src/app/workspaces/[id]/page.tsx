@@ -68,13 +68,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
       try {
-        const [workspaceResult, organisationsResult, membersResult, sessionsResult] =
-          await Promise.all([
-            api.getWorkspace(id, user),
-            api.listOrganisations(user),
-            api.listWorkspaceMemberships(id, user),
-            api.listSessions(id, user),
-          ]);
+        const [workspaceResult, organisationsResult, sessionsResult] = await Promise.all([
+          api.getWorkspace(id, user),
+          api.listOrganisations(user),
+          api.listSessions(id, user),
+        ]);
         if (cancelledRef.current) return;
 
         setWorkspace(workspaceResult);
@@ -82,9 +80,36 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           organisationsResult.organisations.find((o) => o.id === workspaceResult.organisationId) ??
             null,
         );
-        setMembers(membersResult.memberships);
         setSessions(sessionsResult.sessions);
         setError(null);
+
+        // `workspace_membership:read` is admin-only (least privilege —
+        // membership management is administrative by definition, see
+        // `role-grants.ts`) — every other role legitimately gets a 403
+        // here. That must not fail the whole page: an empty member preview
+        // is the correct degraded state for them, not a page-blocking
+        // error a facilitator/reviewer/participant/observer would see on
+        // every visit to their own program's home page.
+        try {
+          const membersResult = await api.listWorkspaceMemberships(id, user);
+          if (cancelledRef.current) return;
+          setMembers(membersResult.memberships);
+        } catch (membersCaught) {
+          if (cancelledRef.current) return;
+          setMembers([]);
+          // A 403 here is the expected, silent case for every non-admin
+          // role. Anything else (network failure, timeout, a real server
+          // error) is not the same as "you can't see this" and must still
+          // surface — the rest of the page loaded fine, so this is a
+          // secondary notice, not a page-blocking one.
+          if (!(membersCaught instanceof ApiError) || membersCaught.status !== 403) {
+            setError(
+              membersCaught instanceof ApiError
+                ? membersCaught.message
+                : "Couldn't load this program's member preview.",
+            );
+          }
+        }
       } catch (caught) {
         if (cancelledRef.current) return;
         setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
