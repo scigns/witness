@@ -30,6 +30,7 @@ import {
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
 import { Button, Card, EmptyState, ErrorNotice, EvidenceReviewStatusBadge } from '@/components/ui';
 import {
@@ -87,6 +88,13 @@ export default function SessionEvidencePage({
 }) {
   const { id: workspaceId, sessionId } = use(params);
   const { user, ready } = useSession();
+  const { currentUser } = useAuth();
+  // Observer (`reader`) is calm read-access by design — the quick-capture
+  // form is hidden rather than shown-then-403'd. Every other role may
+  // genuinely have a reason to submit (a participant their own contribution,
+  // a facilitator/admin running the session); the API remains the real
+  // gate for all of them.
+  const isObserver = currentUser?.workspaces.find((w) => w.id === workspaceId)?.role === 'reader';
 
   const [session, setSession] = useState<CoDesignSessionDetail | null>(null);
   const [evidence, setEvidence] = useState<EvidenceSummary[]>([]);
@@ -294,7 +302,11 @@ export default function SessionEvidencePage({
   };
 
   if (loading) {
-    return <p className="text-[var(--color-ink-muted)]">Loading…</p>;
+    return (
+      <p role="status" className="text-[var(--color-ink-muted)]">
+        Loading…
+      </p>
+    );
   }
 
   if (forbidden) {
@@ -342,7 +354,7 @@ export default function SessionEvidencePage({
         </p>
       )}
 
-      {sessionOpen && (
+      {sessionOpen && !isObserver && (
         <Card className="space-y-4">
           <h2 className="text-lg font-semibold">Quick capture</h2>
           {captureError !== null && <ErrorNotice message={captureError} />}

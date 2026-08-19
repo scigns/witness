@@ -78,7 +78,11 @@ export default function ConsentTemplatesPage({ params }: { params: Promise<{ id:
   }, [ready, load]);
 
   if (loading) {
-    return <p className="text-[var(--color-ink-muted)]">Loading…</p>;
+    return (
+      <p role="status" className="text-[var(--color-ink-muted)]">
+        Loading…
+      </p>
+    );
   }
 
   if (forbidden) {

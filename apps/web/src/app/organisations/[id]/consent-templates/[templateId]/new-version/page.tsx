@@ -85,7 +85,11 @@ export default function NewConsentTemplateVersionPage({
   };
 
   if (loading) {
-    return <p className="text-[var(--color-ink-muted)]">Loading…</p>;
+    return (
+      <p role="status" className="text-[var(--color-ink-muted)]">
+        Loading…
+      </p>
+    );
   }
 
   if (previous === null) {

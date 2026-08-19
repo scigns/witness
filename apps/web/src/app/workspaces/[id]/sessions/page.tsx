@@ -60,7 +60,11 @@ export default function WorkspaceSessionsPage({ params }: { params: Promise<{ id
   }, [ready, id, user]);
 
   if (loading) {
-    return <p className="text-[var(--color-ink-muted)]">Loading…</p>;
+    return (
+      <p role="status" className="text-[var(--color-ink-muted)]">
+        Loading…
+      </p>
+    );
   }
 
   return (

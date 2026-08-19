@@ -40,6 +40,7 @@ import {
 
 const CAN_MANAGE_ROLES = new Set(['admin', 'facilitator']);
 const CAN_REVIEW_ROLES = new Set(['admin', 'reviewer']);
+const NEEDS_REVIEW = new Set(['submitted', 'under_review', 'needs_clarification']);
 
 /** Session type is free text (not a fixed set), so this is a display formatter, not a lookup table. */
 function formatSessionType(sessionType: string): string {
@@ -107,6 +108,35 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const canManage = role !== null && CAN_MANAGE_ROLES.has(role);
   const canReview = role !== null && CAN_REVIEW_ROLES.has(role);
 
+  // A live count on the "Needs your review" link, not just a bare link —
+  // "what needs attention" should be a number a reviewer sees before they
+  // click, not something they discover after. Same per-session aggregation
+  // `/workspaces/[id]/review` already does; `null` (not fetched, or a
+  // session's evidence request failed) renders as no badge, never a false
+  // zero.
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!ready || !canReview || sessions.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const perSession = await Promise.all(
+        sessions.map((session) =>
+          api
+            .listEvidence(id, session.id, user)
+            .then(
+              (result) => result.evidence.filter((e) => NEEDS_REVIEW.has(e.reviewStatus)).length,
+            )
+            .catch(() => 0),
+        ),
+      );
+      if (cancelled) return;
+      setReviewCount(perSession.reduce((sum, n) => sum + n, 0));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, canReview, sessions, id, user]);
+
   const openSession = sessions.find((s) => s.status === 'open') ?? null;
   const upcomingSessions = sessions
     .filter((s) => s.status === 'draft' || s.status === 'scheduled')
@@ -136,7 +166,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   };
 
   if (loading) {
-    return <p className="text-[var(--color-ink-muted)]">Loading…</p>;
+    return (
+      <p role="status" className="text-[var(--color-ink-muted)]">
+        Loading…
+      </p>
+    );
   }
 
   if (workspace === null) {
@@ -205,7 +239,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               href={`/workspaces/${id}/review`}
               className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-accent-soft)]"
             >
-              Needs your review →
+              Needs your review
+              {reviewCount !== null && reviewCount > 0 && (
+                <span className="ml-1.5 rounded-full bg-amber-600 px-1.5 py-0.5 text-xs font-semibold text-white">
+                  {reviewCount}
+                </span>
+              )}{' '}
+              →
             </Link>
           )}
           {canManage && (

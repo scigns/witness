@@ -26,8 +26,18 @@ import type {
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
 import { Button, Card, ErrorNotice, SessionStatusBadge } from '@/components/ui';
+
+/**
+ * Which of the six real `WitnessRole`s (`packages/contracts`) can act as
+ * each of the mission's five personas for the purposes of THIS page's
+ * emphasis — not a permission check (the API remains authoritative; a role
+ * outside a set here still sees the same page, just with different cards
+ * emphasised, never a hidden 403).
+ */
+const CAN_EDIT_SESSION: ReadonlySet<string> = new Set(['admin', 'facilitator']);
 
 type SessionDetailState = Awaited<ReturnType<typeof api.getSession>>;
 
@@ -53,42 +63,63 @@ const TRANSITION_LABELS: Partial<Record<SessionStatus, string>> = {
  * `docs`'s prepare → consent → capture → process → review → decide → act →
  * report hierarchy that this session actually has a page for. `href` is
  * appended to `/workspaces/:id/sessions/:sessionId`.
+ *
+ * `roles` narrows which of the five personas see this card at all — not a
+ * permission check (the linked page still enforces its own; a role left off
+ * here can still open the URL directly and gets that page's own 403/200,
+ * never a hidden capability). `undefined` means every role sees it.
+ * `participant` gets the smallest set on purpose (Phase 20: "simple, calm");
+ * `reader` (Observer) and `admin`/`facilitator` see everything, because an
+ * observer's job is calm read access to all of it, not a subset.
  */
-const SESSION_WORKSPACE_LINKS: { href: string; label: string; description: string }[] = [
+const SESSION_WORKSPACE_LINKS: {
+  href: string;
+  label: string;
+  description: string;
+  roles?: ReadonlySet<string>;
+}[] = [
   {
     href: '/participants',
     label: 'People',
     description: 'Who is expected, who attended, and their roles in this session.',
+    roles: new Set(['admin', 'facilitator', 'reviewer', 'reader']),
   },
   {
     href: '/consent-configuration',
     label: 'Consent',
     description: 'Which categories of consent this session asks for, and from whom.',
+    roles: new Set(['admin', 'facilitator', 'participant', 'contributor', 'reader']),
   },
   {
     href: '/consent-dashboard',
     label: 'Consent dashboard',
     description: "Every participant's consent decisions at a glance.",
+    roles: new Set(['admin', 'facilitator', 'reader']),
   },
   {
     href: '/evidence',
     label: 'Capture & evidence',
     description: 'Record, upload, and review what was said, shown, or handed over.',
+    // Every persona has a reason to be here: participants submit, reviewers
+    // assess, facilitators run it, admins/observers see it all.
   },
   {
     href: '/summary',
     label: 'Summary',
     description: 'A local AI-drafted summary of the session, for a human to confirm.',
+    roles: new Set(['admin', 'facilitator', 'reviewer', 'contributor', 'reader']),
   },
   {
     href: '/outcomes',
     label: 'Outcomes',
     description: 'Decisions, commitments, and actions this session produced.',
+    roles: new Set(['admin', 'facilitator', 'reviewer', 'contributor', 'reader']),
   },
   {
     href: '/reports',
     label: 'Reports',
     description: 'Compose, review, and export a written account of this session.',
+    roles: new Set(['admin', 'facilitator', 'reviewer', 'reader']),
   },
   {
     href: '/recap',
@@ -104,6 +135,12 @@ export default function SessionDetailPage({
 }) {
   const { id: workspaceId, sessionId } = use(params);
   const { user, ready } = useSession();
+  const { currentUser } = useAuth();
+  const role = currentUser?.workspaces.find((w) => w.id === workspaceId)?.role ?? null;
+  // Fails closed like Program Home's identical `canManage` check: a role
+  // that hasn't loaded yet must not briefly show edit controls it then
+  // yanks away, and a role genuinely outside the set never sees them at all.
+  const canEditSession = role !== null && CAN_EDIT_SESSION.has(role);
 
   const [session, setSession] = useState<SessionDetailState | null>(null);
   const [history, setHistory] = useState<SessionLifecycleEventView[]>([]);
@@ -316,7 +353,11 @@ export default function SessionDetailPage({
   };
 
   if (loading) {
-    return <p className="text-[var(--color-ink-muted)]">Loading…</p>;
+    return (
+      <p role="status" className="text-[var(--color-ink-muted)]">
+        Loading…
+      </p>
+    );
   }
 
   if (forbidden) {
@@ -385,7 +426,7 @@ export default function SessionDetailPage({
             {session.sessionType} · {session.deliveryMode.replace('_', ' ')}
           </p>
         </div>
-        {!isArchived && (
+        {!isArchived && canEditSession && (
           <Button variant="secondary" disabled={busy} onClick={() => setEditing((v) => !v)}>
             {editing ? 'Cancel edit' : 'Edit details'}
           </Button>
@@ -436,7 +477,9 @@ export default function SessionDetailPage({
           Session workspace
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {SESSION_WORKSPACE_LINKS.map((link) => (
+          {SESSION_WORKSPACE_LINKS.filter(
+            (link) => link.roles === undefined || role === null || link.roles.has(role),
+          ).map((link) => (
             <Link
               key={link.href}
               href={`/workspaces/${workspaceId}/sessions/${sessionId}${link.href}`}
@@ -518,7 +561,7 @@ export default function SessionDetailPage({
         </Card>
       )}
 
-      {!isArchived && (
+      {!isArchived && canEditSession && (
         <section aria-labelledby="lifecycle-heading">
           <h2 id="lifecycle-heading" className="mb-3 text-lg font-semibold">
             Lifecycle
