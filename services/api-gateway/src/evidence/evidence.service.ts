@@ -55,12 +55,14 @@ import {
 } from '@witness/domain';
 import type {
   CaptureEvidenceRequest,
+  EvidenceAttachmentKind,
   EvidenceAttachmentView,
   EvidenceDetail,
   EvidenceReviewActionRequest,
   EvidenceReviewStatus,
   EvidenceSummary,
   EvidenceTransitionRequest,
+  TranscriptStatus,
   UpdateEvidenceDraftRequest,
 } from '@witness/contracts';
 
@@ -118,6 +120,12 @@ export class EvidenceService {
         ...(filter.reviewStatus !== undefined ? { reviewStatus: filter.reviewStatus } : {}),
         ...(filter.evidenceType !== undefined ? { evidenceType: filter.evidenceType } : {}),
       },
+      // A register view needs to show attachment type and processing state
+      // per row without an N+1 fetch — both are 1:1 with Evidence, so this
+      // is one extra JOIN on an already-indexed foreign key, not a query per
+      // row. Full `include` (not `select`) matches the shape `EvidenceRow`
+      // already declares for these two optional relations.
+      include: { attachment: true, transcript: true },
       orderBy: { capturedAt: 'asc' },
       take: 1000,
     });
@@ -642,6 +650,12 @@ function toSummary(row: EvidenceRow): EvidenceSummary {
     withdrawn: row.withdrawnAt !== null,
     ...(row.attributionMode === 'attributed' && row.sourceParticipantId !== null
       ? { sourceParticipantId: row.sourceParticipantId }
+      : {}),
+    ...(row.attachment !== undefined && row.attachment !== null
+      ? { attachmentKind: row.attachment.kind as EvidenceAttachmentKind }
+      : {}),
+    ...(row.transcript !== undefined && row.transcript !== null
+      ? { transcriptStatus: row.transcript.status as TranscriptStatus }
       : {}),
   };
 }

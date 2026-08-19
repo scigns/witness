@@ -524,6 +524,57 @@ describe('EvidenceService.get / list', () => {
     expect(captured.consentBasis).toBeUndefined();
     expect(captured.withdrawalReason).toBeUndefined();
   });
+
+  it('lists every item in the session, most recently captured last', async () => {
+    const { evidenceService } = service();
+    await evidenceService.capture(WORKSPACE_1, SESSION_1, captureRequest(), FACILITATOR);
+    await evidenceService.capture(
+      WORKSPACE_1,
+      SESSION_1,
+      captureRequest({ title: 'Second item' }),
+      FACILITATOR,
+    );
+
+    const list = await evidenceService.list(WORKSPACE_1, SESSION_1);
+
+    expect(list).toHaveLength(2);
+    expect(list[1]!.title).toBe('Second item');
+  });
+
+  // Backs the Evidence Register (Professional Product Experience pass) — the
+  // register shows attachment type and transcript progress per row without
+  // an N+1 fetch. `attachment`/`transcript` are 1:1 with Evidence, so `list`
+  // includes them directly; this proves the include actually reaches the
+  // returned summary, not just that the query doesn't error.
+  it('includes attachment kind and transcript status when present, omits them when absent', async () => {
+    const { evidenceService, evidenceRows } = service();
+    const withAttachment = await evidenceService.capture(
+      WORKSPACE_1,
+      SESSION_1,
+      captureRequest(),
+      FACILITATOR,
+    );
+    const withoutAttachment = await evidenceService.capture(
+      WORKSPACE_1,
+      SESSION_1,
+      captureRequest({ title: 'No attachment yet' }),
+      FACILITATOR,
+    );
+
+    const row = evidenceRows.find((r) => r['id'] === withAttachment.id)!;
+    row['attachment'] = { kind: 'audio' };
+    row['transcript'] = { status: 'completed' };
+
+    const list = await evidenceService.list(WORKSPACE_1, SESSION_1);
+
+    const withAttachmentSummary = list.find((e) => e.id === withAttachment.id)!;
+    expect(withAttachmentSummary.attachmentKind).toBe('audio');
+    expect(withAttachmentSummary.transcriptStatus).toBe('completed');
+
+    const withoutAttachmentSummary = list.find((e) => e.id === withoutAttachment.id)!;
+    expect(withoutAttachmentSummary.attachmentKind).toBeUndefined();
+    expect(withoutAttachmentSummary.transcriptStatus).toBeUndefined();
+  });
 });
 
 describe('EvidenceService.updateDraft', () => {
