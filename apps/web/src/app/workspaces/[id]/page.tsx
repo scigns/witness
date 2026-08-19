@@ -116,21 +116,30 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   // zero.
   const [reviewCount, setReviewCount] = useState<number | null>(null);
   useEffect(() => {
+    // Reset first — a stale count from a previous session list (or a
+    // previous successful run) must not linger on screen while this run is
+    // still in flight or has nothing to check.
+    setReviewCount(null);
     if (!ready || !canReview || sessions.length === 0) return;
     let cancelled = false;
     void (async () => {
-      const perSession = await Promise.all(
+      const perSession = await Promise.allSettled(
         sessions.map((session) =>
           api
             .listEvidence(id, session.id, user)
             .then(
               (result) => result.evidence.filter((e) => NEEDS_REVIEW.has(e.reviewStatus)).length,
-            )
-            .catch(() => 0),
+            ),
         ),
       );
       if (cancelled) return;
-      setReviewCount(perSession.reduce((sum, n) => sum + n, 0));
+      // A partial count that silently drops a session with a failed
+      // request would undercount and present that undercount as complete
+      // — worse than no badge. Only show a number once every session's
+      // request actually succeeded.
+      if (perSession.some((r) => r.status === 'rejected')) return;
+      const fulfilled = perSession as PromiseFulfilledResult<number>[];
+      setReviewCount(fulfilled.reduce((sum, r) => sum + r.value, 0));
     })();
     return () => {
       cancelled = true;

@@ -731,7 +731,10 @@ function EvidenceRegister({
                     {item.evidenceType.replace(/_/g, ' ')} · {sourceLabel(item)}
                   </p>
                   <p className="text-xs text-[var(--color-ink-muted)]">
-                    {processingLabel(item)} · {new Date(item.capturedAt).toLocaleDateString()}
+                    {consentLabel(item)} · {processingLabel(item)}
+                  </p>
+                  <p className="text-xs text-[var(--color-ink-muted)]">
+                    {new Date(item.capturedAt).toLocaleDateString()}
                   </p>
                 </Card>
               </li>

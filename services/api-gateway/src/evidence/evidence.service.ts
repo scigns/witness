@@ -123,9 +123,26 @@ export class EvidenceService {
       // A register view needs to show attachment type and processing state
       // per row without an N+1 fetch — both are 1:1 with Evidence, so this
       // is one extra JOIN on an already-indexed foreign key, not a query per
-      // row. Full `include` (not `select`) matches the shape `EvidenceRow`
-      // already declares for these two optional relations.
-      include: { attachment: true, transcript: true },
+      // row. `select` (not `include`) so up to 1000 rows never drag along
+      // `transcript.generatedText`/`editedText`/`segments`, which `toSummary`
+      // never reads — only `attachment.kind` and `transcript.status` do.
+      select: {
+        id: true,
+        sessionId: true,
+        evidenceType: true,
+        title: true,
+        attributionMode: true,
+        identityVisibility: true,
+        reviewStatus: true,
+        verificationStatus: true,
+        tags: true,
+        capturedAt: true,
+        updatedAt: true,
+        withdrawnAt: true,
+        sourceParticipantId: true,
+        attachment: { select: { kind: true } },
+        transcript: { select: { status: true } },
+      },
       orderBy: { capturedAt: 'asc' },
       take: 1000,
     });
@@ -627,6 +644,32 @@ function toUpdateRow(evidence: Evidence) {
 }
 
 /**
+ * Everything `toSummary` reads, and nothing more — `EvidenceRow` (the full
+ * `include`d shape used by `toDetail`) satisfies this structurally, and so
+ * does `list()`'s narrower `select`, which only fetches `attachment.kind`/
+ * `transcript.status` rather than the full related rows.
+ */
+type EvidenceSummaryRow = Pick<
+  EvidenceRow,
+  | 'id'
+  | 'sessionId'
+  | 'evidenceType'
+  | 'title'
+  | 'attributionMode'
+  | 'identityVisibility'
+  | 'reviewStatus'
+  | 'verificationStatus'
+  | 'tags'
+  | 'capturedAt'
+  | 'updatedAt'
+  | 'withdrawnAt'
+  | 'sourceParticipantId'
+> & {
+  attachment?: { kind: string } | null;
+  transcript?: { status: string } | null;
+};
+
+/**
  * Privacy-safe by construction — `sourceParticipantId` is present only when
  * `attributionMode` is `attributed`. For `pseudonymous`/`anonymous` evidence
  * the participant link exists in the database (so consent and moderation
@@ -634,7 +677,7 @@ function toUpdateRow(evidence: Evidence) {
  * "structurally absent, not merely redacted" convention every other
  * restricted field in this schema follows.
  */
-function toSummary(row: EvidenceRow): EvidenceSummary {
+function toSummary(row: EvidenceSummaryRow): EvidenceSummary {
   return {
     id: row.id,
     sessionId: row.sessionId,

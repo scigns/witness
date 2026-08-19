@@ -135,7 +135,13 @@ export default function SessionDetailPage({
 }) {
   const { id: workspaceId, sessionId } = use(params);
   const { user, ready } = useSession();
-  const { currentUser } = useAuth();
+  const { status: authStatus, currentUser } = useAuth();
+  // `authStatus === 'loading'` is a genuinely different case from "this
+  // user has no role here" (`role === null` once loading has resolved) —
+  // conflating them let the nav-filter fallback below show every card,
+  // institutional ones included, to a participant for one frame while
+  // `/me` was still in flight. `authReady` keeps the two apart.
+  const authReady = authStatus !== 'loading';
   const role = currentUser?.workspaces.find((w) => w.id === workspaceId)?.role ?? null;
   // Fails closed like Program Home's identical `canManage` check: a role
   // that hasn't loaded yet must not briefly show edit controls it then
@@ -185,6 +191,7 @@ export default function SessionDetailPage({
 
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
+      let sessionLoaded = false;
       try {
         const [sessionResult, historyResult] = await Promise.all([
           api.getSession(workspaceId, sessionId, user),
@@ -198,6 +205,7 @@ export default function SessionDetailPage({
         setEditLocation(sessionResult.location ?? '');
         setError(null);
         setForbidden(false);
+        sessionLoaded = true;
       } catch (caught) {
         if (cancelledRef.current) return;
         if (caught instanceof ApiError && caught.status === 403) {
@@ -208,6 +216,11 @@ export default function SessionDetailPage({
       } finally {
         if (!cancelledRef.current) setLoading(false);
       }
+
+      // A caller who can't even see the session (403, or any other failure)
+      // has no business seeing its participants/evidence/decisions either —
+      // six requests that would only fail the same way, for no benefit.
+      if (!sessionLoaded) return;
 
       const [
         participantsResult,
@@ -478,7 +491,8 @@ export default function SessionDetailPage({
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {SESSION_WORKSPACE_LINKS.filter(
-            (link) => link.roles === undefined || role === null || link.roles.has(role),
+            (link) =>
+              link.roles === undefined || (authReady && (role === null || link.roles.has(role))),
           ).map((link) => (
             <Link
               key={link.href}
