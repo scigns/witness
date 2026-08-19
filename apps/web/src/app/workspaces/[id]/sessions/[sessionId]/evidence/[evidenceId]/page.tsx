@@ -1108,22 +1108,37 @@ export default function EvidenceDetailPage({
 
               {recordedUrl === null && recordingStatus === 'idle' && (
                 <div className="space-y-2">
+                  {/*
+                    The native <input type="file"> is visually hidden (not display:none,
+                    which would drop it from the tab order — `sr-only` keeps it focusable
+                    and in the accessibility tree). Its own rendered width and internal
+                    "Choose File / No file chosen" text are entirely browser-native and
+                    were not reliably constrainable by CSS on iOS Safari — file:* styling
+                    only reaches the button part, not the control's own intrinsic sizing,
+                    so the row still overflowed narrow viewports there. A real <label>
+                    associated by htmlFor natively opens the file picker on click/tap with
+                    no JS required, so this keeps the native picker and native keyboard
+                    behaviour while every pixel of what's on screen is ordinary, fully
+                    constrainable markup — including the filename, now drawn from
+                    `attachmentFile` state instead of the input's own unstyleable text.
+                  */}
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <label htmlFor="attachmentFile" className="sr-only">
-                      Audio, document, or image file
+                    <label
+                      htmlFor="attachmentFile"
+                      className="inline-flex w-full shrink-0 cursor-pointer items-center justify-center rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-1.5 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-accent-soft)] sm:w-auto"
+                    >
+                      Choose file
                     </label>
                     <input
                       id="attachmentFile"
                       type="file"
                       accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/x-wav,audio/webm,audio/ogg,application/pdf,image/jpeg,image/png,image/webp"
                       onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
-                      // The native control has no button styling of its own — on a dark theme it
-                      // reads as plain text next to "No file chosen", not as something to tap.
-                      // `file:*` styles only the browser-generated button part, matching the
-                      // app's own secondary-button look; the row stacks on narrow viewports so
-                      // the filename text truncates instead of pushing the row off-screen.
-                      className="w-full min-w-0 truncate text-sm text-[var(--color-ink-muted)] file:mr-3 file:cursor-pointer file:rounded file:border file:border-[var(--color-line)] file:bg-[var(--color-paper)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-[var(--color-ink)] hover:file:bg-[var(--color-accent-soft)] sm:w-auto"
+                      className="sr-only"
                     />
+                    <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-ink-muted)]">
+                      {attachmentFile?.name ?? 'No file chosen'}
+                    </span>
                     <Button
                       variant="primary"
                       disabled={attachmentBusy || attachmentFile === null}
