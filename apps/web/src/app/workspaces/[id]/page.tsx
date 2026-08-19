@@ -94,9 +94,21 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           const membersResult = await api.listWorkspaceMemberships(id, user);
           if (cancelledRef.current) return;
           setMembers(membersResult.memberships);
-        } catch {
+        } catch (membersCaught) {
           if (cancelledRef.current) return;
           setMembers([]);
+          // A 403 here is the expected, silent case for every non-admin
+          // role. Anything else (network failure, timeout, a real server
+          // error) is not the same as "you can't see this" and must still
+          // surface — the rest of the page loaded fine, so this is a
+          // secondary notice, not a page-blocking one.
+          if (!(membersCaught instanceof ApiError) || membersCaught.status !== 403) {
+            setError(
+              membersCaught instanceof ApiError
+                ? membersCaught.message
+                : "Couldn't load this program's member preview.",
+            );
+          }
         }
       } catch (caught) {
         if (cancelledRef.current) return;

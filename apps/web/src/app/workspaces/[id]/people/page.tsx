@@ -64,11 +64,24 @@ export default function PeoplePage({ params }: { params: Promise<{ id: string }>
                 .map((a) => [a.membershipId, a]),
             ),
           );
-        } catch {
+        } catch (membersCaught) {
           if (cancelledRef.current) return;
           setMembers([]);
           setRoleAssignments({});
-          setMembersForbidden(true);
+          // A 403 is the expected, silent case for every non-admin role —
+          // anything else (network failure, timeout, a real server error)
+          // is not the same as "you can't see this" and must still surface
+          // as a real error, not the permission empty-state.
+          if (membersCaught instanceof ApiError && membersCaught.status === 403) {
+            setMembersForbidden(true);
+          } else {
+            setMembersForbidden(false);
+            setError(
+              membersCaught instanceof ApiError
+                ? membersCaught.message
+                : "Couldn't load this program's people.",
+            );
+          }
         }
       } catch (caught) {
         if (cancelledRef.current) return;

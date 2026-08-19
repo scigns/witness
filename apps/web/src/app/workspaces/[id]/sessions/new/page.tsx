@@ -95,10 +95,22 @@ export default function NewSessionPage({ params }: { params: Promise<{ id: strin
         setMembers(eligible);
         setMembersForbidden(false);
         setPrimaryFacilitatorId((current) => current || (eligible[0]?.userId ?? ''));
-      } catch {
+      } catch (caught) {
         if (cancelled) return;
         setMembers([]);
-        setMembersForbidden(true);
+        // A 403 is the expected, silent case for every non-admin role —
+        // anything else (network failure, timeout, a real server error)
+        // is not the same as "you can't see this" and must still surface,
+        // even though the self-facilitator fallback still applies either
+        // way (`SessionsService` validates it independently server-side).
+        if (caught instanceof ApiError && caught.status === 403) {
+          setMembersForbidden(true);
+        } else {
+          setMembersForbidden(false);
+          setError(
+            caught instanceof ApiError ? caught.message : "Couldn't load this program's roster.",
+          );
+        }
         setPrimaryFacilitatorId((current) => current || (currentUser?.id ?? ''));
       } finally {
         if (!cancelled) setLoadingMembers(false);

@@ -149,12 +149,25 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
           setRoleAssignments(Object.fromEntries(assignments.map((a) => [a.membershipId, a])));
           setOrganisationMembers(orgMembersResult.memberships);
           setMembershipsForbidden(false);
-        } catch {
+        } catch (membershipsCaught) {
           if (cancelledRef.current) return;
           setMemberships([]);
           setRoleAssignments({});
           setOrganisationMembers([]);
-          setMembershipsForbidden(true);
+          // A 403 is the expected, silent case for every non-admin role —
+          // anything else (network failure, timeout, a real server error)
+          // is not the same as "you can't manage this" and must still
+          // surface as a real error, not the permission empty-state.
+          if (membershipsCaught instanceof ApiError && membershipsCaught.status === 403) {
+            setMembershipsForbidden(true);
+          } else {
+            setMembershipsForbidden(false);
+            setError(
+              membershipsCaught instanceof ApiError
+                ? membershipsCaught.message
+                : "Couldn't load this program's membership.",
+            );
+          }
         }
       } catch (caught) {
         if (cancelledRef.current) return;
@@ -258,14 +271,19 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
     },
     {
       label: 'People',
-      ready: memberships.length > 0,
+      // `membershipsForbidden` means "unknown", not "zero" — reporting
+      // not-ready here would claim no one has joined when the truth is
+      // this viewer simply can't see the roster.
+      ready: membershipsForbidden || memberships.length > 0,
       // Membership management lives further down this same page (the
       // "Members" section below), not on a separate route — an href back to
       // `/workspaces/${id}/manage` was a self-link that looked like it did
       // nothing when clicked. An in-page anchor actually takes the
       // facilitator to the section this row describes.
       href: '#members-heading',
-      detail: `${memberships.length} member${memberships.length === 1 ? '' : 's'} added.`,
+      detail: membershipsForbidden
+        ? "You don't have permission to see who's added."
+        : `${memberships.length} member${memberships.length === 1 ? '' : 's'} added.`,
     },
     {
       label: 'Agenda',

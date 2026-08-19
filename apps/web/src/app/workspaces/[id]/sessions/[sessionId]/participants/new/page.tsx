@@ -105,10 +105,27 @@ export default function NewParticipantPage({
         if (cancelled) return;
         setMembers(result.memberships.filter((member) => GOOD_STANDING.has(member.state)));
         setMembersForbidden(false);
-      } catch {
+      } catch (caught) {
         if (cancelled) return;
         setMembers([]);
-        setMembersForbidden(true);
+        // Any previously-selected member is no longer represented by the
+        // roster this render will show (empty, whatever the reason) —
+        // clearing it stops a stale `linkedUserId` from being submitted
+        // against a list the user can no longer see or wasn't shown.
+        setIsRegistered(false);
+        setLinkedUserId('');
+        // A 403 is the expected, silent case for every non-admin role —
+        // anything else (network failure, timeout, a real server error)
+        // is not the same as "you can't see this" and must still surface;
+        // the rest of this form still works either way.
+        if (caught instanceof ApiError && caught.status === 403) {
+          setMembersForbidden(true);
+        } else {
+          setMembersForbidden(false);
+          setError(
+            caught instanceof ApiError ? caught.message : "Couldn't load this program's roster.",
+          );
+        }
       } finally {
         if (!cancelled) setLoadingMembers(false);
       }
