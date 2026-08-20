@@ -70,52 +70,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token === null) return;
 
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
-    authApi
-      .me(token)
-      .then((user) => {
-        if (cancelled) return;
-        setCurrentUser(user);
-        setErrorMessage(null);
-        setStatus('authenticated');
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
+    // A single failed check on a flaky connection (mobile data, poor wifi)
+    // shouldn't strand the badge on "Could not verify sign-in — retrying…"
+    // with nothing actually retrying behind it — that text is a promise, and
+    // this is what keeps it true. Bounded by `cancelled`/the cleanup below,
+    // so it stops the moment the token changes or the provider unmounts.
+    const check = () => {
+      authApi
+        .me(token)
+        .then((user) => {
+          if (cancelled) return;
+          setCurrentUser(user);
+          setErrorMessage(null);
+          setStatus('authenticated');
+        })
+        .catch((error: unknown) => {
+          if (cancelled) return;
 
-        const code = error instanceof ApiError ? error.code : 'SESSION_CHECK_FAILED';
+          const code = error instanceof ApiError ? error.code : 'SESSION_CHECK_FAILED';
 
-        if (!DISCARD_TOKEN_CODES.has(code)) {
-          // Suspended/deactivated (403 — the account, not the session, is
-          // the problem) and any network/server failure keep the token:
-          // discarding it would force a full OIDC round trip to recover
-          // from something that isn't a session problem at all.
-          setCurrentUser(null);
-          if (code === 'ACCOUNT_SUSPENDED') {
-            setStatus('suspended');
-          } else if (code === 'ACCOUNT_DEACTIVATED') {
-            setStatus('deactivated');
-          } else {
-            setErrorMessage(
-              error instanceof ApiError
-                ? error.message
-                : 'Could not verify the session. Try again.',
-            );
-            setStatus('error');
+          if (!DISCARD_TOKEN_CODES.has(code)) {
+            // Suspended/deactivated (403 — the account, not the session, is
+            // the problem) and any network/server failure keep the token:
+            // discarding it would force a full OIDC round trip to recover
+            // from something that isn't a session problem at all.
+            setCurrentUser(null);
+            if (code === 'ACCOUNT_SUSPENDED') {
+              setStatus('suspended');
+            } else if (code === 'ACCOUNT_DEACTIVATED') {
+              setStatus('deactivated');
+            } else {
+              setErrorMessage(
+                error instanceof ApiError
+                  ? error.message
+                  : 'Could not verify the session. Try again.',
+              );
+              setStatus('error');
+              retryTimer = setTimeout(check, 5_000);
+            }
+            return;
           }
-          return;
-        }
 
-        try {
-          window.sessionStorage.removeItem(STORAGE_KEY);
-        } catch {
-          // Non-fatal.
-        }
-        setCurrentUser(null);
-        setStatus('unauthenticated');
-      });
+          try {
+            window.sessionStorage.removeItem(STORAGE_KEY);
+          } catch {
+            // Non-fatal.
+          }
+          setCurrentUser(null);
+          setStatus('unauthenticated');
+        });
+    };
+
+    check();
 
     return () => {
       cancelled = true;
+      if (retryTimer !== undefined) clearTimeout(retryTimer);
     };
   }, [token]);
 
