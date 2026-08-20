@@ -306,13 +306,24 @@ export default function EvidenceDetailPage({
   // MediaRecorder exists but is unreliable to feature-detect via `'MediaRecorder' in window`
   // alone in older Safari; checking getUserMedia too avoids offering a control that would
   // fail immediately on start.
+  //
+  // Some content blockers don't leave `navigator.mediaDevices`/`getUserMedia`
+  // simply `undefined` — they replace it with something that throws on
+  // access. Left uncaught, that throw happens while evaluating the
+  // expression below and `setRecordingSupported` never runs at all, so the
+  // state is stuck at `null` ("not yet checked") forever instead of settling
+  // on `false` ("checked; not available here").
   useEffect(() => {
-    setRecordingSupported(
-      typeof window !== 'undefined' &&
-        'MediaRecorder' in window &&
-        typeof navigator !== 'undefined' &&
-        navigator.mediaDevices?.getUserMedia !== undefined,
-    );
+    try {
+      setRecordingSupported(
+        typeof window !== 'undefined' &&
+          'MediaRecorder' in window &&
+          typeof navigator !== 'undefined' &&
+          navigator.mediaDevices?.getUserMedia !== undefined,
+      );
+    } catch {
+      setRecordingSupported(false);
+    }
   }, []);
 
   // Release the microphone and stop the elapsed timer on unmount, and if the
