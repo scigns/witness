@@ -1838,15 +1838,28 @@ export const authApi = {
   me: async (sessionToken: string): Promise<CurrentUserView> => {
     let response: Response;
 
+    // On a poor mobile connection a request can be accepted by the network
+    // but never actually answered, in which case `fetch` neither resolves nor
+    // rejects — nothing downstream ever hears about it, and the caller (the
+    // "Checking sign-in…" state in auth.tsx) waits forever. Bounding the wait
+    // turns that silent hang into the same "network failure" case below,
+    // which auth.tsx already treats as retry-worthy rather than a reason to
+    // sign the user out.
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), 15_000);
+
     try {
       response = await fetch(`${BASE_URL}/api/v1/me`, {
         headers: { Authorization: `Bearer ${sessionToken}` },
         cache: 'no-store',
+        signal: timeoutController.signal,
       });
     } catch {
-      // A network failure is not a judgement about the session — it is a
-      // reason to try again, not a reason to sign the user out.
+      // A network failure (or the timeout above) is not a judgement about the
+      // session — it is a reason to try again, not a reason to sign the user out.
       throw new ApiError(`Cannot reach the Witness API at ${BASE_URL}.`, 0, 'API_UNREACHABLE');
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     if (!response.ok) {
