@@ -1017,6 +1017,17 @@ export default function EvidenceDetailPage({
                 No file has been attached to this evidence yet.
               </p>
 
+              {/* Silence here previously meant "the browser can't do this" and "we
+                  haven't checked yet" looked identical — a real user reasonably
+                  concluded the feature had been removed. This always states which
+                  of the two is true, rather than just omitting the section. */}
+              {!recordingSupported && recordedUrl === null && recordingStatus === 'idle' && (
+                <p className="rounded border border-[var(--color-line)] p-3 text-sm text-[var(--color-ink-muted)]">
+                  Recording isn&apos;t available in this browser. You can upload an audio file
+                  instead.
+                </p>
+              )}
+
               {recordingSupported && recordedUrl === null && recordingStatus === 'idle' && (
                 <div className="space-y-2 rounded border border-[var(--color-line)] p-3">
                   <p className="text-sm font-medium">Record in browser</p>
