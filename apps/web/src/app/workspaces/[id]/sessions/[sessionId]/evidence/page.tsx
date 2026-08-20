@@ -42,6 +42,15 @@ import {
   type QueuedContribution,
 } from '@/lib/offline-queue';
 
+// Only `contributor`-tier and `admin` roles actually hold `evidence:create`
+// (role-grants.ts) — `reviewer` and `reader` never do, and `participant`
+// maps to the `reader` tier (role-resolution.service.ts's `ROLE_TO_TIER`),
+// so it doesn't either. Gating the quick-capture form on this set, rather
+// than checking for `reader` alone, keeps this the same "hidden, not
+// shown-then-403'd" pattern used for attach/choose-file elsewhere: a role
+// that can never submit shouldn't be shown a form that always fails.
+const CAN_CAPTURE_ROLES = new Set(['admin', 'facilitator', 'contributor']);
+
 const ATTRIBUTION_MODE_LABELS: Record<EvidenceAttributionMode, string> = {
   attributed: 'Attributed — names the participant',
   pseudonymous: 'Pseudonymous — shows their chosen name',
@@ -89,12 +98,9 @@ export default function SessionEvidencePage({
   const { id: workspaceId, sessionId } = use(params);
   const { user, ready } = useSession();
   const { currentUser } = useAuth();
-  // Observer (`reader`) is calm read-access by design — the quick-capture
-  // form is hidden rather than shown-then-403'd. Every other role may
-  // genuinely have a reason to submit (a participant their own contribution,
-  // a facilitator/admin running the session); the API remains the real
-  // gate for all of them.
-  const isObserver = currentUser?.workspaces.find((w) => w.id === workspaceId)?.role === 'reader';
+  const canCapture = CAN_CAPTURE_ROLES.has(
+    currentUser?.workspaces.find((w) => w.id === workspaceId)?.role ?? '',
+  );
 
   const [session, setSession] = useState<CoDesignSessionDetail | null>(null);
   const [evidence, setEvidence] = useState<EvidenceSummary[]>([]);
@@ -354,7 +360,7 @@ export default function SessionEvidencePage({
         </p>
       )}
 
-      {sessionOpen && !isObserver && (
+      {sessionOpen && canCapture && (
         <Card className="space-y-4">
           <h2 className="text-lg font-semibold">Quick capture</h2>
           {captureError !== null && <ErrorNotice message={captureError} />}
