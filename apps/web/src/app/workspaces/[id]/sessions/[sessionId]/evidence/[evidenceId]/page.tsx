@@ -132,9 +132,14 @@ export default function EvidenceDetailPage({
   // kind of File the existing upload path already accepts (MediaRecorder's
   // default output, audio/webm, is already in the file input's `accept`
   // list above). Feature-detected rather than assumed: Safari's support is
-  // inconsistent, and a missing MediaRecorder should silently fall back to
-  // the file input rather than show a broken control.
-  const [recordingSupported, setRecordingSupported] = useState(false);
+  // inconsistent, and a missing MediaRecorder should show a clear
+  // unsupported message rather than a broken control.
+  //
+  // `null`, not `false`, until the detection effect below actually runs —
+  // this state starts as "not yet checked", not "unsupported". Collapsing
+  // those into one boolean showed the "not available" message to every
+  // supported browser too, for one frame, on every page load.
+  const [recordingSupported, setRecordingSupported] = useState<boolean | null>(null);
   const [recordingConsentConfirmed, setRecordingConsentConfirmed] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState<'idle' | 'recording' | 'paused'>('idle');
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -1017,33 +1022,50 @@ export default function EvidenceDetailPage({
                 No file has been attached to this evidence yet.
               </p>
 
-              {recordingSupported && recordedUrl === null && recordingStatus === 'idle' && (
-                <div className="space-y-2 rounded border border-[var(--color-line)] p-3">
-                  <p className="text-sm font-medium">Record in browser</p>
-                  {recordingError !== null && <ErrorNotice message={recordingError} />}
-                  <label className="flex items-start gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={recordingConsentConfirmed}
-                      onChange={(event) => setRecordingConsentConfirmed(event.target.checked)}
-                      className="mt-0.5"
-                    />
-                    <span>
-                      I confirm consent for audio recording has been captured for this
-                      session&apos;s participant(s).
-                    </span>
-                  </label>
-                  <Button
-                    variant="primary"
-                    disabled={!recordingConsentConfirmed}
-                    onClick={() => void startRecording()}
-                  >
-                    Start recording
-                  </Button>
-                </div>
-              )}
+              {/* Silence here previously meant "the browser can't do this" and "we
+                  haven't checked yet" looked identical — a real user reasonably
+                  concluded the feature had been removed. This always states which
+                  of the two is true, rather than just omitting the section.
+                  `=== false` deliberately excludes `null` ("not checked yet") —
+                  otherwise every supported browser shows this for one frame too. */}
+              {recordingSupported === false &&
+                recordedUrl === null &&
+                recordingStatus === 'idle' && (
+                  <p className="rounded border border-[var(--color-line)] p-3 text-sm text-[var(--color-ink-muted)]">
+                    Recording isn&apos;t available in this browser. You can upload an audio file
+                    instead.
+                  </p>
+                )}
 
-              {recordingSupported &&
+              {recordingSupported === true &&
+                recordedUrl === null &&
+                recordingStatus === 'idle' && (
+                  <div className="space-y-2 rounded border border-[var(--color-line)] p-3">
+                    <p className="text-sm font-medium">Record in browser</p>
+                    {recordingError !== null && <ErrorNotice message={recordingError} />}
+                    <label className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={recordingConsentConfirmed}
+                        onChange={(event) => setRecordingConsentConfirmed(event.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        I confirm consent for audio recording has been captured for this
+                        session&apos;s participant(s).
+                      </span>
+                    </label>
+                    <Button
+                      variant="primary"
+                      disabled={!recordingConsentConfirmed}
+                      onClick={() => void startRecording()}
+                    >
+                      Start recording
+                    </Button>
+                  </div>
+                )}
+
+              {recordingSupported === true &&
                 (recordingStatus === 'recording' || recordingStatus === 'paused') && (
                   <div
                     className="space-y-2 rounded border border-[var(--color-line)] p-3"
