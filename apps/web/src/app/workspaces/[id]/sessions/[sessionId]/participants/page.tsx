@@ -32,6 +32,15 @@ const IDENTITY_MODE_LABELS: Record<string, string> = {
   anonymous: 'Anonymous',
 };
 
+function formatLabel(value: string): string {
+  const spaced = value.replace(/_/g, ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function consentNeedsAttention(value: string): boolean {
+  return !['granted', 'not_required'].includes(value);
+}
+
 export default function SessionParticipantsPage({
   params,
 }: {
@@ -84,6 +93,17 @@ export default function SessionParticipantsPage({
       cancelled = true;
     };
   }, [ready, workspaceId, sessionId, user]);
+
+  const activeParticipants = participants.filter((participant) => !participant.withdrawn);
+  const attendingCount = activeParticipants.filter(
+    (participant) => participant.attendanceStatus === 'present',
+  ).length;
+  const acceptedCount = activeParticipants.filter(
+    (participant) => participant.invitationStatus === 'accepted',
+  ).length;
+  const consentAttentionCount = activeParticipants.filter((participant) =>
+    consentNeedsAttention(participant.consentStatusSummary),
+  ).length;
 
   const exportRedacted = async () => {
     setExporting(true);
@@ -166,10 +186,61 @@ export default function SessionParticipantsPage({
         </div>
       </div>
 
+      {error === null && participants.length > 0 && (
+        <section aria-labelledby="participant-preparation-heading" className="space-y-3">
+          <div>
+            <h2 id="participant-preparation-heading" className="text-lg font-semibold">
+              Preparation overview
+            </h2>
+            <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+              A quick view of the roster before the session begins.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="!p-4">
+              <p className="text-xs uppercase tracking-wide text-[var(--color-ink-muted)]">
+                Participants
+              </p>
+              <p className="mt-1 text-xl font-semibold">{activeParticipants.length}</p>
+            </Card>
+
+            <Card className="!p-4">
+              <p className="text-xs uppercase tracking-wide text-[var(--color-ink-muted)]">
+                Invitations accepted
+              </p>
+              <p className="mt-1 text-xl font-semibold">{acceptedCount}</p>
+            </Card>
+
+            <Card className="!p-4">
+              <p className="text-xs uppercase tracking-wide text-[var(--color-ink-muted)]">
+                Attended
+              </p>
+              <p className="mt-1 text-xl font-semibold">{attendingCount}</p>
+            </Card>
+
+            <Card className="!p-4">
+              <p className="text-xs uppercase tracking-wide text-[var(--color-ink-muted)]">
+                Consent needs attention
+              </p>
+              <p
+                className={`mt-1 text-xl font-semibold ${
+                  consentAttentionCount > 0 ? 'text-[var(--color-accent)]' : ''
+                }`}
+              >
+                {consentAttentionCount}
+              </p>
+            </Card>
+          </div>
+        </section>
+      )}
+
       {error !== null ? null : participants.length === 0 ? (
         <Card>
-          <p className="text-sm text-[var(--color-ink-muted)]">
-            No participants yet. Add one to start building this session's roster.
+          <p className="font-medium">No participants yet</p>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+            Add the people expected at this session so invitations, attendance and consent can be
+            prepared in one place.
           </p>
         </Card>
       ) : (
@@ -190,8 +261,11 @@ export default function SessionParticipantsPage({
                 <th scope="col" className="py-2 pr-4 font-medium">
                   Invitation
                 </th>
-                <th scope="col" className="py-2 font-medium">
+                <th scope="col" className="py-2 pr-4 font-medium">
                   Attendance
+                </th>
+                <th scope="col" className="py-2 font-medium">
+                  Consent
                 </th>
               </tr>
             </thead>
@@ -220,8 +294,19 @@ export default function SessionParticipantsPage({
                   <td className="py-3 pr-4">
                     <ParticipantInvitationBadge status={participant.invitationStatus} />
                   </td>
-                  <td className="py-3">
+                  <td className="py-3 pr-4">
                     <ParticipantAttendanceBadge status={participant.attendanceStatus} />
+                  </td>
+                  <td className="py-3">
+                    <span
+                      className={
+                        consentNeedsAttention(participant.consentStatusSummary)
+                          ? 'font-medium'
+                          : 'text-[var(--color-ink-muted)]'
+                      }
+                    >
+                      {formatLabel(participant.consentStatusSummary)}
+                    </span>
                   </td>
                 </tr>
               ))}

@@ -14,12 +14,15 @@ import { use, useEffect, useState } from 'react';
 import type { CoDesignSessionSummary, WorkspaceSummary } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
+import { ProgramNav } from '@/components/program-nav';
 import { Button, Card, ErrorNotice, SessionStatusBadge } from '@/components/ui';
 
 export default function WorkspaceSessionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user, ready } = useSession();
+  const { currentUser } = useAuth();
 
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   const [sessions, setSessions] = useState<CoDesignSessionSummary[]>([]);
@@ -59,6 +62,9 @@ export default function WorkspaceSessionsPage({ params }: { params: Promise<{ id
     };
   }, [ready, id, user]);
 
+  const role = currentUser?.workspaces.find((w) => w.id === id)?.role ?? null;
+  const canManage = role === 'admin' || role === 'facilitator';
+
   if (loading) {
     return (
       <p role="status" className="text-[var(--color-ink-muted)]">
@@ -70,35 +76,45 @@ export default function WorkspaceSessionsPage({ params }: { params: Promise<{ id
   return (
     <div className="space-y-6">
       <Link href={`/workspaces/${id}`} className="inline-block text-sm underline">
-        ← Back to workspace
+        ← Back to program
       </Link>
 
       {error !== null && <ErrorNotice message={error} />}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Co-design sessions{workspace !== null ? ` — ${workspace.name}` : ''}
-          </h1>
-          <p className="mt-1 text-[var(--color-ink-muted)]">
-            Workshops, consultations, and other structured conversations run in this workspace.
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-2xl">
+          <p className="text-sm font-medium text-[var(--color-accent)]">
+            {workspace?.name ?? 'Program'}
+          </p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Sessions</h1>
+          <p className="mt-2 text-[var(--color-ink-muted)]">
+            Plan and run workshops, consultations and other structured conversations in this
+            program.
           </p>
         </div>
-        <Link href={`/workspaces/${id}/sessions/new`}>
-          <Button variant="primary">New session</Button>
-        </Link>
+
+        {canManage && (
+          <Link href={`/workspaces/${id}/sessions/new`}>
+            <Button variant="primary">Create session</Button>
+          </Link>
+        )}
       </div>
+
+      <ProgramNav workspaceId={id} role={role} />
 
       {error !== null ? null : sessions.length === 0 ? (
         <Card>
-          <p className="text-sm text-[var(--color-ink-muted)]">
-            No sessions yet. Create one to start preparing a co-design workshop.
+          <p className="font-medium">No sessions yet</p>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+            {canManage
+              ? 'Create the first session to begin preparing this program.'
+              : 'Sessions will appear here when a facilitator schedules them.'}
           </p>
         </Card>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
-            <caption className="sr-only">Co-design sessions in this workspace</caption>
+            <caption className="sr-only">Sessions in this program</caption>
             <thead>
               <tr className="border-b border-[var(--color-line)]">
                 <th scope="col" className="py-2 pr-4 font-medium">

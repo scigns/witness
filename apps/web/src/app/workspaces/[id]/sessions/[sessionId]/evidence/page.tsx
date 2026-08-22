@@ -703,14 +703,20 @@ function EvidenceRegister({
                       <EvidenceReviewStatusBadge status={item.reviewStatus} />
                     </td>
                     <td className="py-3 pr-4 whitespace-nowrap text-[var(--color-ink-muted)]">
-                      {new Date(item.capturedAt).toLocaleDateString()}
+                      {new Date(item.capturedAt).toLocaleString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
                     </td>
                     <td className="py-3 pr-4 whitespace-nowrap">
                       <Link
                         href={`/workspaces/${workspaceId}/sessions/${sessionId}/evidence/${item.id}`}
                         className="text-xs underline"
                       >
-                        View provenance
+                        Open details
                       </Link>
                     </td>
                   </tr>
@@ -740,7 +746,13 @@ function EvidenceRegister({
                     {consentLabel(item)} · {processingLabel(item)}
                   </p>
                   <p className="text-xs text-[var(--color-ink-muted)]">
-                    {new Date(item.capturedAt).toLocaleDateString()}
+                    {new Date(item.capturedAt).toLocaleString(undefined, {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
                   </p>
                 </Card>
               </li>

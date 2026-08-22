@@ -9,12 +9,14 @@
  */
 
 import Link from 'next/link';
-import { use, useState, type FormEvent } from 'react';
+import { use, useEffect, useState, type FormEvent } from 'react';
 
-import type { SearchResultType, SearchResultView } from '@witness/contracts';
+import type { SearchResultType, SearchResultView, WorkspaceSummary } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
+import { ProgramNav } from '@/components/program-nav';
 import { Button, Card, ErrorNotice } from '@/components/ui';
 
 const TYPE_LABELS: Record<SearchResultType, string> = {
@@ -51,12 +53,41 @@ function resultHref(workspaceId: string, result: SearchResultView): string {
 
 export default function WorkspaceSearchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: workspaceId } = use(params);
-  const { user } = useSession();
+  const { user, ready } = useSession();
+  const { currentUser } = useAuth();
 
+  const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultView[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const role =
+    currentUser?.workspaces.find((workspace) => workspace.id === workspaceId)?.role ?? null;
+
+  useEffect(() => {
+    if (!ready) return;
+
+    let cancelled = false;
+
+    void api
+      .getWorkspace(workspaceId, user)
+      .then((result) => {
+        if (!cancelled) {
+          setWorkspace(result);
+          setError(null);
+        }
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, workspaceId, user]);
 
   const runSearch = async (event: FormEvent) => {
     event.preventDefault();
@@ -76,30 +107,35 @@ export default function WorkspaceSearchPage({ params }: { params: Promise<{ id: 
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-6">
       <Link href={`/workspaces/${workspaceId}`} className="inline-block text-sm underline">
-        ← Back to workspace
+        ← Back to program
       </Link>
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Search</h1>
-        <p className="mt-1 text-[var(--color-ink-muted)]">
-          Session titles and purposes, contributions, transcripts, summaries, decisions, commitments
-          and actions — everything in this program you already have permission to read.
+      <div className="max-w-2xl">
+        <p className="text-sm font-medium text-[var(--color-accent)]">
+          {workspace?.name ?? 'Program'}
+        </p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Search</h1>
+        <p className="mt-2 text-[var(--color-ink-muted)]">
+          Find previous discussions, contributions, transcripts, summaries, decisions, commitments
+          and actions in this program.
         </p>
       </div>
+
+      <ProgramNav workspaceId={workspaceId} role={role} />
 
       {error !== null && <ErrorNotice message={error} />}
 
       <form onSubmit={(event) => void runSearch(event)} className="flex gap-2">
         <label htmlFor="searchQuery" className="sr-only">
-          Search this workspace
+          Search this program
         </label>
         <input
           id="searchQuery"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search this workspace…"
+          placeholder="Search this program…"
           minLength={2}
           className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
         />

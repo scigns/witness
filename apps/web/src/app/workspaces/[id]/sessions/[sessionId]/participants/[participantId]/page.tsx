@@ -104,6 +104,8 @@ export default function ParticipantDetailPage({
   const [editPreferredName, setEditPreferredName] = useState('');
   const [editPronouns, setEditPronouns] = useState('');
   const [editAffiliation, setEditAffiliation] = useState('');
+  const [editLanguagePreference, setEditLanguagePreference] = useState('');
+  const [editAccessibilityRequirements, setEditAccessibilityRequirements] = useState('');
 
   const [notesDraft, setNotesDraft] = useState('');
   const [withdrawReason, setWithdrawReason] = useState('');
@@ -123,6 +125,8 @@ export default function ParticipantDetailPage({
         setEditPreferredName(participantResult.preferredName ?? '');
         setEditPronouns(participantResult.pronouns ?? '');
         setEditAffiliation(participantResult.affiliation ?? '');
+        setEditLanguagePreference(participantResult.languagePreference ?? '');
+        setEditAccessibilityRequirements(participantResult.accessibilityRequirements ?? '');
         setNotesDraft(participantResult.facilitatorNotes ?? '');
         setError(null);
         setForbidden(false);
@@ -192,6 +196,9 @@ export default function ParticipantDetailPage({
           preferredName: editPreferredName.trim() === '' ? null : editPreferredName,
           pronouns: editPronouns.trim() === '' ? null : editPronouns,
           affiliation: editAffiliation.trim() === '' ? null : editAffiliation,
+          languagePreference: editLanguagePreference.trim() === '' ? null : editLanguagePreference,
+          accessibilityRequirements:
+            editAccessibilityRequirements.trim() === '' ? null : editAccessibilityRequirements,
           expectedVersion: participant.version,
         },
         user,
@@ -446,6 +453,41 @@ export default function ParticipantDetailPage({
               </div>
             </>
           )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="editLanguagePreference" className="mb-1 block text-sm font-medium">
+                Language preference
+              </label>
+              <input
+                id="editLanguagePreference"
+                maxLength={50}
+                value={editLanguagePreference}
+                onChange={(event) => setEditLanguagePreference(event.target.value)}
+                placeholder="e.g. English, iTaukei, Fiji Hindi"
+                className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="editAccessibilityRequirements"
+                className="mb-1 block text-sm font-medium"
+              >
+                Accessibility requirements
+              </label>
+              <textarea
+                id="editAccessibilityRequirements"
+                maxLength={2000}
+                rows={3}
+                value={editAccessibilityRequirements}
+                onChange={(event) => setEditAccessibilityRequirements(event.target.value)}
+                placeholder="Anything the facilitator should prepare for participation."
+                className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+              />
+            </div>
+          </div>
+
           <Button
             variant="primary"
             disabled={busy || (!isAnonymous && editDisplayName.trim() === '')}

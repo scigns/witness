@@ -24,8 +24,6 @@ const NAV = [
   { href: '/workspaces', label: 'Programs' },
   { href: '/records', label: 'Records' },
   { href: '/records/new', label: 'Capture' },
-  { href: '/organisations', label: 'Organisations' },
-  { href: '/users', label: 'Users' },
 ] as const;
 
 const ROLES: ReadonlyArray<ActingUser['role']> = ['reader', 'contributor', 'reviewer', 'admin'];
@@ -55,8 +53,8 @@ export function Shell({ children }: { children: ReactNode }) {
           </>
         ) : (
           <>
-            <strong>Internal pilot</strong> — requests are authenticated and every entry is
-            recorded. Treat what you enter here as real institutional memory.
+            <strong>Protected workspace</strong> — your work is authenticated, recorded and
+            traceable to its source.
           </>
         )}
       </div>
@@ -100,12 +98,37 @@ export function Shell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <AuthStatusBadge
-            status={status}
-            currentUser={currentUser}
-            errorMessage={errorMessage}
-            signOut={signOut}
-          />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {currentUser !== null &&
+              currentUser.organisations.some((organisation) => organisation.role === 'admin') && (
+                <details className="relative">
+                  <summary className="cursor-pointer list-none rounded px-3 py-1.5 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-ink)]">
+                    Administration
+                  </summary>
+                  <div className="absolute right-0 z-40 mt-2 min-w-44 rounded-lg border border-[var(--color-line)] bg-[var(--color-paper-raised)] p-2 shadow-lg">
+                    <Link
+                      href="/organisations"
+                      className="block rounded px-3 py-2 text-sm hover:bg-[var(--color-accent-soft)]"
+                    >
+                      Organisations
+                    </Link>
+                    <Link
+                      href="/users"
+                      className="block rounded px-3 py-2 text-sm hover:bg-[var(--color-accent-soft)]"
+                    >
+                      Users
+                    </Link>
+                  </div>
+                </details>
+              )}
+
+            <AuthStatusBadge
+              status={status}
+              currentUser={currentUser}
+              errorMessage={errorMessage}
+              signOut={signOut}
+            />
+          </div>
         </div>
 
         {/*

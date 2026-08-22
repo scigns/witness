@@ -39,7 +39,9 @@ import type {
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
+import { ProgramNav } from '@/components/program-nav';
 import {
   Button,
   Card,
@@ -66,6 +68,7 @@ const GOOD_STANDING: ReadonlySet<MembershipState> = new Set<MembershipState>(['i
 export default function ManageWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user, ready } = useSession();
+  const { currentUser } = useAuth();
 
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   const [organisation, setOrganisation] = useState<OrganisationSummary | null>(null);
@@ -316,31 +319,33 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
     },
   ];
   const readyCount = readiness.filter((row) => row.ready).length;
+  const role = currentUser?.workspaces.find((item) => item.id === id)?.role ?? null;
 
   return (
     <div className="space-y-6">
       <Link href={`/workspaces/${id}`} className="inline-block text-sm underline">
-        ← Back to {workspace.name}
+        ← Back to program
       </Link>
 
       {error !== null && <ErrorNotice message={error} />}
 
-      <div>
-        <p className="text-sm text-[var(--color-ink-muted)]">Manage program</p>
-        <h1 className="text-2xl font-semibold tracking-tight">{workspace.name}</h1>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          {organisation === null ? (
-            'Organisation: unknown'
-          ) : (
-            <>
-              Organisation:{' '}
-              <Link href={`/organisations/${organisation.id}`} className="underline">
-                {organisation.name}
-              </Link>
-            </>
-          )}
+      <div className="max-w-2xl">
+        <p className="text-sm font-medium text-[var(--color-accent)]">{workspace.name}</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Manage</h1>
+        <p className="mt-2 text-[var(--color-ink-muted)]">
+          Prepare this program to run, review its setup and manage access where your role permits.
         </p>
+        {organisation !== null && (
+          <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
+            Organisation:{' '}
+            <Link href={`/organisations/${organisation.id}`} className="underline">
+              {organisation.name}
+            </Link>
+          </p>
+        )}
       </div>
+
+      <ProgramNav workspaceId={id} role={role} />
 
       <section aria-labelledby="readiness-heading" className="space-y-3">
         <h2 id="readiness-heading" className="text-lg font-semibold">

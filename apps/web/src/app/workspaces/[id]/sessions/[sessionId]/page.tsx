@@ -457,6 +457,7 @@ export default function SessionDetailPage({
         sessionId={sessionId}
         session={session}
         journey={journey}
+        showNextAction={role === 'admin' || role === 'facilitator'}
       />
 
       {/* One number that doesn't fit the journey stages themselves. */}
@@ -485,11 +486,18 @@ export default function SessionDetailPage({
           );
         })()}
 
-      <section aria-labelledby="workspace-nav-heading">
-        <h2 id="workspace-nav-heading" className="mb-3 text-lg font-semibold">
-          Session workspace
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <section aria-labelledby="workspace-nav-heading" className="space-y-3">
+        <div>
+          <h2 id="workspace-nav-heading" className="text-lg font-semibold">
+            Session tools
+          </h2>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+            Open a specific part of the session when you need to work with its people, evidence,
+            outputs or record.
+          </p>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {SESSION_WORKSPACE_LINKS.filter(
             (link) =>
               link.roles === undefined || (authReady && (role === null || link.roles.has(role))),
@@ -497,12 +505,22 @@ export default function SessionDetailPage({
             <Link
               key={link.href}
               href={`/workspaces/${workspaceId}/sessions/${sessionId}${link.href}`}
-              className="block rounded-lg focus-visible:outline-none"
+              className="group flex min-h-20 items-start justify-between gap-3 rounded-lg border border-[var(--color-line)] bg-[var(--color-paper-raised)] px-4 py-3 transition-colors hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
             >
-              <Card className="h-full transition-colors hover:bg-[var(--color-accent-soft)]">
-                <p className="font-medium">{link.label}</p>
-                <p className="mt-1 text-sm text-[var(--color-ink-muted)]">{link.description}</p>
-              </Card>
+              <div className="min-w-0">
+                <p className="text-sm font-medium group-hover:text-[var(--color-accent)]">
+                  {link.label}
+                </p>
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--color-ink-muted)]">
+                  {link.description}
+                </p>
+              </div>
+              <span
+                aria-hidden="true"
+                className="shrink-0 text-sm text-[var(--color-ink-muted)] group-hover:text-[var(--color-accent)]"
+              >
+                →
+              </span>
             </Link>
           ))}
         </div>
@@ -1104,6 +1122,7 @@ function SessionJourneyMap({
   sessionId,
   session,
   journey,
+  showNextAction,
 }: {
   workspaceId: string;
   sessionId: string;
@@ -1116,35 +1135,89 @@ function SessionJourneyMap({
     actions: ActionItemSummary[] | null;
     reports: ReportSummary[] | null;
   } | null;
+  showNextAction: boolean;
 }) {
   if (journey === null) return null;
+
   const stages = computeJourneyStages(session, journey, workspaceId, sessionId);
 
+  // Prefer an actual problem over ordinary progression. Otherwise choose the
+  // first incomplete stage in the established session journey. A stage whose
+  // source failed to load has detail "—"; do not turn missing data into a
+  // fabricated recommendation.
+  const actionableStages = stages.filter(
+    (stage) => stage.status !== 'complete' && stage.detail !== '—',
+  );
+  const nextStage =
+    actionableStages.find((stage) => stage.status === 'needs_attention') ??
+    actionableStages[0] ??
+    null;
+
   return (
-    <section aria-labelledby="journey-heading">
-      <h2 id="journey-heading" className="mb-3 text-lg font-semibold">
-        Session journey
-      </h2>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
-        {stages.map((stage) => (
-          <Link
-            key={stage.key}
-            href={stage.href}
-            className="block rounded-lg focus-visible:outline-none"
-          >
-            <Card className="flex h-full flex-col gap-1.5 p-3 transition-colors hover:bg-[var(--color-accent-soft)]">
-              <p className="text-sm font-medium">{stage.label}</p>
-              <span
-                className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${JOURNEY_STATUS_CLASSES[stage.status]}`}
-              >
-                {JOURNEY_STATUS_LABELS[stage.status]}
-              </span>
-              <p className="text-xs text-[var(--color-ink-muted)]">{stage.detail}</p>
-            </Card>
-          </Link>
-        ))}
-      </div>
-    </section>
+    <div className="space-y-5">
+      {showNextAction && (
+        <section aria-labelledby="next-action-heading">
+          <Card className="border-[var(--color-accent)] bg-[var(--color-accent-soft)]">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">
+              Next action
+            </p>
+
+            {nextStage === null ? (
+              <>
+                <h2 id="next-action-heading" className="mt-1 text-lg font-semibold">
+                  No outstanding session steps
+                </h2>
+                <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+                  The core session journey is complete. You can review the record or continue
+                  following up any open actions.
+                </p>
+              </>
+            ) : (
+              <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
+                <div className="max-w-2xl">
+                  <h2 id="next-action-heading" className="text-lg font-semibold">
+                    {nextStage.label}
+                  </h2>
+                  <p className="mt-1 text-sm text-[var(--color-ink-muted)]">{nextStage.detail}</p>
+                </div>
+
+                <Link
+                  href={nextStage.href}
+                  className="inline-flex min-h-11 items-center rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-accent-contrast)] hover:opacity-90"
+                >
+                  Open {nextStage.label} →
+                </Link>
+              </div>
+            )}
+          </Card>
+        </section>
+      )}
+
+      <section aria-labelledby="journey-heading">
+        <h2 id="journey-heading" className="mb-3 text-lg font-semibold">
+          Session journey
+        </h2>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+          {stages.map((stage) => (
+            <Link
+              key={stage.key}
+              href={stage.href}
+              className="block rounded-lg focus-visible:outline-none"
+            >
+              <Card className="flex h-full flex-col gap-1.5 p-3 transition-colors hover:bg-[var(--color-accent-soft)]">
+                <p className="text-sm font-medium">{stage.label}</p>
+                <span
+                  className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${JOURNEY_STATUS_CLASSES[stage.status]}`}
+                >
+                  {JOURNEY_STATUS_LABELS[stage.status]}
+                </span>
+                <p className="text-xs text-[var(--color-ink-muted)]">{stage.detail}</p>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 
