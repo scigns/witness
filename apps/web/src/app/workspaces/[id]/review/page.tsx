@@ -20,7 +20,9 @@ import { use, useCallback, useEffect, useState } from 'react';
 import type { CoDesignSessionSummary, EvidenceSummary, WorkspaceSummary } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
+import { ProgramNav } from '@/components/program-nav';
 import { Card, EmptyState, ErrorNotice, EvidenceReviewStatusBadge } from '@/components/ui';
 
 const NEEDS_ATTENTION = new Set(['submitted', 'under_review', 'needs_clarification']);
@@ -33,6 +35,7 @@ interface QueueItem {
 export default function ReviewQueuePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user, ready } = useSession();
+  const { currentUser } = useAuth();
 
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   const [items, setItems] = useState<QueueItem[]>([]);
@@ -90,6 +93,8 @@ export default function ReviewQueuePage({ params }: { params: Promise<{ id: stri
     };
   }, [ready, load]);
 
+  const role = currentUser?.workspaces.find((w) => w.id === id)?.role ?? null;
+
   if (loading) {
     return (
       <p role="status" className="text-[var(--color-ink-muted)]">
@@ -112,18 +117,21 @@ export default function ReviewQueuePage({ params }: { params: Promise<{ id: stri
   return (
     <div className="space-y-6">
       <Link href={`/workspaces/${id}`} className="inline-block text-sm underline">
-        ← Back to {workspace.name}
+        ← Back to program
       </Link>
 
       {error !== null && <ErrorNotice message={error} />}
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Needs your review</h1>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Contributions across {workspace.name} that are submitted, under review, or waiting on a
-          clarification.
+      <div className="max-w-2xl">
+        <p className="text-sm font-medium text-[var(--color-accent)]">{workspace.name}</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Review</h1>
+        <p className="mt-2 text-[var(--color-ink-muted)]">
+          Review submitted contributions, resolve clarification requests and confirm what becomes
+          part of the program record.
         </p>
       </div>
+
+      <ProgramNav workspaceId={id} role={role} />
 
       {items.length === 0 ? (
         <EmptyState

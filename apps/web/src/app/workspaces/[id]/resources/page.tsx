@@ -15,6 +15,7 @@ import type { ResourceView, WorkspaceSummary } from '@witness/contracts';
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { useAuth } from '@/lib/auth';
+import { ProgramNav } from '@/components/program-nav';
 import { Button, Card, EmptyState, ErrorNotice } from '@/components/ui';
 
 const CAN_MANAGE_ROLES = new Set(['admin', 'facilitator']);
@@ -187,17 +188,21 @@ export default function ResourcesPage({ params }: { params: Promise<{ id: string
   return (
     <div className="space-y-6">
       <Link href={`/workspaces/${id}`} className="inline-block text-sm underline">
-        ← Back to {workspace.name}
+        ← Back to program
       </Link>
 
       {error !== null && <ErrorNotice message={error} />}
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Resources</h1>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Presentations, briefing papers, and links shared for {workspace.name}.
+      <div className="max-w-2xl">
+        <p className="text-sm font-medium text-[var(--color-accent)]">{workspace.name}</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Resources</h1>
+        <p className="mt-2 text-[var(--color-ink-muted)]">
+          Keep briefing papers, presentations, reference documents and useful links together with
+          the program they support.
         </p>
       </div>
+
+      <ProgramNav workspaceId={id} role={role} />
 
       {canManage && (
         <div className="grid gap-4 sm:grid-cols-2">

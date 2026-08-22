@@ -17,6 +17,7 @@ import type { AgendaItemView, CoDesignSessionSummary, WorkspaceSummary } from '@
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { useAuth } from '@/lib/auth';
+import { ProgramNav } from '@/components/program-nav';
 import { Button, Card, EmptyState, ErrorNotice } from '@/components/ui';
 
 const CAN_MANAGE_ROLES = new Set(['admin', 'facilitator']);
@@ -179,25 +180,29 @@ export default function AgendaPage({ params }: { params: Promise<{ id: string }>
   return (
     <div className="space-y-6">
       <Link href={`/workspaces/${id}`} className="inline-block text-sm underline">
-        ← Back to {workspace.name}
+        ← Back to program
       </Link>
 
       {error !== null && <ErrorNotice message={error} />}
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            What&rsquo;s happening now, what&rsquo;s next, and what already happened in{' '}
-            {workspace.name}.
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-2xl">
+          <p className="text-sm font-medium text-[var(--color-accent)]">{workspace.name}</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Agenda</h1>
+          <p className="mt-2 text-[var(--color-ink-muted)]">
+            See what is happening now, what comes next and what has already been completed in this
+            program.
           </p>
         </div>
+
         {canManage && !showForm && (
           <Button variant="primary" onClick={() => setShowForm(true)}>
             Add agenda item
           </Button>
         )}
       </div>
+
+      <ProgramNav workspaceId={id} role={role} />
 
       {canManage && showForm && (
         <Card className="space-y-3">

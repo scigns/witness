@@ -167,8 +167,29 @@ export default function ConsentDashboardPage({
     );
   }
 
-  const granted = dashboard.participants.filter(
-    (p) => p.status === 'granted' || p.status === 'partially_granted',
+  const totalParticipants = dashboard.participants.length;
+
+  const decisionRecordedCount = dashboard.participants.filter(
+    (participant) =>
+      participant.status === 'granted' ||
+      participant.status === 'partially_granted' ||
+      participant.status === 'refused',
+  ).length;
+
+  const grantedCount = dashboard.participants.filter(
+    (participant) => participant.status === 'granted' || participant.status === 'partially_granted',
+  ).length;
+
+  const needsAttentionCount = dashboard.participants.filter(
+    (participant) =>
+      participant.status === 'not_configured' ||
+      participant.status === 'not_requested' ||
+      participant.status === 'withdrawn' ||
+      participant.status === 'expired',
+  ).length;
+
+  const refusedOrWithdrawnCount = dashboard.participants.filter(
+    (participant) => participant.status === 'refused' || participant.status === 'withdrawn',
   ).length;
 
   return (
@@ -194,14 +215,81 @@ export default function ConsentDashboardPage({
             >
               Configure consent
             </Link>{' '}
-            before capturing any participant's decisions.
+            before capturing any participant&apos;s decisions.
           </p>
         </Card>
       ) : (
-        <p className="text-sm text-[var(--color-ink-muted)]">
-          {granted} of {dashboard.participants.length} participants have granted at least their
-          required consent.
-        </p>
+        <section aria-labelledby="consent-overview-heading" className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="consent-overview-heading" className="text-lg font-semibold">
+                Consent overview
+              </h2>
+              <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+                See whether every participant has a current consent decision before capturing or
+                using their contribution.
+              </p>
+            </div>
+
+            <Link
+              href={`/workspaces/${workspaceId}/sessions/${sessionId}/consent-configuration`}
+              className="text-sm underline hover:no-underline"
+            >
+              View configuration →
+            </Link>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="!p-4">
+              <p className="text-xs uppercase tracking-wide text-[var(--color-ink-muted)]">
+                Participants
+              </p>
+              <p className="mt-1 text-xl font-semibold">{totalParticipants}</p>
+            </Card>
+
+            <Card className="!p-4">
+              <p className="text-xs uppercase tracking-wide text-[var(--color-ink-muted)]">
+                Decisions recorded
+              </p>
+              <p className="mt-1 text-xl font-semibold">{decisionRecordedCount}</p>
+              <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
+                {grantedCount} granted or partially granted
+              </p>
+            </Card>
+
+            <Card className="!p-4">
+              <p className="text-xs uppercase tracking-wide text-[var(--color-ink-muted)]">
+                Needs attention
+              </p>
+              <p
+                className={`mt-1 text-xl font-semibold ${
+                  needsAttentionCount > 0 ? 'text-amber-700 dark:text-amber-400' : ''
+                }`}
+              >
+                {needsAttentionCount}
+              </p>
+              <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
+                Not requested, withdrawn or expired
+              </p>
+            </Card>
+
+            <Card className="!p-4">
+              <p className="text-xs uppercase tracking-wide text-[var(--color-ink-muted)]">
+                Refused or withdrawn
+              </p>
+              <p
+                className={`mt-1 text-xl font-semibold ${
+                  refusedOrWithdrawnCount > 0 ? 'text-red-700 dark:text-red-400' : ''
+                }`}
+              >
+                {refusedOrWithdrawnCount}
+              </p>
+              <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
+                Respect these decisions before proceeding
+              </p>
+            </Card>
+          </div>
+        </section>
       )}
 
       {dashboard.participants.length === 0 ? (
