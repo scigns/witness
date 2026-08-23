@@ -1,7 +1,7 @@
 # Status
 
-**Last updated:** 2026-08-09 (Milestone 8)
-**Updated by:** CTO
+**Last updated:** 2026-08-23 (v0.3.0 release preparation)
+**Updated by:** Release Manager
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
@@ -9,81 +9,93 @@ Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Executive summary
 
-Witness is in **Phase 1 (Architecture & Research)**, and now ships a **Developer Preview (0.1.0)**
-that runs.
+Witness has moved beyond the original Developer Preview and is now operating
+as a **controlled institutional-pilot product**.
 
-Phase 0 is complete. The preview proves the architecture end to end on one narrow workflow —
-capture a record, store it, display it, show its provenance, let a human accept or reject it — with
-a hash-chained audit trail and a real authorisation boundary.
+The currently deployed build on `main` provides the human-led institutional
+memory workflow end to end:
 
-**The pipeline is still deliberately unbuilt.** No AI extraction, no transcription, no knowledge
-graph, no Keycloak. Consent and provenance are enforced for co-design sessions as of Milestone 4
-(below); tenancy remains a cross-cutting invariant enforced only at the organisation/workspace
-scoping layer. Any assertion written before a capability is enforceable is permanently
-untrustworthy. The running instance lists every missing capability at `/ready` and renders it on
-the dashboard, so the gap is visible rather than inferred.
+organisation → program → session → participants → consent → evidence →
+human review → decisions/commitments/actions → summary → reports/exports →
+audit/provenance.
 
-**Overall health:** 🟢 On track
-**Biggest current risk:** R-01 — ontology design becoming an unbounded research project. Mitigation
-is a hard time-box on ontology v0.1 and a commitment to versioned, evolvable schema rather than a
-correct-first-time one. See [`docs/governance/RISK_REGISTER.md`](docs/governance/RISK_REGISTER.md).
+Production is authenticated through Keycloak, organisation/program scoped,
+consent-aware, backed by PostgreSQL and Cloudflare R2-compatible object
+storage, and uses local transcription/inference paths with external inference
+disabled in the current production profile.
+
+The current product focus is no longer proving that the workflow can be
+built. It is learning whether institutions can configure, facilitate and
+repeat useful pilots with limited developer intervention.
+
+**Overall health:** 🟢 Controlled pilot release candidate
+**Current platform release:** 0.3.0 preparation
+**Production main:** deployed from merge commit `8534751`
+**Primary product objective:** repeatable institutional pilots and evidence
+of client value.
+
+Important boundaries remain explicit:
+
+- Fijian/iTaukei machine transcription is not authoritative.
+- Sensitive institutional attachments require a deployment-specific
+  readiness decision and storage-protection/recovery controls.
+- Database-level row-level security remains future defence-in-depth;
+  organisation/program isolation is currently enforced in the application
+  and repository layers.
+- Knowledge-graph projection, speaker diarisation and hybrid/vector search
+  remain future capabilities.
+- Witness does not claim to provide an institution's legal basis or legal
+  compliance merely by selecting an institutional profile.
 
 ---
 
-## Phase status
+## Delivery status
 
-| Phase | Name | State | Gate met |
-|---|---|---|---|
-| 0 | Engineering organisation | 🟢 Complete | ✅ |
-| 1 | Architecture & research | 🟡 In progress | — |
-| — | *Developer Preview 0.1.0* | 🟢 *Shipped 2026-08-01* | *n/a — not a phase gate* |
-| 2 | Infrastructure & identity | ⚪ Not started | — |
-| 3 | Core backend & data | ⚪ Not started | — |
-| 4 | Knowledge graph | ⚪ Not started | — |
-| 5 | AI platform & capture | ⚪ Not started | — |
-| 6 | Search & experience | ⚪ Not started | — |
-| 7 | Hardening | ⚪ Not started | — |
-| 8 | v1.0 & reference deployments | ⚪ Not started | — |
+The original Phase 1–8 roadmap remains the long-term architecture sequence.
+Implementation has intentionally delivered a controlled human-led MVP ahead
+of several formal roadmap phase exits. Therefore a phase not marked complete
+does **not** mean that every capability described within it is absent.
 
-Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not started
+| Area                                      | Current state                              |
+| ----------------------------------------- | ------------------------------------------ |
+| Engineering organisation                  | 🟢 Established                             |
+| Human-led institutional-memory workflow   | 🟢 Delivered                               |
+| Authentication and role-aware access      | 🟢 Delivered for controlled pilot          |
+| Organisation/program isolation            | 🟢 Application/repository enforced         |
+| Consent lifecycle and evidence gates      | 🟢 Delivered for supported pilot workflows |
+| Evidence review and provenance            | 🟢 Delivered                               |
+| Decisions, commitments and actions        | 🟢 Delivered                               |
+| Session summary, reports and exports      | 🟢 Delivered                               |
+| Browser audio/document capture            | 🟢 Delivered                               |
+| Local transcription and local AI drafting | 🟢 Delivered with stated limitations       |
+| Client-ready web experience               | 🟢 Delivered                               |
+| Repeatable institutional pilot operations | 🟢 Delivered in 0.3.0                      |
+| Knowledge graph projection                | ⚪ Deferred                                |
+| Hybrid/vector search                      | ⚪ Deferred                                |
+| Speaker diarisation                       | ⚪ Deferred                                |
+| Database-level RLS defence-in-depth       | ⚪ Deferred                                |
+| General-availability / v1.0 hardening     | ⚪ Not complete                            |
 
 ---
 
 ## Workstream status
 
-| Workstream | Branch | Owner | State | Notes |
-|---|---|---|---|---|
-| Architecture | `architecture` | Principal Architect | 🟡 | C4 context/container done; component views pending |
-| Research | `research` | Research Lead | 🟡 | OSS evaluation complete for core stack; ASR benchmark pending |
-| Documentation | `documentation` | Documentation Lead | 🟢 | Baseline complete; onboarding verified end-to-end; docs site not yet built |
-| Product | `product` | Product Director | 🟡 | Personas and core journeys defined; PRDs pending |
-| UX design | `ux-design` | UX Lead | ⚪ | Blocked on Phase 1 journeys |
-| Governance | `governance` | Governance Lead | 🟡 | Consent framework drafted; Indigenous protocols need external review |
-| Security | `security` | Security Lead | 🟡 | Threat model started; PIA not begun; Casbin-based, organisation/workspace-scoped authorisation shipped (ADR-0007); real identity is Phase 2 |
-| Infrastructure | `infrastructure` | Infrastructure Lead | 🟡 | Compose stack running; observability overlay added, wiring pending |
-| Backend | `backend` | Backend Lead | 🟡 | Domain, config, contracts and API gateway shipped in 0.1.0; Co-design Session lifecycle (Milestone 2), Participant Management (Milestone 3), Consent Management (Milestone 4) and Structured Live Evidence Capture (Milestone 5) and Evidence Review and Validation (Milestone 6) shipped; Decisions, Commitments and Actions (Milestone 7) shipped; Session Summary, Reporting and Export (Milestone 8) implemented in this PR, not yet merged |
-| Knowledge graph | `knowledge-graph` | Knowledge Graph Lead | 🟡 | Ontology v0.1 in design |
-| AI platform | `ai-platform` | AI Lead | ⚪ | Awaiting Phase 5; model policy drafted |
-| Frontend | `frontend` | Frontend Lead | 🟡 | Preview web application shipped; co-design session (Milestone 2), participant (Milestone 3), consent management (Milestone 4) and evidence capture (Milestone 5) and evidence review (Milestone 6) screens shipped; outcome register and detail screens (Milestone 7) shipped; report authoring, review and export screens (Milestone 8) implemented in this PR, not yet merged; design system awaits Phase 6 |
-| Testing | `testing` | QA Lead | 🟡 | 818 tests across all packages (413 API-gateway, 405 domain); invariant and adversarial suites live |
-| Release | `release` | Release Manager | 🟢 | Strategy and versioning defined |
-
----
-
-## Phase 1 deliverable tracker
-
-| # | Deliverable | Owner | State |
-|---|---|---|---|
-| 1.1 | C4 architecture views | Principal Architect | 🟡 MERGED — SIGN-OFF REQUIRED (Principal Architect + CTO) — [`architecture/views/COMPONENT_VIEWS.md`](architecture/views/COMPONENT_VIEWS.md) |
-| 1.2 | Domain model & bounded contexts | Principal Architect | 🟡 Drafted, PR open — [`architecture/domains/DOMAIN_MODEL.md`](architecture/domains/DOMAIN_MODEL.md) |
-| 1.3 | Knowledge graph ontology v0.1 | Knowledge Graph Lead | 🟡 Draft in `architecture/KNOWLEDGE_GRAPH.md` |
-| 1.4 | Event catalogue v0.1 | Backend Lead | 🟡 Draft in `architecture/EVENT_CATALOGUE.md` |
-| 1.5 | API contract v0.1 | Backend Lead | ⚪ Not started |
-| 1.6 | OSS evaluation | Research Lead | 🟢 Complete for core stack |
-| 1.7 | Threat model & PIA | Security Lead | 🟡 MERGED — SIGN-OFF REQUIRED (2nd Security Lead + QA Lead) — [`docs/research/THREAT_MODEL.md`](docs/research/THREAT_MODEL.md); 7 CodeRabbit findings landed after merge, unaddressed |
-| 1.8 | Consent framework spec | Governance Lead | 🔴 BLOCKED — needs external Indigenous governance review |
-| 1.9 | Accessibility & i18n strategy | UX Lead | 🟡 MERGED — SIGN-OFF REQUIRED (UX Lead + D10) — [`docs/product/ACCESSIBILITY_I18N_STRATEGY.md`](docs/product/ACCESSIBILITY_I18N_STRATEGY.md); 2 CodeRabbit nitpicks outstanding |
-| 1.10 | NFRs & SLOs | CTO | 🟡 MERGED — SIGN-OFF REQUIRED (Principal Architect + CTO) — [`architecture/NFR_SLO.md`](architecture/NFR_SLO.md) |
+| Workstream      | Owner                | State | Current position                                                                                            |
+| --------------- | -------------------- | ----- | ----------------------------------------------------------------------------------------------------------- |
+| Architecture    | Principal Architect  | 🟡    | Long-term phase architecture remains active; production boundaries are documented                           |
+| Research        | Research Lead        | 🟡    | Language/ASR validation and pilot evidence remain active                                                    |
+| Documentation   | Documentation Lead   | 🟢    | Pilot readiness, launch and facilitator material now operational                                            |
+| Product         | Product Director     | 🟢    | Human-led MVP and repeatable pilot productisation delivered                                                 |
+| UX design       | UX Lead              | 🟡    | Client-ready workflow delivered; field usability evidence still required                                    |
+| Governance      | Governance Lead      | 🟡    | Consent controls implemented; external Indigenous/legal governance review remains required where applicable |
+| Security        | Security Lead        | 🟡    | Keycloak, deny-by-default authorisation and adversarial checks active; further hardening remains            |
+| Infrastructure  | Infrastructure Lead  | 🟡    | Production deployment, backup and object storage operational; broader HA/DR remains future work             |
+| Backend         | Backend Lead         | 🟢    | Human-led MVP services and pilot metrics delivered                                                          |
+| Knowledge graph | Knowledge Graph Lead | ⚪    | Projection remains deferred                                                                                 |
+| AI platform     | AI Lead              | 🟡    | Local transcription/AI drafting available; evaluation and diarisation remain incomplete                     |
+| Frontend        | Frontend Lead        | 🟢    | Client-ready program/session experience deployed                                                            |
+| Testing         | QA Lead              | 🟢    | Unit, contract, invariant, adversarial and CI gates active                                                  |
+| Release         | Release Manager      | 🟢    | 0.3.0 release preparation underway                                                                          |
 
 ---
 
@@ -102,14 +114,14 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   chase it. Referencing means there is only ever one copy to redact.
 - **Traceability freezes, redaction does not.** `ReportSource` records the version each cited record
   held at inclusion, so a reader can be told the evidence behind a paragraph has been corrected since
-  the report cited it. Consent, by contrast, is evaluated at *render* time — a participant who
+  the report cited it. Consent, by contrast, is evaluated at _render_ time — a participant who
   withdraws after a report is approved disappears from the next copy of it, which a rule frozen at
   approval would not achieve.
 - **`report-composition.ts` is the redaction rule, and it is pure.** Every export format goes through
   the same call, so HTML, Markdown, JSON and CSV cannot disagree about what a participant agreed to.
   Appearing, being quoted and being named are three separate permissions: withdrawn or
   audience-refused consent removes a record entirely; refused quotation keeps the finding and
-  withholds the content, *structurally absent* rather than blanked, so a template cannot render a
+  withholds the content, _structurally absent_ rather than blanked, so a template cannot render a
   redaction as though it were silence; attributed evidence without attributed-quotation consent falls
   back to anonymous rather than vanishing, because losing the finding would distort the record in the
   other direction.
@@ -139,19 +151,19 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 ### 2026-08-08 — Decisions, Commitments and Actions delivered (BUILD_ROADMAP.md Milestone 7), PR open
 
 - **Sixth capability in the "WITNESS — COMPLETE THE HUMAN-LED MVP" sequence.** Milestone 6 made
-  evidence validated; this milestone is what validation is *for*. A session now produces three
+  evidence validated; this milestone is what validation is _for_. A session now produces three
   registers — decisions, commitments and actions — and each of the first two has to answer "on what
   basis?" before it counts as institutional record.
 - **`outcome-support.ts` is the load-bearing module.** There are exactly two admissible bases, and
   the distinction is the point: `validated_evidence` (something a reviewer examined and validated)
-  or `institutional_synthesis` (the institution's own judgement, with a *mandatory* rationale —
+  or `institutional_synthesis` (the institution's own judgement, with a _mandatory_ rationale —
   an outcome with neither evidence nor stated reasoning is indistinguishable from one somebody made
   up). Everything else is refused by name rather than by a catch-all: evidence that is `draft`,
   `submitted`, `under_review`, `needs_clarification`, `rejected` or `withdrawn` has not been
   validated by anyone; evidence marked `disputed` was examined and doubted; cross-workspace and
   cross-organisation evidence is refused for the same reason `evidence-link.ts` refuses it.
 - **The evidence link freezes what was relied on.** `OutcomeSupport` records the evidence id, the
-  *version* that was validated, and the verification status at link time. A later correction bumps
+  _version_ that was validated, and the verification status at link time. A later correction bumps
   the evidence's own version and leaves the support record alone, so "what did we actually rely on"
   survives the correction rather than being silently rewritten by it.
 - **"Confirmed with nothing behind it" is not representable.** `confirmDecision` and
@@ -169,7 +181,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   `ActionItem` (`open`/`in_progress`/`blocked`/`completed`/`cancelled`, with a priority and an
   advisory percentage). One mutator per legal transition throughout, the same structural approach
   Milestones 5 and 6 used.
-- **`ActionItem` deliberately does not require support.** An action is *how* an institution carries
+- **`ActionItem` deliberately does not require support.** An action is _how_ an institution carries
   out a decision, not an institutional claim in its own right. Requiring a basis for "book the
   surveyor" would make the requirement ceremonial, and a ceremonial requirement is one people learn
   to satisfy without meaning it.
@@ -177,7 +189,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   because the owner of a commitment is usually a team, a service or a named post rather than a
   Witness account holder; `ownerUserId` is optional and, when given, must be a member in good
   standing of the outcome's own organisation — the same org-scoped check
-  `SessionsService.requireFacilitator` applies. Recording a session *participant* as an owner would
+  `SessionsService.requireFacilitator` applies. Recording a session _participant_ as an owner would
   defeat Milestone 4's anonymity guarantees, so no field allows it.
 - **Authorisation reuses Milestone 6's institutional split rather than inventing one.** Seven new
   `outcome:*` actions: `read`/`create`/`update`/`transition`/`link_support` are contributor-tier
@@ -200,7 +212,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   `permittedActions`, so the client never reimplements the state machine. The evidence picker lists
   only validated evidence: the API refuses the rest by name, but a picker that offers rejected
   evidence and then fails on submit teaches people the rule is arbitrary rather than meaningful.
-  Support counts appear on every row *including zero* — an outcome resting on nothing is exactly
+  Support counts appear on every row _including zero_ — an outcome resting on nothing is exactly
   what a reader scanning a register needs to notice.
 - **Audit.** Twenty-two new actions on the existing hash-chained trail, and four new subject types
   (`decision`, `commitment`, `action_item`, `outcome_support`), each getting its own chain.
@@ -226,7 +238,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   starting state, not a runtime check preventing it.
 - **Two new domain aggregates** (`packages/domain/src`): `ReviewAssignment` (who is reviewing a
   piece of evidence and where that review stands — `assigned`/`in_progress`/`completed`/
-  `cancelled`/`reassigned`; the MVP supports exactly one *active* assignment per evidence, enforced
+  `cancelled`/`reassigned`; the MVP supports exactly one _active_ assignment per evidence, enforced
   by the service layer plus a partial unique database index as the last line of defence, since the
   domain layer cannot read the database to check it itself) and `Clarification` (a reviewer's
   question and its answer — `open`/`answered`/`withdrawn`/`closed` — never exposing a restricted
@@ -250,10 +262,10 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   whoever captured the evidence nothing to act on.
 - **Two authorisation layers on every review-lifecycle write, not one.** The Casbin scope-tier
   boundary (new `evidence_review:list/read/assign/reassign/start/clarify/respond/correct/validate/
-  reject/view_history/manage_restricted` actions, `reader`/`contributor`/`reviewer`/`admin` tiers)
+reject/view_history/manage_restricted` actions, `reader`/`contributor`/`reviewer`/`admin` tiers)
   answers "does this role hold the action at all, in this workspace"; `EvidenceReviewService`
   additionally checks the caller is the specific reviewer holding the active `ReviewAssignment` for
-  *this* evidence before `begin_review`/`validate`/`reject`/clarification actions succeed — a role
+  _this_ evidence before `begin_review`/`validate`/`reject`/clarification actions succeed — a role
   grant alone is not enough, since the milestone's authorisation matrix explicitly rejects
   "validation by an unauthorised reviewer" even when that reviewer's role would otherwise permit the
   Casbin action generally. A caller holding `evidence_review:manage_restricted` (admin tier)
@@ -392,7 +404,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   Milestone 5 (Structured Evidence Capture) will call before recording or using anything a
   participant said — it is not wired into evidence capture yet, since that capability does not
   exist.
-- **Privacy**: general participant/session views expose only a consent *status summary*
+- **Privacy**: general participant/session views expose only a consent _status summary_
   (`not_configured`/`not_requested`/`granted`/`partially_granted`/`refused`/`withdrawn`/`expired`);
   the category-by-category breakdown and withdrawal reason require
   `participant_consent:manage_restricted` and are structurally absent — not merely `null` — from
@@ -528,7 +540,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   `409 STALE_VERSION` — the entire
   transaction, including the audit event, rolls back rather than silently overwriting a change the
   client never saw. `sessions.service.test.ts` verifies the case that actually matters: a client
-  acting on a version it read *before* someone else's write landed is rejected identically whether
+  acting on a version it read _before_ someone else's write landed is rejected identically whether
   the conflicting write happened during this exact request or five minutes earlier.
 - **Authorisation reuses the existing Casbin boundary exactly, with two named simplifications.**
   Four new actions (`session:read`/`session:create`/`session:update`/`session:transition`) were
@@ -538,7 +550,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   named rather than hidden: (1) a plain `contributor` WitnessRole can create and manage sessions too,
   not only `facilitator` — splitting them onto separate tiers was judged out of scope; (2) there is
   no per-session "only the assigned facilitator may manage this specific session" ownership check —
-  any contributor- or admin-tier holder in the session's organisation or workspace may manage *any*
+  any contributor- or admin-tier holder in the session's organisation or workspace may manage _any_
   session there. Every session route nests under `:workspaceId`
   (`/api/v1/workspaces/:workspaceId/sessions/...`), which is what makes `AuthorizationGuard`'s
   existing scope resolution (Milestone 1.4) correctly Casbin-scope every session action without any
@@ -599,7 +611,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   `admin` excluded, unchanged from Milestone 1.3) and `scopedGrantTiers` (a specific organisation or
   workspace — `admin` included, only within that exact scope, and only when the backing
   `OrganisationMembership`/`WorkspaceMembership` is in good standing; a workspace scope also honours
-  an assignment on the workspace's *parent* organisation). The workspace/organisation split is a
+  an assignment on the workspace's _parent_ organisation). The workspace/organisation split is a
   compile-time guarantee, not a runtime convention: `scopedGrantTiers`'s scope parameter type
   excludes `'global'` entirely, so `admin` cannot leak into an unscoped decision by a later edit
   forgetting a branch.
@@ -637,7 +649,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   `organisationId`/`workspaceId` foreign key in the Prisma schema, and `User` is not
   organisation-scoped — inventing a scoping model for either was out of scope ("speculative
   infrastructure" this milestone does not need to build). `organisation:create`/`user:create` stay
-  admin-only in the *global* tier resolution, which never includes `admin` for a real session — the
+  admin-only in the _global_ tier resolution, which never includes `admin` for a real session — the
   same fail-closed boundary Milestone 1.3 documented and explicitly re-deferred, not resolved, here.
 - **Tests**: 177 API-gateway tests (up from 153 at PR #24's merge) — new coverage for
   `RoleResolutionService.scopedGrantTiers` (organisation scope, workspace scope, the parent-org
@@ -703,7 +715,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   of assignment count, with a regression test asserting exactly one query per scope type for three
   assignments across three organisations.
 - **Three attack tests in the development identity-provider double's suite were passing for the
-  wrong reason** — each verified a token signed by a *different* key, so `jwtVerify` rejected on
+  wrong reason** — each verified a token signed by a _different_ key, so `jwtVerify` rejected on
   signature before the issuer/audience/expiry claim under test was ever evaluated; if the adapter
   had dropped those checks entirely, the tests would still have passed. `DevelopmentIdentityProviderAdapter`
   now accepts an optional shared key pair (test-only — production code never supplies one), and the
@@ -777,7 +789,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   paths, so any spec-compliant provider (Zitadel, Authentik — both named acceptable in ADR-0007)
   can replace it without a domain or API change.
 - **No live Keycloak container is available in this sandbox** (no container runtime — `docker ps`
-  fails, nested containerization is not permitted here). This is a sandbox limitation on *manual*
+  fails, nested containerization is not permitted here). This is a sandbox limitation on _manual_
   verification, not a technical-impossibility finding against ADR-0007: the real
   `KeycloakOidcAdapter` is built and shipped exactly as specified. A protocol-faithful
   `DevelopmentIdentityProviderAdapter` — the same port, a locally generated RSA keypair, real
@@ -854,15 +866,15 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
 - One role assignment per (user, scope): assigning where none exists creates it, assigning where one
   already exists replaces it (`changeRoleAssignment`), refusing a no-op "change" to the role already
   held (duplicate-assignment prevention). A role assignment can never create membership implicitly —
-  it is always resolved from an *existing* membership row, and requires that membership (and, for a
-  workspace-scoped assignment, the *parent organisation* membership, re-checked at assignment time
+  it is always resolved from an _existing_ membership row, and requires that membership (and, for a
+  workspace-scoped assignment, the _parent organisation_ membership, re-checked at assignment time
   rather than assumed from the workspace membership having once been valid) to be in good standing.
   Real foreign keys throughout; one `role_assignment` table with mutually-exclusive nullable
   `organisationId`/`workspaceId` columns, a CHECK constraint enforcing that exclusivity, and two
   `@@unique` constraints that give independent "one row per (organisation, user)" and "one row per
   (workspace, user)" using Postgres's NULL-never-equals-NULL semantics rather than a partial index.
 - API: `GET /api/v1/roles` (the static catalog); `GET`/`PUT`/`DELETE
-  /api/v1/{organisations,workspaces}/{scopeId}/memberships/{membershipId}/role`. All four new
+/api/v1/{organisations,workspaces}/{scopeId}/memberships/{membershipId}/role`. All four new
   actions (`role:read`, `role_assignment:{read,write,delete}`) admin-only except `role:read`, which
   is broadly granted — understanding what a role permits is useful to everyone, unlike managing
   assignments. Self-promotion prevention is enforced today only as a corollary of "role-assignment
@@ -918,7 +930,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   (`packages/domain/src/user.ts`, email normalised and deduplicated), a shared membership state
   machine (`packages/domain/src/membership.ts`: `invited → active ⇄ suspended`, `revoked` terminal)
   reused by both `organisation-membership.ts` and `workspace-membership.ts`. A workspace membership
-  cannot be created without an *organisation* membership in good standing for that workspace's
+  cannot be created without an _organisation_ membership in good standing for that workspace's
   specific parent organisation — enforced in the domain from a state the service reads and passes in,
   which is what stops standing in one organisation being used to justify workspace access under
   another. Real foreign keys and unique constraints throughout (`witness_user`,
@@ -963,7 +975,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   `workspace:create`; all four roles get `workspace:read`, matching the least-privilege shape already
   established for organisations.
 - All checks green: lint, typecheck, build, full test suite (29 domain tests, up from 26), `pnpm
-  test:invariants` (20/20), `pnpm test:adversarial` (23/23, one new "reviewer cannot create a
+test:invariants` (20/20), `pnpm test:adversarial` (23/23, one new "reviewer cannot create a
   workspace" case). As with Organisations, no live Postgres was available in this environment — the
   migration is schema-validated but not executed against a real database.
 - **Open discrepancies from the previous PR remain unresolved** (not this capability's job to fix):
@@ -1000,7 +1012,7 @@ Legend: 🟢 complete/healthy · 🟡 in progress · 🔴 blocked · ⚪ not sta
   a race between the human merge and the review finishing); neither is human sign-off, both are
   recorded as outstanding rather than silently dropped.
 - **D-10 recorded**: whether a deliverable's formal sign-off (not merge) is required before a
-  *dependent* deliverable may start. Interim reading — no, only phase-gate closure requires it —
+  _dependent_ deliverable may start. Interim reading — no, only phase-gate closure requires it —
   already acted on to start 1.2, since `DEPARTMENT_ASSIGNMENTS.md`'s own dependency column and
   status (`⚪ available`, not `⛔ gated`) already reflected that reading before this decision made it
   explicit.
@@ -1135,7 +1147,7 @@ chain fail — then restoring it and watching it pass.
 
 **Known gaps, stated plainly:**
 
-- The *runtime* half of zero-egress verification activates with the Phase 2 stack. Only the static
+- The _runtime_ half of zero-egress verification activates with the Phase 2 stack. Only the static
   half runs today.
 - Deployment, admin, user and API guides describe the **target** experience, not a shipped one. They
   are published early so operators can tell us they are wrong before we build them.
@@ -1147,18 +1159,18 @@ chain fail — then restoring it and watching it pass.
 
 ## Open decisions needing resolution
 
-| # | Decision | Owner | Needed by | Notes |
-|---|---|---|---|---|
-| D-1 | Confirm SDK/contracts permissive licensing with copyright holders | Open Source Lead | Phase 2 | 🟡 **Structurally resolved; one human action outstanding.** The full Apache-2.0 boundary is implemented, documented in [`docs/governance/LICENSING.md`](docs/governance/LICENSING.md) and mechanically enforced by `check-licenses.sh`. Attribution uses the collective placeholder "The Witness Contributors" rather than an invented legal entity. **Remaining:** the copyright holder must affirm the boundary in writing — see LICENSING.md §D-1 for the exact three-step action. No software change can complete this |
-| D-2 | Event transport: NATS JetStream vs Postgres-only for small deployments | Backend Lead | Phase 3 | ADR-0005 proposes profile-based; needs load evidence |
-| D-3 | ASR engine: faster-whisper vs whisper.cpp vs WhisperX composition | AI Lead | Phase 5 | Blocked on benchmark against target languages |
-| D-4 | Graph store: confirm Neo4j Community vs Apache AGE for constrained deployments | Knowledge Graph Lead | Phase 4 | Licensing/footprint trade-off, ADR-0004 |
-| D-5 | Foundation host for long-term stewardship | Founder | Phase 8 | Candidates under consideration |
-| D-7 | Agent persona layer: adopt subordinate, fold into charters, or replace charters | CTO & Product Director | Before Phase 2 | `main` gained five execution personas (`agents/architect.md` etc.) alongside the 19 role charters. They are different artefacts — personas describe behaviour, charters describe authority — and both are retained with the personas explicitly subordinate. Whether that is the end state is a governance call. See [`AGENT_STRUCTURE_RECONCILIATION.md`](docs/engineering/AGENT_STRUCTURE_RECONCILIATION.md) §8 |
-| D-8 | `engineering/README.md`: build the layout it describes, rewrite it, or deprecate it | CTO | Before Phase 2 | It directs agents to `engineering/vision/`, `engineering/standards/` and four other paths that do not exist. Retained with a banner; an agent following it literally fails at step one |
-| D-9 | `docs/engineering/BRANCH_STRATEGY.md` (ADR-0015) describes `main → develop → domain → working`; no `develop` branch has ever existed and every merged PR (#10, #11, #12) branched from and targeted `main` directly | CTO & Release Manager | Before the next delivery wave scales past two parallel agents | Recorded in [`docs/governance/DECISIONS.md`](docs/governance/DECISIONS.md) and [`docs/engineering/organisation/00-INDEX.md`](docs/engineering/organisation/00-INDEX.md). Until resolved, the organisational control plane follows the actually-practiced direct-to-`main` model, not ADR-0015 |
-| D-10 | Does a Phase 1 deliverable need its formal department sign-off (not just a merge) before a *dependent* deliverable can start — e.g. must 1.1 be signed off before 1.2 begins? | CTO & Principal Architect | Confirm before Phase 1 exit | **Interim reading, already acted on:** no. `DEPARTMENT_ASSIGNMENTS.md`'s Dependencies column names the prior deliverable (`1.1`), not its sign-off state, and 1.2's own row already read `⚪ available` rather than `⛔ gated` once 1.1 merged. The phase-level exit gate (`PHASE_EXECUTION_PLAN.md`: "verified by the named department, not self-certified") still requires every deliverable's sign-off before *Phase 1* closes — this decision is narrower, about starting dependent *work*, not about closing the *phase* |
-| D-6 | Product and architecture reconciliation | CTO & Founder | **Phase 1 — resolved 2026-08-01** | ✅ **Resolved** by [ADR-0021](architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md). `VISION.md` is canonical product scope; ADR-0000–0020 are the canonical architecture. `docs/vision.md`, `docs/architecture.md`, `docs/coding-standards.md` and `memory/decisions.md` are superseded; `memory/changelog.md` (fictional implementation history) removed. Sector material preserved as explicitly non-canonical in [`docs/product/SECTOR_APPLICATIONS.md`](docs/product/SECTOR_APPLICATIONS.md). **Reversible via a superseding ADR if the multi-sector framing reflects a stakeholder commitment the engineering organisation is not party to** |
+| #    | Decision                                                                                                                                                                                                            | Owner                     | Needed by                                                     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-1  | Confirm SDK/contracts permissive licensing with copyright holders                                                                                                                                                   | Open Source Lead          | Phase 2                                                       | 🟡 **Structurally resolved; one human action outstanding.** The full Apache-2.0 boundary is implemented, documented in [`docs/governance/LICENSING.md`](docs/governance/LICENSING.md) and mechanically enforced by `check-licenses.sh`. Attribution uses the collective placeholder "The Witness Contributors" rather than an invented legal entity. **Remaining:** the copyright holder must affirm the boundary in writing — see LICENSING.md §D-1 for the exact three-step action. No software change can complete this                                                                                                                                                       |
+| D-2  | Event transport: NATS JetStream vs Postgres-only for small deployments                                                                                                                                              | Backend Lead              | Phase 3                                                       | ADR-0005 proposes profile-based; needs load evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| D-3  | ASR engine: faster-whisper vs whisper.cpp vs WhisperX composition                                                                                                                                                   | AI Lead                   | Phase 5                                                       | Blocked on benchmark against target languages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| D-4  | Graph store: confirm Neo4j Community vs Apache AGE for constrained deployments                                                                                                                                      | Knowledge Graph Lead      | Phase 4                                                       | Licensing/footprint trade-off, ADR-0004                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| D-5  | Foundation host for long-term stewardship                                                                                                                                                                           | Founder                   | Phase 8                                                       | Candidates under consideration                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| D-7  | Agent persona layer: adopt subordinate, fold into charters, or replace charters                                                                                                                                     | CTO & Product Director    | Before Phase 2                                                | `main` gained five execution personas (`agents/architect.md` etc.) alongside the 19 role charters. They are different artefacts — personas describe behaviour, charters describe authority — and both are retained with the personas explicitly subordinate. Whether that is the end state is a governance call. See [`AGENT_STRUCTURE_RECONCILIATION.md`](docs/engineering/AGENT_STRUCTURE_RECONCILIATION.md) §8                                                                                                                                                                                                                                                                |
+| D-8  | `engineering/README.md`: build the layout it describes, rewrite it, or deprecate it                                                                                                                                 | CTO                       | Before Phase 2                                                | It directs agents to `engineering/vision/`, `engineering/standards/` and four other paths that do not exist. Retained with a banner; an agent following it literally fails at step one                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| D-9  | `docs/engineering/BRANCH_STRATEGY.md` (ADR-0015) describes `main → develop → domain → working`; no `develop` branch has ever existed and every merged PR (#10, #11, #12) branched from and targeted `main` directly | CTO & Release Manager     | Before the next delivery wave scales past two parallel agents | Recorded in [`docs/governance/DECISIONS.md`](docs/governance/DECISIONS.md) and [`docs/engineering/organisation/00-INDEX.md`](docs/engineering/organisation/00-INDEX.md). Until resolved, the organisational control plane follows the actually-practiced direct-to-`main` model, not ADR-0015                                                                                                                                                                                                                                                                                                                                                                                    |
+| D-10 | Does a Phase 1 deliverable need its formal department sign-off (not just a merge) before a _dependent_ deliverable can start — e.g. must 1.1 be signed off before 1.2 begins?                                       | CTO & Principal Architect | Confirm before Phase 1 exit                                   | **Interim reading, already acted on:** no. `DEPARTMENT_ASSIGNMENTS.md`'s Dependencies column names the prior deliverable (`1.1`), not its sign-off state, and 1.2's own row already read `⚪ available` rather than `⛔ gated` once 1.1 merged. The phase-level exit gate (`PHASE_EXECUTION_PLAN.md`: "verified by the named department, not self-certified") still requires every deliverable's sign-off before _Phase 1_ closes — this decision is narrower, about starting dependent _work_, not about closing the _phase_                                                                                                                                                    |
+| D-6  | Product and architecture reconciliation                                                                                                                                                                             | CTO & Founder             | **Phase 1 — resolved 2026-08-01**                             | ✅ **Resolved** by [ADR-0021](architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md). `VISION.md` is canonical product scope; ADR-0000–0020 are the canonical architecture. `docs/vision.md`, `docs/architecture.md`, `docs/coding-standards.md` and `memory/decisions.md` are superseded; `memory/changelog.md` (fictional implementation history) removed. Sector material preserved as explicitly non-canonical in [`docs/product/SECTOR_APPLICATIONS.md`](docs/product/SECTOR_APPLICATIONS.md). **Reversible via a superseding ADR if the multi-sector framing reflects a stakeholder commitment the engineering organisation is not party to** |
 
 ---
 
