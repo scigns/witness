@@ -26,17 +26,17 @@ stateDiagram-v2
   done --> [*]
 ```
 
-| State | Meaning | Exit condition |
-|---|---|---|
-| `triage` | New, unassessed | Owning lead assesses — **within 2 working days** |
-| `needs-info` | Cannot proceed without more from the reporter | Response received, or 30 days → closed |
-| `accepted` | Real, in scope, will be done | Acceptance criteria written |
-| `ready` | **Anyone could pick this up and know when it is done** | Someone claims it |
-| `in-progress` | Actively being worked | PR opened |
-| `blocked` | Cannot proceed — dependency, decision, external | Blocker cleared; blocker is named |
-| `in-review` | PR open | Merged or changes requested |
-| `done` | Merged and deployed to `develop` | — |
-| `declined` | Out of scope, or we will not do it | — |
+| State         | Meaning                                                | Exit condition                                   |
+| ------------- | ------------------------------------------------------ | ------------------------------------------------ |
+| `triage`      | New, unassessed                                        | Owning lead assesses — **within 2 working days** |
+| `needs-info`  | Cannot proceed without more from the reporter          | Response received, or 30 days → closed           |
+| `accepted`    | Real, in scope, will be done                           | Acceptance criteria written                      |
+| `ready`       | **Anyone could pick this up and know when it is done** | Someone claims it                                |
+| `in-progress` | Actively being worked                                  | PR opened                                        |
+| `blocked`     | Cannot proceed — dependency, decision, external        | Blocker cleared; blocker is named                |
+| `in-review`   | PR open                                                | Merged or changes requested                      |
+| `done`        | Merged and deployed to `develop`                       | —                                                |
+| `declined`    | Out of scope, or we will not do it                     | —                                                |
 
 **`ready` is the important state.** An issue is not ready until acceptance criteria are written.
 Starting work on an issue without them is the most reliable way to build the wrong thing carefully.
@@ -59,23 +59,23 @@ explanation and remain searchable.
 
 ## Labels
 
-| Group | Labels |
-|---|---|
-| **Type** | `type:bug` `type:feature` `type:chore` `type:docs` `type:research` `type:security` `type:adr` `type:epic` `type:accessibility` `type:sovereignty` |
-| **Priority** | `P0` `P1` `P2` `P3` |
-| **State** | `triage` `needs-info` `accepted` `ready` `blocked` `in-progress` `in-review` |
-| **Domain** | `domain:architecture` `domain:backend` `domain:frontend` `domain:knowledge-graph` `domain:ai-platform` `domain:security` `domain:governance` `domain:infrastructure` `domain:docs` … (one per branch) |
-| **Community** | `good first issue` `help wanted` `needs-expertise` |
-| **Flags** | `breaking-change` `needs-adr` `needs-external-review` `ai-generated` |
+| Group         | Labels                                                                                                                                                                                                |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Type**      | `type:bug` `type:feature` `type:chore` `type:docs` `type:research` `type:security` `type:adr` `type:epic` `type:accessibility` `type:sovereignty` `type:pilot-feedback`                               |
+| **Priority**  | `P0` `P1` `P2` `P3`                                                                                                                                                                                   |
+| **State**     | `triage` `needs-info` `accepted` `ready` `blocked` `in-progress` `in-review`                                                                                                                          |
+| **Domain**    | `domain:architecture` `domain:backend` `domain:frontend` `domain:knowledge-graph` `domain:ai-platform` `domain:security` `domain:governance` `domain:infrastructure` `domain:docs` … (one per branch) |
+| **Community** | `good first issue` `help wanted` `needs-expertise`                                                                                                                                                    |
+| **Flags**     | `breaking-change` `needs-adr` `needs-external-review` `ai-generated`                                                                                                                                  |
 
 ## Priority
 
-| Priority | Definition | Response |
-|---|---|---|
-| **P0** | Production down, data at risk, active security exposure, **any consent violation** | Drop everything. Incident process |
-| **P1** | Blocks a release, blocks contributors, significant user harm | Next sprint |
-| **P2** | Planned work | Scheduled |
-| **P3** | Backlog, nice to have | When capacity allows |
+| Priority | Definition                                                                         | Response                          |
+| -------- | ---------------------------------------------------------------------------------- | --------------------------------- |
+| **P0**   | Production down, data at risk, active security exposure, **any consent violation** | Drop everything. Incident process |
+| **P1**   | Blocks a release, blocks contributors, significant user harm                       | Next sprint                       |
+| **P2**   | Planned work                                                                       | Scheduled                         |
+| **P3**   | Backlog, nice to have                                                              | When capacity allows              |
 
 **Any consent violation is P0 regardless of the number of records affected.** One person's consent
 violated is a breach of the promise the system exists to keep. Treating it as minor because it was
@@ -130,11 +130,11 @@ privately with thanks.
 
 ## Stale handling
 
-| Age | Action |
-|---|---|
-| `needs-info`, 30 days no response | Closed with a note; reopening is welcome |
-| `P3`, 12 months no activity | Reviewed; closed if no longer relevant |
-| `blocked`, 90 days | Escalated to the lead — a blocker nobody is clearing is a decision nobody is making |
+| Age                               | Action                                                                              |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| `needs-info`, 30 days no response | Closed with a note; reopening is welcome                                            |
+| `P3`, 12 months no activity       | Reviewed; closed if no longer relevant                                              |
+| `blocked`, 90 days                | Escalated to the lead — a blocker nobody is clearing is a decision nobody is making |
 
 Closing an issue is not a judgement on the reporter. A backlog that only grows is not a plan; it is
 a list of things we are quietly not doing, and it is more honest to say so.

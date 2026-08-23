@@ -33,6 +33,9 @@ labels:
   - name: "type:sovereignty"
     color: "006b75"
     description: "Data sovereignty, egress, self-hosting"
+  - name: "type:pilot-feedback"
+    color: "5319e7"
+    description: "Operational/product learning from a real pilot session"
 
   # ─── Priority ─────────────────────────────────────────────────────────────────
   - name: "P0"

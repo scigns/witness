@@ -6,6 +6,11 @@ import { useState, type FormEvent } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { Button, Card, ErrorNotice } from '@/components/ui';
+import {
+  INSTITUTIONAL_PROFILE_INFO,
+  INSTITUTIONAL_PROFILE_ORDER,
+  type InstitutionalProfile,
+} from '@/lib/institutional-profiles';
 
 export default function NewOrganisationPage() {
   const router = useRouter();
@@ -14,7 +19,7 @@ export default function NewOrganisationPage() {
   const [name, setName] = useState('');
   const [administratorEmail, setAdministratorEmail] = useState('');
   const [administratorName, setAdministratorName] = useState('');
-  const [profile, setProfile] = useState('general');
+  const [profile, setProfile] = useState<InstitutionalProfile>('general');
   const [storageQuotaGb, setStorageQuotaGb] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -30,7 +35,7 @@ export default function NewOrganisationPage() {
           name,
           administratorEmail,
           administratorName,
-          profile: profile as 'general' | 'spc' | 'fta' | 'moj' | 'church',
+          profile,
           storageQuotaGb: storageQuotaGb.trim() === '' ? undefined : Number(storageQuotaGb),
         },
         user,
@@ -117,18 +122,19 @@ export default function NewOrganisationPage() {
             <select
               id="profile"
               value={profile}
-              onChange={(event) => setProfile(event.target.value)}
+              onChange={(event) => setProfile(event.target.value as InstitutionalProfile)}
               className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
             >
-              <option value="general">General — no starting defaults</option>
-              <option value="spc">Regional / multi-community (SPC)</option>
-              <option value="fta">Training / classroom (FTA)</option>
-              <option value="moj">Formal proceeding (MOJ)</option>
-              <option value="church">Congregational meeting (Church)</option>
+              {INSTITUTIONAL_PROFILE_ORDER.map((value) => (
+                <option key={value} value={value}>
+                  {INSTITUTIONAL_PROFILE_INFO[value].label}
+                </option>
+              ))}
             </select>
             <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-              Configures a starting consent template only — never a separate deployment.
-              Facilitators can edit or replace it afterwards.
+              {INSTITUTIONAL_PROFILE_INFO[profile].description} Configures a starting consent
+              template only — never a separate deployment. Facilitators can edit or replace it
+              afterwards.
             </p>
           </div>
 

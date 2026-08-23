@@ -77,12 +77,26 @@ const SESSION_WORKSPACE_LINKS: {
   label: string;
   description: string;
   roles?: ReadonlySet<string>;
+  /**
+   * Agenda and Live are program-wide, not nested under one session — the
+   * program can be running only one current agenda item at a time regardless
+   * of which session you opened this list from. `true` links to
+   * `/workspaces/:id${href}` instead of this session's own route.
+   */
+  absolute?: boolean;
 }[] = [
   {
     href: '/participants',
     label: 'People',
     description: 'Who is expected, who attended, and their roles in this session.',
     roles: new Set(['admin', 'facilitator', 'reviewer', 'reader']),
+  },
+  {
+    href: '/agenda',
+    label: 'Agenda',
+    description: 'The program’s running order — add, reorder, and track items.',
+    roles: new Set(['admin', 'facilitator', 'reviewer', 'reader']),
+    absolute: true,
   },
   {
     href: '/consent-configuration',
@@ -95,6 +109,12 @@ const SESSION_WORKSPACE_LINKS: {
     label: 'Consent dashboard',
     description: "Every participant's consent decisions at a glance.",
     roles: new Set(['admin', 'facilitator', 'reader']),
+  },
+  {
+    href: '/live',
+    label: 'Live',
+    description: 'The current agenda item, right now, for everyone in the room.',
+    absolute: true,
   },
   {
     href: '/evidence',
@@ -504,7 +524,11 @@ export default function SessionDetailPage({
           ).map((link) => (
             <Link
               key={link.href}
-              href={`/workspaces/${workspaceId}/sessions/${sessionId}${link.href}`}
+              href={
+                link.absolute
+                  ? `/workspaces/${workspaceId}${link.href}`
+                  : `/workspaces/${workspaceId}/sessions/${sessionId}${link.href}`
+              }
               className="group flex min-h-20 items-start justify-between gap-3 rounded-lg border border-[var(--color-line)] bg-[var(--color-paper-raised)] px-4 py-3 transition-colors hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
             >
               <div className="min-w-0">

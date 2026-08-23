@@ -7,7 +7,7 @@ import type { OrganisationSummary } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { Card, ErrorNotice } from '@/components/ui';
+import { Card, EmptyState, ErrorNotice } from '@/components/ui';
 
 export default function OrganisationsPage() {
   const { user, ready } = useSession();
@@ -66,12 +66,18 @@ export default function OrganisationsPage() {
           </p>
         </Card>
       ) : organisations.length === 0 ? (
-        <Card>
-          <p className="font-medium">No organisations yet.</p>
-          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            Create one — this requires the <code className="font-mono">admin</code> role.
-          </p>
-        </Card>
+        <EmptyState
+          title="No organisations yet"
+          body="Create one — this requires a platform-operator session, not an organisation admin role."
+          action={
+            <Link
+              href="/organisations/new"
+              className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-accent-contrast)]"
+            >
+              Create organisation
+            </Link>
+          }
+        />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">

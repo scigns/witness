@@ -17,7 +17,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
 import { ProgramNav } from '@/components/program-nav';
-import { Button, Card, ErrorNotice, SessionStatusBadge } from '@/components/ui';
+import { Button, EmptyState, ErrorNotice, SessionStatusBadge } from '@/components/ui';
 
 export default function WorkspaceSessionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -103,14 +103,24 @@ export default function WorkspaceSessionsPage({ params }: { params: Promise<{ id
       <ProgramNav workspaceId={id} role={role} />
 
       {error !== null ? null : sessions.length === 0 ? (
-        <Card>
-          <p className="font-medium">No sessions yet</p>
-          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            {canManage
+        <EmptyState
+          title="No sessions yet"
+          body={
+            canManage
               ? 'Create the first session to begin preparing this program.'
-              : 'Sessions will appear here when a facilitator schedules them.'}
-          </p>
-        </Card>
+              : 'Sessions will appear here when a facilitator schedules them.'
+          }
+          action={
+            canManage ? (
+              <Link
+                href={`/workspaces/${id}/sessions/new`}
+                className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-accent-contrast)]"
+              >
+                Create session
+              </Link>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">

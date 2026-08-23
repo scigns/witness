@@ -25,7 +25,7 @@ import {
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { Button, Card, ErrorNotice, ReportStatusBadge } from '@/components/ui';
+import { Button, Card, EmptyState, ErrorNotice, ReportStatusBadge } from '@/components/ui';
 
 const AUDIENCE_LABELS: Record<ReportAudience, string> = {
   internal: 'Internal — for use inside this organisation',
@@ -249,7 +249,10 @@ export default function SessionReportsPage({
 
       <section className="space-y-3" aria-label="Reports">
         {reports.length === 0 ? (
-          <p className="text-[var(--color-ink-muted)]">No reports yet.</p>
+          <EmptyState
+            title="No reports yet"
+            body="Create the first report above once evidence has been reviewed."
+          />
         ) : (
           reports.map((report) => (
             <Card key={report.id}>
