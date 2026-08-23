@@ -30,26 +30,65 @@ SDK and contract packages version independently via Changesets.
 **Pre-1.0: minor versions may break.** Stated loudly rather than quietly, because pretending to be
 stable before we are is how trust is lost early.
 
-## Release checklist
+## Release classes
 
-Run by `scripts/release/preflight.sh`; the Release Manager owns the go/no-go.
+Witness uses different release gates for different maturity and support
+commitments. A version number is not, by itself, a statement of production
+readiness.
 
-**Code**
+### Institutional Pilot
+
+A pre-1.0 Institutional Pilot release is a controlled release for supervised
+institutional evaluation. It is not a Stable or LTS release and does not
+authorise sensitive institutional data by itself.
+
+Deployment-specific restrictions in
+[`PILOT_1_READINESS.md`](../operations/PILOT_1_READINESS.md) remain
+authoritative.
+
+The Release Manager must confirm:
+
+- [ ] release is cut from clean, synchronised `main`
+- [ ] package version and curated changelog agree
+- [ ] no P0 or P1 blockers are open against the release
+- [ ] required CI, Security and CodeQL checks are green on the release commit
+- [ ] unit, integration and contract tests required by the current build are green
+- [ ] invariant and adversarial suites are green
+- [ ] zero-egress verification passes where the deployment profile requires it
+- [ ] the exact release candidate SHA deployed successfully
+- [ ] live health/readiness verification passed
+- [ ] `STATUS.md`, `ROADMAP.md` and release notes describe the current state
+- [ ] known limitations and deferred capabilities are stated explicitly
+- [ ] backup and rollback status appropriate to the pilot deployment is documented
+- [ ] deployment-specific readiness restrictions have not been bypassed
+- [ ] Release Manager has made an explicit go/no-go decision
+
+An Institutional Pilot release does **not** claim general production
+readiness, regulatory certification, Stable/LTS support, or authorisation for
+sensitive institutional data.
+
+### Stable
+
+A Stable release requires the Institutional Pilot controls above plus the
+full production release evidence appropriate to supported institutional
+operation:
+
+**Code and evaluation**
 
 - [ ] All required CI checks green on `main`
 - [ ] No P0 or P1 issues open against this release
-- [ ] Full test suite including E2E, performance and evaluation
-- [ ] **Projection rebuild-from-log test passes** (validates ADR-0011)
+- [ ] Full applicable E2E, performance and evaluation suites pass
+- [ ] Projection rebuild-from-log test passes where ADR-0011 is implemented
 - [ ] Adversarial security suite passes
 - [ ] Zero-egress verification passes in the sovereign profile
 
 **Migration and recovery**
 
-- [ ] Migrations tested forward **and** backward on a realistic data volume
+- [ ] Migrations tested forward and backward on realistic data volume
 - [ ] Migration duration measured and documented
-- [ ] Upgrade tested from the previous stable **and** from the current LTS
+- [ ] Upgrade tested from the previous supported Stable release
 - [ ] Rollback tested — not assumed
-- [ ] Backup and restore drill passed
+- [ ] Backup and independent restore drill passed
 
 **Supply chain**
 
@@ -62,16 +101,41 @@ Run by `scripts/release/preflight.sh`; the Release Manager owns the go/no-go.
 **Documentation**
 
 - [ ] Changelog curated — not just generated
-- [ ] Upgrade notes written, including **operator actions required**
+- [ ] Upgrade notes written, including operator actions required
 - [ ] Breaking changes documented with a migration path
 - [ ] `STATUS.md` and `ROADMAP.md` current
 - [ ] Known issues and limitations published honestly
 
-**Security and support**
+### LTS
 
-- [ ] Security fixes backported to **all supported LTS lines** — this is part of the fix's
-      definition of done, never a follow-up task
-- [ ] Advisories drafted for any disclosed vulnerability
+An LTS release satisfies every Stable gate and additionally requires:
+
+- [ ] upgrade testing from the currently supported LTS line
+- [ ] security fixes assessed for all supported LTS lines
+- [ ] required backports completed
+- [ ] support period and operator obligations published
+- [ ] CTO approval for the LTS cut
+
+### Patch and hotfix
+
+Patch and hotfix releases use the gate of the release line they modify.
+Incident response may shorten review time, but does not permit required
+security, recovery or support evidence to be fabricated or silently waived.
+
+## Automated preflight
+
+Run `scripts/release/preflight.sh`; the Release Manager owns the final
+go/no-go.
+
+The script verifies only the controls it can establish locally and
+deterministically. It is **not evidence** for deployment, GitHub CI status,
+human approval, migration drills, SBOM/signing, provenance attestation or
+offline-bundle verification unless it explicitly performs and reports those
+checks.
+
+For pre-1.0 versions the default release class is `institutional-pilot`.
+Stable and LTS releases must not be represented as compliant until their
+additional evidence has actually been produced.
 
 ## Changelog
 
