@@ -21,23 +21,37 @@ with genuinely different audiences: the platform, the SDKs, and the contracts.
 
 ## Decision
 
-> We will use **semantic versioning** for all published packages, **time-based platform releases**
-> every six weeks, and an **LTS release every 12 months supported for 24 months**.
+> We will use **semantic versioning** for all published packages, explicit
+> **release classes** for platform maturity, **time-based Stable releases**
+> every six weeks once the Stable line begins, and an **LTS release every
+> 12 months supported for 24 months** once LTS support begins.
 
-| Line | Cadence | Support | Contents |
+| Class | Cadence | Support | Contents |
 |---|---|---|---|
-| **Stable** | Every 6 weeks | Until the next stable | Features, fixes |
-| **LTS** | Every 12 months | **24 months** | Security and critical fixes only after cut |
-| **Patch** | As needed | — | Security and critical bug fixes |
+| **Institutional Pilot** | As needed while pre-1.0 | No Stable/LTS support commitment | Controlled institutional evaluation |
+| **Stable** | Every 6 weeks once Stable begins | Until the next Stable | Features and fixes |
+| **LTS** | Every 12 months once LTS begins | **24 months** | Security and critical fixes only after cut |
+| **Patch / Hotfix** | As needed | Inherits the target release line | Security and critical bug fixes |
 
-`main` is always releasable (ADR-0015). A release is a tag plus a checklist, not a project.
+`main` is always releasable (ADR-0015). A release is a tag plus the evidence
+required by its release class, not a project.
 
 **Versioning scope.** The **REST API** contract governs the platform major version — a breaking REST
 change means a major release, full stop. The GraphQL BFF is not a public contract and does not
 constrain versioning (ADR-0006). SDK and contract packages version independently via Changesets.
 
-**Pre-1.0:** minor versions may break. This is stated loudly, and we will not pretend otherwise to
-seem stable.
+**Pre-1.0:** minor versions may break. Pre-1.0 platform releases may be
+classified as **Institutional Pilot** releases. They are named, tested and
+documented artefacts for supervised institutional evaluation, but they do not
+claim general production readiness, Stable/LTS support, regulatory
+certification, or authorisation for sensitive institutional data. Deployment
+readiness remains separately governed by the applicable operational readiness
+decision.
+
+The stronger Stable and LTS commitments are not waived or removed. They become
+applicable when Witness makes those release-class promises and require the
+additional migration, recovery, supply-chain, signing, provenance and offline
+distribution evidence defined in `docs/engineering/RELEASE_STRATEGY.md`.
 
 ## Options considered
 
@@ -96,11 +110,18 @@ missed backports are tracked as incidents. **We would rather shorten the LTS pro
 - Changesets for package version management; a PR changing a published package without a changeset
   fails CI.
 - **Breaking-change detection** on the REST spec; a breaking change without a major bump fails CI.
-- Release checklist (`scripts/release/preflight.sh`) covers: migration test, rollback test, SBOM,
-  signing, upgrade notes, LTS backport assessment.
-- Security fixes are not considered done until backported to all supported LTS lines.
-- Every release publishes: signed artefacts, SBOM, changelog, migration notes, and an explicit
-  statement of operator actions required.
+- Release requirements are selected by release class and are defined in
+  `docs/engineering/RELEASE_STRATEGY.md`.
+- `scripts/release/preflight.sh` verifies only controls it can establish locally and
+  deterministically; it must not claim evidence for checks it does not perform.
+- Institutional Pilot releases require an explicit Release Manager go/no-go and do not themselves
+  authorise sensitive institutional data.
+- Stable releases retain the full migration, recovery, SBOM, signing, provenance, dependency and
+  offline-bundle requirements.
+- LTS releases satisfy every Stable requirement and add LTS upgrade, backport and support
+  obligations.
+- Security fixes are not considered done until backported to all supported LTS lines where an LTS
+  line exists.
 
 ## Reversal
 
