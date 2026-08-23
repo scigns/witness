@@ -25,6 +25,10 @@ WEB_URL="${WITNESS_PILOT_WEB_URL:?WITNESS_PILOT_WEB_URL must be set}"
 HEALTH_TIMEOUT_SECONDS="${WITNESS_DEPLOY_HEALTH_TIMEOUT_SECONDS:-90}"
 HISTORY_FILE="deployments/cloud-managed/.deploy-history.log"
 COMMIT="$(git rev-parse HEAD)"
+VERSION="$(node -p "require('./package.json').version")"
+
+export WITNESS_VERSION="$VERSION"
+export WITNESS_BUILD_ID="$COMMIT"
 
 log() { echo "[deploy] $*"; }
 record() { echo "$(date -u +%FT%TZ) commit=${COMMIT} result=$1" >>"$HISTORY_FILE"; }

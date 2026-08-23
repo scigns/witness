@@ -130,6 +130,8 @@ services:
       dockerfile: services/api-gateway/Dockerfile
     environment:
       NODE_ENV: production
+      WITNESS_VERSION: ${WITNESS_VERSION:?WITNESS_VERSION must be set}
+      WITNESS_BUILD_ID: ${WITNESS_BUILD_ID:?WITNESS_BUILD_ID must be set}
       WITNESS_DEPLOYMENT_PROFILE: ${WITNESS_DEPLOYMENT_PROFILE:-sovereign}
       WITNESS_INSTANCE_NAME: ${WITNESS_INSTANCE_NAME:?WITNESS_INSTANCE_NAME must be set}
       WITNESS_DATA_RESIDENCY: ${WITNESS_DATA_RESIDENCY:?WITNESS_DATA_RESIDENCY must be set}
