@@ -40,6 +40,13 @@ const ACTION_LABELS: Record<MembershipAction['action'], string> = {
   revoke: 'Revoke membership',
 };
 
+/** `null` (no completed cycle yet) reads as "—", never a misleading "0h". */
+function formatHours(hours: number | null): string {
+  if (hours === null) return '—';
+  if (hours < 48) return `${Math.round(hours)}h`;
+  return `${(hours / 24).toFixed(1)}d`;
+}
+
 export default function OrganisationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user, ready } = useSession();
@@ -368,9 +375,25 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
                 ['Participants', usage.participantCount],
                 ['Programs', usage.programCount],
                 ['Sessions', usage.sessionCount],
-                ['Transcription jobs', usage.transcriptionJobCount],
-                ['AI processing jobs', usage.aiProcessingJobCount],
+                [
+                  'Transcription jobs',
+                  usage.transcriptionFailedCount > 0
+                    ? `${usage.transcriptionJobCount} (${usage.transcriptionFailedCount} failed)`
+                    : usage.transcriptionJobCount,
+                ],
+                [
+                  'AI summary jobs',
+                  usage.summaryFailedCount > 0
+                    ? `${usage.aiProcessingJobCount} (${usage.summaryFailedCount} failed)`
+                    : usage.aiProcessingJobCount,
+                ],
+                ['Reviews completed', usage.reviewsCompletedCount],
+                ['Reports published', usage.reportsPublishedCount],
                 ['Exports', usage.exportCount],
+                [
+                  'Session close → report published',
+                  formatHours(usage.medianSessionCloseToPublishHours),
+                ],
               ].map(([label, value]) => (
                 <div key={label}>
                   <dt className="text-[var(--color-ink-muted)]">{label}</dt>

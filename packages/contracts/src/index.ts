@@ -1228,8 +1228,20 @@ export interface OrganisationUsage {
   programCount: number;
   sessionCount: number;
   transcriptionJobCount: number;
+  transcriptionFailedCount: number;
   aiProcessingJobCount: number;
+  summaryFailedCount: number;
+  reviewsCompletedCount: number;
+  reportsPublishedCount: number;
   exportCount: number;
+  /**
+   * Median hours between a session's `closedAt` and a report of that
+   * session's `publishedAt`, across every (session, published report) pair
+   * this organisation has — `null` when there are none yet, never `0`, so an
+   * organisation with no completed cycle is never misread as an
+   * instantaneous one.
+   */
+  medianSessionCloseToPublishHours: number | null;
 }
 
 export const updateStorageQuotaRequestSchema = z.object({

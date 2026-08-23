@@ -234,7 +234,7 @@ export default function NewParticipantPage({
           {isRegistered && (
             <div>
               <label htmlFor="linkedUserId" className="mb-1 block text-sm font-medium">
-                Workspace member <span aria-hidden="true">*</span>
+                Program member <span aria-hidden="true">*</span>
                 <span className="sr-only">(required)</span>
               </label>
               <select

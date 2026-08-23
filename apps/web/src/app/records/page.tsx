@@ -7,7 +7,7 @@ import type { RecordSummary } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { Card, ErrorNotice, StateBadge } from '@/components/ui';
+import { Card, EmptyState, ErrorNotice, StateBadge } from '@/components/ui';
 
 export default function RecordsPage() {
   const { user, ready } = useSession();
@@ -66,12 +66,18 @@ export default function RecordsPage() {
           </p>
         </Card>
       ) : records.length === 0 ? (
-        <Card>
-          <p className="font-medium">No records yet.</p>
-          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            Capture one, or run <code className="font-mono">make seed</code> for synthetic fixtures.
-          </p>
-        </Card>
+        <EmptyState
+          title="No records yet"
+          body="Capture your first record to begin building institutional memory."
+          action={
+            <Link
+              href="/records/new"
+              className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-accent-contrast)]"
+            >
+              Capture a record
+            </Link>
+          }
+        />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">

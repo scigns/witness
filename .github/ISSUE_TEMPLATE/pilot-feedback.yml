@@ -1,0 +1,109 @@
+name: 🧭 Pilot feedback
+description: Record operational/product learning from a real pilot session
+labels: ["type:pilot-feedback", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the pilot learning record referenced by
+        `docs/operations/PILOT_1_READINESS.md` §15 — one issue per real session.
+
+        **Do not copy confidential participant contributions into this issue** —
+        no names, quotes, transcripts or session content. This is for
+        operational and product learning only: what worked, what was
+        confusing, what took too long. If a defect needs separate tracking,
+        file it with the 🐛 Bug report template instead and link it here.
+  - type: input
+    id: pilot
+    attributes:
+      label: Pilot / organisation
+      description: The rollout profile and organisation, not any participant's name.
+      placeholder: e.g. SPC — Eastern Region Water Consultation
+    validations:
+      required: true
+  - type: input
+    id: session-date
+    attributes:
+      label: Session date
+    validations:
+      required: true
+  - type: dropdown
+    id: completed
+    attributes:
+      label: Session completed
+      options: [yes, no]
+    validations:
+      required: true
+  - type: dropdown
+    id: limited-assistance
+    attributes:
+      label: Facilitator able to operate with limited assistance
+      options: [yes, no]
+    validations:
+      required: true
+  - type: input
+    id: prep-time
+    attributes:
+      label: Approximate preparation time
+      placeholder: e.g. 30 minutes
+  - type: input
+    id: time-to-output
+    attributes:
+      label: Approximate time from session end to approved output
+      placeholder: e.g. 2 days
+  - type: textarea
+    id: transcription-usefulness
+    attributes:
+      label: Transcription usefulness
+      description: Was the transcript usable as a starting draft? Any language it struggled with?
+  - type: textarea
+    id: major-edits
+    attributes:
+      label: Major edits required to generated output
+      description: How much did a human have to change in the AI-drafted summary/actions/decisions?
+  - type: textarea
+    id: confusing-step
+    attributes:
+      label: Confusing step
+      description: Where did the facilitator get stuck or need to ask a question?
+  - type: textarea
+    id: trust-concern
+    attributes:
+      label: Trust concern
+  - type: textarea
+    id: consent-concern
+    attributes:
+      label: Consent concern
+  - type: textarea
+    id: failure-recovery
+    attributes:
+      label: Failure / recovery event
+      description: Anything that broke, and how it was recovered from (or the manual fallback used).
+  - type: textarea
+    id: most-valuable
+    attributes:
+      label: Most valuable Witness capability
+  - type: textarea
+    id: missing-capability
+    attributes:
+      label: Missing capability
+  - type: dropdown
+    id: use-again
+    attributes:
+      label: Would the facilitator use Witness again
+      options: [yes, no, unsure]
+    validations:
+      required: true
+  - type: dropdown
+    id: reused-evidence
+    attributes:
+      label: Evidence or records retrieved from an earlier session
+      options: [yes, no]
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      options:
+        - label: This contains no participant names, quotes, transcripts or session content
+          required: true

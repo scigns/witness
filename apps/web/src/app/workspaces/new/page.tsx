@@ -8,17 +8,30 @@ import type { OrganisationSummary } from '@witness/contracts';
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { Button, Card, ErrorNotice } from '@/components/ui';
+import {
+  INSTITUTIONAL_PROFILE_INFO,
+  type InstitutionalProfile,
+} from '@/lib/institutional-profiles';
 
 export default function NewWorkspacePage() {
   const router = useRouter();
   const { user, ready } = useSession();
 
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [organisationId, setOrganisationId] = useState('');
   const [organisations, setOrganisations] = useState<OrganisationSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadingOrganisations, setLoadingOrganisations] = useState(true);
+
+  const selectedOrganisation = organisations.find(
+    (organisation) => organisation.id === organisationId,
+  );
+  const profileInfo =
+    INSTITUTIONAL_PROFILE_INFO[
+      (selectedOrganisation?.profile as InstitutionalProfile) ?? 'general'
+    ];
 
   useEffect(() => {
     if (!ready) return;
@@ -51,7 +64,14 @@ export default function NewWorkspacePage() {
     setError(null);
 
     try {
-      await api.createWorkspace({ name, organisationId }, user);
+      await api.createWorkspace(
+        {
+          name,
+          organisationId,
+          description: description.trim() === '' ? undefined : description.trim(),
+        },
+        user,
+      );
       router.push('/workspaces');
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
@@ -62,7 +82,7 @@ export default function NewWorkspacePage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Create a workspace</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Create a program</h1>
         <p className="mt-1 text-[var(--color-ink-muted)]">
           Least privilege means this requires the <code className="font-mono">admin</code> role —
           switch to it above if the request is refused.
@@ -75,7 +95,7 @@ export default function NewWorkspacePage() {
         <Card>
           <p className="font-medium">No organisations exist yet.</p>
           <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            A workspace cannot exist without an organisation — create one first.
+            A program cannot exist without an organisation — create one first.
           </p>
         </Card>
       ) : (
@@ -101,6 +121,12 @@ export default function NewWorkspacePage() {
                   </option>
                 ))}
               </select>
+              {profileInfo.programGuidance !== null && (
+                <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+                  {selectedOrganisation?.name} uses the {profileInfo.label} profile.{' '}
+                  {profileInfo.programGuidance}
+                </p>
+              )}
             </div>
 
             <div>
@@ -114,7 +140,22 @@ export default function NewWorkspacePage() {
                 maxLength={200}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="Water Committee Programme"
+                placeholder={profileInfo.programNamePlaceholder}
+                className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="description" className="mb-1 block text-sm font-medium">
+                Description
+              </label>
+              <textarea
+                id="description"
+                rows={3}
+                maxLength={4000}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Optional — what is this program for?"
                 className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
               />
             </div>
@@ -122,7 +163,7 @@ export default function NewWorkspacePage() {
 
           <div className="flex gap-2">
             <Button type="submit" variant="primary" disabled={busy || organisationId === ''}>
-              {busy ? 'Creating…' : 'Create workspace'}
+              {busy ? 'Creating…' : 'Create program'}
             </Button>
           </div>
         </form>

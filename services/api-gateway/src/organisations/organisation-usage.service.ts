@@ -26,8 +26,23 @@ export interface OrganisationUsage {
   readonly programCount: number;
   readonly sessionCount: number;
   readonly transcriptionJobCount: number;
+  readonly transcriptionFailedCount: number;
   readonly aiProcessingJobCount: number;
+  readonly summaryFailedCount: number;
+  readonly reviewsCompletedCount: number;
+  readonly reportsPublishedCount: number;
   readonly exportCount: number;
+  readonly medianSessionCloseToPublishHours: number | null;
+}
+
+/** The middle value of a numerically-sorted, non-empty list; `null` for an empty one. */
+function median(sortedAscending: readonly number[]): number | null {
+  if (sortedAscending.length === 0) return null;
+  const mid = Math.floor(sortedAscending.length / 2);
+  if (sortedAscending.length % 2 !== 0) {
+    return sortedAscending[mid]!;
+  }
+  return (sortedAscending[mid - 1]! + sortedAscending[mid]!) / 2;
 }
 
 @Injectable()
@@ -50,8 +65,13 @@ export class OrganisationUsageService {
       programCount,
       sessionCount,
       transcriptionJobCount,
+      transcriptionFailedCount,
       aiProcessingJobCount,
+      summaryFailedCount,
+      reviewsCompletedCount,
+      reportsPublishedCount,
       exportCount,
+      publishedReports,
     ] = await Promise.all([
       this.storageQuota.usage(organisationId),
       this.prisma.organisationMembership.count({ where: { organisationId, state: 'active' } }),
@@ -59,7 +79,13 @@ export class OrganisationUsageService {
       this.prisma.workspace.count({ where: { organisationId } }),
       this.prisma.coDesignSession.count({ where: { organisationId } }),
       this.prisma.transcript.count({ where: { evidence: { organisationId } } }),
+      this.prisma.transcript.count({ where: { evidence: { organisationId }, status: 'failed' } }),
       this.prisma.sessionSummary.count({ where: { session: { organisationId } } }),
+      this.prisma.sessionSummary.count({
+        where: { session: { organisationId }, status: 'failed' },
+      }),
+      this.prisma.reviewAssignment.count({ where: { organisationId, status: 'completed' } }),
+      this.prisma.report.count({ where: { organisationId, publishedAt: { not: null } } }),
       this.prisma.auditEvent.count({
         where: {
           subjectType: 'report',
@@ -67,7 +93,24 @@ export class OrganisationUsageService {
           subjectId: { in: reportIds.map((r) => r.id) },
         },
       }),
+      // Raw material for the median below — one row per published report whose
+      // session has also closed, not a second source of truth for either fact.
+      this.prisma.report.findMany({
+        where: { organisationId, publishedAt: { not: null }, session: { closedAt: { not: null } } },
+        select: { publishedAt: true, session: { select: { closedAt: true } } },
+      }),
     ]);
+
+    const closeToPublishHours = publishedReports
+      .map((report) => {
+        // Both are non-null by the query's own `where` clause; Prisma's types
+        // just can't express that a selected relation's field is guaranteed.
+        const closedAt = report.session.closedAt as Date;
+        const publishedAt = report.publishedAt as Date;
+        return (publishedAt.getTime() - closedAt.getTime()) / (1000 * 60 * 60);
+      })
+      .filter((hours) => hours >= 0)
+      .sort((a, b) => a - b);
 
     return {
       storageBytes: storage.usedBytes.toString(),
@@ -77,8 +120,13 @@ export class OrganisationUsageService {
       programCount,
       sessionCount,
       transcriptionJobCount,
+      transcriptionFailedCount,
       aiProcessingJobCount,
+      summaryFailedCount,
+      reviewsCompletedCount,
+      reportsPublishedCount,
       exportCount,
+      medianSessionCloseToPublishHours: median(closeToPublishHours),
     };
   }
 }

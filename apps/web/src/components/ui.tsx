@@ -88,6 +88,18 @@ export function MembershipStateBadge({ state }: { state: MembershipState }) {
   );
 }
 
+// Mirrors `services/api-gateway/src/infrastructure/role.helper.ts`'s `ROLE_LABELS` — the
+// single plain-language label for each role, so a role never reads differently on one
+// screen (a raw capitalized enum) than another (the roles catalog / role-assignment control).
+const ROLE_LABELS: Readonly<Record<WitnessRole, string>> = {
+  admin: 'Administrator',
+  facilitator: 'Facilitator',
+  contributor: 'Contributor',
+  reviewer: 'Reviewer',
+  participant: 'Participant',
+  reader: 'Read-only',
+};
+
 /**
  * The role a signed-in user holds in one organisation or workspace — display
  * only, never itself an authorisation decision (the server re-derives the
@@ -107,7 +119,7 @@ export function RoleBadge({ role }: { role: WitnessRole | null }) {
 
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-accent)] px-2 py-0.5 text-xs font-medium text-[var(--color-accent)]">
-      {role.charAt(0).toUpperCase() + role.slice(1)}
+      {ROLE_LABELS[role]}
     </span>
   );
 }

@@ -195,11 +195,27 @@ function authHeaders(user: ActingUser | null): Record<string, string> {
   return headers;
 }
 
+/**
+ * Only used when the server's response carries no structured `error.message`
+ * of its own (a proxy error, an unhandled crash, a non-JSON body) — the
+ * normal case always has a plain-language message from the API itself. A raw
+ * HTTP status code is not a sentence a facilitator should have to read.
+ */
+function fallbackErrorMessage(status: number): string {
+  if (status === 401) return 'You need to sign in again to do that.';
+  if (status === 403) return "You don't have permission to do that.";
+  if (status === 404) return "That couldn't be found.";
+  if (status === 409) return 'That was changed by someone else — reload the page and try again.';
+  if (status === 429) return 'Too many requests — wait a moment and try again.';
+  if (status >= 500) return 'Something went wrong on the server. Try again in a moment.';
+  return 'Something went wrong.';
+}
+
 async function throwOnError(response: Response): Promise<void> {
   if (response.ok) return;
 
   let code = 'UNKNOWN';
-  let message = `Request failed with status ${response.status}.`;
+  let message = fallbackErrorMessage(response.status);
 
   try {
     const body = (await response.json()) as { error?: { code?: string; message?: string } };
@@ -1703,7 +1719,7 @@ export const api = {
 
     if (!response.ok) {
       let code = 'EXPORT_FAILED';
-      let message = `The export failed (HTTP ${response.status}).`;
+      let message = `The export failed. ${fallbackErrorMessage(response.status)}`;
       try {
         const body = (await response.json()) as { error?: { code?: string; message?: string } };
         code = body.error?.code ?? code;
@@ -1870,7 +1886,7 @@ export const authApi = {
       // same bucket as a 401 (never signed in) and a transient 5xx doesn't
       // read as either.
       let code = 'SESSION_CHECK_FAILED';
-      let message = `Could not verify the session (HTTP ${response.status}).`;
+      let message = `Could not verify the session. ${fallbackErrorMessage(response.status)}`;
 
       try {
         const body = (await response.json()) as { error?: { code?: string; message?: string } };
@@ -1908,7 +1924,7 @@ export const authApi = {
 
     if (!response.ok) {
       let code = 'PROFILE_UPDATE_FAILED';
-      let message = `Could not update the profile (HTTP ${response.status}).`;
+      let message = `Could not update the profile. ${fallbackErrorMessage(response.status)}`;
 
       try {
         const body2 = (await response.json()) as { error?: { code?: string; message?: string } };

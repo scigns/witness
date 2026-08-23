@@ -178,7 +178,7 @@ export default function DashboardPage() {
     <div className="space-y-10">
       <section className="flex flex-wrap items-start justify-between gap-5">
         <div className="max-w-2xl">
-          <p className="text-sm font-medium text-[var(--color-accent)]">Your workspace</p>
+          <p className="text-sm font-medium text-[var(--color-accent)]">Your programs</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">
             Welcome, {firstName(currentUser.displayName)}
           </h1>
