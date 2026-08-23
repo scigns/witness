@@ -1,5 +1,8 @@
 # Witness Facilitator Quick Start
 
+**Status:** Active
+**Owner:** Product / Pilot Operations
+
 **For:** The person preparing and running a Witness session.
 
 This is the short session guide.
