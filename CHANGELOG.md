@@ -12,6 +12,112 @@ own subsection, regardless of size — those changes carry obligations for opera
 
 ---
 
+## [0.3.0] — 2026-08-23 — Institutional Pilot Release
+
+> **Witness Institutional Pilot Release — client-ready controlled pilot workflows.**
+>
+> Builds on the 0.2.0 controlled-pilot foundation with a substantially clearer
+> facilitator and participant experience, reusable institutional onboarding,
+> operational pilot controls and measurable evidence of pilot value.
+>
+> This remains a pre-1.0 release. Sensitive institutional data is subject to the
+> deployment-specific readiness decision in
+> `docs/operations/PILOT_1_READINESS.md`; this version number does not by itself
+> authorise sensitive data or attachments.
+
+### Added
+
+- Client-ready program and session experience across the main Witness workflow,
+  including clearer role-aware navigation, session journey guidance, evidence
+  registers, consent views, review surfaces and program administration.
+- Reusable institutional starter-profile presentation for regional /
+  multi-community consultation, training/classroom work, formal proceedings,
+  congregational meetings and general-purpose use without creating separate
+  product forks.
+- Browser audio recording and participant document/image evidence, with
+  `evidence_submission` enforced as a distinct consent category.
+- Organisation-level pilot value indicators derived from existing records:
+  failed transcription and summary jobs, completed reviews, published reports
+  and median session-close-to-report-publication time.
+- Structured pilot feedback issue template that explicitly excludes participant
+  names, quotations, transcripts and confidential session content.
+- Pilot operations material:
+  - `PILOT_1_READINESS.md`
+  - `PILOT_LAUNCH_CHECKLIST.md`
+  - `FACILITATOR_QUICKSTART.md`
+  - client rollout profiles and onboarding runbook.
+
+### Changed
+
+- Client-facing terminology now consistently prefers **Program** where the
+  underlying domain/API still uses `workspace`.
+- Empty states, role descriptions, first-use guidance and administrator wording
+  were rewritten around what a real facilitator needs to do next.
+- API errors exposed in the web application use plain-language fallbacks rather
+  than raw HTTP-oriented messages.
+- Session, participant, consent, evidence, review, report and administration
+  pages were substantially refined for real pilot operation.
+- Sign-in/session handling now bounds and retries the identity session check
+  rather than allowing an indefinite wait.
+
+### Fixed
+
+- Non-admin users being incorrectly locked out of their own authorised program
+  pages.
+- Quick-capture visibility for roles that can never submit evidence.
+- Consent amendment and consent-configuration failure paths discovered during
+  controlled UAT.
+- Dead links and missing export-history feedback in the capture workflow.
+- Native file-input and browser-recording usability issues, including mobile
+  overflow and clearer browser capability guidance.
+- Identity role consistency and centralised friendly authorisation errors.
+- Pilot deployment now preserves the runner-managed `.env` across application
+  checkouts.
+
+### Consent, provenance and sovereignty
+
+- Consent remains category-specific and fail-closed.
+- `evidence_submission` authorises a participant submission; it does not invent
+  authority on behalf of people identified inside a submitted artefact.
+- Generated transcripts, summaries and suggestions remain drafts until a human
+  confirms them.
+- Report composition continues to apply consent/redaction at render time rather
+  than copying participant-derived content into an uncontrolled second store.
+- No external AI provider was enabled by this release; the deployed production
+  profile continues to report external inference disabled.
+- No claim of legal or regulatory compliance is made by the institutional
+  profiles. Formal-proceeding deployments still require the institution to
+  establish the applicable lawful basis and governance approvals.
+
+### Operations
+
+- PR #97 was merged to `main` and automatically deployed successfully.
+- Production web, API readiness and identity endpoints were healthy after
+  deployment.
+- PostgreSQL, Keycloak and local Ollama inference reported healthy after
+  deployment.
+- Controlled-pilot database backups remained scheduled and checksum-valid
+  during the release-preparation period.
+- Pilot feedback, readiness and facilitator procedures are now reusable rather
+  than rediscovered for each institution.
+
+### Known limitations
+
+- Fijian/iTaukei automated transcription is not approved as authoritative;
+  human verification or manual transcription is required where textual
+  accuracy matters.
+- Speaker diarisation remains deferred.
+- Neo4j knowledge-graph projection and OpenSearch hybrid/vector search remain
+  unconfigured in the current production profile.
+- Database-level row-level security is not yet the independent second tenant
+  isolation layer; application/repository scoping remains the current
+  enforcement layer.
+- PDF export remains deferred; HTML, Markdown, JSON and CSV are supported.
+- Sensitive institutional attachments remain subject to explicit storage
+  protection/recovery and deployment-readiness approval.
+- This release does not claim completion of the repository's longer-term Phase
+  1–8 architecture roadmap.
+
 ## [0.2.0] — 2026-08-16 — Controlled Pilot
 
 > **Witness Controlled Pilot — real institutional use under supervision.**
@@ -187,6 +293,7 @@ an ADR. **Next phase:** Phase 2 — infrastructure and identity, beginning with 
 ## [Unreleased]
 
 ### Added
+
 - Repository scaffold covering the full enterprise structure (`.ai/`, `agents/`, `architecture/`,
   `docs/`, `apps/`, `packages/`, `services/`, `workers/`, `infrastructure/`, `deployments/`,
   `sdk/`, `examples/`, `scripts/`, `templates/`, `.github/`).
@@ -207,6 +314,7 @@ an ADR. **Next phase:** Phase 2 — infrastructure and identity, beginning with 
 - Scaffolding templates for ADRs, RFCs, services, packages, runbooks and postmortems.
 
 ### Notes
+
 - No application code has been released. Witness is pre-implementation; see [`STATUS.md`](STATUS.md).
 
 ---
@@ -219,21 +327,27 @@ Each released version uses this shape:
 ## [1.4.0] — 2027-05-14
 
 ### ⚠️ Operator action required
+
 Anything requiring an operator to act before or during upgrade.
 
 ### 🔐 Security
+
 Security fixes, with CVE identifiers where assigned.
 
 ### 🤝 Consent & sovereignty
+
 Changes to consent semantics, data residency, egress behaviour or retention.
 
 ### 🧬 Data migration
+
 Schema or projection changes, with rebuild requirements and expected duration.
 
 ### Added / Changed / Deprecated / Removed / Fixed
+
 Standard Keep a Changelog sections.
 
 ### Contributors
+
 Everyone whose work is in this release.
 ```
 
