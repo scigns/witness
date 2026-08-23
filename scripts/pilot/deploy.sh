@@ -25,7 +25,7 @@ WEB_URL="${WITNESS_PILOT_WEB_URL:?WITNESS_PILOT_WEB_URL must be set}"
 HEALTH_TIMEOUT_SECONDS="${WITNESS_DEPLOY_HEALTH_TIMEOUT_SECONDS:-90}"
 HISTORY_FILE="deployments/cloud-managed/.deploy-history.log"
 COMMIT="$(git rev-parse HEAD)"
-VERSION="$(node -p "require('./package.json').version")"
+VERSION="$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
 
 export WITNESS_VERSION="$VERSION"
 export WITNESS_BUILD_ID="$COMMIT"
