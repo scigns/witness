@@ -27,6 +27,7 @@ import { SessionBackedAuthorizationAdapter } from './authz/session-backed.adapte
 import { AgendaItemsController } from './agenda-items/agenda-items.controller.js';
 import { AgendaItemsService } from './agenda-items/agenda-items.service.js';
 import { ConsentPolicyService } from './consent/consent-policy.service.js';
+import { CommercialEntitlementService } from './commercial/commercial-entitlement.service.js';
 import { ConsentTemplatesController } from './consent-templates/consent-templates.controller.js';
 import { ConsentTemplatesService } from './consent-templates/consent-templates.service.js';
 import { EvidenceController } from './evidence/evidence.controller.js';
@@ -133,6 +134,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     OrganisationsService,
     StorageQuotaService,
     OrganisationUsageService,
+    CommercialEntitlementService,
     WorkspacesService,
     UsersService,
     OrganisationInvitationsService,

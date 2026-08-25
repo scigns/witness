@@ -82,6 +82,9 @@ function fakePrisma(options: {
     role: string;
   }[] = [];
   const auditEvents: { subjectType: string; subjectId: string; action: string }[] = [];
+  const billingAccounts: { id: string; organisationId: string; currency: string }[] = [];
+  const subscriptions: { id: string; organisationId: string; planId: string; status: string }[] =
+    [];
   let raceOnEmail = options.raceOnEmail ?? null;
 
   const organisationOps = {
@@ -120,6 +123,26 @@ function fakePrisma(options: {
 
   const tx = {
     organisation: organisationOps,
+    billingAccount: {
+      create: async ({
+        data,
+      }: {
+        data: { id: string; organisationId: string; currency: string };
+      }) => {
+        billingAccounts.push(data);
+        return data;
+      },
+    },
+    subscription: {
+      create: async ({
+        data,
+      }: {
+        data: { id: string; organisationId: string; planId: string; status: string };
+      }) => {
+        subscriptions.push(data);
+        return data;
+      },
+    },
     actor: {
       findFirst: async ({ where }: { where: { displayName: string; kind: string } }) =>
         actors.find((a) => a.displayName === where.displayName && a.kind === where.kind) ?? null,
@@ -197,7 +220,15 @@ function fakePrisma(options: {
 
   return {
     prisma: prisma as unknown as PrismaService,
-    state: { organisations, users, memberships, roleAssignments, auditEvents },
+    state: {
+      organisations,
+      users,
+      memberships,
+      roleAssignments,
+      auditEvents,
+      billingAccounts,
+      subscriptions,
+    },
   };
 }
 
@@ -283,8 +314,15 @@ describe('OrganisationsService.create — provisions an administrator', () => {
       userId: invitedUserId,
       role: 'admin',
     });
+    expect(state.billingAccounts).toEqual([
+      expect.objectContaining({ organisationId: result.id, currency: 'AUD' }),
+    ]);
+    expect(state.subscriptions).toEqual([
+      expect.objectContaining({ organisationId: result.id, status: 'FREE' }),
+    ]);
     expect(state.auditEvents.map((e) => e.action)).toEqual([
       'organisation.created',
+      'subscription.created',
       'user.invited',
     ]);
   });
@@ -385,7 +423,10 @@ describe('OrganisationsService.create — provisions an administrator', () => {
 
     expect(state.users).toHaveLength(1);
     expect(state.memberships[0]).toMatchObject({ userId: USER_1 });
-    expect(state.auditEvents.map((e) => e.action)).toEqual(['organisation.created']);
+    expect(state.auditEvents.map((e) => e.action)).toEqual([
+      'organisation.created',
+      'subscription.created',
+    ]);
   });
 
   it('ATTACK — a concurrent create winning the race for the same email is reused instead of failing the request', async () => {
@@ -413,7 +454,10 @@ describe('OrganisationsService.create — provisions an administrator', () => {
     expect(state.memberships[0]).toMatchObject({ organisationId: result.id, userId: winnerId });
     expect(state.roleAssignments[0]).toMatchObject({ organisationId: result.id, userId: winnerId });
     // The user row that won the race is not this request's to have invited.
-    expect(state.auditEvents.map((e) => e.action)).toEqual(['organisation.created']);
+    expect(state.auditEvents.map((e) => e.action)).toEqual([
+      'organisation.created',
+      'subscription.created',
+    ]);
   });
 });
 

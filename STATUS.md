@@ -1,7 +1,7 @@
 # Status
 
-**Last updated:** 2026-08-23 (v0.3.0 release preparation)
-**Updated by:** Release Manager
+**Last updated:** 2026-08-25 (Commercial Foundation C1)
+**Updated by:** Engineering
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
@@ -75,6 +75,39 @@ does **not** mean that every capability described within it is absent.
 | Speaker diarisation                       | ⚪ Deferred                                |
 | Database-level RLS defence-in-depth       | ⚪ Deferred                                |
 | General-availability / v1.0 hardening     | ⚪ Not complete                            |
+| Commercial domain foundation (C1)         | 🟢 Implemented and validated               |
+
+---
+
+## Commercial foundation
+
+Milestone C1 is implemented. Witness now owns a provider-independent commercial catalogue and
+customer subscription state in PostgreSQL. The additive migration seeds FREE, TEAM, ORGANISATION,
+and INSTITUTIONAL plans with AUD monthly/yearly prices where applicable, 16 typed entitlement
+definitions, plan grants, billing accounts, subscriptions, and subscription entitlement overrides.
+
+Every existing organisation is backfilled with a FREE subscription by migration. Both new
+organisation provisioning paths create a billing account and FREE subscription atomically; normal
+application provisioning also records `subscription.created` in the existing hash-chained audit log.
+The application loads organisation-scoped commercial state and delegates override precedence and
+fail-closed entitlement evaluation to the pure domain layer. No payment provider or SDK is present.
+
+Validation completed on 2026-08-25:
+
+- `pnpm verify`: format, lint, typecheck, 1,102 package tests, API/web production builds passed;
+- invariant suite: 20 passed; adversarial suite: 30 passed;
+- documentation lint: 215 files, zero issues;
+- Prisma schema validation/client generation passed;
+- all 27 migrations applied to a fresh temporary PostgreSQL 17 database; four plans and 16
+  entitlement definitions verified.
+
+The documentation link checker is expected to pass once the new linked files are Git-tracked. This
+workspace exposes `.git` read-only, so its precondition could not be satisfied here; direct file/link
+inspection found both targets present. The execution environment used Node 24.1.0 while the project
+declares Node 22, so release CI must repeat validation on the supported runtime.
+
+Next is C2: public pricing, a customer billing overview, and plan/frequency/payment-choice UX. No C2
+implementation is included in this change.
 
 ---
 

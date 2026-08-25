@@ -47,6 +47,8 @@ const prisma = new PrismaClient();
 // the service's module graph, and packages/domain is GPL-3.0 while this is a
 // build-time operator tool (ADR-0002's licensing boundary).
 const DEFAULT_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
+// Stable catalogue identifier seeded by the commercial-foundation migration.
+const FREE_PLAN_ID = '10000000-0000-4000-8000-000000000001';
 
 /** The three values bootstrap takes. Named as a type so a typo is a compile error. */
 type RequiredVariable =
@@ -84,6 +86,8 @@ async function main(): Promise<void> {
   const organisationId = randomUUID();
   const userId = randomUUID();
   const actorId = randomUUID();
+  const billingAccountId = randomUUID();
+  const subscriptionId = randomUUID();
 
   await prisma.$transaction(async (tx) => {
     // The audit chain needs an actor row, and the actor here is genuinely the
@@ -99,6 +103,32 @@ async function main(): Promise<void> {
         name: organisationName,
         storageQuotaBytes: DEFAULT_STORAGE_QUOTA_BYTES,
         createdAt: now,
+      },
+    });
+
+    await tx.billingAccount.create({
+      data: {
+        id: billingAccountId,
+        organisationId,
+        currency: 'AUD',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+
+    await tx.subscription.create({
+      data: {
+        id: subscriptionId,
+        organisationId,
+        billingAccountId,
+        planId: FREE_PLAN_ID,
+        status: 'FREE',
+        billingInterval: null,
+        currentPeriodStart: now,
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+        createdAt: now,
+        updatedAt: now,
       },
     });
 
@@ -159,6 +189,12 @@ async function main(): Promise<void> {
         subjectId: userId,
         action: 'user.invited',
         metadata: { via: 'bootstrap', role: 'admin' },
+      },
+      {
+        subjectType: 'subscription',
+        subjectId: subscriptionId,
+        action: 'subscription.created',
+        metadata: { via: 'bootstrap', planCode: 'FREE', organisationId },
       },
     ]) {
       await tx.auditEvent.create({ data: firstAuditEventFor(event, actorId, now) });
