@@ -103,10 +103,10 @@ model Record {
 /// and multi-tenant scoping of Record/Source are later roadmap items — modelling
 /// them now, before anything reads or writes them, would be fiction.
 model Organisation {
-  id        String   @id @db.Uuid
+  id                String   @id @db.Uuid
   /// Unique so two institutions never collide under one name and an operator
   /// gets a clear "already exists" instead of two indistinguishable tenants.
-  name      String   @unique @db.VarChar(200)
+  name              String   @unique @db.VarChar(200)
   /// Bytes, not GB — avoids float rounding in a number an operator override
   /// can set to anything. 5 GiB default (packages/domain/src/organisation.ts's
   /// DEFAULT_STORAGE_QUOTA_BYTES) applied at creation, not here: a schema
@@ -137,8 +137,121 @@ model Organisation {
   outcomeSupports              OutcomeSupport[]
   reports                      Report[]
   reportSources                ReportSource[]
+  billingAccount               BillingAccount?
+  subscriptions                Subscription[]
 
   @@map("organisation")
+}
+
+/// A commercial offer owned by Witness. Provider product/price identifiers do
+/// not belong here: providers settle money and never define entitlement.
+model Plan {
+  id          String  @id @db.Uuid
+  code        String  @unique @db.VarChar(32)
+  name        String  @db.VarChar(100)
+  description String  @db.VarChar(1000)
+  quoteBased  Boolean @default(false) @map("quote_based")
+  active      Boolean @default(true)
+
+  prices        PlanPrice[]
+  entitlements  PlanEntitlement[]
+  subscriptions Subscription[]
+
+  @@map("plan")
+}
+
+model PlanPrice {
+  id           String  @id @db.Uuid
+  planId       String  @map("plan_id") @db.Uuid
+  plan         Plan    @relation(fields: [planId], references: [id], onDelete: Restrict)
+  interval     String  @db.VarChar(16)
+  currency     String  @db.Char(3)
+  amountMinor  Int     @map("amount_minor")
+  startingFrom Boolean @default(false) @map("starting_from")
+  active       Boolean @default(true)
+
+  @@unique([planId, interval, currency])
+  @@index([planId, active])
+  @@map("plan_price")
+}
+
+model EntitlementDefinition {
+  id          String  @id @db.Uuid
+  key         String  @unique @db.VarChar(100)
+  valueType   String  @map("value_type") @db.VarChar(16)
+  unit        String? @db.VarChar(32)
+  description String  @db.VarChar(500)
+
+  planEntitlements PlanEntitlement[]
+  overrides        SubscriptionEntitlementOverride[]
+
+  @@map("entitlement_definition")
+}
+
+model PlanEntitlement {
+  id                      String                @id @db.Uuid
+  planId                  String                @map("plan_id") @db.Uuid
+  plan                    Plan                  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  entitlementDefinitionId String                @map("entitlement_definition_id") @db.Uuid
+  entitlementDefinition   EntitlementDefinition @relation(fields: [entitlementDefinitionId], references: [id], onDelete: Restrict)
+  value                   Json
+
+  @@unique([planId, entitlementDefinitionId])
+  @@index([entitlementDefinitionId])
+  @@map("plan_entitlement")
+}
+
+model BillingAccount {
+  id             String       @id @db.Uuid
+  organisationId String       @unique @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  currency       String       @default("AUD") @db.Char(3)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  subscriptions Subscription[]
+
+  @@map("billing_account")
+}
+
+model Subscription {
+  id                 String         @id @db.Uuid
+  organisationId     String         @map("organisation_id") @db.Uuid
+  organisation       Organisation   @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  billingAccountId   String         @map("billing_account_id") @db.Uuid
+  billingAccount     BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Restrict)
+  planId             String         @map("plan_id") @db.Uuid
+  plan               Plan           @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status             String         @db.VarChar(16)
+  billingInterval    String?        @map("billing_interval") @db.VarChar(16)
+  currentPeriodStart DateTime       @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd   DateTime?      @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd  Boolean        @default(false) @map("cancel_at_period_end")
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  overrides SubscriptionEntitlementOverride[]
+
+  @@index([organisationId, status])
+  @@index([billingAccountId])
+  @@index([planId])
+  @@map("subscription")
+}
+
+model SubscriptionEntitlementOverride {
+  id                      String                @id @db.Uuid
+  subscriptionId          String                @map("subscription_id") @db.Uuid
+  subscription            Subscription          @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  entitlementDefinitionId String                @map("entitlement_definition_id") @db.Uuid
+  entitlementDefinition   EntitlementDefinition @relation(fields: [entitlementDefinitionId], references: [id], onDelete: Restrict)
+  value                   Json
+  reason                  String                @db.VarChar(500)
+  createdAt               DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([subscriptionId, entitlementDefinitionId])
+  @@index([entitlementDefinitionId])
+  @@map("subscription_entitlement_override")
 }
 
 /// A scoped working area inside an organisation (BUILD_ROADMAP.md, Release 0.2,
@@ -816,7 +929,7 @@ model Evidence {
   transcript        Transcript?
   reviewAssignments ReviewAssignment[]
   clarifications    Clarification[]
-  outcomeSupports   OutcomeSupport[]   @relation("OutcomeSupportEvidence")
+  outcomeSupports   OutcomeSupport[]    @relation("OutcomeSupportEvidence")
 
   @@unique([sessionId, clientRequestId])
   @@index([sessionId])

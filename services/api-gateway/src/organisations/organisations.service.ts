@@ -14,6 +14,7 @@ import {
   createActor,
   createAuditEvent,
   createOrganisation,
+  FREE_PLAN_ID,
   updateStorageQuota,
   toActorId,
   toAuditEventId,
@@ -123,6 +124,8 @@ export class OrganisationsService {
     });
 
     const administratorUserId = randomUUID();
+    const billingAccountId = randomUUID();
+    const subscriptionId = randomUUID();
 
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -133,6 +136,32 @@ export class OrganisationsService {
             storageQuotaBytes: BigInt(outcome.organisation.storageQuotaBytes),
             profile: outcome.organisation.profile,
             createdAt: outcome.organisation.createdAt,
+          },
+        });
+
+        await tx.billingAccount.create({
+          data: {
+            id: billingAccountId,
+            organisationId: outcome.organisation.id,
+            currency: 'AUD',
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+
+        await tx.subscription.create({
+          data: {
+            id: subscriptionId,
+            organisationId: outcome.organisation.id,
+            billingAccountId,
+            planId: FREE_PLAN_ID,
+            status: 'FREE',
+            billingInterval: null,
+            currentPeriodStart: now,
+            currentPeriodEnd: null,
+            cancelAtPeriodEnd: false,
+            createdAt: now,
+            updatedAt: now,
           },
         });
 
@@ -163,6 +192,33 @@ export class OrganisationsService {
             previousHash: event.previousHash,
             hash: event.hash,
             metadata: event.metadata,
+          },
+        });
+
+        const subscriptionEvent = createAuditEvent(
+          {
+            id: toAuditEventId(randomUUID()),
+            subjectType: 'subscription',
+            subjectId: subscriptionId,
+            action: 'subscription.created',
+            actor,
+            occurredAt: now,
+            previousHash: null,
+            metadata: { planCode: 'FREE', organisationId: outcome.organisation.id },
+          },
+          sha256,
+        );
+        await tx.auditEvent.create({
+          data: {
+            id: subscriptionEvent.id,
+            subjectType: subscriptionEvent.subjectType,
+            subjectId: subscriptionEvent.subjectId,
+            action: subscriptionEvent.action,
+            actorId: subscriptionEvent.actor.id,
+            occurredAt: subscriptionEvent.occurredAt,
+            previousHash: subscriptionEvent.previousHash,
+            hash: subscriptionEvent.hash,
+            metadata: subscriptionEvent.metadata,
           },
         });
 

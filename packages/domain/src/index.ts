@@ -47,3 +47,4 @@ export * from './report-source.js';
 export * from './report-composition.js';
 export * from './agenda-item.js';
 export * from './resource.js';
+export * from './commercial.js';
