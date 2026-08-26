@@ -141,6 +141,11 @@ model Organisation {
   billingAccount               BillingAccount?
   subscriptions                Subscription[]
   commercialChangeRequests     CommercialChangeRequest[]
+  invoices                     Invoice[]
+  invoiceNumberCounter         InvoiceNumberCounter?
+  purchaseOrders               PurchaseOrder[]
+  paymentMethods               PaymentMethod[]
+  payments                     Payment[]
 
   @@map("organisation")
 }
@@ -213,8 +218,141 @@ model BillingAccount {
 
   subscriptions  Subscription[]
   changeRequests CommercialChangeRequest[]
+  invoices       Invoice[]
+  purchaseOrders PurchaseOrder[]
+  paymentMethods PaymentMethod[]
+  payments       Payment[]
 
+  @@unique([organisationId, id])
   @@map("billing_account")
+}
+
+/// Durable provider-neutral invoice truth. Issued values are snapshots; later
+/// application code must treat them as immutable commercial history.
+model Invoice {
+  id                String         @id @db.Uuid
+  organisationId    String         @map("organisation_id") @db.Uuid
+  organisation      Organisation   @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  billingAccountId  String         @map("billing_account_id") @db.Uuid
+  billingAccount    BillingAccount @relation(fields: [organisationId, billingAccountId], references: [organisationId, id], onDelete: Restrict)
+  status            String         @default("DRAFT") @db.VarChar(16)
+  currency          String         @db.Char(3)
+  invoiceNumber     String?        @map("invoice_number") @db.VarChar(64)
+  customerReference String?        @map("customer_reference") @db.VarChar(200)
+  purchaseOrderId   String?        @map("purchase_order_id") @db.Uuid
+  purchaseOrder     PurchaseOrder? @relation(fields: [organisationId, purchaseOrderId], references: [organisationId, id], onDelete: Restrict)
+  subtotalMinor     BigInt         @map("subtotal_minor")
+  taxMinor          BigInt         @map("tax_minor")
+  totalMinor        BigInt         @map("total_minor")
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  issuedAt          DateTime?      @map("issued_at") @db.Timestamptz(6)
+  dueAt             DateTime?      @map("due_at") @db.Timestamptz(6)
+  paidAt            DateTime?      @map("paid_at") @db.Timestamptz(6)
+  statusChangedAt   DateTime       @default(now()) @map("status_changed_at") @db.Timestamptz(6)
+  statusReason      String?        @map("status_reason") @db.VarChar(500)
+
+  lines    InvoiceLineItem[]
+  payments Payment[]
+
+  @@unique([organisationId, id])
+  @@unique([organisationId, invoiceNumber])
+  @@index([organisationId, status])
+  @@index([billingAccountId, status])
+  @@map("invoice")
+}
+
+model InvoiceLineItem {
+  id                 String  @id @db.Uuid
+  organisationId     String  @map("organisation_id") @db.Uuid
+  invoiceId          String  @map("invoice_id") @db.Uuid
+  invoice            Invoice @relation(fields: [organisationId, invoiceId], references: [organisationId, id], onDelete: Restrict)
+  description        String  @db.VarChar(500)
+  currency           String  @db.Char(3)
+  quantity           BigInt
+  unitAmountMinor    BigInt  @map("unit_amount_minor")
+  taxRateBasisPoints Int     @map("tax_rate_basis_points")
+  subtotalMinor      BigInt  @map("subtotal_minor")
+  taxMinor           BigInt  @map("tax_minor")
+  totalMinor         BigInt  @map("total_minor")
+
+  @@index([organisationId, invoiceId])
+  @@map("invoice_line_item")
+}
+
+model InvoiceNumberCounter {
+  organisationId String       @id @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  nextValue      BigInt       @default(1) @map("next_value")
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("invoice_number_counter")
+}
+
+model PurchaseOrder {
+  id                String         @id @db.Uuid
+  organisationId    String         @map("organisation_id") @db.Uuid
+  organisation      Organisation   @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  billingAccountId  String         @map("billing_account_id") @db.Uuid
+  billingAccount    BillingAccount @relation(fields: [organisationId, billingAccountId], references: [organisationId, id], onDelete: Restrict)
+  customerReference String         @map("customer_reference") @db.VarChar(200)
+  status            String         @default("DRAFT") @db.VarChar(16)
+  authorisedAmount  BigInt         @map("authorised_amount")
+  currency          String         @db.Char(3)
+  validFrom         DateTime       @map("valid_from") @db.Timestamptz(6)
+  validUntil        DateTime?      @map("valid_until") @db.Timestamptz(6)
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  invoices Invoice[]
+
+  @@unique([organisationId, id])
+  @@index([organisationId, status])
+  @@map("purchase_order")
+}
+
+model PaymentMethod {
+  id               String         @id @db.Uuid
+  organisationId   String         @map("organisation_id") @db.Uuid
+  organisation     Organisation   @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  billingAccountId String         @map("billing_account_id") @db.Uuid
+  billingAccount   BillingAccount @relation(fields: [organisationId, billingAccountId], references: [organisationId, id], onDelete: Restrict)
+  type             String         @db.VarChar(24)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  payments Payment[]
+
+  @@unique([organisationId, id])
+  @@map("payment_method")
+}
+
+model Payment {
+  id               String         @id @db.Uuid
+  organisationId   String         @map("organisation_id") @db.Uuid
+  organisation     Organisation   @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  billingAccountId String         @map("billing_account_id") @db.Uuid
+  billingAccount   BillingAccount @relation(fields: [organisationId, billingAccountId], references: [organisationId, id], onDelete: Restrict)
+  invoiceId        String         @map("invoice_id") @db.Uuid
+  invoice          Invoice        @relation(fields: [organisationId, invoiceId], references: [organisationId, id], onDelete: Restrict)
+  paymentMethodId  String         @map("payment_method_id") @db.Uuid
+  paymentMethod    PaymentMethod  @relation(fields: [organisationId, paymentMethodId], references: [organisationId, id], onDelete: Restrict)
+  method           String         @db.VarChar(24)
+  sourceReference  String         @map("source_reference") @db.VarChar(200)
+  amountMinor      BigInt         @map("amount_minor")
+  currency         String         @db.Char(3)
+  receivedAt       DateTime       @map("received_at") @db.Timestamptz(6)
+  status           String         @default("UNVERIFIED") @db.VarChar(16)
+  statusChangedAt  DateTime       @default(now()) @map("status_changed_at") @db.Timestamptz(6)
+  verifiedAt       DateTime?      @map("verified_at") @db.Timestamptz(6)
+  reason           String?        @db.VarChar(500)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organisationId, paymentMethodId, sourceReference])
+  @@index([organisationId, invoiceId])
+  @@index([organisationId, status])
+  @@map("payment")
 }
 
 /// A customer's requested commercial transition. It is deliberately separate

@@ -1,7 +1,7 @@
 # C3 invoice and procurement domain
 
 **Owner:** Principal Architect & Backend Lead
-**Status:** Issue #111 domain implementation; persistence and application effects not implemented
+**Status:** Issue #111 domain and #112 persistence implementation; application effects not implemented
 **Review:** Architecture and security review before merge; revisit in issues #112, #115, and #116
 
 This document records the provider-neutral commercial rules implemented by issue #111. Witness
@@ -111,7 +111,10 @@ data, provider secrets or raw confidential payloads.
 
 ## Explicitly remaining
 
-- #112: Prisma schema/migration, foreign keys, invoice numbering and durable idempotency uniqueness.
+- #112 persistence: implemented as one additive migration, with composite ownership foreign keys,
+  database checks, immutable issued-record guards, organisation-scoped invoice-number allocation,
+  and durable payment-evidence uniqueness. Fresh and upgrade migration-chain proofs are recorded in
+  the #112 implementation review; no financial rows are backfilled.
 - #113: billing profile and immutable supplier/customer issue snapshots.
 - #114: authenticated issuance/rendering and secret-backed remittance presentation.
 - #115: authorised manual reconciliation and correction workflow.
@@ -122,3 +125,35 @@ data, provider secrets or raw confidential payloads.
 
 ADR-0022 remains **Proposed**. #111 demonstrates provider-free domain rules, but not persisted
 invoice/payment truth, exactly-once application, or manual/fake port replaceability.
+
+## Persistence boundary (#112)
+
+The #112 migration is `20260826100000_commercial_persistence`. It adds `Invoice`,
+`InvoiceLineItem`, `PurchaseOrder`, `PaymentMethod`, `Payment`, and the organisation-scoped
+`InvoiceNumberCounter` persistence models. Existing C1/C2 tables and rows are not rewritten and no
+invoice or payment records are backfilled.
+
+Every new commercial record carries an organisation owner. Billing-account, invoice, payment-method
+and purchase-order references use composite `(organisation_id, id)` foreign keys so a valid UUID from
+another tenant cannot be attached to an otherwise valid row. PostgreSQL enforces ownership foreign
+keys, known statuses, currency syntax, non-negative money, line arithmetic, date ordering, evidence
+status shape, and durable `(organisation_id, payment_method_id, source_reference)` uniqueness.
+Invoice and line totals are checked independently; aggregate invoice totals remain application
+validated because PostgreSQL CHECK constraints cannot safely aggregate child rows without triggers.
+
+Issued invoice identity, ownership, currency, references, dates and monetary totals are protected by
+database triggers; issued line items cannot be inserted, changed or deleted. Deletion is restrictive
+for commercial history. These guards supplement, rather than replace, the domain state machine and
+later authorised application services.
+
+Invoice numbers are allocated by `allocate_invoice_number(organisation_id)`, which atomically creates
+or locks an organisation counter row and returns the next `INV-########` value. The scoped unique
+constraint is the final duplicate defence. Payment evidence is stored as non-secret observation only;
+the migration does not reconcile evidence, mark invoices paid, transition subscriptions, or apply
+entitlements.
+
+The supported validation evidence includes a fresh 29-migration PostgreSQL 17.4 chain, a canonical
+28-migration upgrade followed by #112, C1 bootstrap/FREE provisioning, direct database constraint
+probes, and independent-connection concurrent invoice-number allocation. Revenue Gate B remains
+**UNAVAILABLE** until later persistence consumers, reconciliation, exactly-once entitlement
+application, tenant-isolation API evidence and release/security approval exist.
