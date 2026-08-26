@@ -378,6 +378,18 @@ describe('purchase-order controls', () => {
     ).toThrowError(expect.objectContaining({ code: 'CURRENCY_MISMATCH' }));
   });
 
+  it('rejects a supplied PO when the invoice does not reference it', () => {
+    expect(() =>
+      issueInvoice({
+        invoice: draft(),
+        invoiceNumber: 'INV-PO-X',
+        issuedAt,
+        dueAt,
+        purchaseOrder: purchaseOrder(),
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'PURCHASE_ORDER_NOT_REFERENCED' }));
+  });
+
   it('rejects inverted or expired PO dates', () => {
     expect(() =>
       createPurchaseOrder({
@@ -449,6 +461,20 @@ describe('manual bank-transfer settlement evidence', () => {
     ]);
     expect(() => verifyPaymentEvidence(verified, later)).toThrow(IllegalTransition);
     expect(() => reversePaymentEvidence(unverified, later, 'Invalid')).toThrow(IllegalTransition);
+  });
+
+  it('reports rejected and reversed evidence with their actual status', () => {
+    const unverified = payment({ verified: false });
+    const rejected = rejectPaymentEvidence(unverified, issuedAt, 'Reference not found');
+    const reversed = reversePaymentEvidence(payment(), later, 'Receipt reversed');
+    expect(assessPayment(openInvoice(), rejected)).toEqual({
+      code: 'REJECTED',
+      eligibleForReconciliation: false,
+    });
+    expect(assessPayment(openInvoice(), reversed)).toEqual({
+      code: 'REVERSED',
+      eligibleForReconciliation: false,
+    });
   });
 
   it.each([

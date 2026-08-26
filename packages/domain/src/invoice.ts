@@ -107,6 +107,8 @@ export interface Payment {
 export type PaymentAssessmentCode =
   | 'EXACT'
   | 'UNVERIFIED'
+  | 'REJECTED'
+  | 'REVERSED'
   | 'TENANT_MISMATCH'
   | 'BILLING_ACCOUNT_MISMATCH'
   | 'INVOICE_MISMATCH'
@@ -389,7 +391,15 @@ function assertPurchaseOrderCoversInvoice(
   purchaseOrder: PurchaseOrder | null,
   issuedAt: Date,
 ): void {
-  if (invoice.purchaseOrderId === null) return;
+  if (invoice.purchaseOrderId === null) {
+    if (purchaseOrder !== null) {
+      throw new InvariantViolation(
+        'Invoice does not reference the supplied purchase order.',
+        'PURCHASE_ORDER_NOT_REFERENCED',
+      );
+    }
+    return;
+  }
   if (purchaseOrder === null || purchaseOrder.id !== invoice.purchaseOrderId) {
     throw new InvariantViolation(
       'Referenced purchase order is required.',
@@ -585,7 +595,7 @@ export function assessPayment(invoice: Invoice, payment: Payment): PaymentAssess
     return { code: 'INVOICE_MISMATCH', eligibleForReconciliation: false };
   }
   if (payment.status !== 'VERIFIED') {
-    return { code: 'UNVERIFIED', eligibleForReconciliation: false };
+    return { code: payment.status, eligibleForReconciliation: false };
   }
   if (invoice.status !== 'OPEN' && invoice.status !== 'OVERDUE') {
     return { code: 'INVOICE_NOT_RECEIVABLE', eligibleForReconciliation: false };

@@ -91,7 +91,7 @@ commercial/entitlement effects; an in-memory domain key alone is not that proof.
 | Partial settlement | Not eligible for normal reconciliation | Explicit `PARTIAL` | Evidence retained later | Allocation policy requires separate design |
 | Overpayment | Not eligible for normal reconciliation | Explicit `OVERPAYMENT` | Evidence retained later | Credit/refund policy requires human decision and later design |
 | Void invoice settlement | Only `OPEN`/`OVERDUE` is receivable | `INVOICE_NOT_RECEIVABLE` | Exception planned | Manual correction; never normal activation |
-| Settlement reversal/refund | `PAID → REFUNDED` requires reversed same-owner evidence | Illegal/mismatched reversal fails | Reversal/refund facts planned | Later subscription policy must decide access; #111 does not |
+| Settlement reversal/refund | `PAID → REFUNDED` requires same-owner payment evidence with status `REVERSED`, plus a reason | Illegal/mismatched reversal fails | Reversal/refund facts planned | Later subscription policy must decide access; #111 does not |
 | Issued invoice mutation | Draft-only line replacement; issued identity/totals retained across transitions | Illegal transition | Issue/void/supersession facts planned | Void and issue replacement; never rewrite issued meaning |
 | Manual operator error | Domain validation; later least privilege and confirmation | Reconciliation exception and review planned | Actor and reason required later | Correction workflow in #115; append, do not erase |
 | Provider outage | No hosted provider or network dependency in #111 | Adapter health belongs to demand-gated C4 | Provider incidents later | Manual path remains provider-independent |
