@@ -2,7 +2,7 @@
 
 **Owner:** CTO & Product Director
 **Status:** Active
-**Last updated:** 2026-08-25
+**Last updated:** 2026-08-26
 **Review cadence:** Fortnightly (Engineering Review), quarterly (Steering Committee)
 
 > This roadmap sequences _capability_, not calendar dates. Dates are targets, not commitments;
@@ -46,6 +46,13 @@ pilot while its broader roadmap phase remains incomplete.**
 Commercialisation is an additive workstream over the controlled human-led pilot; it does not reorder
 or weaken the Phase 1-8 architectural sequence. Detailed, atomic tasks and acceptance criteria are in
 [`COMMERCIAL_IMPLEMENTATION_ROADMAP.md`](docs/engineering/COMMERCIAL_IMPLEMENTATION_ROADMAP.md).
+The governed customer-facing programme and reusable templates are indexed in
+[`docs/commercial/README.md`](docs/commercial/README.md). Its primary outcome is the first paid
+institutional customer, followed by the first renewing institutional customer.
+
+Commercial engagement does not wait for C3. Revenue Gate A permits a controlled pilot whose legal,
+invoice, payment and reconciliation administration occurs outside Witness, with no claim that the
+application performed those functions. Revenue Gate B is the later C3-native lifecycle.
 
 | Milestone                                      | Outcome                                                                     | State          |
 | ---------------------------------------------- | --------------------------------------------------------------------------- | -------------- |
@@ -58,6 +65,8 @@ or weaken the Phase 1-8 architectural sequence. Detailed, atomic tasks and accep
 
 Commercial state remains in Witness/PostgreSQL. Payment providers only transport or confirm
 settlement, as proposed in [ADR-0022](architecture/decisions/ADR-0022-billing-and-payments-as-replaceable-ports.md).
+C4 is demand-gated after C3: a real provider integration starts only when customer evidence shows
+invoice, purchase-order and bank-transfer operation is insufficient.
 
 ---
 

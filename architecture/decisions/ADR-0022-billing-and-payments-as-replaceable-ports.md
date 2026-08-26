@@ -9,6 +9,12 @@
 | **Related** | ADR-0003, ADR-0004, ADR-0009, ADR-0013 |
 | **Principles engaged** | P1 (digital sovereignty), P6 (replaceability), P7 (boring technology) |
 
+**Board recommendation (2026-08-26):** keep this ADR Proposed. Consider acceptance after C3 proves
+that Witness owns invoice/payment truth, exactly-once settlement-to-entitlement application is
+demonstrated, and a C4.1 manual/fake provider port proves replaceability. A Stripe or other hosted
+provider integration is not required for acceptance. C4 implementation remains demand-gated by real
+customer evidence.
+
 ## Context
 
 Witness must support self-service upgrades and institutional procurement without making a hosted
@@ -129,3 +135,4 @@ can be replaced or removed without reversing this decision.
 
 - [`WITNESS_COMMERCIAL_FOUNDATION.md`](../../docs/product/WITNESS_COMMERCIAL_FOUNDATION.md)
 - [`COMMERCIAL_IMPLEMENTATION_ROADMAP.md`](../../docs/engineering/COMMERCIAL_IMPLEMENTATION_ROADMAP.md)
+- [`Commercial programme`](../../docs/commercial/README.md)
