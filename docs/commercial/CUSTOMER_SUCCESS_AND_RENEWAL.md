@@ -23,6 +23,16 @@
 
 `RENEW`, `EXPAND`, `CONTINUE CONDITIONALLY`, `PAUSE`, or `END`.
 
+A **renewal decision** is complete when the formal review records one of these outcomes with all
+mandatory evidence. `PAUSE` and `END` are valid decisions, but they are not renewal success.
+
+A **successful paid renewal** requires a previous paying customer to complete an authorised paid
+`RENEW` or `EXPAND` outcome, with payment evidence and continued service or entitlement evidenced.
+The second company objective maps to this first paid renewal, not merely to a renewal decision.
+Customers administered through Revenue Gate A may renew using approved external commercial and
+payment evidence; Revenue Gate B is not a prerequisite. Gate B renewals use Witness-native
+settlement evidence once C3 is implemented and accepted.
+
 A successful paying pilot requires payment plus evidence that authorised users reconstructed
 material governance history with useful completeness and provenance. Deployment, logins or invoice
 payment alone are insufficient. Case studies require separate permission and redaction.

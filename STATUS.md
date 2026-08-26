@@ -32,7 +32,8 @@ repeat useful pilots with limited developer intervention.
 **Current platform release:** 0.3.0 preparation
 **Production main:** deployed from merge commit `8534751`
 **Primary company objective:** first paid institutional customer.
-**Second company objective:** first renewing institutional customer.
+**Second company objective:** first paid renewal by an institutional customer. A completed renewal
+decision that results in `PAUSE` or `END` is valid evaluation evidence, but is not renewal success.
 
 Important boundaries remain explicit:
 

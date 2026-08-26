@@ -15,7 +15,8 @@ evidence and next action from observed facts.
 | C3 technically complete | Backend Lead | Gate B lifecycle proven exactly once | Not started | Issues 4–10 | Tests, migrations, audit and runbooks | Start only after programme PR approval |
 | First controlled production pilot | Product Director | Go/no-go approved; real-data gates evidenced | Not started | Customer and deployment-specific gates | Signed decision and rehearsal | Qualify design partner |
 | First evaluation | Customer Success Lead | Baseline/after evaluation completed | Not started | Pilot not selected | Evaluation evidence | Agree measures during discovery |
-| First renewal decision | Customer Sponsor & Commercial Lead | Explicit renewal outcome recorded | Not started | Requires completed paid pilot | Renewal review | Build evaluation into proposal |
+| First renewal decision | Customer Sponsor & Commercial Lead | Formal review records `RENEW`, `EXPAND`, `CONTINUE CONDITIONALLY`, `PAUSE`, or `END` | Not started | Requires completed paid pilot | Completed renewal review | Build evaluation into proposal |
+| First paid renewal | Commercial Lead & Customer Sponsor | A previous paying customer completes an authorised paid renewal or expansion and continued service/entitlement is evidenced | Not started | Requires a renewal decision and verified payment evidence | Authorised renewal, payment and continued-service evidence | Convert evaluation evidence into a reviewed renewal proposal |
 
 ## Parallel programme cadence
 

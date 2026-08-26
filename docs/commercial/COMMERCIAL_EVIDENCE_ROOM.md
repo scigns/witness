@@ -25,4 +25,6 @@ organisation.
 Use `PUBLIC`, `INTERNAL`, `CONFIDENTIAL`, or `CUSTOMER-CONFIDENTIAL`. Customer-confidential data,
 executed agreements, bank details, credentials, personal data and non-public security findings must
 never enter the public repository. Every artefact records owner, source, date, reviewer, expiry or
-review date, and whether it is evidence of implementation or only a plan.
+review date, and whether it is evidence of implementation or only a plan. Assign each evidence-room
+record a stable record ID that resolves to those fields so controlled questionnaires and reviews can
+cite it without duplicating confidential evidence.

@@ -20,4 +20,14 @@
 - Tax and total: `[QUALIFIED HUMAN REVIEW REQUIRED]`
 - Assumptions, exclusions, procurement requirements and acceptance mechanism: `[REQUIRED]`
 
-State whether Revenue Gate A or B applies. A quote request is not acceptance or activation.
+## Required review gates
+
+- `[SUPPLIER LEGAL REVIEW REQUIRED]`
+- `[CUSTOMER PROCUREMENT REVIEW REQUIRED]`
+- `[TAX/JURISDICTION REVIEW REQUIRED]`
+- `[DATA PROCESSING/PRIVACY REVIEW REQUIRED]`
+- `[SUPPORT COMMITMENT APPROVAL REQUIRED]`
+
+State whether Revenue Gate A or B applies. A quote request is not acceptance or activation, and a
+quotation is not automatically a contract. No SLA is implied. Negotiated customer values belong in
+authorised commercial systems and executed documents, never source code.

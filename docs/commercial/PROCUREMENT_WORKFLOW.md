@@ -23,7 +23,11 @@ activated entitlements.
 ## Revenue Gate B — Witness-native C3
 
 C3 will own invoice truth, settlement evidence, reconciliation, subscription transition and
-entitlement activation. Until that capability is implemented and verified, Gate B is unavailable.
+entitlement activation. Until that capability is implemented and accepted, Gate B is `UNAVAILABLE`.
+Selection requires linked evidence for the C3 release/version, invoice capability,
+settlement/reconciliation, exactly-once settlement-to-entitlement application, commercial tenant
+isolation, and relevant release/security approval. Gate B records commercial truth and coordinates
+authorised transitions; it does not make Witness a bank or payment processor.
 
 ## Procurement questions
 

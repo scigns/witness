@@ -11,9 +11,13 @@ Sponsor. Absence of one perspective is a condition or no-go, not implicit approv
 
 ## Decision states
 
-- **GO:** all mandatory controls and ownership are evidenced.
+- **GO:** all mandatory commercial/pilot controls and ownership are evidenced. Before confidential
+  or real institutional data is used, the applicable operational real-data gate in
+  [Pilot 1 readiness](../operations/PILOT_1_READINESS.md) must also be explicitly `GO`.
 - **GO WITH CONDITIONS:** bounded conditions have owners, evidence, due points and an explicit rule
-  for stopping if unmet.
+  for stopping if unmet, and are permitted by the existing operational readiness model. A
+  commercial `GO WITH CONDITIONS` never permits confidential or real institutional data while the
+  operational real-data gate is not `GO`.
 - **NO-GO:** an unacceptable fit, safety, authority, operational or commercial condition exists.
 
 ## Assessment dimensions
@@ -30,4 +34,5 @@ expectation of autonomous institutional decisions; contractual claims the suppli
 or real confidential data before readiness evidence exists.
 
 Use the reusable [template](templates/PILOT_GO_NO_GO_TEMPLATE.md). A documented condition is not an
-implemented control.
+implemented control. This framework references, and does not replace or duplicate, the
+authoritative operational real-data gate.
