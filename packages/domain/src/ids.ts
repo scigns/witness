@@ -48,6 +48,11 @@ export type ReportId = Branded<string, 'ReportId'>;
 export type ReportSourceId = Branded<string, 'ReportSourceId'>;
 export type AgendaItemId = Branded<string, 'AgendaItemId'>;
 export type ResourceId = Branded<string, 'ResourceId'>;
+export type InvoiceId = Branded<string, 'InvoiceId'>;
+export type InvoiceLineItemId = Branded<string, 'InvoiceLineItemId'>;
+export type PaymentId = Branded<string, 'PaymentId'>;
+export type PaymentMethodId = Branded<string, 'PaymentMethodId'>;
+export type PurchaseOrderId = Branded<string, 'PurchaseOrderId'>;
 
 /**
  * UUID v4/v7 shape. We accept both: v7 is time-ordered, which matters for the
@@ -214,4 +219,29 @@ export function toAgendaItemId(value: string): AgendaItemId {
 export function toResourceId(value: string): ResourceId {
   assertUuid(value, 'ResourceId');
   return value as ResourceId;
+}
+
+export function toInvoiceId(value: string): InvoiceId {
+  assertUuid(value, 'InvoiceId');
+  return value as InvoiceId;
+}
+
+export function toInvoiceLineItemId(value: string): InvoiceLineItemId {
+  assertUuid(value, 'InvoiceLineItemId');
+  return value as InvoiceLineItemId;
+}
+
+export function toPaymentId(value: string): PaymentId {
+  assertUuid(value, 'PaymentId');
+  return value as PaymentId;
+}
+
+export function toPaymentMethodId(value: string): PaymentMethodId {
+  assertUuid(value, 'PaymentMethodId');
+  return value as PaymentMethodId;
+}
+
+export function toPurchaseOrderId(value: string): PurchaseOrderId {
+  assertUuid(value, 'PurchaseOrderId');
+  return value as PurchaseOrderId;
 }
