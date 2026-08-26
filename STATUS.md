@@ -31,8 +31,9 @@ repeat useful pilots with limited developer intervention.
 **Overall health:** 🟢 Controlled pilot release candidate
 **Current platform release:** 0.3.0 preparation
 **Production main:** deployed from merge commit `8534751`
-**Primary product objective:** repeatable institutional pilots and evidence
-of client value.
+**Primary company objective:** first paid institutional customer.
+**Second company objective:** first paid renewal by an institutional customer. A completed renewal
+decision that results in `PAUSE` or `END` is valid evaluation evidence, but is not renewal success.
 
 Important boundaries remain explicit:
 
@@ -116,6 +117,15 @@ C2 validation completed on 2026-08-26: formatting, lint, typecheck, 1,120 packag
 production builds, documentation lint/link checks, Prisma schema validation, and diff integrity all
 passed. Validation ran under Node 24.1.0 while the repository declares Node 22; release CI must repeat
 the gates on the supported runtime.
+
+The Board has approved the commercialisation programme with two explicit revenue gates. Revenue Gate
+A permits an externally administered controlled pilot before C3: approved supplier, legal/tax and
+procurement processes remain outside Witness, and the product makes no invoice, processing,
+reconciliation or automatic-activation claim. Revenue Gate B requires C3's Witness-native
+invoice-to-entitlement lifecycle with exactly-once and security evidence. The programme pack,
+governance and 90-day dashboard are indexed at [`docs/commercial/README.md`](docs/commercial/README.md).
+C3 remains the immediate engineering priority; C4 provider implementation is demand-gated by real
+customer evidence.
 
 ---
 

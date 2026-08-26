@@ -1,11 +1,16 @@
 # Commercial Implementation Roadmap
 
-**Status:** Active; C1 and C2 implemented
+**Status:** Active; C1 and C2 implemented; commercial enablement programme established
 **Owner:** Product and Engineering
 **Last reviewed:** 2026-08-25
 
 Each task below is intended to be independently reviewed and merged. Every task preserves existing
 RBAC, consent, provenance, audit, tenancy, export, and sovereign deployment behaviour.
+
+The customer-facing programme is indexed in [`../commercial/README.md`](../commercial/README.md).
+Revenue Gate A (externally administered commercial pilot) runs in parallel with C3 and must not be
+represented as Witness-native billing. Revenue Gate B requires C3. C4 is planned architecture but
+implementation is gated by observed customer demand after C3.
 
 ## Milestone C1 — Commercial Domain Foundation
 
@@ -158,6 +163,12 @@ RBAC, consent, provenance, audit, tenancy, export, and sovereign deployment beha
 
 ## Milestone C4 — Payment Provider Port
 
+**Demand gate:** Do not begin provider implementation automatically after C3. First assess real
+customer payment-method evidence. If invoice, purchase order and bank transfer satisfy institutional
+customers, continue improving that lifecycle. Create provider implementation work only for observed
+card, direct-debit, PayTo, BECS, checkout or regional-rail need. A manual/fake port proof remains the
+evidence required for ADR-0022 acceptance, not authority to integrate a hosted provider.
+
 ### C4.1 — Define payment provider port and registry
 
 - **Objective:** Isolate settlement transports from commercial rules.
@@ -246,7 +257,8 @@ RBAC, consent, provenance, audit, tenancy, export, and sovereign deployment beha
 - **Objective:** Make customer expectations and procurement steps clear.
 - **Scope:** Terms/privacy links or placeholders, onboarding, pricing docs, institutional workflow.
 - **Non-goals:** Inventing legal advice or contractual terms.
-- **Dependencies:** C2-C5.
+- **Dependencies:** C2 for the documentation programme; C3-C5 only for claims and procedures that
+  depend on capabilities those milestones implement.
 - **Likely files:** web content, user/admin guides and runbooks.
 - **Data model:** No change unless procurement reconciliation requires it.
 - **Security:** No public remittance data; content ownership and review named.
