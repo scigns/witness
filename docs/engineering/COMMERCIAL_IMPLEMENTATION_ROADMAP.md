@@ -1,6 +1,6 @@
 # Commercial Implementation Roadmap
 
-**Status:** Active; C1 implemented
+**Status:** Active; C1 and C2 implemented
 **Owner:** Product and Engineering
 **Last reviewed:** 2026-08-25
 
@@ -73,6 +73,8 @@ RBAC, consent, provenance, audit, tenancy, export, and sovereign deployment beha
 - **Documentation:** Exact commands, risks, and next milestone.
 
 ## Milestone C2 — Pricing and Self-Service Upgrade UX
+
+**State:** Implemented and validated on 2026-08-26.
 
 ### C2.1 — Publish plan catalogue API and `/pricing`
 

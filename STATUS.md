@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-08-25 (Commercial Foundation C1)
+**Last updated:** 2026-08-26 (Commercial Foundation C2)
 **Updated by:** Engineering
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -76,6 +76,7 @@ does **not** mean that every capability described within it is absent.
 | Database-level RLS defence-in-depth       | ⚪ Deferred                                |
 | General-availability / v1.0 hardening     | ⚪ Not complete                            |
 | Commercial domain foundation (C1)         | 🟢 Implemented and validated               |
+| Pricing and self-service upgrade UX (C2)  | 🟢 Implemented and validated               |
 
 ---
 
@@ -106,8 +107,15 @@ workspace exposes `.git` read-only, so its precondition could not be satisfied h
 inspection found both targets present. The execution environment used Node 24.1.0 while the project
 declares Node 22, so release CI must repeat validation on the supported runtime.
 
-Next is C2: public pricing, a customer billing overview, and plan/frequency/payment-choice UX. No C2
-implementation is included in this change.
+Milestone C2 adds a public catalogue-backed pricing route and an organisation-admin billing overview
+with current commercial state, resolved entitlements, operational usage, and explicit plan,
+frequency, and payment-method choices. Upgrade, downgrade, and cancellation submissions are stored
+as audited, idempotent pending intent and never activate paid access or imply settlement.
+
+C2 validation completed on 2026-08-26: formatting, lint, typecheck, 1,120 package tests, API/web
+production builds, documentation lint/link checks, Prisma schema validation, and diff integrity all
+passed. Validation ran under Node 24.1.0 while the repository declares Node 22; release CI must repeat
+the gates on the supported runtime.
 
 ---
 

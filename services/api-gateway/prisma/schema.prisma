@@ -28,22 +28,23 @@ model Actor {
   displayName String   @map("display_name") @db.VarChar(200)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  capturedRecords           Record[]           @relation("CapturedBy")
-  auditEvents               AuditEvent[]
-  evidenceLinks             EvidenceLink[]     @relation("EvidenceLinkCreatedBy")
-  reviewAssignmentsAssigned ReviewAssignment[] @relation("ReviewAssignmentAssignedBy")
-  clarificationsRequested   Clarification[]    @relation("ClarificationRequestedBy")
-  clarificationsResponded   Clarification[]    @relation("ClarificationRespondedBy")
-  decisionsProposed         Decision[]         @relation("DecisionProposedBy")
-  decisionsConfirmed        Decision[]         @relation("DecisionConfirmedBy")
-  commitmentsProposed       Commitment[]       @relation("CommitmentProposedBy")
-  commitmentsActivated      Commitment[]       @relation("CommitmentActivatedBy")
-  actionItemsCreated        ActionItem[]       @relation("ActionItemCreatedBy")
-  outcomeSupportsRecorded   OutcomeSupport[]   @relation("OutcomeSupportRecordedBy")
-  reportsCreated            Report[]           @relation("ReportCreatedBy")
-  reportsSubmitted          Report[]           @relation("ReportSubmittedBy")
-  reportsApproved           Report[]           @relation("ReportApprovedBy")
-  reportSourcesIncluded     ReportSource[]     @relation("ReportSourceIncludedBy")
+  capturedRecords            Record[]                  @relation("CapturedBy")
+  auditEvents                AuditEvent[]
+  evidenceLinks              EvidenceLink[]            @relation("EvidenceLinkCreatedBy")
+  reviewAssignmentsAssigned  ReviewAssignment[]        @relation("ReviewAssignmentAssignedBy")
+  clarificationsRequested    Clarification[]           @relation("ClarificationRequestedBy")
+  clarificationsResponded    Clarification[]           @relation("ClarificationRespondedBy")
+  decisionsProposed          Decision[]                @relation("DecisionProposedBy")
+  decisionsConfirmed         Decision[]                @relation("DecisionConfirmedBy")
+  commitmentsProposed        Commitment[]              @relation("CommitmentProposedBy")
+  commitmentsActivated       Commitment[]              @relation("CommitmentActivatedBy")
+  actionItemsCreated         ActionItem[]              @relation("ActionItemCreatedBy")
+  outcomeSupportsRecorded    OutcomeSupport[]          @relation("OutcomeSupportRecordedBy")
+  reportsCreated             Report[]                  @relation("ReportCreatedBy")
+  reportsSubmitted           Report[]                  @relation("ReportSubmittedBy")
+  reportsApproved            Report[]                  @relation("ReportApprovedBy")
+  reportSourcesIncluded      ReportSource[]            @relation("ReportSourceIncludedBy")
+  commercialChangesRequested CommercialChangeRequest[]
 
   @@index([kind])
   @@map("actor")
@@ -139,6 +140,7 @@ model Organisation {
   reportSources                ReportSource[]
   billingAccount               BillingAccount?
   subscriptions                Subscription[]
+  commercialChangeRequests     CommercialChangeRequest[]
 
   @@map("organisation")
 }
@@ -209,9 +211,37 @@ model BillingAccount {
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  subscriptions Subscription[]
+  subscriptions  Subscription[]
+  changeRequests CommercialChangeRequest[]
 
   @@map("billing_account")
+}
+
+/// A customer's requested commercial transition. It is deliberately separate
+/// from Subscription: a request never represents settlement or paid access.
+model CommercialChangeRequest {
+  id                          String         @id @db.Uuid
+  billingAccountId            String         @map("billing_account_id") @db.Uuid
+  billingAccount              BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Restrict)
+  organisationId              String         @map("organisation_id") @db.Uuid
+  organisation                Organisation   @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  action                      String         @db.VarChar(16)
+  sourceSubscriptionId        String         @map("source_subscription_id") @db.Uuid
+  sourceSubscription          Subscription   @relation(fields: [sourceSubscriptionId], references: [id], onDelete: Restrict)
+  sourceSubscriptionUpdatedAt DateTime       @map("source_subscription_updated_at") @db.Timestamptz(6)
+  requestedPlanCode           String?        @map("requested_plan_code") @db.VarChar(32)
+  billingInterval             String?        @map("billing_interval") @db.VarChar(16)
+  paymentMethod               String?        @map("payment_method") @db.VarChar(24)
+  status                      String         @default("PENDING") @db.VarChar(16)
+  effectiveAt                 DateTime?      @map("effective_at") @db.Timestamptz(6)
+  idempotencyKey              String         @map("idempotency_key") @db.Uuid
+  requestedById               String         @map("requested_by_id") @db.Uuid
+  requestedBy                 Actor          @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+  requestedAt                 DateTime       @default(now()) @map("requested_at") @db.Timestamptz(6)
+
+  @@unique([organisationId, idempotencyKey])
+  @@index([organisationId, status])
+  @@map("commercial_change_request")
 }
 
 model Subscription {
@@ -230,7 +260,8 @@ model Subscription {
   createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  overrides SubscriptionEntitlementOverride[]
+  overrides      SubscriptionEntitlementOverride[]
+  changeRequests CommercialChangeRequest[]
 
   @@index([organisationId, status])
   @@index([billingAccountId])

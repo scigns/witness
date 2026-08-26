@@ -119,6 +119,10 @@ import type {
   UpdateActionItemRequest,
   UpdateCommitmentRequest,
   UpdateDecisionRequest,
+  BillingOverview,
+  CommercialChangeRequest,
+  CommercialChangeView,
+  PublicPlanCatalogue,
 } from '@witness/contracts';
 
 const BASE_URL = process.env['NEXT_PUBLIC_WITNESS_API_URL'] ?? 'http://localhost:3001';
@@ -329,6 +333,22 @@ function reportPath(workspaceId: string, sessionId: string): string {
 
 export const api = {
   health: (): Promise<HealthResponse> => request<HealthResponse>('/ready', null),
+
+  getPlanCatalogue: (): Promise<PublicPlanCatalogue> => request('/api/v1/plans', null),
+
+  getBillingOverview: (organisationId: string, user: ActingUser): Promise<BillingOverview> =>
+    request(`/api/v1/organisations/${encodeURIComponent(organisationId)}/billing`, user),
+
+  requestCommercialChange: (
+    organisationId: string,
+    body: CommercialChangeRequest,
+    user: ActingUser,
+  ): Promise<CommercialChangeView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/billing/change-requests`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
 
   listRecords: (user: ActingUser): Promise<{ records: RecordSummary[] }> =>
     request<{ records: RecordSummary[] }>('/api/v1/records', user),
