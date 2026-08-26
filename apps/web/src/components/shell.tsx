@@ -24,6 +24,7 @@ const NAV = [
   { href: '/workspaces', label: 'Programs' },
   { href: '/records', label: 'Records' },
   { href: '/records/new', label: 'Capture' },
+  { href: '/pricing', label: 'Pricing' },
 ] as const;
 
 const ROLES: ReadonlyArray<ActingUser['role']> = ['reader', 'contributor', 'reviewer', 'admin'];
@@ -118,6 +119,17 @@ export function Shell({ children }: { children: ReactNode }) {
                     >
                       Users
                     </Link>
+                    {currentUser.organisations
+                      .filter((organisation) => organisation.role === 'admin')
+                      .map((organisation) => (
+                        <Link
+                          key={organisation.id}
+                          href={`/organisations/${organisation.id}/billing`}
+                          className="block rounded px-3 py-2 text-sm hover:bg-[var(--color-accent-soft)]"
+                        >
+                          {organisation.name} billing
+                        </Link>
+                      ))}
                   </div>
                 </details>
               )}

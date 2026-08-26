@@ -11,7 +11,71 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { createRecordRequestSchema, reviewActionSchema } from './index.js';
+import {
+  commercialChangeRequestSchema,
+  createRecordRequestSchema,
+  reviewActionSchema,
+} from './index.js';
+
+describe('commercialChangeRequest', () => {
+  const idempotencyKey = '00000000-0000-4000-8000-000000000000';
+
+  it('accepts an explicit paid-plan, frequency and payment choice', () => {
+    expect(
+      commercialChangeRequestSchema.safeParse({
+        action: 'CHANGE_PLAN',
+        planCode: 'TEAM',
+        billingInterval: 'YEARLY',
+        paymentMethod: 'BANK_TRANSFER',
+        idempotencyKey,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('requires paid choices but forbids them on a FREE downgrade', () => {
+    expect(
+      commercialChangeRequestSchema.safeParse({
+        action: 'CHANGE_PLAN',
+        planCode: 'TEAM',
+        billingInterval: null,
+        paymentMethod: null,
+        idempotencyKey,
+      }).success,
+    ).toBe(false);
+    expect(
+      commercialChangeRequestSchema.safeParse({
+        action: 'CHANGE_PLAN',
+        planCode: 'FREE',
+        billingInterval: 'MONTHLY',
+        paymentMethod: 'CARD',
+        idempotencyKey,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires replay-safe mutation identity', () => {
+    expect(commercialChangeRequestSchema.safeParse({ action: 'CANCEL' }).success).toBe(false);
+  });
+
+  it('keeps quote-based Institutional interest distinct from a paid plan change', () => {
+    expect(
+      commercialChangeRequestSchema.safeParse({
+        action: 'REQUEST_QUOTE',
+        planCode: 'INSTITUTIONAL',
+        idempotencyKey,
+      }).success,
+    ).toBe(true);
+    expect(
+      commercialChangeRequestSchema.safeParse({
+        action: 'CHANGE_PLAN',
+        planCode: 'INSTITUTIONAL',
+        billingInterval: 'MONTHLY',
+        paymentMethod: 'INVOICE',
+        idempotencyKey,
+      }).success,
+    ).toBe(false);
+  });
+});
 
 describe('createRecordRequest', () => {
   const valid = {

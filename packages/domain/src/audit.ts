@@ -31,6 +31,7 @@ export const AUDIT_ACTIONS = [
   'organisation.created',
   'organisation.storage_quota_updated',
   'subscription.created',
+  'subscription.change_requested',
   'entitlement.overridden',
   'workspace.created',
   'workspace.details_updated',

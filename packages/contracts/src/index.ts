@@ -154,6 +154,98 @@ export const assignRoleRequestSchema = z.object({
 });
 export type AssignRoleRequest = z.infer<typeof assignRoleRequestSchema>;
 
+// ─── Commercial catalogue and billing (Commercial Foundation C2) ──────────
+
+export const BILLING_INTERVALS = ['MONTHLY', 'YEARLY'] as const;
+export type BillingInterval = (typeof BILLING_INTERVALS)[number];
+
+export const PAYMENT_METHOD_CHOICES = ['CARD', 'BANK_TRANSFER', 'INVOICE'] as const;
+export type PaymentMethodChoice = (typeof PAYMENT_METHOD_CHOICES)[number];
+
+export const commercialChangeRequestSchema = z.union([
+  z.object({
+    action: z.literal('CHANGE_PLAN'),
+    planCode: z.literal('FREE'),
+    billingInterval: z.null(),
+    paymentMethod: z.null(),
+    idempotencyKey: z.string().uuid('A valid idempotency key is required'),
+  }),
+  z.object({
+    action: z.literal('CHANGE_PLAN'),
+    planCode: z.enum(['TEAM', 'ORGANISATION']),
+    billingInterval: z.enum(BILLING_INTERVALS),
+    paymentMethod: z.enum(PAYMENT_METHOD_CHOICES),
+    idempotencyKey: z.string().uuid('A valid idempotency key is required'),
+  }),
+  z.object({
+    action: z.literal('REQUEST_QUOTE'),
+    planCode: z.literal('INSTITUTIONAL'),
+    idempotencyKey: z.string().uuid('A valid idempotency key is required'),
+  }),
+  z.object({
+    action: z.literal('CANCEL'),
+    idempotencyKey: z.string().uuid('A valid idempotency key is required'),
+  }),
+]);
+export type CommercialChangeRequest = z.infer<typeof commercialChangeRequestSchema>;
+
+export interface PublicPlanPrice {
+  interval: BillingInterval;
+  currency: string;
+  amountMinor: number;
+  startingFrom: boolean;
+}
+
+export interface PublicPlanEntitlement {
+  key: string;
+  description: string;
+  unit: string | null;
+  value: boolean | number | string;
+}
+
+export interface PublicPlan {
+  code: 'FREE' | 'TEAM' | 'ORGANISATION' | 'INSTITUTIONAL';
+  name: string;
+  description: string;
+  quoteBased: boolean;
+  prices: PublicPlanPrice[];
+  entitlements: PublicPlanEntitlement[];
+}
+
+export interface PublicPlanCatalogue {
+  currency: 'AUD';
+  plans: PublicPlan[];
+}
+
+export interface CommercialChangeView {
+  id: string;
+  action: 'CHANGE_PLAN' | 'REQUEST_QUOTE' | 'CANCEL';
+  requestedPlanCode: PublicPlan['code'] | null;
+  billingInterval: BillingInterval | null;
+  paymentMethod: PaymentMethodChoice | null;
+  status: 'PENDING';
+  sourceSubscriptionId: string;
+  sourceSubscriptionUpdatedAt: string;
+  effectiveAt: string | null;
+  requestedAt: string;
+}
+
+export interface BillingOverview {
+  organisationId: string;
+  currentPlan: PublicPlan;
+  subscription: {
+    status: string;
+    billingInterval: BillingInterval | null;
+    currentPeriodStart: string;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+  };
+  resolvedEntitlements: PublicPlanEntitlement[];
+  usage: OrganisationUsage;
+  availablePlans: PublicPlan[];
+  pendingChange: CommercialChangeView | null;
+}
+
 // ─── Co-design sessions (BUILD_ROADMAP.md Milestone 2) ────────────────────────
 
 export const SESSION_STATUSES = ['draft', 'scheduled', 'open', 'closed', 'archived'] as const;

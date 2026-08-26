@@ -47,14 +47,14 @@ Commercialisation is an additive workstream over the controlled human-led pilot;
 or weaken the Phase 1-8 architectural sequence. Detailed, atomic tasks and acceptance criteria are in
 [`COMMERCIAL_IMPLEMENTATION_ROADMAP.md`](docs/engineering/COMMERCIAL_IMPLEMENTATION_ROADMAP.md).
 
-| Milestone | Outcome | State |
-| --- | --- | --- |
-| C1 — Commercial Domain Foundation | Every organisation has a FREE subscription; entitlement is domain-evaluated | ✅ Implemented |
-| C2 — Pricing and Self-Service Upgrade UX | Public pricing and authenticated upgrade choice | ⚪ Planned |
-| C3 — Invoice + Direct Bank Transfer | Institution can be invoiced and manually reconciled | ⚪ Planned |
-| C4 — Payment Provider Port | Settlement providers are replaceable adapters | ⚪ Planned |
-| C5 — Usage, Cost Allocation and Unit Economics | Allowances and per-customer margin are reportable | ⚪ Planned |
-| C6 — Commercial Pilot Readiness | External customer journey verified end to end | ⚪ Planned |
+| Milestone                                      | Outcome                                                                     | State          |
+| ---------------------------------------------- | --------------------------------------------------------------------------- | -------------- |
+| C1 — Commercial Domain Foundation              | Every organisation has a FREE subscription; entitlement is domain-evaluated | ✅ Implemented |
+| C2 — Pricing and Self-Service Upgrade UX       | Public pricing and authenticated upgrade choice                             | ✅ Implemented |
+| C3 — Invoice + Direct Bank Transfer            | Institution can be invoiced and manually reconciled                         | ⚪ Planned     |
+| C4 — Payment Provider Port                     | Settlement providers are replaceable adapters                               | ⚪ Planned     |
+| C5 — Usage, Cost Allocation and Unit Economics | Allowances and per-customer margin are reportable                           | ⚪ Planned     |
+| C6 — Commercial Pilot Readiness                | External customer journey verified end to end                               | ⚪ Planned     |
 
 Commercial state remains in Witness/PostgreSQL. Payment providers only transport or confirm
 settlement, as proposed in [ADR-0022](architecture/decisions/ADR-0022-billing-and-payments-as-replaceable-ports.md).
