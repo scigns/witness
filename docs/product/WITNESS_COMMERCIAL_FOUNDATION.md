@@ -118,6 +118,9 @@ it never branches on a plan name. The initial keys are:
 Future invoice and payment values use integer minor currency units. Usage quantities use integer base
 units and an explicit metric. Percent allocations use basis points so calculations remain exact.
 
+The implemented #111 invoice/procurement domain rules and their explicit later-milestone boundaries
+are recorded in [`C3_INVOICE_PROCUREMENT_DOMAIN.md`](C3_INVOICE_PROCUREMENT_DOMAIN.md).
+
 ### Later-milestone model design
 
 | Model | Authoritative fields and invariants |
