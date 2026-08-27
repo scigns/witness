@@ -37,6 +37,36 @@ describe('loadConfig', () => {
     expect(config.profile).toBe('development');
     expect(config.apiPort).toBe(3001);
     expect(config.externalInferenceEnabled).toBe(false);
+    expect(config.billingProfile).toBeNull();
+  });
+
+  it('fails closed for partial billing configuration without exposing values', () => {
+    expect(() =>
+      loadConfig({
+        ...base,
+        BILLING_LEGAL_NAME: 'Supplier',
+        BILLING_BANK_BSB: 'SYNTHETIC-BSB-123',
+      }),
+    ).toThrow(/required when billing configuration is present/i);
+    try {
+      loadConfig({ ...base, BILLING_EMAIL: 'not-an-email', BILLING_BANK_BSB: 'SYNTHETIC-BSB-123' });
+    } catch (error) {
+      expect(String(error)).not.toContain('SYNTHETIC-BSB-123');
+    }
+  });
+
+  it('loads a complete reviewed billing profile but never includes it in public config', () => {
+    const config = loadConfig({
+      ...base,
+      BILLING_LEGAL_NAME: 'Supplier',
+      BILLING_ADDRESS: 'Address',
+      BILLING_EMAIL: 'billing@example.invalid',
+      BILLING_BANK_ACCOUNT_NAME: 'Supplier',
+      BILLING_BANK_BSB: 'SYNTHETIC-BSB-123',
+      BILLING_BANK_ACCOUNT_NUMBER: 'SYNTHETIC-ACCOUNT-456',
+    });
+    expect(config.billingProfile?.remittance.accountNumber).toBe('SYNTHETIC-ACCOUNT-456');
+    expect(JSON.stringify(publicConfig(config))).not.toContain('SYNTHETIC');
   });
 
   it('requires DATABASE_URL', () => {

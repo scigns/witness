@@ -252,14 +252,45 @@ model Invoice {
   statusChangedAt   DateTime       @default(now()) @map("status_changed_at") @db.Timestamptz(6)
   statusReason      String?        @map("status_reason") @db.VarChar(500)
 
-  lines    InvoiceLineItem[]
-  payments Payment[]
+  // Reviewed issue-time identity facts. Null is permitted only for drafts;
+  // issuance/application services must supply the complete snapshot.
+  supplierLegalNameSnapshot          String? @map("supplier_legal_name_snapshot") @db.VarChar(200)
+  supplierBusinessIdentifierSnapshot String? @map("supplier_business_identifier_snapshot") @db.VarChar(100)
+  supplierAddressSnapshot            String? @map("supplier_address_snapshot") @db.VarChar(1000)
+  supplierBillingEmailSnapshot       String? @map("supplier_billing_email_snapshot") @db.VarChar(320)
+  customerLegalNameSnapshot          String? @map("customer_legal_name_snapshot") @db.VarChar(200)
+  customerBusinessIdentifierSnapshot String? @map("customer_business_identifier_snapshot") @db.VarChar(100)
+  customerAddressSnapshot            String? @map("customer_address_snapshot") @db.VarChar(1000)
+  customerBillingEmailSnapshot       String? @map("customer_billing_email_snapshot") @db.VarChar(320)
+
+  lines              InvoiceLineItem[]
+  payments           Payment[]
+  remittanceSnapshot InvoiceRemittanceSnapshot?
 
   @@unique([organisationId, id])
   @@unique([organisationId, invoiceNumber])
   @@index([organisationId, status])
   @@index([billingAccountId, status])
   @@map("invoice")
+}
+
+/// Restricted issue-time remittance facts. This is deliberately separate from
+/// Invoice so generic invoice/catalogue serializers cannot accidentally expose
+/// bank details. Access is application-authorised; values are never secrets or
+/// credentials and are not emitted in audit metadata.
+model InvoiceRemittanceSnapshot {
+  id                  String   @id @db.Uuid
+  organisationId      String   @map("organisation_id") @db.Uuid
+  invoiceId           String   @unique @map("invoice_id") @db.Uuid
+  invoice             Invoice  @relation(fields: [organisationId, invoiceId], references: [organisationId, id], onDelete: Restrict)
+  accountName         String   @map("account_name") @db.VarChar(200)
+  routingIdentifier   String   @map("routing_identifier") @db.VarChar(100)
+  accountNumber       String   @map("account_number") @db.VarChar(100)
+  paymentInstructions String?  @map("payment_instructions") @db.VarChar(1000)
+  capturedAt          DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
+
+  @@unique([organisationId, invoiceId])
+  @@map("invoice_remittance_snapshot")
 }
 
 model InvoiceLineItem {

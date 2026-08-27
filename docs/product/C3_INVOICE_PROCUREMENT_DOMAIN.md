@@ -157,3 +157,15 @@ The supported validation evidence includes a fresh 29-migration PostgreSQL 17.4 
 probes, and independent-connection concurrent invoice-number allocation. Revenue Gate B remains
 **UNAVAILABLE** until later persistence consumers, reconciliation, exactly-once entitlement
 application, tenant-isolation API evidence and release/security approval exist.
+
+## #113 snapshot boundary
+
+The optional deployment billing profile is validated by `@witness/config`; absent configuration
+leaves the application usable while invoice issuance remains unavailable. A complete reviewed
+profile supplies supplier identity and sensitive remittance values to a later issuance operation.
+`packages/domain/src/billing-snapshot.ts` validates explicit supplier and customer facts and returns
+frozen issue-time snapshots. Supplier/customer identity fields are additive columns on `invoice`;
+remittance is isolated in the one-to-one `invoice_remittance_snapshot` table so generic invoice
+serialisation cannot expose it. Database triggers protect issued snapshot fields and remittance rows
+from mutation. No invoice rendering, payment processing, reconciliation or entitlement application
+is implemented here. Revenue Gate B remains **UNAVAILABLE**.

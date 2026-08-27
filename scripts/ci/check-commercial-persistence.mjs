@@ -46,6 +46,7 @@ const accountB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc';
 const invoiceA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac';
 const invoiceB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbd';
 const lineA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaad';
+const remittanceA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaba';
 const poA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaae';
 const methodA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaf';
 const methodB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb0';
@@ -81,9 +82,16 @@ sql(`
      unit_amount_minor, tax_rate_basis_points, subtotal_minor, tax_minor, total_minor)
   VALUES ('${lineA}', '${organisationA}', '${invoiceA}', 'Probe line', 'AUD',
           1, 10000, 1000, 10000, 1000, 11000);
+  INSERT INTO invoice_remittance_snapshot
+    (id, organisation_id, invoice_id, account_name, routing_identifier, account_number, captured_at)
+  VALUES ('${remittanceA}', '${organisationA}', '${invoiceA}', 'Synthetic Supplier',
+          'SYNTHETIC-BSB-123', 'SYNTHETIC-ACCOUNT-456', CURRENT_TIMESTAMP);
   UPDATE invoice
   SET status = 'OPEN', invoice_number = 'INV-PROBE-${suffix}', issued_at = CURRENT_TIMESTAMP,
-      due_at = CURRENT_TIMESTAMP + INTERVAL '30 days', status_changed_at = CURRENT_TIMESTAMP
+      due_at = CURRENT_TIMESTAMP + INTERVAL '30 days', status_changed_at = CURRENT_TIMESTAMP,
+      supplier_legal_name_snapshot = 'Synthetic Supplier', supplier_address_snapshot = '1 Test Lane',
+      supplier_billing_email_snapshot = 'supplier@example.invalid',
+      customer_legal_name_snapshot = 'Synthetic Customer', customer_address_snapshot = '2 Test Lane'
   WHERE id = '${invoiceA}';
   INSERT INTO payment
     (id, organisation_id, billing_account_id, invoice_id, payment_method_id,
@@ -177,6 +185,14 @@ expectRejected(
 expectRejected(
   'issued invoice meaning mutation',
   `UPDATE invoice SET total_minor = 12000 WHERE id = '${invoiceA}'`,
+);
+expectRejected(
+  'issued invoice snapshot mutation',
+  `UPDATE invoice SET supplier_legal_name_snapshot = 'Changed' WHERE id = '${invoiceA}'`,
+);
+expectRejected(
+  'remittance snapshot mutation',
+  `UPDATE invoice_remittance_snapshot SET account_number = 'Changed' WHERE invoice_id = '${invoiceA}'`,
 );
 expectRejected(
   'issued invoice line mutation',
