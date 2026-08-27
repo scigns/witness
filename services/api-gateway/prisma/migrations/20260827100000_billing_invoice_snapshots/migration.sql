@@ -98,5 +98,5 @@ BEGIN
 END;
 $$;
 CREATE TRIGGER "invoice_remittance_snapshot_immutability"
-  BEFORE UPDATE OR DELETE ON "invoice_remittance_snapshot"
+  BEFORE INSERT OR UPDATE OR DELETE ON "invoice_remittance_snapshot"
   FOR EACH ROW EXECUTE FUNCTION "prevent_invoice_remittance_snapshot_mutation"();

@@ -46,6 +46,7 @@ const accountB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc';
 const invoiceA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac';
 const invoiceB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbd';
 const invoiceC = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbe';
+const invoiceD = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbf';
 const lineA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaad';
 const remittanceA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaba';
 const poA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaae';
@@ -122,6 +123,27 @@ expectRejected(
     supplier_address_snapshot = '1 Test Lane', supplier_billing_email_snapshot = 'supplier@example.invalid',
     customer_legal_name_snapshot = 'Synthetic Customer', customer_address_snapshot = '2 Test Lane'
     WHERE id = '${invoiceC}'`,
+);
+
+sql(`
+  INSERT INTO invoice
+    (id, organisation_id, billing_account_id, status, currency, subtotal_minor, tax_minor, total_minor, status_changed_at, updated_at)
+  VALUES ('${invoiceD}', '${organisationA}', '${accountA}', 'DRAFT', 'AUD', 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+  INSERT INTO invoice_remittance_snapshot
+    (id, organisation_id, invoice_id, account_name, routing_identifier, account_number)
+  VALUES ('${remittanceA.replace('aaba', 'aabc')}', '${organisationA}', '${invoiceD}', 'Synthetic Supplier',
+          'SYNTHETIC-BSB-123', 'SYNTHETIC-ACCOUNT-456');
+`);
+expectRejected(
+  'issued invoice with incomplete snapshots',
+  `UPDATE invoice SET status = 'OPEN', invoice_number = 'INV-INCOMPLETE-${suffix}', issued_at = CURRENT_TIMESTAMP,
+    due_at = CURRENT_TIMESTAMP + INTERVAL '30 days', supplier_legal_name_snapshot = 'Synthetic Supplier',
+    supplier_address_snapshot = '1 Test Lane', supplier_billing_email_snapshot = 'supplier@example.invalid'
+    WHERE id = '${invoiceD}'`,
+);
+
+sql(
+  `UPDATE invoice SET status = 'VOID', status_reason = 'Persistence probe' WHERE id = '${invoiceA}'`,
 );
 
 expectRejected(
@@ -208,6 +230,10 @@ expectRejected(
 expectRejected(
   'remittance snapshot mutation',
   `UPDATE invoice_remittance_snapshot SET account_number = 'Changed' WHERE invoice_id = '${invoiceA}'`,
+);
+expectRejected(
+  'remittance snapshot deletion',
+  `DELETE FROM invoice_remittance_snapshot WHERE invoice_id = '${invoiceA}'`,
 );
 expectRejected(
   'late remittance snapshot insertion',
