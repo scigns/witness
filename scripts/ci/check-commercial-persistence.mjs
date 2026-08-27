@@ -45,6 +45,7 @@ const accountA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab';
 const accountB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc';
 const invoiceA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac';
 const invoiceB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbd';
+const invoiceC = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbe';
 const lineA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaad';
 const remittanceA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaba';
 const poA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaae';
@@ -107,6 +108,20 @@ expectRejected(
     subtotal_minor, tax_minor, total_minor, status_changed_at, updated_at)
   VALUES ('${invoiceB}', '${organisationA}', '${accountA}', 'DRAFT', 'aud', 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 `,
+);
+
+sql(`
+  INSERT INTO invoice
+    (id, organisation_id, billing_account_id, status, currency, subtotal_minor, tax_minor, total_minor, status_changed_at, updated_at)
+  VALUES ('${invoiceC}', '${organisationA}', '${accountA}', 'DRAFT', 'AUD', 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+`);
+expectRejected(
+  'issued invoice without remittance snapshot',
+  `UPDATE invoice SET status = 'OPEN', invoice_number = 'INV-MISSING-${suffix}', issued_at = CURRENT_TIMESTAMP,
+    due_at = CURRENT_TIMESTAMP + INTERVAL '30 days', supplier_legal_name_snapshot = 'Synthetic Supplier',
+    supplier_address_snapshot = '1 Test Lane', supplier_billing_email_snapshot = 'supplier@example.invalid',
+    customer_legal_name_snapshot = 'Synthetic Customer', customer_address_snapshot = '2 Test Lane'
+    WHERE id = '${invoiceC}'`,
 );
 
 expectRejected(
@@ -193,6 +208,12 @@ expectRejected(
 expectRejected(
   'remittance snapshot mutation',
   `UPDATE invoice_remittance_snapshot SET account_number = 'Changed' WHERE invoice_id = '${invoiceA}'`,
+);
+expectRejected(
+  'late remittance snapshot insertion',
+  `INSERT INTO invoice_remittance_snapshot
+    (id, organisation_id, invoice_id, account_name, routing_identifier, account_number)
+   VALUES ('${remittanceA.replace('aaba', 'aabb')}', '${organisationA}', '${invoiceA}', 'Late', 'Late', 'Late')`,
 );
 expectRejected(
   'issued invoice line mutation',

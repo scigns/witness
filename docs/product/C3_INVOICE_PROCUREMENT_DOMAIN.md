@@ -165,7 +165,8 @@ leaves the application usable while invoice issuance remains unavailable. A comp
 profile supplies supplier identity and sensitive remittance values to a later issuance operation.
 `packages/domain/src/billing-snapshot.ts` validates explicit supplier and customer facts and returns
 frozen issue-time snapshots. Supplier/customer identity fields are additive columns on `invoice`;
-remittance is isolated in the one-to-one `invoice_remittance_snapshot` table so generic invoice
-serialisation cannot expose it. Database triggers protect issued snapshot fields and remittance rows
+remittance is isolated in the one-to-one `invoice_remittance_snapshot` table for storage isolation;
+future API serializers must explicitly select a non-remittance invoice projection and must not include
+the relation by default. Database triggers protect issued snapshot fields and remittance rows
 from mutation. No invoice rendering, payment processing, reconciliation or entitlement application
 is implemented here. Revenue Gate B remains **UNAVAILABLE**.

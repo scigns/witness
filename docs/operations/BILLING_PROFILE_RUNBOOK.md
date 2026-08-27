@@ -16,8 +16,8 @@ professionals, and do not infer tax jurisdiction or bank ownership from format v
 
 ## Classification and prohibition
 
-Supplier name and business identifier are authenticated commercial facts. Address and billing email
-are authenticated commercial facts. Account name, routing identifier and account number are
+Supplier name, business identifier, address and billing email are human-reviewed commercial facts;
+configuration validation does not authenticate ownership. Account name, routing identifier and account number are
 sensitive remittance. Online-banking usernames/passwords, MFA secrets, PINs, card PAN/CVV, bank API
 secrets and provider webhook secrets are prohibited from billing profile and invoice snapshots.
 

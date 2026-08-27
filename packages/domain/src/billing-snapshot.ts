@@ -47,7 +47,7 @@ function optionalText(value: string | null | undefined, field: string, max = 500
 /** Validate reviewed facts before an invoice issuance operation persists them. */
 export function createInvoiceSnapshot(input: InvoiceSnapshotInput): InvoiceSnapshotInput {
   const supplier = {
-    legalName: text(input.supplier.legalName, 'Supplier legal name'),
+    legalName: text(input.supplier.legalName, 'Supplier legal name', 200),
     businessIdentifier: optionalText(
       input.supplier.businessIdentifier,
       'Supplier business identifier',
@@ -57,7 +57,7 @@ export function createInvoiceSnapshot(input: InvoiceSnapshotInput): InvoiceSnaps
     billingEmail: text(input.supplier.billingEmail, 'Supplier billing email', 320),
   };
   const customer = {
-    legalName: text(input.customer.legalName, 'Customer legal name'),
+    legalName: text(input.customer.legalName, 'Customer legal name', 200),
     billingAddress: text(input.customer.billingAddress, 'Customer billing address', 1000),
     billingEmail: optionalText(input.customer.billingEmail, 'Customer billing email', 320),
     businessIdentifier: optionalText(

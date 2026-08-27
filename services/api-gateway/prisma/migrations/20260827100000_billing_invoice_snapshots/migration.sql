@@ -14,13 +14,13 @@ ALTER TABLE "invoice"
 ALTER TABLE "invoice"
   ADD CONSTRAINT "invoice_snapshot_shape_check" CHECK (
     "status" = 'DRAFT' OR (
-      length(trim("supplier_legal_name_snapshot")) > 0 AND
-      length(trim("supplier_address_snapshot")) > 0 AND
-      length(trim("supplier_billing_email_snapshot")) > 0 AND
-      length(trim("customer_legal_name_snapshot")) > 0 AND
-      length(trim("customer_address_snapshot")) > 0
+      "supplier_legal_name_snapshot" IS NOT NULL AND length(trim("supplier_legal_name_snapshot")) > 0 AND
+      "supplier_address_snapshot" IS NOT NULL AND length(trim("supplier_address_snapshot")) > 0 AND
+      "supplier_billing_email_snapshot" IS NOT NULL AND length(trim("supplier_billing_email_snapshot")) > 0 AND
+      "customer_legal_name_snapshot" IS NOT NULL AND length(trim("customer_legal_name_snapshot")) > 0 AND
+      "customer_address_snapshot" IS NOT NULL AND length(trim("customer_address_snapshot")) > 0
     )
-  );
+  ) NOT VALID;
 
 CREATE TABLE "invoice_remittance_snapshot" (
   "id" UUID NOT NULL,
@@ -54,6 +54,12 @@ BEGIN
     END IF;
     RETURN OLD;
   END IF;
+  IF OLD.status = 'DRAFT' AND NEW.status = 'OPEN' AND NOT EXISTS (
+    SELECT 1 FROM "invoice_remittance_snapshot"
+    WHERE organisation_id = NEW.organisation_id AND invoice_id = NEW.id
+  ) THEN
+    RAISE EXCEPTION 'Issued invoices require a remittance snapshot' USING ERRCODE = 'check_violation';
+  END IF;
   IF OLD.status <> 'DRAFT' AND (
     NEW.supplier_legal_name_snapshot IS DISTINCT FROM OLD.supplier_legal_name_snapshot OR
     NEW.supplier_business_identifier_snapshot IS DISTINCT FROM OLD.supplier_business_identifier_snapshot OR
@@ -75,7 +81,16 @@ CREATE TRIGGER "invoice_snapshot_immutability"
 
 CREATE OR REPLACE FUNCTION "prevent_invoice_remittance_snapshot_mutation"()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE invoice_status VARCHAR(16);
 BEGIN
+  IF TG_OP = 'INSERT' THEN
+    SELECT status INTO invoice_status FROM "invoice"
+      WHERE organisation_id = NEW.organisation_id AND id = NEW.invoice_id;
+    IF invoice_status IS DISTINCT FROM 'DRAFT' THEN
+      RAISE EXCEPTION 'Remittance snapshots must be created while invoice is DRAFT' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+  END IF;
   IF TG_OP = 'UPDATE' OR TG_OP = 'DELETE' THEN
     RAISE EXCEPTION 'Invoice remittance snapshots are immutable' USING ERRCODE = 'check_violation';
   END IF;
