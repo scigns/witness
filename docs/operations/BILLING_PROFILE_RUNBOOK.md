@@ -17,9 +17,10 @@ professionals, and do not infer tax jurisdiction or bank ownership from format v
 ## Classification and prohibition
 
 Supplier name, business identifier, address and billing email are human-reviewed commercial facts;
-configuration validation does not authenticate ownership. Account name, routing identifier and account number are
-sensitive remittance. Online-banking usernames/passwords, MFA secrets, PINs, card PAN/CVV, bank API
-secrets and provider webhook secrets are prohibited from billing profile and invoice snapshots.
+configuration validation does not authenticate ownership. Account name, routing identifier and
+account number are sensitive remittance. Online-banking usernames/passwords, MFA secrets, PINs,
+card PAN/CVV, bank API secrets and provider webhook secrets are prohibited from billing profile and
+invoice snapshots.
 
 ## Rotation and absence
 
@@ -30,7 +31,8 @@ partial or malformed configuration fails closed and never substitutes placeholde
 
 ## Redaction and review
 
-Remittance values must not appear in logs, errors, metrics, traces, audit metadata, public catalogue,
+Remittance values must not appear in logs, errors, metrics, traces, audit metadata, public
+catalogue,
 health/readiness responses or unauthenticated pages. Verify this with synthetic values during a
 deployment review. Configuration presence is not professional approval; retain evidence of human
 legal, tax, security and procurement review in the authorised evidence room.
