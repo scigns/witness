@@ -47,6 +47,7 @@ const invoiceA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac';
 const invoiceB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbd';
 const invoiceC = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbe';
 const invoiceD = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbf';
+const invoiceE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
 const lineA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaad';
 const remittanceA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaba';
 const poA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaae';
@@ -123,6 +124,18 @@ expectRejected(
     supplier_address_snapshot = '1 Test Lane', supplier_billing_email_snapshot = 'supplier@example.invalid',
     customer_legal_name_snapshot = 'Synthetic Customer', customer_address_snapshot = '2 Test Lane'
     WHERE id = '${invoiceC}'`,
+);
+
+sql(`
+  INSERT INTO invoice
+    (id, organisation_id, billing_account_id, status, currency, subtotal_minor, tax_minor, total_minor, status_changed_at, updated_at)
+  VALUES ('${invoiceE}', '${organisationA}', '${accountA}', 'DRAFT', 'AUD', 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+`);
+expectRejected(
+  'issued invoice without any snapshots',
+  `UPDATE invoice SET status = 'OPEN', invoice_number = 'INV-NO-SNAPSHOTS-${suffix}', issued_at = CURRENT_TIMESTAMP,
+    due_at = CURRENT_TIMESTAMP + INTERVAL '30 days'
+    WHERE id = '${invoiceE}'`,
 );
 
 sql(`
