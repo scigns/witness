@@ -45,7 +45,11 @@ const accountA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab';
 const accountB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc';
 const invoiceA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac';
 const invoiceB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbd';
+const invoiceC = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbe';
+const invoiceD = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbf';
+const invoiceE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
 const lineA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaad';
+const remittanceA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaba';
 const poA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaae';
 const methodA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaf';
 const methodB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb0';
@@ -81,9 +85,16 @@ sql(`
      unit_amount_minor, tax_rate_basis_points, subtotal_minor, tax_minor, total_minor)
   VALUES ('${lineA}', '${organisationA}', '${invoiceA}', 'Probe line', 'AUD',
           1, 10000, 1000, 10000, 1000, 11000);
+  INSERT INTO invoice_remittance_snapshot
+    (id, organisation_id, invoice_id, account_name, routing_identifier, account_number, captured_at)
+  VALUES ('${remittanceA}', '${organisationA}', '${invoiceA}', 'Synthetic Supplier',
+          'SYNTHETIC-BSB-123', 'SYNTHETIC-ACCOUNT-456', CURRENT_TIMESTAMP);
   UPDATE invoice
   SET status = 'OPEN', invoice_number = 'INV-PROBE-${suffix}', issued_at = CURRENT_TIMESTAMP,
-      due_at = CURRENT_TIMESTAMP + INTERVAL '30 days', status_changed_at = CURRENT_TIMESTAMP
+      due_at = CURRENT_TIMESTAMP + INTERVAL '30 days', status_changed_at = CURRENT_TIMESTAMP,
+      supplier_legal_name_snapshot = 'Synthetic Supplier', supplier_address_snapshot = '1 Test Lane',
+      supplier_billing_email_snapshot = 'supplier@example.invalid',
+      customer_legal_name_snapshot = 'Synthetic Customer', customer_address_snapshot = '2 Test Lane'
   WHERE id = '${invoiceA}';
   INSERT INTO payment
     (id, organisation_id, billing_account_id, invoice_id, payment_method_id,
@@ -99,6 +110,53 @@ expectRejected(
     subtotal_minor, tax_minor, total_minor, status_changed_at, updated_at)
   VALUES ('${invoiceB}', '${organisationA}', '${accountA}', 'DRAFT', 'aud', 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 `,
+);
+
+sql(`
+  INSERT INTO invoice
+    (id, organisation_id, billing_account_id, status, currency, subtotal_minor, tax_minor, total_minor, status_changed_at, updated_at)
+  VALUES ('${invoiceC}', '${organisationA}', '${accountA}', 'DRAFT', 'AUD', 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+`);
+expectRejected(
+  'issued invoice without remittance snapshot',
+  `UPDATE invoice SET status = 'OPEN', invoice_number = 'INV-MISSING-${suffix}', issued_at = CURRENT_TIMESTAMP,
+    due_at = CURRENT_TIMESTAMP + INTERVAL '30 days', supplier_legal_name_snapshot = 'Synthetic Supplier',
+    supplier_address_snapshot = '1 Test Lane', supplier_billing_email_snapshot = 'supplier@example.invalid',
+    customer_legal_name_snapshot = 'Synthetic Customer', customer_address_snapshot = '2 Test Lane'
+    WHERE id = '${invoiceC}'`,
+);
+
+sql(`
+  INSERT INTO invoice
+    (id, organisation_id, billing_account_id, status, currency, subtotal_minor, tax_minor, total_minor, status_changed_at, updated_at)
+  VALUES ('${invoiceE}', '${organisationA}', '${accountA}', 'DRAFT', 'AUD', 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+`);
+expectRejected(
+  'issued invoice without any snapshots',
+  `UPDATE invoice SET status = 'OPEN', invoice_number = 'INV-NO-SNAPSHOTS-${suffix}', issued_at = CURRENT_TIMESTAMP,
+    due_at = CURRENT_TIMESTAMP + INTERVAL '30 days'
+    WHERE id = '${invoiceE}'`,
+);
+
+sql(`
+  INSERT INTO invoice
+    (id, organisation_id, billing_account_id, status, currency, subtotal_minor, tax_minor, total_minor, status_changed_at, updated_at)
+  VALUES ('${invoiceD}', '${organisationA}', '${accountA}', 'DRAFT', 'AUD', 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+  INSERT INTO invoice_remittance_snapshot
+    (id, organisation_id, invoice_id, account_name, routing_identifier, account_number)
+  VALUES ('${remittanceA.replace('aaba', 'aabc')}', '${organisationA}', '${invoiceD}', 'Synthetic Supplier',
+          'SYNTHETIC-BSB-123', 'SYNTHETIC-ACCOUNT-456');
+`);
+expectRejected(
+  'issued invoice with incomplete snapshots',
+  `UPDATE invoice SET status = 'OPEN', invoice_number = 'INV-INCOMPLETE-${suffix}', issued_at = CURRENT_TIMESTAMP,
+    due_at = CURRENT_TIMESTAMP + INTERVAL '30 days', supplier_legal_name_snapshot = 'Synthetic Supplier',
+    supplier_address_snapshot = '1 Test Lane', supplier_billing_email_snapshot = 'supplier@example.invalid'
+    WHERE id = '${invoiceD}'`,
+);
+
+sql(
+  `UPDATE invoice SET status = 'VOID', status_reason = 'Persistence probe' WHERE id = '${invoiceA}'`,
 );
 
 expectRejected(
@@ -177,6 +235,24 @@ expectRejected(
 expectRejected(
   'issued invoice meaning mutation',
   `UPDATE invoice SET total_minor = 12000 WHERE id = '${invoiceA}'`,
+);
+expectRejected(
+  'issued invoice snapshot mutation',
+  `UPDATE invoice SET supplier_legal_name_snapshot = 'Changed' WHERE id = '${invoiceA}'`,
+);
+expectRejected(
+  'remittance snapshot mutation',
+  `UPDATE invoice_remittance_snapshot SET account_number = 'Changed' WHERE invoice_id = '${invoiceA}'`,
+);
+expectRejected(
+  'remittance snapshot deletion',
+  `DELETE FROM invoice_remittance_snapshot WHERE invoice_id = '${invoiceA}'`,
+);
+expectRejected(
+  'late remittance snapshot insertion',
+  `INSERT INTO invoice_remittance_snapshot
+    (id, organisation_id, invoice_id, account_name, routing_identifier, account_number)
+   VALUES ('${remittanceA.replace('aaba', 'aabb')}', '${organisationA}', '${invoiceA}', 'Late', 'Late', 'Late')`,
 );
 expectRejected(
   'issued invoice line mutation',

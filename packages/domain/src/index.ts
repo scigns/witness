@@ -49,3 +49,4 @@ export * from './agenda-item.js';
 export * from './resource.js';
 export * from './commercial.js';
 export * from './invoice.js';
+export * from './billing-snapshot.js';

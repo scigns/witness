@@ -121,6 +121,17 @@ const schema = z.object({
   S3_FORCE_PATH_STYLE: booleanish,
   S3_SERVER_SIDE_ENCRYPTION: z.string().optional().default(''),
   ALLOW_OBJECT_STORAGE_EGRESS: booleanish,
+
+  // Optional Revenue Gate B billing profile. Presence never enables billing;
+  // the later issuance service must explicitly consume a complete reviewed profile.
+  BILLING_LEGAL_NAME: z.string().optional().default(''),
+  BILLING_BUSINESS_IDENTIFIER: z.string().optional().default(''),
+  BILLING_ADDRESS: z.string().optional().default(''),
+  BILLING_EMAIL: z.string().optional().default(''),
+  BILLING_BANK_ACCOUNT_NAME: z.string().optional().default(''),
+  BILLING_BANK_BSB: z.string().optional().default(''),
+  BILLING_BANK_ACCOUNT_NUMBER: z.string().optional().default(''),
+  BILLING_PAYMENT_INSTRUCTIONS: z.string().optional().default(''),
 });
 
 export interface WitnessConfig {
@@ -178,6 +189,35 @@ export interface WitnessConfig {
     readonly forcePathStyle: boolean;
     readonly serverSideEncryption: string;
   };
+  /** Null means Revenue Gate B invoice issuance is unavailable. */
+  readonly billingProfile: BillingProfile | null;
+}
+
+export interface BillingProfile {
+  readonly legalName: string;
+  readonly businessIdentifier: string | null;
+  readonly address: string;
+  readonly email: string;
+  /** Sensitive remittance values; never pass to publicConfig or audit metadata. */
+  readonly remittance: {
+    readonly accountName: string;
+    readonly routingIdentifier: string;
+    readonly accountNumber: string;
+    readonly paymentInstructions: string | null;
+  };
+}
+
+function billingFieldProblems(name: string, value: string, max: number): string[] {
+  const trimmed = value.trim();
+  if (trimmed === '') return [];
+  const hasControlCharacter = Array.from(trimmed).some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint < 32 || codePoint === 127;
+  });
+  if (trimmed.length > max || hasControlCharacter) {
+    return [`${name} is too long or contains control characters.`];
+  }
+  return [];
 }
 
 /**
@@ -254,6 +294,38 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
 
   const value = parsed.data;
   const problems: string[] = [];
+
+  const billingValues = [
+    ['BILLING_LEGAL_NAME', value.BILLING_LEGAL_NAME, 200],
+    ['BILLING_BUSINESS_IDENTIFIER', value.BILLING_BUSINESS_IDENTIFIER, 100],
+    ['BILLING_ADDRESS', value.BILLING_ADDRESS, 1000],
+    ['BILLING_EMAIL', value.BILLING_EMAIL, 320],
+    ['BILLING_BANK_ACCOUNT_NAME', value.BILLING_BANK_ACCOUNT_NAME, 200],
+    ['BILLING_BANK_BSB', value.BILLING_BANK_BSB, 100],
+    ['BILLING_BANK_ACCOUNT_NUMBER', value.BILLING_BANK_ACCOUNT_NUMBER, 100],
+    ['BILLING_PAYMENT_INSTRUCTIONS', value.BILLING_PAYMENT_INSTRUCTIONS, 1000],
+  ] as const;
+  for (const [name, field, max] of billingValues)
+    problems.push(...billingFieldProblems(name, field, max));
+  const billingConfigured = billingValues.some(([, field]) => field.trim() !== '');
+  if (billingConfigured) {
+    const requiredBilling = [
+      ['BILLING_LEGAL_NAME', value.BILLING_LEGAL_NAME],
+      ['BILLING_ADDRESS', value.BILLING_ADDRESS],
+      ['BILLING_EMAIL', value.BILLING_EMAIL],
+      ['BILLING_BANK_ACCOUNT_NAME', value.BILLING_BANK_ACCOUNT_NAME],
+      ['BILLING_BANK_BSB', value.BILLING_BANK_BSB],
+      ['BILLING_BANK_ACCOUNT_NUMBER', value.BILLING_BANK_ACCOUNT_NUMBER],
+    ] as const;
+    for (const [name, field] of requiredBilling)
+      if (field.trim() === '')
+        problems.push(`${name} is required when billing configuration is present.`);
+    if (
+      value.BILLING_EMAIL.trim() !== '' &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(value.BILLING_EMAIL.trim())
+    )
+      problems.push('BILLING_EMAIL must be a valid email address.');
+  }
 
   const providerConfigured =
     value.EXTERNAL_MODEL_PROVIDER.trim() !== '' ||
@@ -487,6 +559,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
       forcePathStyle: value.S3_FORCE_PATH_STYLE,
       serverSideEncryption: value.S3_SERVER_SIDE_ENCRYPTION,
     },
+    billingProfile:
+      value.BILLING_LEGAL_NAME.trim() === '' && !billingConfigured
+        ? null
+        : {
+            legalName: value.BILLING_LEGAL_NAME.trim(),
+            businessIdentifier: value.BILLING_BUSINESS_IDENTIFIER.trim() || null,
+            address: value.BILLING_ADDRESS.trim(),
+            email: value.BILLING_EMAIL.trim(),
+            remittance: {
+              accountName: value.BILLING_BANK_ACCOUNT_NAME.trim(),
+              routingIdentifier: value.BILLING_BANK_BSB.trim(),
+              accountNumber: value.BILLING_BANK_ACCOUNT_NUMBER.trim(),
+              paymentInstructions: value.BILLING_PAYMENT_INSTRUCTIONS.trim() || null,
+            },
+          },
   };
 }
 
