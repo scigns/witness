@@ -32,6 +32,7 @@ export const AUDIT_ACTIONS = [
   'organisation.storage_quota_updated',
   'subscription.created',
   'subscription.change_requested',
+  'invoice.issued',
   'entitlement.overridden',
   'workspace.created',
   'workspace.details_updated',
@@ -189,6 +190,7 @@ export const AUDIT_SUBJECT_TYPES = [
   'agenda_item',
   'resource',
   'subscription',
+  'invoice',
 ] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 

@@ -11,17 +11,17 @@ approval requirements in the [procurement workflow](../commercial/PROCUREMENT_WO
 
 ## Requirement evidence
 
-| Requirement | Baseline before #111 | #111 domain change | Test/evidence |
-|---|---|---|---|
-| Exact money | Plan prices used integer minor units | `Money` uses non-negative `bigint` minor units and explicit three-letter currency | Exact totals, validation and half-up rounding tests |
-| Invoice truth | Target-state documentation only | Organisation-owned invoice and derived line totals | Construction and total tests |
-| Lifecycle | No invoice state machine | Fail-closed `DRAFT`, `OPEN`, `OVERDUE`, `PAID`, `VOID`, `REFUNDED` rules | Legal and illegal transition tests |
-| Issued meaning | Target-state documentation only | Lines and issue identity can change only in `DRAFT`; issued snapshots are immutable domain outcomes | Draft-edit and snapshot-retention tests |
-| Procurement | Commercial request references only | Organisation-owned purchase order with authority, currency, coverage and validity checks | PO issue-boundary tests |
-| Manual settlement | Payment preference only | `MANUAL_BANK_TRANSFER` method and non-secret payment evidence | Evidence lifecycle and assessment tests |
-| Ambiguous amounts | No rule | Partial and overpayment are explicit non-eligible manual-review outcomes | Assessment matrix |
-| Tenant ownership | Organisation is the existing tenant boundary | Invoice, PO, method and payment carry organisation and billing-account ownership | Cross-owner rejection tests |
-| Provider independence | ADR-0022 Proposed | No provider SDK, webhook or hosted-provider type in the domain | Domain-purity and dependency checks |
+| Requirement           | Baseline before #111                         | #111 domain change                                                                                  | Test/evidence                                       |
+| --------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Exact money           | Plan prices used integer minor units         | `Money` uses non-negative `bigint` minor units and explicit three-letter currency                   | Exact totals, validation and half-up rounding tests |
+| Invoice truth         | Target-state documentation only              | Organisation-owned invoice and derived line totals                                                  | Construction and total tests                        |
+| Lifecycle             | No invoice state machine                     | Fail-closed `DRAFT`, `OPEN`, `OVERDUE`, `PAID`, `VOID`, `REFUNDED` rules                            | Legal and illegal transition tests                  |
+| Issued meaning        | Target-state documentation only              | Lines and issue identity can change only in `DRAFT`; issued snapshots are immutable domain outcomes | Draft-edit and snapshot-retention tests             |
+| Procurement           | Commercial request references only           | Organisation-owned purchase order with authority, currency, coverage and validity checks            | PO issue-boundary tests                             |
+| Manual settlement     | Payment preference only                      | `MANUAL_BANK_TRANSFER` method and non-secret payment evidence                                       | Evidence lifecycle and assessment tests             |
+| Ambiguous amounts     | No rule                                      | Partial and overpayment are explicit non-eligible manual-review outcomes                            | Assessment matrix                                   |
+| Tenant ownership      | Organisation is the existing tenant boundary | Invoice, PO, method and payment carry organisation and billing-account ownership                    | Cross-owner rejection tests                         |
+| Provider independence | ADR-0022 Proposed                            | No provider SDK, webhook or hosted-provider type in the domain                                      | Domain-purity and dependency checks                 |
 
 ## Domain model
 
@@ -44,16 +44,16 @@ aggregation and allocation across invoices are not supported by #111.
 
 ## Invoice state machine
 
-| From | To | Required evidence/rule |
-|---|---|---|
-| `DRAFT` | `OPEN` | Unique number supplied later by persistence; valid issue/due dates; referenced PO is authorised, current, same-owner, same-currency and sufficient |
-| `DRAFT` | `VOID` | Non-empty reason |
-| `OPEN` | `OVERDUE` | Evaluation time is later than due time |
-| `OPEN` | `PAID` | Exact, verified, same-invoice, same-owner payment evidence |
-| `OPEN` | `VOID` | Non-empty reason |
-| `OVERDUE` | `PAID` | Exact, verified, same-invoice, same-owner payment evidence |
-| `OVERDUE` | `VOID` | Non-empty reason |
-| `PAID` | `REFUNDED` | Reversed payment evidence for the same invoice and owner, plus reason |
+| From      | To         | Required evidence/rule                                                                                                                             |
+| --------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DRAFT`   | `OPEN`     | Unique number supplied later by persistence; valid issue/due dates; referenced PO is authorised, current, same-owner, same-currency and sufficient |
+| `DRAFT`   | `VOID`     | Non-empty reason                                                                                                                                   |
+| `OPEN`    | `OVERDUE`  | Evaluation time is later than due time                                                                                                             |
+| `OPEN`    | `PAID`     | Exact, verified, same-invoice, same-owner payment evidence                                                                                         |
+| `OPEN`    | `VOID`     | Non-empty reason                                                                                                                                   |
+| `OVERDUE` | `PAID`     | Exact, verified, same-invoice, same-owner payment evidence                                                                                         |
+| `OVERDUE` | `VOID`     | Non-empty reason                                                                                                                                   |
+| `PAID`    | `REFUNDED` | Reversed payment evidence for the same invoice and owner, plus reason                                                                              |
 
 `VOID` and `REFUNDED` are terminal in #111. All unlisted transitions fail closed. Marking an invoice
 `PAID` is a domain eligibility rule only; #111 has no controller, database transaction,
@@ -78,28 +78,28 @@ commercial/entitlement effects; an in-memory domain key alone is not that proof.
 
 `Planned` below means the control is not implemented by #111.
 
-| Threat | Prevent | Detect | Audit | Recover |
-|---|---|---|---|---|
-| Duplicate settlement notification | Stable evidence identity; durable uniqueness planned in #112 | Duplicate-key conflict planned | One receipt plus duplicate observation planned | Re-query canonical receipt; no second effect (#115/#116) |
-| Replayed settlement evidence | Same identity as original; replay store planned | Duplicate/replay metric planned | Record replay without a second payment claim | Operator review; retain original evidence |
-| Settlement attached to wrong invoice | Payment carries invoice ID; exact match required | `INVOICE_MISMATCH` | Rejection fact planned | Correct through a new authorised evidence record, never rewrite history |
-| Invoice attached to wrong organisation | Organisation and billing-account ownership are explicit | Owner mismatch fails domain validation | Attempt/rejection planned | Correct draft or void/supersede issued invoice |
-| Cross-tenant invoice access | Application authorization and scoped query required in later API issue | Adversarial suite #117 | Denied-access audit where policy permits | Incident response; no domain transition |
-| Cross-tenant settlement access | Same-owner method/payment/invoice rules plus later authorization | `TENANT_MISMATCH`; #117 tests | Denied mutation/reconciliation planned | Reject evidence; investigate attempted access |
-| Currency mismatch | Exact currency equality | `CURRENCY_MISMATCH` | Assessment/rejection planned | Manual review or new correct evidence |
-| Amount mismatch | Exact total required | `PARTIAL` or `OVERPAYMENT` | Assessment planned | Hold for manual review; no automatic allocation/refund |
-| Partial settlement | Not eligible for normal reconciliation | Explicit `PARTIAL` | Evidence retained later | Allocation policy requires separate design |
-| Overpayment | Not eligible for normal reconciliation | Explicit `OVERPAYMENT` | Evidence retained later | Credit/refund policy requires human decision and later design |
-| Void invoice settlement | Only `OPEN`/`OVERDUE` is receivable | `INVOICE_NOT_RECEIVABLE` | Exception planned | Manual correction; never normal activation |
-| Settlement reversal/refund | `PAID → REFUNDED` requires same-owner payment evidence with status `REVERSED`, plus a reason | Illegal/mismatched reversal fails | Reversal/refund facts planned | Later subscription policy must decide access; #111 does not |
-| Issued invoice mutation | Draft-only line replacement; issued identity/totals retained across transitions | Illegal transition | Issue/void/supersession facts planned | Void and issue replacement; never rewrite issued meaning |
-| Manual operator error | Domain validation; later least privilege and confirmation | Reconciliation exception and review planned | Actor and reason required later | Correction workflow in #115; append, do not erase |
-| Provider outage | No hosted provider or network dependency in #111 | Adapter health belongs to demand-gated C4 | Provider incidents later | Manual path remains provider-independent |
-| Malicious provider payload | No provider payload boundary in #111 | Signature/schema/replay controls belong to C4 | Verified event receipt later | Reject/quarantine without commercial effect |
-| Entitlement activation before settlement | #111 has no entitlement operation; exact verified evidence is only eligibility | #116 invariant suite | Transition/application audit planned | Atomic forward-fix in #116 |
-| Duplicate entitlement application | No entitlement operation; durable applicator identity required in #116 | Concurrency/invariant tests planned | One canonical application event planned | Idempotent replay of canonical application |
-| Reconciliation race | No reconciliation operation; database constraint/transaction required later | Concurrency tests in #112/#115/#116 | Winning/duplicate attempts planned | Reload canonical state; no second effect |
-| Commercial audit deletion/mutation | Existing append-only hash-chain architecture; commercial events not added in #111 | Chain verification | Future invoice/payment/reconciliation subjects/actions | Restore and incident process; never silently reconstruct claims |
+| Threat                                   | Prevent                                                                                      | Detect                                        | Audit                                                  | Recover                                                                 |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------- |
+| Duplicate settlement notification        | Stable evidence identity; durable uniqueness planned in #112                                 | Duplicate-key conflict planned                | One receipt plus duplicate observation planned         | Re-query canonical receipt; no second effect (#115/#116)                |
+| Replayed settlement evidence             | Same identity as original; replay store planned                                              | Duplicate/replay metric planned               | Record replay without a second payment claim           | Operator review; retain original evidence                               |
+| Settlement attached to wrong invoice     | Payment carries invoice ID; exact match required                                             | `INVOICE_MISMATCH`                            | Rejection fact planned                                 | Correct through a new authorised evidence record, never rewrite history |
+| Invoice attached to wrong organisation   | Organisation and billing-account ownership are explicit                                      | Owner mismatch fails domain validation        | Attempt/rejection planned                              | Correct draft or void/supersede issued invoice                          |
+| Cross-tenant invoice access              | Application authorization and scoped query required in later API issue                       | Adversarial suite #117                        | Denied-access audit where policy permits               | Incident response; no domain transition                                 |
+| Cross-tenant settlement access           | Same-owner method/payment/invoice rules plus later authorization                             | `TENANT_MISMATCH`; #117 tests                 | Denied mutation/reconciliation planned                 | Reject evidence; investigate attempted access                           |
+| Currency mismatch                        | Exact currency equality                                                                      | `CURRENCY_MISMATCH`                           | Assessment/rejection planned                           | Manual review or new correct evidence                                   |
+| Amount mismatch                          | Exact total required                                                                         | `PARTIAL` or `OVERPAYMENT`                    | Assessment planned                                     | Hold for manual review; no automatic allocation/refund                  |
+| Partial settlement                       | Not eligible for normal reconciliation                                                       | Explicit `PARTIAL`                            | Evidence retained later                                | Allocation policy requires separate design                              |
+| Overpayment                              | Not eligible for normal reconciliation                                                       | Explicit `OVERPAYMENT`                        | Evidence retained later                                | Credit/refund policy requires human decision and later design           |
+| Void invoice settlement                  | Only `OPEN`/`OVERDUE` is receivable                                                          | `INVOICE_NOT_RECEIVABLE`                      | Exception planned                                      | Manual correction; never normal activation                              |
+| Settlement reversal/refund               | `PAID → REFUNDED` requires same-owner payment evidence with status `REVERSED`, plus a reason | Illegal/mismatched reversal fails             | Reversal/refund facts planned                          | Later subscription policy must decide access; #111 does not             |
+| Issued invoice mutation                  | Draft-only line replacement; issued identity/totals retained across transitions              | Illegal transition                            | Issue/void/supersession facts planned                  | Void and issue replacement; never rewrite issued meaning                |
+| Manual operator error                    | Domain validation; later least privilege and confirmation                                    | Reconciliation exception and review planned   | Actor and reason required later                        | Correction workflow in #115; append, do not erase                       |
+| Provider outage                          | No hosted provider or network dependency in #111                                             | Adapter health belongs to demand-gated C4     | Provider incidents later                               | Manual path remains provider-independent                                |
+| Malicious provider payload               | No provider payload boundary in #111                                                         | Signature/schema/replay controls belong to C4 | Verified event receipt later                           | Reject/quarantine without commercial effect                             |
+| Entitlement activation before settlement | #111 has no entitlement operation; exact verified evidence is only eligibility               | #116 invariant suite                          | Transition/application audit planned                   | Atomic forward-fix in #116                                              |
+| Duplicate entitlement application        | No entitlement operation; durable applicator identity required in #116                       | Concurrency/invariant tests planned           | One canonical application event planned                | Idempotent replay of canonical application                              |
+| Reconciliation race                      | No reconciliation operation; database constraint/transaction required later                  | Concurrency tests in #112/#115/#116           | Winning/duplicate attempts planned                     | Reload canonical state; no second effect                                |
+| Commercial audit deletion/mutation       | Existing append-only hash-chain architecture; commercial events not added in #111            | Chain verification                            | Future invoice/payment/reconciliation subjects/actions | Restore and incident process; never silently reconstruct claims         |
 
 ## Future audit facts
 
@@ -166,7 +166,8 @@ profile supplies supplier identity and sensitive remittance values to a later is
 `packages/domain/src/billing-snapshot.ts` validates explicit supplier and customer facts and returns
 frozen issue-time snapshots. Supplier/customer identity fields are additive columns on `invoice`;
 remittance is isolated in the one-to-one `invoice_remittance_snapshot` table for storage isolation;
-future API serializers must explicitly select a non-remittance invoice projection and must not include
-the relation by default. Database triggers protect issued snapshot fields and remittance rows
-from mutation. No invoice rendering, payment processing, reconciliation or entitlement application
-is implemented here. Revenue Gate B remains **UNAVAILABLE**.
+Milestone #114 adds authenticated issuance and rendering and must explicitly select remittance only
+for its privileged render path. Generic invoice DTOs must not include the relation. Database triggers
+protect issued snapshot fields and remittance rows from mutation. Invoice issuance is not settlement:
+no payment processing, reconciliation or entitlement application is implied. Revenue Gate B remains
+**UNAVAILABLE**.

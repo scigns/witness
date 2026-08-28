@@ -246,6 +246,89 @@ export interface BillingOverview {
   pendingChange: CommercialChangeView | null;
 }
 
+// ─── Institutional invoice issuance (C3.3 / #114) ─────────────────────────
+
+const invoiceMoneyMinorSchema = z.string().regex(/^\d+$/, 'Use non-negative integer minor units');
+const invoiceCurrencySchema = z.string().regex(/^[A-Z]{3}$/, 'Use an uppercase ISO currency code');
+const invoiceCustomerSchema = z
+  .object({
+    legalName: z.string().trim().min(1).max(200),
+    businessIdentifier: z.string().trim().min(1).max(100).optional(),
+    address: z.string().trim().min(1).max(1000),
+    email: z.string().trim().email().max(320).optional(),
+  })
+  .strict();
+const invoiceLineSchema = z
+  .object({
+    description: z.string().trim().min(1).max(500),
+    quantity: invoiceMoneyMinorSchema,
+    unitAmountMinor: invoiceMoneyMinorSchema,
+    taxRateBasisPoints: z.number().int().min(0).max(10_000),
+  })
+  .strict();
+
+export const issueInvoiceRequestSchema = z
+  .object({
+    idempotencyKey: z.string().uuid(),
+    billingAccountId: z.string().uuid(),
+    currency: invoiceCurrencySchema,
+    customer: invoiceCustomerSchema,
+    lines: z.array(invoiceLineSchema).min(1).max(100),
+    dueAt: z.string().datetime({ offset: true }),
+    customerReference: z.string().trim().min(1).max(200).optional(),
+    purchaseOrderId: z.string().uuid().optional(),
+  })
+  .strict();
+export type IssueInvoiceRequest = z.infer<typeof issueInvoiceRequestSchema>;
+
+export interface InvoiceLineView {
+  description: string;
+  quantity: string;
+  unitAmountMinor: string;
+  taxRateBasisPoints: number;
+  subtotalMinor: string;
+  taxMinor: string;
+  totalMinor: string;
+}
+
+export interface InvoiceView {
+  id: string;
+  organisationId: string;
+  billingAccountId: string;
+  status: string;
+  currency: string;
+  invoiceNumber: string;
+  customerReference: string | null;
+  purchaseOrderId: string | null;
+  supplier: {
+    legalName: string;
+    businessIdentifier: string | null;
+    address: string;
+    email: string;
+  };
+  customer: {
+    legalName: string;
+    businessIdentifier: string | null;
+    address: string;
+    email: string | null;
+  };
+  lines: InvoiceLineView[];
+  subtotalMinor: string;
+  taxMinor: string;
+  totalMinor: string;
+  issuedAt: string;
+  dueAt: string;
+}
+
+export interface InvoiceRenderView extends InvoiceView {
+  remittance: {
+    accountName: string;
+    routingIdentifier: string;
+    accountNumber: string;
+    paymentInstructions: string | null;
+  };
+}
+
 // ─── Co-design sessions (BUILD_ROADMAP.md Milestone 2) ────────────────────────
 
 export const SESSION_STATUSES = ['draft', 'scheduled', 'open', 'closed', 'archived'] as const;

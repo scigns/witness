@@ -14,8 +14,45 @@ import { describe, expect, it } from 'vitest';
 import {
   commercialChangeRequestSchema,
   createRecordRequestSchema,
+  issueInvoiceRequestSchema,
   reviewActionSchema,
 } from './index.js';
+
+describe('issueInvoiceRequest', () => {
+  const valid = {
+    idempotencyKey: '00000000-0000-4000-8000-000000000001',
+    billingAccountId: '00000000-0000-4000-8000-000000000002',
+    currency: 'AUD',
+    customer: { legalName: 'Customer', address: '1 Test Lane', email: 'billing@example.invalid' },
+    lines: [
+      {
+        description: 'Implementation',
+        quantity: '1',
+        unitAmountMinor: '10000',
+        taxRateBasisPoints: 0,
+      },
+    ],
+    dueAt: '2026-09-01T00:00:00.000Z',
+  };
+
+  it('accepts bounded invoice facts without client totals or snapshots', () => {
+    expect(issueInvoiceRequestSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('rejects malformed currency, negative minor units and client invoice authority', () => {
+    expect(issueInvoiceRequestSchema.safeParse({ ...valid, currency: 'aud' }).success).toBe(false);
+    expect(
+      issueInvoiceRequestSchema.safeParse({
+        ...valid,
+        lines: [{ ...valid.lines[0], unitAmountMinor: '-1' }],
+      }).success,
+    ).toBe(false);
+    expect(issueInvoiceRequestSchema.safeParse({ ...valid, totalMinor: '1' }).success).toBe(false);
+    expect(issueInvoiceRequestSchema.safeParse({ ...valid, invoiceNumber: 'INV-1' }).success).toBe(
+      false,
+    );
+  });
+});
 
 describe('commercialChangeRequest', () => {
   const idempotencyKey = '00000000-0000-4000-8000-000000000000';
