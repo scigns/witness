@@ -53,7 +53,7 @@ describe('InvoicesService retrieval boundaries', () => {
     };
     const tx = {
       invoice: {
-        findFirst: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(created),
+        findFirst: vi.fn().mockResolvedValueOnce(null).mockResolvedValue(created),
         create: vi.fn().mockResolvedValue(created),
         findUniqueOrThrow: vi.fn().mockResolvedValue(created),
       },
@@ -106,6 +106,14 @@ describe('InvoicesService retrieval boundaries', () => {
     expect(first.id).toBe(second.id);
     expect(tx.invoice.create).toHaveBeenCalledTimes(1);
     expect(tx.auditEvent.create).toHaveBeenCalledTimes(1);
+    await expect(
+      service.issue(
+        row.organisationId,
+        { ...request, lines: [{ ...request.lines[0], unitAmountMinor: '2000' }] },
+        principal,
+      ),
+    ).rejects.toMatchObject({ response: { error: { code: 'IDEMPOTENCY_CONFLICT' } } });
+    expect(tx.invoice.create).toHaveBeenCalledTimes(1);
   });
 
   it('scopes detail reads by organisation and excludes remittance', async () => {

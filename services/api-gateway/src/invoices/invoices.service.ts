@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
@@ -35,6 +36,49 @@ function requiredSnapshot(value: string | null, field: string): string {
   if (value === null || value.length === 0)
     throw new Error(`Persisted invoice is missing ${field}.`);
   return value;
+}
+
+function sameIssuanceRequest(row: InvoiceWithLines, request: IssueInvoiceRequest): boolean {
+  const customer = {
+    legalName: request.customer.legalName,
+    businessIdentifier: request.customer.businessIdentifier ?? null,
+    address: request.customer.address,
+    email: request.customer.email ?? null,
+  };
+  const requestedDueAt = new Date(request.dueAt).getTime();
+  return (
+    row.billingAccountId === request.billingAccountId &&
+    row.currency === request.currency &&
+    row.supplierLegalNameSnapshot !== null &&
+    row.supplierAddressSnapshot !== null &&
+    row.supplierBillingEmailSnapshot !== null &&
+    row.customerLegalNameSnapshot === customer.legalName &&
+    row.customerBusinessIdentifierSnapshot === customer.businessIdentifier &&
+    row.customerAddressSnapshot === customer.address &&
+    row.customerBillingEmailSnapshot === customer.email &&
+    row.customerReference === (request.customerReference ?? null) &&
+    row.purchaseOrderId === (request.purchaseOrderId ?? null) &&
+    row.dueAt?.getTime() === requestedDueAt &&
+    row.lines.length === request.lines.length &&
+    row.lines.every((line, index) => {
+      const requested = request.lines[index]!;
+      return (
+        line.description === requested.description &&
+        line.quantity === BigInt(requested.quantity) &&
+        line.unitAmountMinor === BigInt(requested.unitAmountMinor) &&
+        line.taxRateBasisPoints === requested.taxRateBasisPoints
+      );
+    })
+  );
+}
+
+function idempotencyConflict(): ConflictException {
+  return new ConflictException({
+    error: {
+      code: 'IDEMPOTENCY_CONFLICT',
+      message: 'The idempotency key was already used for a different invoice request.',
+    },
+  });
 }
 
 function toView(row: InvoiceWithLines | InvoiceWithRender): InvoiceView {
@@ -115,7 +159,10 @@ export class InvoicesService {
           where: { organisationId, issuanceIdempotencyKey: request.idempotencyKey },
           include: { lines: true },
         });
-        if (existing) return toView(existing);
+        if (existing) {
+          if (!sameIssuanceRequest(existing, request)) throw idempotencyConflict();
+          return toView(existing);
+        }
         const account = await tx.billingAccount.findFirst({
           where: { id: request.billingAccountId, organisationId },
         });
@@ -283,7 +330,10 @@ export class InvoicesService {
         where: { organisationId, issuanceIdempotencyKey: request.idempotencyKey },
         include: { lines: true },
       });
-      if (retry) return toView(retry);
+      if (retry) {
+        if (!sameIssuanceRequest(retry, request)) throw idempotencyConflict();
+        return toView(retry);
+      }
       throw error;
     }
   }
