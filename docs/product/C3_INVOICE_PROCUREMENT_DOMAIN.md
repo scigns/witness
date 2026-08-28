@@ -1,10 +1,11 @@
 # C3 invoice and procurement domain
 
 **Owner:** Principal Architect & Backend Lead
-**Status:** Issue #111 domain and #112 persistence implementation; application effects not implemented
-**Review:** Architecture and security review before merge; revisit in issues #112, #115, and #116
+**Status:** Issues #111–#114 domain, persistence, snapshot and authenticated issuance/rendering
+implemented; settlement/application effects not implemented
+**Review:** Architecture and security review before merge; revisit in issues #115, and #116
 
-This document records the provider-neutral commercial rules implemented by issue #111. Witness
+This document records the provider-neutral commercial rules implemented by issues #111–#114. Witness
 represents receivable and settlement evidence; it does not move money, verify a bank account, or
 become an accounting ledger. Revenue Gate B remains unavailable until the complete C3 evidence and
 approval requirements in the [procurement workflow](../commercial/PROCUREMENT_WORKFLOW.md) exist.

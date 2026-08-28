@@ -67,6 +67,7 @@ export class InvoicesController {
     const invoice = await this.invoices.render(organisationId, invoiceId);
     response
       .type('html')
+      .set('Cache-Control', 'no-store')
       .set('Content-Disposition', `attachment; filename="${invoice.invoiceNumber}.html"`)
       .send(renderInvoiceHtml(invoice));
   }

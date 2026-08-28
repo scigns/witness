@@ -1,4 +1,4 @@
-import type { InvoiceRenderView } from '@witness/contracts';
+import { INVOICE_CURRENCY_EXPONENTS, type InvoiceRenderView } from '@witness/contracts';
 
 function escapeHtml(value: string): string {
   return value
@@ -9,8 +9,16 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-const money = (minor: string, currency: string): string =>
-  `${currency} ${(BigInt(minor) / 100n).toString()}.${(BigInt(minor) % 100n).toString().padStart(2, '0')}`;
+const money = (minor: string, currency: string): string => {
+  if (!(currency in INVOICE_CURRENCY_EXPONENTS)) throw new Error('Unsupported invoice currency.');
+  const exponent = INVOICE_CURRENCY_EXPONENTS[currency as keyof typeof INVOICE_CURRENCY_EXPONENTS];
+  const value = BigInt(minor);
+  if (exponent === 0) return `${currency} ${value.toString()}`;
+  const scale = 10n ** BigInt(exponent);
+  const whole = value / scale;
+  const fraction = (value % scale).toString().padStart(exponent, '0');
+  return `${currency} ${whole.toString()}.${fraction}`;
+};
 
 export function renderInvoiceHtml(invoice: InvoiceRenderView): string {
   const lines = invoice.lines

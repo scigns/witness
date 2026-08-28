@@ -248,8 +248,27 @@ export interface BillingOverview {
 
 // ─── Institutional invoice issuance (C3.3 / #114) ─────────────────────────
 
+/** Supported invoice currencies and their ISO 4217 minor-unit exponents. */
+export const INVOICE_CURRENCY_EXPONENTS = {
+  AUD: 2,
+  CAD: 2,
+  CHF: 2,
+  EUR: 2,
+  GBP: 2,
+  JPY: 0,
+  KWD: 3,
+  NZD: 2,
+  SGD: 2,
+  USD: 2,
+} as const;
+export type InvoiceCurrency = keyof typeof INVOICE_CURRENCY_EXPONENTS;
+
 const invoiceMoneyMinorSchema = z.string().regex(/^\d+$/, 'Use non-negative integer minor units');
-const invoiceCurrencySchema = z.string().regex(/^[A-Z]{3}$/, 'Use an uppercase ISO currency code');
+const invoiceCurrencySchema = z
+  .string()
+  .refine((currency): currency is InvoiceCurrency => currency in INVOICE_CURRENCY_EXPONENTS, {
+    message: 'Use a supported ISO 4217 currency code',
+  });
 const invoiceCustomerSchema = z
   .object({
     legalName: z.string().trim().min(1).max(200),
