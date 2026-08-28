@@ -257,17 +257,17 @@ export class InvoicesService {
             id,
             organisationId,
             billingAccountId: account.id,
-            status: issued.status,
+            status: 'DRAFT',
             currency: issued.currency,
-            invoiceNumber: issued.invoiceNumber,
+            invoiceNumber: null,
             issuanceIdempotencyKey: request.idempotencyKey,
             customerReference: issued.customerReference,
             purchaseOrderId: issued.purchaseOrderId,
             subtotalMinor: issued.subtotal.amountMinor,
             taxMinor: issued.tax.amountMinor,
             totalMinor: issued.total.amountMinor,
-            issuedAt: issued.issuedAt,
-            dueAt: issued.dueAt,
+            issuedAt: null,
+            dueAt: null,
             statusChangedAt: issued.statusChangedAt,
             supplierLegalNameSnapshot: snapshot.supplier.legalName,
             supplierBusinessIdentifierSnapshot: snapshot.supplier.businessIdentifier,
@@ -280,7 +280,6 @@ export class InvoicesService {
             lines: {
               create: issued.lineItems.map((line) => ({
                 id: line.id,
-                organisationId,
                 description: line.description,
                 currency: line.total.currency,
                 quantity: line.quantity,
@@ -291,15 +290,27 @@ export class InvoicesService {
                 totalMinor: line.total.amountMinor,
               })),
             },
-            remittanceSnapshot: {
-              create: {
-                id: randomUUID(),
-                accountName: snapshot.remittance.accountName,
-                routingIdentifier: snapshot.remittance.routingIdentifier,
-                accountNumber: snapshot.remittance.accountNumber,
-                paymentInstructions: snapshot.remittance.paymentInstructions,
-              },
-            },
+          },
+        });
+        await tx.invoiceRemittanceSnapshot.create({
+          data: {
+            id: randomUUID(),
+            organisationId,
+            invoiceId: id,
+            accountName: snapshot.remittance.accountName,
+            routingIdentifier: snapshot.remittance.routingIdentifier,
+            accountNumber: snapshot.remittance.accountNumber,
+            paymentInstructions: snapshot.remittance.paymentInstructions,
+          },
+        });
+        await tx.invoice.update({
+          where: { id },
+          data: {
+            status: issued.status,
+            invoiceNumber: issued.invoiceNumber,
+            issuedAt: issued.issuedAt,
+            dueAt: issued.dueAt,
+            statusChangedAt: issued.statusChangedAt,
           },
         });
         await appendAuditEvent(

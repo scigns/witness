@@ -56,7 +56,9 @@ describe('InvoicesService retrieval boundaries', () => {
         findFirst: vi.fn().mockResolvedValueOnce(null).mockResolvedValue(created),
         create: vi.fn().mockResolvedValue(created),
         findUniqueOrThrow: vi.fn().mockResolvedValue(created),
+        update: vi.fn().mockResolvedValue(created),
       },
+      invoiceRemittanceSnapshot: { create: vi.fn().mockResolvedValue(row.remittanceSnapshot) },
       billingAccount: {
         findFirst: vi.fn().mockResolvedValue({ id: row.billingAccountId, currency: 'AUD' }),
       },
