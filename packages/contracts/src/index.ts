@@ -266,9 +266,13 @@ export type InvoiceCurrency = keyof typeof INVOICE_CURRENCY_EXPONENTS;
 const invoiceMoneyMinorSchema = z.string().regex(/^\d+$/, 'Use non-negative integer minor units');
 const invoiceCurrencySchema = z
   .string()
-  .refine((currency): currency is InvoiceCurrency => currency in INVOICE_CURRENCY_EXPONENTS, {
-    message: 'Use a supported ISO 4217 currency code',
-  });
+  .refine(
+    (currency): currency is InvoiceCurrency =>
+      Object.prototype.hasOwnProperty.call(INVOICE_CURRENCY_EXPONENTS, currency),
+    {
+      message: 'Use a supported ISO 4217 currency code',
+    },
+  );
 const invoiceCustomerSchema = z
   .object({
     legalName: z.string().trim().min(1).max(200),

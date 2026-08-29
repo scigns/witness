@@ -10,7 +10,9 @@ function escapeHtml(value: string): string {
 }
 
 const money = (minor: string, currency: string): string => {
-  if (!(currency in INVOICE_CURRENCY_EXPONENTS)) throw new Error('Unsupported invoice currency.');
+  if (!Object.prototype.hasOwnProperty.call(INVOICE_CURRENCY_EXPONENTS, currency)) {
+    throw new Error('Unsupported invoice currency.');
+  }
   const exponent = INVOICE_CURRENCY_EXPONENTS[currency as keyof typeof INVOICE_CURRENCY_EXPONENTS];
   const value = BigInt(minor);
   if (exponent === 0) return `${currency} ${value.toString()}`;
