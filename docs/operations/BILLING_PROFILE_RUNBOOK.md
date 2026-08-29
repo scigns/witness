@@ -37,6 +37,7 @@ health/readiness responses or unauthenticated pages. Verify this with synthetic 
 deployment review. Configuration presence is not professional approval; retain evidence of human
 legal, tax, security and procurement review in the authorised evidence room.
 
-Invoice rendering and authenticated remittance presentation are #114 scope. This milestone defines
-the snapshot contract and storage boundary only; it does not process payments, reconcile settlement
-or activate entitlements.
+Invoice issuance and authenticated remittance presentation are #114 scope. Rendering uses persisted
+snapshots, not current configuration. An invoice and its payment instructions are not evidence that
+payment occurred; this milestone does not process payments, reconcile settlement or activate
+entitlements.

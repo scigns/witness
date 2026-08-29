@@ -164,3 +164,30 @@ describe('AuthorizationGuard — denial response shape', () => {
     });
   });
 });
+
+describe('AuthorizationGuard — development invoice containment', () => {
+  it('rejects unverified development invoice access off localhost', async () => {
+    const guard = new AuthorizationGuard(
+      fakeReflector('invoice:read'),
+      {
+        authenticate: vi.fn().mockResolvedValue({
+          subject: 'dev',
+          displayName: 'Dev',
+          kind: 'human',
+          roles: ['admin'],
+        }),
+      } as never,
+      { authenticate: vi.fn().mockResolvedValue(null) } as never,
+      fakePolicyEnforcement(),
+    );
+    await expect(
+      guard.canActivate(
+        fakeContext({
+          headers: { 'x-witness-dev-user': 'Dev|admin' },
+          params: {},
+          socket: { remoteAddress: '10.0.0.5' },
+        }),
+      ),
+    ).rejects.toMatchObject({ response: { error: { code: 'DEVELOPMENT_ACCESS_LOCAL_ONLY' } } });
+  });
+});

@@ -128,6 +128,7 @@
 # packages/domain/src/report-composition.ts.
 p, reader, record:read
 p, reader, organisation:read
+p, reader, invoice:read
 p, reader, workspace:read
 p, reader, role:read
 p, reader, session:read
@@ -155,6 +156,7 @@ p, reader, resource:read
 p, contributor, record:read
 p, contributor, record:create
 p, contributor, organisation:read
+p, contributor, invoice:read
 p, contributor, workspace:read
 p, contributor, workspace:update
 p, contributor, role:read
@@ -208,6 +210,7 @@ p, reviewer, record:read
 p, reviewer, record:create
 p, reviewer, record:review
 p, reviewer, organisation:read
+p, reviewer, invoice:read
 p, reviewer, workspace:read
 p, reviewer, role:read
 p, reviewer, session:read
@@ -245,8 +248,11 @@ p, admin, record:read
 p, admin, record:create
 p, admin, record:review
 p, admin, organisation:read
+p, admin, invoice:read
 p, admin, organisation:create
 p, admin, organisation:update
+p, admin, invoice:create
+p, admin, invoice:render
 p, admin, workspace:read
 p, admin, workspace:create
 p, admin, workspace:update

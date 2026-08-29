@@ -44,6 +44,11 @@ export interface RequestWithPrincipal {
   params: Record<string, string | undefined>;
   body?: Record<string, unknown>;
   principal?: Principal;
+  socket?: { remoteAddress?: string };
+}
+
+function isLoopback(address: string | undefined): boolean {
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 
 /**
@@ -122,6 +127,21 @@ export class AuthorizationGuard implements CanActivate {
             'No principal. Sign in and send Authorization: Bearer <session token>. In the ' +
             'development profile only, X-Witness-Dev-User: "Name|reviewer" is also accepted — ' +
             'that header is unverified and never trusted outside development.',
+        },
+      });
+    }
+
+    // Development identity is intentionally unverified. Keep invoice
+    // surfaces confined to a local socket even when a role header claims admin.
+    if (
+      required.startsWith('invoice:') &&
+      sessionPrincipal === null &&
+      !isLoopback(request.socket?.remoteAddress)
+    ) {
+      throw new UnauthorizedException({
+        error: {
+          code: 'DEVELOPMENT_ACCESS_LOCAL_ONLY',
+          message: 'Development-authenticated invoice access is restricted to localhost.',
         },
       });
     }

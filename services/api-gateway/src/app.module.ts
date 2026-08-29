@@ -95,6 +95,8 @@ import { WorkspaceRoleAssignmentsController } from './workspace-role-assignments
 import { WorkspaceRoleAssignmentsService } from './workspace-role-assignments/workspace-role-assignments.service.js';
 import { WorkspacesController } from './workspaces/workspaces.controller.js';
 import { WorkspacesService } from './workspaces/workspaces.service.js';
+import { InvoicesController } from './invoices/invoices.controller.js';
+import { InvoicesService } from './invoices/invoices.service.js';
 
 @Module({
   controllers: [
@@ -127,6 +129,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     CurrentUserController,
     PublicCommercialController,
     BillingController,
+    InvoicesController,
   ],
   providers: [
     PrismaService,
@@ -143,6 +146,7 @@ import { WorkspacesService } from './workspaces/workspaces.service.js';
     OrganisationUsageService,
     CommercialEntitlementService,
     CommercialCatalogueService,
+    InvoicesService,
     WorkspacesService,
     UsersService,
     OrganisationInvitationsService,

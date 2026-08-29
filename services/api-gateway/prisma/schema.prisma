@@ -251,6 +251,7 @@ model Invoice {
   paidAt            DateTime?      @map("paid_at") @db.Timestamptz(6)
   statusChangedAt   DateTime       @default(now()) @map("status_changed_at") @db.Timestamptz(6)
   statusReason      String?        @map("status_reason") @db.VarChar(500)
+  issuanceIdempotencyKey String?   @map("issuance_idempotency_key") @db.Uuid
 
   // Reviewed issue-time identity facts. Null is permitted only for drafts;
   // issuance/application services must supply the complete snapshot.
@@ -269,6 +270,7 @@ model Invoice {
 
   @@unique([organisationId, id])
   @@unique([organisationId, invoiceNumber])
+  @@unique([organisationId, issuanceIdempotencyKey])
   @@index([organisationId, status])
   @@index([billingAccountId, status])
   @@map("invoice")
