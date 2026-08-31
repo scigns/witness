@@ -36,22 +36,29 @@ POSTGRES_DB="$(env_get POSTGRES_DB)"
 KEYCLOAK_DB_USER="$(env_get KEYCLOAK_DB_USER)"
 KEYCLOAK_DB="$(env_get KEYCLOAK_DB)"
 KEYCLOAK_DB="${KEYCLOAK_DB:-keycloak}"
+POSTGRES_PASSWORD="$(env_get POSTGRES_PASSWORD)"
+KEYCLOAK_DB_PASSWORD="$(env_get KEYCLOAK_DB_PASSWORD)"
 
 [[ -n "${POSTGRES_USER}" && -n "${POSTGRES_DB}" ]] || { echo "Witness database identity is incomplete" >&2; exit 1; }
 [[ -n "${KEYCLOAK_DB_USER}" && -n "${KEYCLOAK_DB}" ]] || { echo "Keycloak database identity is incomplete" >&2; exit 1; }
+[[ -n "${POSTGRES_PASSWORD}" ]] || { echo "Witness database password is incomplete" >&2; exit 1; }
+[[ -n "${KEYCLOAK_DB_PASSWORD}" ]] || { echo "Keycloak database password is incomplete" >&2; exit 1; }
 
 cleanup() {
   rm -f -- "${WITNESS_ARCHIVE}.tmp" "${KEYCLOAK_ARCHIVE}.tmp"
 }
 trap cleanup EXIT
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres \
+export PGPASSWORD="${POSTGRES_PASSWORD}"
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T --env PGPASSWORD postgres \
   pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
   --format=custom --no-owner >"${WITNESS_ARCHIVE}.tmp"
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres \
+export PGPASSWORD="${KEYCLOAK_DB_PASSWORD}"
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T --env PGPASSWORD postgres \
   pg_dump -U "${KEYCLOAK_DB_USER}" -d "${KEYCLOAK_DB}" \
   --format=custom --no-owner >"${KEYCLOAK_ARCHIVE}.tmp"
+unset PGPASSWORD
 
 mv -- "${WITNESS_ARCHIVE}.tmp" "${WITNESS_ARCHIVE}"
 mv -- "${KEYCLOAK_ARCHIVE}.tmp" "${KEYCLOAK_ARCHIVE}"
