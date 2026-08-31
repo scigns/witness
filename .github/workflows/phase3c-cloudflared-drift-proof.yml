@@ -48,6 +48,7 @@ jobs:
               /^[[:space:]]*hostname:[[:space:]]*/ || /^[[:space:]]*service:[[:space:]]*/ ||
               /^[[:space:]]*tunnel:[[:space:]]*/ || /^[[:space:]]*credentials-file:[[:space:]]*/ ||
               /^[[:space:]]*metrics:[[:space:]]*/ || /^[[:space:]]*originRequest:[[:space:]]*/ ||
+              /^[[:space:]]+(connectTimeout|keepAliveTimeout|httpHostHeader):[[:space:]]*/ ||
               /return_status:[[:space:]]*/ {
                 if ($0 ~ /(^|[[:space:]])(token|password|secret|private[_-]?key):/ && $0 !~ /\$\{/) print "SENSITIVE_VALUE_REDACTED";
                 else print;
@@ -76,8 +77,9 @@ jobs:
           compare_element TUNNEL_DECLARATION '/^[[:space:]]*tunnel:[[:space:]]*/ { print }'
           compare_element CREDENTIALS_FILE '/^[[:space:]]*credentials-file:[[:space:]]*/ { print }'
           compare_element METRICS '/^[[:space:]]*metrics:[[:space:]]*/ { print }'
-          compare_element ORIGIN_REQUEST '/^[[:space:]]*originRequest:[[:space:]]*/ { print }'
+          compare_element ORIGIN_REQUEST '/^[[:space:]]*originRequest:[[:space:]]*$/ { in_block=1; print; next } /^[^[:space:]]/ { in_block=0 } in_block && /^[[:space:]]+(connectTimeout|keepAliveTimeout|httpHostHeader):[[:space:]]*/ { print }'
           compare_element HOSTNAME_ROUTES '/^[[:space:]]*hostname:[[:space:]]*/ || /^[[:space:]]*service:[[:space:]]*/ || /return_status:[[:space:]]*/ { print }'
+          compare_element CATCH_ALL_404 '/^[[:space:]]*service:[[:space:]]*http_status:404[[:space:]]*$/ { print }'
 
           echo "LIVE_TUNNEL_NAME=witness-prod"
           echo "LIVE_HOSTNAMES_AND_SERVICES=NOT_AVAILABLE"
