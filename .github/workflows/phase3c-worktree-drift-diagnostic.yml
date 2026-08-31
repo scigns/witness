@@ -17,6 +17,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          [[ "${GITHUB_REF:-}" == "refs/heads/main" ]] || { echo "Diagnostic must be dispatched from main; refusing inspection."; exit 1; }
           expected_host="witness-prod-01"
           actual_host="$(hostname -s 2>/dev/null || hostname)"
           [[ "$actual_host" == "$expected_host" ]] || { echo "Unexpected runner hostname; refusing inspection."; exit 1; }
@@ -29,7 +30,7 @@ jobs:
           echo "PRODUCTION_REPOSITORY=$production_repo"
           echo "PRODUCTION_BRANCH=$(git -C "$production_repo" symbolic-ref --short -q HEAD 2>/dev/null || echo detached)"
           echo "PRODUCTION_HEAD=$(git -C "$production_repo" rev-parse HEAD)"
-          echo "CURRENT_MAIN=$GITHUB_SHA"
+          echo "CURRENT_GITHUB_MAIN_SHA=$GITHUB_SHA"
           if git -C "$production_repo" rev-parse --verify origin/main >/dev/null 2>&1; then
             echo "PRODUCTION_ORIGIN_MAIN=$(git -C "$production_repo" rev-parse origin/main)"
             relationship="$(git -C "$production_repo" rev-list --left-right --count origin/main...HEAD)"
@@ -41,33 +42,50 @@ jobs:
 
           dirty_count="$(git -C "$production_repo" status --porcelain=v1 | wc -l | tr -d ' ')"
           echo "DIRTY_ENTRY_COUNT=$dirty_count"
+
+          redact_path() {
+            local path="$1" lower
+            lower="$(printf '%s' "$path" | tr '[:upper:]' '[:lower:]')"
+            case "$lower" in
+              *.env|*.env.*|*credential*|*secret*|*private*|*.pem|*.key|*password*|*token*|*backup*|*.dump|*.sql|*database*)
+                printf '%s' "SENSITIVE_PATH_REDACTED" ;;
+              *) printf '%s' "$path" ;;
+            esac
+          }
+
+          emit_change() {
+            local status="$1" source="$2" destination="${3:-}"
+            if [[ "$status" == R* || "$status" == C* ]]; then
+              printf 'STATUS=%s SOURCE_PATH=%s DESTINATION_PATH=%s\n' "$status" "$(redact_path "$source")" "$(redact_path "$destination")"
+            else
+              printf 'STATUS=%s PATH=%s\n' "$status" "$(redact_path "$source")"
+            fi
+          }
+
           echo "DIRTY_ENTRIES="
           git -C "$production_repo" status --porcelain=v1 | while IFS= read -r entry; do
             code="${entry:0:2}"
             path="${entry:3}"
-            case "$path" in
-              .env|.env.*|*credential*|*secret*|*private*|*.pem|*.key|*password*|*token*|*backup*|*.dump|*.sql|*database*)
-                path="UNTRACKED_SENSITIVE_PATH_REDACTED"
-                ;;
-            esac
-            echo "STATUS=$code PATH=$path"
+            if [[ "$code" == R* || "$code" == C* ]] && [[ "$path" == *' -> '* ]]; then
+              emit_change "$code" "${path%% -> *}" "${path#* -> }"
+            else
+              emit_change "$code" "$path"
+            fi
           done
 
-          echo "TRACKED_MODIFIED="
-          git -C "$production_repo" diff --name-status | while IFS=$'\t' read -r status path rest; do
-            [[ -n "$path" ]] || continue
-            case "$path" in .env|.env.*|*credential*|*secret*|*private*|*.pem|*.key|*password*|*token*|*backup*|*.dump|*.sql|*database*) path="SENSITIVE_PATH_REDACTED";; esac
-            echo "STATUS=$status PATH=$path"
+          echo "UNSTAGED_TRACKED_ENTRIES="
+          git -C "$production_repo" diff --name-status --find-renames | while IFS=$'\t' read -r status source destination; do
+            [[ -n "$source" ]] || continue
+            emit_change "$status" "$source" "$destination"
           done
           echo "STAGED_ENTRIES="
-          git -C "$production_repo" diff --cached --name-status | while IFS=$'\t' read -r status path rest; do
-            [[ -n "$path" ]] || continue
-            case "$path" in .env|.env.*|*credential*|*secret*|*private*|*.pem|*.key|*password*|*token*|*backup*|*.dump|*.sql|*database*) path="SENSITIVE_PATH_REDACTED";; esac
-            echo "STATUS=$status PATH=$path"
+          git -C "$production_repo" diff --cached --name-status --find-renames | while IFS=$'\t' read -r status source destination; do
+            [[ -n "$source" ]] || continue
+            emit_change "$status" "$source" "$destination"
           done
           echo "UNTRACKED_ENTRIES="
           git -C "$production_repo" ls-files --others --exclude-standard | while IFS= read -r path; do
-            case "$path" in .env|.env.*|*credential*|*secret*|*private*|*.pem|*.key|*password*|*token*|*backup*|*.dump|*.sql|*database*) echo "PATH=UNTRACKED_SENSITIVE_PATH_REDACTED";; *) echo "PATH=$path";; esac
+            echo "PATH=$(redact_path "$path")"
           done
           echo "FILE_CONTENTS_READ=NO"
           echo "PRODUCTION_ACTIONS=NONE"
