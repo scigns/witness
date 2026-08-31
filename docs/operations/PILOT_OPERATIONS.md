@@ -173,6 +173,9 @@ password with the identity provider and are unaffected by any of this.
 
 ## Backup
 
+Pre-cutover backup, export and rollback controls are documented in
+[Phase 3C backup and rollback controls](PHASE3C_BACKUP_AND_ROLLBACK.md).
+
 ```bash
 make pilot-backup                    # writes to ~/witness-backups by default
 BACKUP_DIR=/path scripts/pilot/backup.sh /path
@@ -181,10 +184,13 @@ BACKUP_DIR=/path scripts/pilot/backup.sh /path
 `scripts/pilot/backup.sh` is `scripts/ops/backup.sh` adapted for this compose
 topology: Postgres has no published port (reachable only from the compose
 network, by design), so it runs `pg_dump` through `docker compose exec`
-instead of a direct `DATABASE_URL` connection. Output is identical either way
-— a custom-format dump plus a SHA-256 checksum beside it.
+instead of a direct `DATABASE_URL` connection. It writes separate custom-format
+Witness and Keycloak dumps, each with a SHA-256 checksum beside it. The Witness
+pair remains compatible with the existing application backup/restore flow;
+Keycloak restoration is a separate procedure and is not handled by
+`scripts/ops/restore.sh`.
 
-Only PostgreSQL is backed up. Under ADR-0011 the graph and search projections
+Under ADR-0011 the graph and search projections
 are rebuildable from the event log; copying them costs storage and buys nothing.
 
 That reasoning does **not** extend to evidence attachments (audio, document
