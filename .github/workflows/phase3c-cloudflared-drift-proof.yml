@@ -1,0 +1,88 @@
+name: Phase 3C cloudflared drift proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift-proof:
+    name: Read-only cloudflared configuration comparison
+    runs-on: [self-hosted, witness-pilot]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout current main reference
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.1.7
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+          path: drift-proof-source
+
+      - name: Compare the single approved production file
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_REF:-}" == "refs/heads/main" ]] || { echo "Drift proof must be dispatched from main; refusing inspection."; exit 1; }
+          expected_host="witness-prod-01"
+          actual_host="$(hostname -s 2>/dev/null || hostname)"
+          [[ "$actual_host" == "$expected_host" ]] || { echo "Unexpected runner hostname; refusing inspection."; exit 1; }
+
+          production_repo="/home/witness/witness"
+          relative_file="deployments/cloud-managed/cloudflared/config.yml"
+          production_file="$production_repo/$relative_file"
+          current_main_file="$GITHUB_WORKSPACE/drift-proof-source/$relative_file"
+          [[ -d "$production_repo/.git" && -f "$production_file" && -f "$current_main_file" ]] || { echo "Approved production or main file is unavailable."; exit 1; }
+
+          temp_root="$(mktemp -d)"
+          trap 'rm -rf "$temp_root"' EXIT
+          git -C "$production_repo" show "HEAD:$relative_file" >"$temp_root/head"
+          cp "$production_file" "$temp_root/worktree"
+          cp "$current_main_file" "$temp_root/main"
+
+          summarize() {
+            local label="$1" file="$2"
+            echo "${label}_HOSTNAMES_AND_SERVICES="
+            awk '
+              /^[[:space:]]*hostname:[[:space:]]*/ || /^[[:space:]]*service:[[:space:]]*/ ||
+              /^[[:space:]]*tunnel:[[:space:]]*/ || /^[[:space:]]*credentials-file:[[:space:]]*/ ||
+              /^[[:space:]]*metrics:[[:space:]]*/ || /^[[:space:]]*originRequest:[[:space:]]*/ ||
+              /return_status:[[:space:]]*/ {
+                if ($0 ~ /(^|[[:space:]])(token|password|secret|private[_-]?key):/ && $0 !~ /\$\{/) print "SENSITIVE_VALUE_REDACTED";
+                else print;
+              }
+            ' "$file"
+          }
+          summarize PRODUCTION_HEAD "$temp_root/head"
+          summarize PRODUCTION_WORKTREE "$temp_root/worktree"
+          summarize CURRENT_MAIN "$temp_root/main"
+
+          if awk '/(^|[[:space:]])(token|password|secret|private[_-]?key):/ && $0 !~ /\$\{/ { found=1 } END { exit !found }' "$temp_root/worktree"; then
+            echo "SECRET_LIKE_VALUE_REDACTED=YES"
+          else
+            echo "SECRET_LIKE_VALUE_REDACTED=NO"
+          fi
+
+          compare_element() {
+            local name="$1" pattern="$2"
+            local head_summary worktree_summary main_summary
+            head_summary="$(awk "$pattern" "$temp_root/head")"
+            worktree_summary="$(awk "$pattern" "$temp_root/worktree")"
+            main_summary="$(awk "$pattern" "$temp_root/main")"
+            [[ "$head_summary" == "$worktree_summary" ]] && echo "$name HEAD_vs_WORKTREE=SAME" || echo "$name HEAD_vs_WORKTREE=DIFFERENT"
+            [[ "$worktree_summary" == "$main_summary" ]] && echo "$name WORKTREE_vs_MAIN=SAME" || echo "$name WORKTREE_vs_MAIN=DIFFERENT"
+          }
+          compare_element TUNNEL_DECLARATION '/^[[:space:]]*tunnel:[[:space:]]*/ { print }'
+          compare_element CREDENTIALS_FILE '/^[[:space:]]*credentials-file:[[:space:]]*/ { print }'
+          compare_element METRICS '/^[[:space:]]*metrics:[[:space:]]*/ { print }'
+          compare_element ORIGIN_REQUEST '/^[[:space:]]*originRequest:[[:space:]]*/ { print }'
+          compare_element HOSTNAME_ROUTES '/^[[:space:]]*hostname:[[:space:]]*/ || /^[[:space:]]*service:[[:space:]]*/ || /return_status:[[:space:]]*/ { print }'
+
+          echo "LIVE_TUNNEL_NAME=witness-prod"
+          echo "LIVE_HOSTNAMES_AND_SERVICES=NOT_AVAILABLE"
+          echo "LOCAL_TUNNEL_MATCH=UNKNOWN"
+          echo "PRODUCTION_WORKTREE_MATCHES_LIVE_TUNNEL=UNKNOWN"
+          echo "PRODUCTION_CONFIG_CHANGED=NO"
+          echo "CLOUDFLARE_CHANGED=NO"
+          echo "RECOVERY_WORKFLOW_RERUN=NO"
