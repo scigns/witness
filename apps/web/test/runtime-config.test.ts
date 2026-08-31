@@ -36,4 +36,22 @@ describe('browser API origin contract', () => {
       }),
     ).toThrow();
   });
+
+  it('rejects plaintext API origins outside development', () => {
+    expect(() =>
+      resolveApiBaseUrl({
+        WITNESS_BUILD_PROFILE: 'sovereign',
+        NEXT_PUBLIC_WITNESS_API_URL: 'http://api.example.org',
+      }),
+    ).toThrow(/must use HTTPS/i);
+  });
+
+  it('allows plaintext API origins only for local development', () => {
+    expect(
+      resolveApiBaseUrl({
+        WITNESS_BUILD_PROFILE: 'development',
+        NEXT_PUBLIC_WITNESS_API_URL: 'http://localhost:3001',
+      }),
+    ).toBe('http://localhost:3001');
+  });
 });

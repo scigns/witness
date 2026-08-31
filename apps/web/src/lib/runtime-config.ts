@@ -24,6 +24,9 @@ export function resolveApiBaseUrl(env: Record<string, string | undefined>): stri
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error('NEXT_PUBLIC_WITNESS_API_URL must use HTTP or HTTPS.');
   }
+  if (parsed.protocol === 'http:' && profile !== 'development') {
+    throw new Error('NEXT_PUBLIC_WITNESS_API_URL must use HTTPS outside the development profile.');
+  }
   if (parsed.username !== '' || parsed.password !== '') {
     throw new Error('NEXT_PUBLIC_WITNESS_API_URL must not contain credentials.');
   }
