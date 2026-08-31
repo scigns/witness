@@ -173,6 +173,9 @@ password with the identity provider and are unaffected by any of this.
 
 ## Backup
 
+Pre-cutover backup, export and rollback controls are documented in
+[Phase 3C backup and rollback controls](PHASE3C_BACKUP_AND_ROLLBACK.md).
+
 ```bash
 make pilot-backup                    # writes to ~/witness-backups by default
 BACKUP_DIR=/path scripts/pilot/backup.sh /path

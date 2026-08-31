@@ -23,7 +23,7 @@ if [[ ! -d "${DESTINATION}" ]]; then
 fi
 
 shopt -s nullglob
-dumps=("${DESTINATION}"/witness-*.dump)
+dumps=("${DESTINATION}"/witness-*.dump "${DESTINATION}"/keycloak-*.dump)
 shopt -u nullglob
 
 if [[ ${#dumps[@]} -eq 0 ]]; then
@@ -34,6 +34,15 @@ fi
 overall_exit=0
 latest=""
 latest_mtime=0
+
+shopt -s nullglob
+witness_dumps=("${DESTINATION}"/witness-*.dump)
+keycloak_dumps=("${DESTINATION}"/keycloak-*.dump)
+shopt -u nullglob
+if [[ ${#witness_dumps[@]} -eq 0 || ${#keycloak_dumps[@]} -eq 0 ]]; then
+  overall_exit=1
+  echo "STATUS: DEGRADED — both witness and keycloak backup sets are required."
+fi
 
 echo "Backups in ${DESTINATION}:"
 for dump in "${dumps[@]}"; do
