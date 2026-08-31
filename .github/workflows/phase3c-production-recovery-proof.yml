@@ -12,6 +12,14 @@ jobs:
     runs-on: [self-hosted, witness-pilot]
     timeout-minutes: 30
     steps:
+      - name: Checkout reviewed recovery tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.1.7
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+          path: phase3c-recovery-source
+
       - name: Execute approved recovery proof
         shell: bash
         run: |
@@ -21,42 +29,57 @@ jobs:
           actual_host="$(hostname -s 2>/dev/null || hostname)"
           [[ "$actual_host" == "$expected_host" ]] || { echo "Unexpected runner hostname; refusing recovery proof."; exit 1; }
 
-          repo="/home/witness/witness"
-          [[ -d "$repo/.git" ]] || { echo "Authoritative production repository not found."; exit 1; }
-          [[ "$(git -C "$repo" symbolic-ref --short -q HEAD 2>/dev/null || true)" == "main" ]] || { echo "Production repository is not on main."; exit 1; }
-          [[ "$(git -C "$repo" rev-parse HEAD)" == "$GITHUB_SHA" ]] || { echo "Production repository does not match dispatched main revision."; exit 1; }
-          [[ "$(git -C "$repo" status --short | wc -l | tr -d ' ')" == "0" ]] || { echo "Production repository is not clean."; exit 1; }
+          production_repo="/home/witness/witness"
+          tooling_repo="$GITHUB_WORKSPACE/phase3c-recovery-source"
+          [[ -d "$production_repo/.git" ]] || { echo "Authoritative production repository not found."; exit 1; }
+          [[ -d "$tooling_repo/.git" ]] || { echo "Reviewed recovery tooling checkout not found."; exit 1; }
+          [[ "$(git -C "$production_repo" symbolic-ref --short -q HEAD 2>/dev/null || true)" == "main" ]] || { echo "Production repository is not on main."; exit 1; }
+          [[ "$(git -C "$production_repo" status --short | wc -l | tr -d ' ')" == "0" ]] || { echo "Production repository is not clean."; exit 1; }
+          production_sha="$(git -C "$production_repo" rev-parse HEAD)"
+          [[ "$(git -C "$tooling_repo" rev-parse --verify HEAD)" == "$GITHUB_SHA" ]] || { echo "Reviewed tooling checkout does not match dispatched main revision."; exit 1; }
 
-          compose_file="$repo/deployments/cloud-managed/docker-compose.pilot.yml"
-          env_file="$repo/.env"
-          backup_dir="/home/witness/witness-backups/phase3c"
+          compose_file="$production_repo/deployments/cloud-managed/docker-compose.pilot.yml"
+          reviewed_compose_file="$tooling_repo/deployments/cloud-managed/docker-compose.pilot.yml"
+          env_file="$production_repo/.env"
+          run_root="/home/witness/witness-backups/phase3c/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           [[ -f "$compose_file" && -f "$env_file" ]] || { echo "Authoritative Compose or environment file is unavailable."; exit 1; }
+          [[ -f "$reviewed_compose_file" ]] || { echo "Reviewed Compose definition is unavailable."; exit 1; }
           grep -q '^name: witness-pilot$' "$compose_file" || { echo "Unexpected Compose project declaration."; exit 1; }
-          services="$(cd "$repo" && docker compose --env-file "$env_file" -f "$compose_file" config --services)"
+          grep -q '^name: witness-pilot$' "$reviewed_compose_file" || { echo "Reviewed Compose project declaration differs."; exit 1; }
+          services="$(cd "$production_repo" && docker compose --env-file "$env_file" -f "$compose_file" config --services)"
+          reviewed_services="$(cd "$tooling_repo" && docker compose --env-file "$env_file" -f "$reviewed_compose_file" config --services)"
           grep -qx postgres <<<"$services" || { echo "Expected postgres service is unavailable."; exit 1; }
+          [[ "$services" == "$reviewed_services" ]] || { echo "Reviewed and production Compose services differ."; exit 1; }
           compose_projects="$(docker compose ls --format '{{.Name}}' 2>/dev/null || true)"
           grep -qx witness-pilot <<<"$compose_projects" || { echo "Active witness-pilot Compose project is unavailable."; exit 1; }
 
-          mkdir -p "$backup_dir"
-          chmod 700 "$backup_dir"
+          if [[ -e "$run_root" ]]; then echo "Recovery run directory already exists; refusing stale-artifact reuse."; exit 1; fi
+          mkdir -p "$run_root" "$run_root/config" "$run_root/database" "$run_root/keycloak-config"
+          chmod 700 "$run_root" "$run_root/config" "$run_root/database" "$run_root/keycloak-config"
 
           echo "HOST=$actual_host"
           echo "COMPOSE_PROJECT=witness-pilot"
+          echo "PRODUCTION_DEPLOYMENT_SHA=$production_sha"
 
           export WITNESS_ENV_FILE="$env_file"
-          "$repo/scripts/pilot/snapshot-env.sh" "$backup_dir/config" >/dev/null
-          env_snapshot="$(find "$backup_dir/config" -maxdepth 1 -type f -name 'witness-env-*.snapshot' -print | sort | tail -1)"
-          [[ -n "$env_snapshot" ]] || { echo "Environment snapshot was not created."; exit 1; }
+          "$tooling_repo/scripts/pilot/snapshot-env.sh" "$run_root/config" >/dev/null
+          mapfile -t env_snapshots < <(find "$run_root/config" -maxdepth 1 -type f -name 'witness-env-*.snapshot' -print)
+          [[ ${#env_snapshots[@]} -eq 1 ]] || { echo "Expected exactly one environment snapshot in this run."; exit 1; }
+          env_snapshot="${env_snapshots[0]}"
+          [[ -f "${env_snapshot}.sha256" ]] || { echo "Environment snapshot checksum is missing."; exit 1; }
           (cd "$(dirname "$env_snapshot")" && sha256sum -c "$(basename "$env_snapshot").sha256" >/dev/null)
           [[ "$(stat -c '%a' "$env_snapshot" 2>/dev/null || stat -f '%Lp' "$env_snapshot")" == "600" ]] || { echo "Environment snapshot permissions are unsafe."; exit 1; }
           echo "ENV_SNAPSHOT_CREATED=YES"
           echo "ENV_CHECKSUM_VERIFIED=YES"
 
-          "$repo/scripts/pilot/backup.sh" "$backup_dir/database" >/dev/null
-          witness_dump="$(find "$backup_dir/database" -maxdepth 1 -type f -name 'witness-*.dump' -print | sort | tail -1)"
-          keycloak_dump="$(find "$backup_dir/database" -maxdepth 1 -type f -name 'keycloak-*.dump' -print | sort | tail -1)"
-          [[ -n "$witness_dump" && -n "$keycloak_dump" ]] || { echo "Expected database backup artifacts are missing."; exit 1; }
-          (cd "$backup_dir/database" && sha256sum -c "$(basename "$witness_dump").sha256" >/dev/null && sha256sum -c "$(basename "$keycloak_dump").sha256" >/dev/null)
+          "$tooling_repo/scripts/pilot/backup.sh" "$run_root/database" >/dev/null
+          mapfile -t witness_dumps < <(find "$run_root/database" -maxdepth 1 -type f -name 'witness-*.dump' -print)
+          mapfile -t keycloak_dumps < <(find "$run_root/database" -maxdepth 1 -type f -name 'keycloak-*.dump' -print)
+          [[ ${#witness_dumps[@]} -eq 1 && ${#keycloak_dumps[@]} -eq 1 ]] || { echo "Expected exactly one Witness and one Keycloak dump in this run."; exit 1; }
+          witness_dump="${witness_dumps[0]}"
+          keycloak_dump="${keycloak_dumps[0]}"
+          [[ -f "${witness_dump}.sha256" && -f "${keycloak_dump}.sha256" ]] || { echo "Database backup checksum is missing."; exit 1; }
+          (cd "$run_root/database" && sha256sum -c "$(basename "$witness_dump").sha256" >/dev/null && sha256sum -c "$(basename "$keycloak_dump").sha256" >/dev/null)
           echo "WITNESS_BACKUP_CREATED=YES"
           echo "WITNESS_BACKUP_CHECKSUM=VERIFIED"
           echo "WITNESS_BACKUP_SIZE=$(du -h "$witness_dump" | cut -f1)"
@@ -64,11 +87,14 @@ jobs:
           echo "KEYCLOAK_BACKUP_CHECKSUM=VERIFIED"
           echo "KEYCLOAK_BACKUP_SIZE=$(du -h "$keycloak_dump" | cut -f1)"
 
-          "$repo/scripts/pilot/export-keycloak-config.sh" "$backup_dir/keycloak-config" >/dev/null
-          realm_export="$(find "$backup_dir/keycloak-config" -maxdepth 1 -type f -name 'witness-realm-*.json' -print | sort | tail -1)"
-          client_export="$(find "$backup_dir/keycloak-config" -maxdepth 1 -type f -name 'witness-api-client-*.json' -print | sort | tail -1)"
-          [[ -n "$realm_export" && -n "$client_export" ]] || { echo "Expected Keycloak exports are missing."; exit 1; }
-          (cd "$backup_dir/keycloak-config" && sha256sum -c "$(basename "$realm_export").sha256" >/dev/null && sha256sum -c "$(basename "$client_export").sha256" >/dev/null)
+          "$tooling_repo/scripts/pilot/export-keycloak-config.sh" "$run_root/keycloak-config" >/dev/null
+          mapfile -t realm_exports < <(find "$run_root/keycloak-config" -maxdepth 1 -type f -name 'witness-realm-*.json' -print)
+          mapfile -t client_exports < <(find "$run_root/keycloak-config" -maxdepth 1 -type f -name 'witness-api-client-*.json' -print)
+          [[ ${#realm_exports[@]} -eq 1 && ${#client_exports[@]} -eq 1 ]] || { echo "Expected exactly one realm and client export in this run."; exit 1; }
+          realm_export="${realm_exports[0]}"
+          client_export="${client_exports[0]}"
+          [[ -f "${realm_export}.sha256" && -f "${client_export}.sha256" ]] || { echo "Keycloak export checksum is missing."; exit 1; }
+          (cd "$run_root/keycloak-config" && sha256sum -c "$(basename "$realm_export").sha256" >/dev/null && sha256sum -c "$(basename "$client_export").sha256" >/dev/null)
           echo "KEYCLOAK_REALM_EXPORT=PROVEN"
           echo "KEYCLOAK_CLIENT_EXPORT=PROVEN"
           echo "KEYCLOAK_EXPORT_CHECKSUMS=VERIFIED"
@@ -88,8 +114,11 @@ jobs:
             sleep 2
           done
           docker exec -e PGPASSWORD="$restore_password" "$restore_name" pg_isready -U postgres >/dev/null
-          docker run --rm --network container:"$restore_name" --mount "type=bind,source=$backup_dir/database,destination=/backup,readonly" -e PGPASSWORD="$restore_password" postgres:16-alpine pg_restore --list "/backup/$(basename "$keycloak_dump")" >/dev/null
-          docker run --rm --network container:"$restore_name" --mount "type=bind,source=$backup_dir/database,destination=/backup,readonly" -e PGPASSWORD="$restore_password" postgres:16-alpine pg_restore --no-owner --dbname=postgresql://postgres@127.0.0.1/postgres "/backup/$(basename "$keycloak_dump")" >/dev/null
+          docker run --rm --network container:"$restore_name" --mount "type=bind,source=$run_root/database,destination=/backup,readonly" -e PGPASSWORD="$restore_password" postgres:16-alpine pg_restore --list "/backup/$(basename "$keycloak_dump")" >/dev/null
+          docker run --rm --network container:"$restore_name" --mount "type=bind,source=$run_root/database,destination=/backup,readonly" -e PGPASSWORD="$restore_password" postgres:16-alpine pg_restore --no-owner --dbname=postgresql://postgres@127.0.0.1/postgres "/backup/$(basename "$keycloak_dump")" >/dev/null
+          structural_count="$(docker exec -e PGPASSWORD="$restore_password" "$restore_name" psql -U postgres -d postgres -Atqc "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND c.relkind IN ('r','p','v','m','f');")"
+          [[ "$structural_count" =~ ^[1-9][0-9]*$ ]] || { echo "Isolated restore contains no restored structural objects."; exit 1; }
+          echo "RESTORED_USER_TABLE_COUNT=$structural_count"
           echo "KEYCLOAK_RESTORE=PROVEN"
 
           echo "ANONYMOUS_VOLUMES="
@@ -108,7 +137,7 @@ jobs:
             if [[ -n "$attached" ]]; then
               classification="ACTIVE_REQUIRED"
             else
-              classification="HISTORICAL_ORPHANED"
+              classification="UNKNOWN"
               attached="none"
             fi
             echo "ANONYMOUS_VOLUME=${volume:0:12} ATTACHMENT=$attached CLASSIFICATION=$classification"
