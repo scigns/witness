@@ -2,8 +2,9 @@
 set -euo pipefail
 
 # Export only reviewed, non-secret realm/client configuration for rollback.
-# Credentials are supplied to kcadm through an environment variable inside the
-# container and are never placed on the command line or printed.
+# Credentials are supplied to kcadm through the Keycloak container's existing
+# bootstrap environment and are never placed on the host command line or
+# printed.
 cd "$(git rev-parse --show-toplevel)"
 
 COMPOSE_FILE="deployments/cloud-managed/docker-compose.pilot.yml"
@@ -16,24 +17,21 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 REALM_EXPORT="${DESTINATION}/witness-realm-${STAMP}.json"
 CLIENT_EXPORT="${DESTINATION}/witness-api-client-${STAMP}.json"
 
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T \
-  --env KEYCLOAK_ADMIN_PASSWORD keycloak \
-  /opt/keycloak/bin/kcadm.sh config credentials \
-  --server http://keycloak:8080 --realm master \
-  --user "$(grep -E '^KEYCLOAK_ADMIN=' "${ENV_FILE}" | tail -1 | cut -d= -f2-)" \
-  --password:env KEYCLOAK_ADMIN_PASSWORD >/dev/null
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T keycloak \
+  sh -lc '/opt/keycloak/bin/kcadm.sh config credentials \
+    --server http://keycloak:8080 --realm master \
+    --user "$KC_BOOTSTRAP_ADMIN_USERNAME" \
+    --password:env KC_BOOTSTRAP_ADMIN_PASSWORD' >/dev/null
 
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T \
-  --env KEYCLOAK_ADMIN_PASSWORD keycloak \
-  /opt/keycloak/bin/kcadm.sh get realms/witness \
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T keycloak \
+  sh -lc '/opt/keycloak/bin/kcadm.sh get realms/witness \
   --fields realm,enabled,sslRequired,frontendUrl,attributes,accessTokenLifespan,ssoSessionIdleTimeout,ssoSessionMaxLifespan \
-  -o > "${REALM_EXPORT}.tmp"
+  -o' > "${REALM_EXPORT}.tmp"
 
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T \
-  --env KEYCLOAK_ADMIN_PASSWORD keycloak \
-  /opt/keycloak/bin/kcadm.sh get clients -r witness -q clientId=witness-api \
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T keycloak \
+  sh -lc '/opt/keycloak/bin/kcadm.sh get clients -r witness -q clientId=witness-api \
   --fields id,clientId,enabled,publicClient,redirectUris,webOrigins,attributes,standardFlowEnabled,directAccessGrantsEnabled \
-  -o > "${CLIENT_EXPORT}.tmp"
+  -o' > "${CLIENT_EXPORT}.tmp"
 
 mv -- "${REALM_EXPORT}.tmp" "${REALM_EXPORT}"
 mv -- "${CLIENT_EXPORT}.tmp" "${CLIENT_EXPORT}"

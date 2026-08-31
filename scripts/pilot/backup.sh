@@ -15,9 +15,13 @@ cd "$(git rev-parse --show-toplevel)"
 
 DESTINATION="${1:-$HOME/witness-backups}"
 COMPOSE_FILE="deployments/cloud-managed/docker-compose.pilot.yml"
-ENV_FILE=".env"
+ENV_FILE="${WITNESS_ENV_FILE:-.env}"
 
-env_get() { grep -E "^${1}=" "$ENV_FILE" | tail -1 | cut -d= -f2-; }
+env_get() {
+  # grep returns 1 when a variable is absent; normalise that into an empty
+  # value so set -e does not abort before the explicit validation below.
+  awk -F= -v key="$1" '$1 == key { value = substr($0, index($0, "=") + 1) } END { print value }' "$ENV_FILE"
+}
 
 mkdir -p "${DESTINATION}"
 chmod 700 "${DESTINATION}"
