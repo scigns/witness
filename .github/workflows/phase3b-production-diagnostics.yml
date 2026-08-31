@@ -117,7 +117,8 @@ jobs:
           done < <(docker ps -a --format '{{.Names}}')
           if [[ -n "$cloudflared" ]]; then
             docker inspect --format 'container={{.Name}} image={{.Config.Image}} image_id={{.Image}}' "$cloudflared"
-            docker inspect --format 'config_mount_destinations={{range .Mounts}}{{if or (contains .Destination "cloudflared") (contains .Destination "config")}}type={{.Type}} name={{.Name}} destination={{.Destination}} {{end}}{{end}}' "$cloudflared"
+            cloudflared_mounts="$(docker inspect --format '{{range .Mounts}}{{.Type}}|{{.Name}}|{{.Destination}}{{println}}{{end}}' "$cloudflared")"
+            printf '%s\n' "$cloudflared_mounts" | awk -F'|' '$3 ~ /cloudflared|config/ { printf "config_mount=type=%s name=%s destination=%s\n", $1, $2, $3 }'
             echo "tunnel_id_presence=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$cloudflared" | grep -q '^CLOUDFLARE_TUNNEL_ID=' && echo YES || echo NO)"
             echo "tunnel_credentials_contents=NOT_READ"
           else
@@ -133,7 +134,8 @@ jobs:
           if [[ -n "$keycloak" ]]; then
             docker inspect --format 'container={{.Name}} image={{.Config.Image}} image_id={{.Image}}' "$keycloak"
             echo "kcadm_present=$(docker exec "$keycloak" test -x /opt/keycloak/bin/kcadm.sh >/dev/null 2>&1 && echo YES || echo NO)"
-            echo "realm_import_mount_destinations=$(docker inspect --format '{{range .Mounts}}{{if contains .Destination "/import"}}type={{.Type}} name={{.Name}} destination={{.Destination}}{{end}}{{end}}' "$keycloak")"
+            keycloak_mounts="$(docker inspect --format '{{range .Mounts}}{{.Type}}|{{.Name}}|{{.Destination}}{{println}}{{end}}' "$keycloak")"
+            printf '%s\n' "$keycloak_mounts" | awk -F'|' '$3 ~ /\/import/ { printf "realm_import_mount=type=%s name=%s destination=%s\n", $1, $2, $3 }'
             echo "realm= witness (repository-defined; live realm not queried)"
             echo "client=witness-api (repository-defined; live client not queried)"
             echo "admin_console=standard Keycloak console; reachability not probed"
