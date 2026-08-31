@@ -1,0 +1,122 @@
+name: Phase 3C production recovery proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recovery-proof:
+    name: Protected recovery proof (read-only database operations)
+    runs-on: [self-hosted, witness-pilot]
+    timeout-minutes: 30
+    steps:
+      - name: Execute approved recovery proof
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expected_host="witness-prod-01"
+          actual_host="$(hostname -s 2>/dev/null || hostname)"
+          [[ "$actual_host" == "$expected_host" ]] || { echo "Unexpected runner hostname; refusing recovery proof."; exit 1; }
+
+          repo="/home/witness/witness"
+          [[ -d "$repo/.git" ]] || { echo "Authoritative production repository not found."; exit 1; }
+          [[ "$(git -C "$repo" symbolic-ref --short -q HEAD 2>/dev/null || true)" == "main" ]] || { echo "Production repository is not on main."; exit 1; }
+          [[ "$(git -C "$repo" rev-parse HEAD)" == "$GITHUB_SHA" ]] || { echo "Production repository does not match dispatched main revision."; exit 1; }
+          [[ "$(git -C "$repo" status --short | wc -l | tr -d ' ')" == "0" ]] || { echo "Production repository is not clean."; exit 1; }
+
+          compose_file="$repo/deployments/cloud-managed/docker-compose.pilot.yml"
+          env_file="$repo/.env"
+          backup_dir="/home/witness/witness-backups/phase3c"
+          [[ -f "$compose_file" && -f "$env_file" ]] || { echo "Authoritative Compose or environment file is unavailable."; exit 1; }
+          grep -q '^name: witness-pilot$' "$compose_file" || { echo "Unexpected Compose project declaration."; exit 1; }
+          services="$(cd "$repo" && docker compose --env-file "$env_file" -f "$compose_file" config --services)"
+          grep -qx postgres <<<"$services" || { echo "Expected postgres service is unavailable."; exit 1; }
+          compose_projects="$(docker compose ls --format '{{.Name}}' 2>/dev/null || true)"
+          grep -qx witness-pilot <<<"$compose_projects" || { echo "Active witness-pilot Compose project is unavailable."; exit 1; }
+
+          mkdir -p "$backup_dir"
+          chmod 700 "$backup_dir"
+
+          echo "HOST=$actual_host"
+          echo "COMPOSE_PROJECT=witness-pilot"
+
+          export WITNESS_ENV_FILE="$env_file"
+          "$repo/scripts/pilot/snapshot-env.sh" "$backup_dir/config" >/dev/null
+          env_snapshot="$(find "$backup_dir/config" -maxdepth 1 -type f -name 'witness-env-*.snapshot' -print | sort | tail -1)"
+          [[ -n "$env_snapshot" ]] || { echo "Environment snapshot was not created."; exit 1; }
+          (cd "$(dirname "$env_snapshot")" && sha256sum -c "$(basename "$env_snapshot").sha256" >/dev/null)
+          [[ "$(stat -c '%a' "$env_snapshot" 2>/dev/null || stat -f '%Lp' "$env_snapshot")" == "600" ]] || { echo "Environment snapshot permissions are unsafe."; exit 1; }
+          echo "ENV_SNAPSHOT_CREATED=YES"
+          echo "ENV_CHECKSUM_VERIFIED=YES"
+
+          "$repo/scripts/pilot/backup.sh" "$backup_dir/database" >/dev/null
+          witness_dump="$(find "$backup_dir/database" -maxdepth 1 -type f -name 'witness-*.dump' -print | sort | tail -1)"
+          keycloak_dump="$(find "$backup_dir/database" -maxdepth 1 -type f -name 'keycloak-*.dump' -print | sort | tail -1)"
+          [[ -n "$witness_dump" && -n "$keycloak_dump" ]] || { echo "Expected database backup artifacts are missing."; exit 1; }
+          (cd "$backup_dir/database" && sha256sum -c "$(basename "$witness_dump").sha256" >/dev/null && sha256sum -c "$(basename "$keycloak_dump").sha256" >/dev/null)
+          echo "WITNESS_BACKUP_CREATED=YES"
+          echo "WITNESS_BACKUP_CHECKSUM=VERIFIED"
+          echo "WITNESS_BACKUP_SIZE=$(du -h "$witness_dump" | cut -f1)"
+          echo "KEYCLOAK_BACKUP_CREATED=YES"
+          echo "KEYCLOAK_BACKUP_CHECKSUM=VERIFIED"
+          echo "KEYCLOAK_BACKUP_SIZE=$(du -h "$keycloak_dump" | cut -f1)"
+
+          "$repo/scripts/pilot/export-keycloak-config.sh" "$backup_dir/keycloak-config" >/dev/null
+          realm_export="$(find "$backup_dir/keycloak-config" -maxdepth 1 -type f -name 'witness-realm-*.json' -print | sort | tail -1)"
+          client_export="$(find "$backup_dir/keycloak-config" -maxdepth 1 -type f -name 'witness-api-client-*.json' -print | sort | tail -1)"
+          [[ -n "$realm_export" && -n "$client_export" ]] || { echo "Expected Keycloak exports are missing."; exit 1; }
+          (cd "$backup_dir/keycloak-config" && sha256sum -c "$(basename "$realm_export").sha256" >/dev/null && sha256sum -c "$(basename "$client_export").sha256" >/dev/null)
+          echo "KEYCLOAK_REALM_EXPORT=PROVEN"
+          echo "KEYCLOAK_CLIENT_EXPORT=PROVEN"
+          echo "KEYCLOAK_EXPORT_CHECKSUMS=VERIFIED"
+
+          restore_name="witness-phase3c-restore-$$"
+          restore_volume="witness-phase3c-restore-data-$$"
+          cleanup() {
+            docker rm -f "$restore_name" >/dev/null 2>&1 || true
+            docker volume rm "$restore_volume" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker volume create "$restore_volume" >/dev/null
+          restore_password="phase3c-isolated-only"
+          docker run -d --name "$restore_name" --network none -e POSTGRES_PASSWORD="$restore_password" --mount "type=volume,source=$restore_volume,destination=/var/lib/postgresql/data" postgres:16-alpine >/dev/null
+          for _ in $(seq 1 60); do
+            docker exec -e PGPASSWORD="$restore_password" "$restore_name" pg_isready -U postgres >/dev/null 2>&1 && break
+            sleep 2
+          done
+          docker exec -e PGPASSWORD="$restore_password" "$restore_name" pg_isready -U postgres >/dev/null
+          docker run --rm --network container:"$restore_name" --mount "type=bind,source=$backup_dir/database,destination=/backup,readonly" -e PGPASSWORD="$restore_password" postgres:16-alpine pg_restore --list "/backup/$(basename "$keycloak_dump")" >/dev/null
+          docker run --rm --network container:"$restore_name" --mount "type=bind,source=$backup_dir/database,destination=/backup,readonly" -e PGPASSWORD="$restore_password" postgres:16-alpine pg_restore --no-owner --dbname=postgresql://postgres@127.0.0.1/postgres "/backup/$(basename "$keycloak_dump")" >/dev/null
+          echo "KEYCLOAK_RESTORE=PROVEN"
+
+          echo "ANONYMOUS_VOLUMES="
+          while IFS= read -r volume; do
+            [[ -n "$volume" ]] || continue
+            attached=""
+            while IFS= read -r container; do
+              [[ -n "$container" ]] || continue
+              mounts="$(docker inspect --format '{{range .Mounts}}{{if eq .Type "volume"}}{{.Name}}|{{.Destination}}{{println}}{{end}}{{end}}' "$container" 2>/dev/null || true)"
+              while IFS='|' read -r mounted_name destination; do
+                [[ "$mounted_name" == "$volume" ]] || continue
+                service="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$container" 2>/dev/null || echo unknown)"
+                attached="${service}:${destination}"
+              done <<<"$mounts"
+            done < <(docker ps -aq)
+            if [[ -n "$attached" ]]; then
+              classification="ACTIVE_REQUIRED"
+            else
+              classification="HISTORICAL_ORPHANED"
+              attached="none"
+            fi
+            echo "ANONYMOUS_VOLUME=${volume:0:12} ATTACHMENT=$attached CLASSIFICATION=$classification"
+          done < <(docker volume ls -q | awk 'length($0) == 64 && $0 ~ /^[0-9a-f]+$/')
+          echo "CLOUDFLARE_REFRESH=NOT_AVAILABLE"
+          echo "LOCAL_TUNNEL_MATCH=UNKNOWN"
+          echo "PRODUCTION_CONFIG_CHANGED=NO"
+          echo "APPLICATION_RESTARTED=NO"
+          echo "MIGRATIONS_RUN=NO"
+          echo "DNS_CHANGED=NO"
+          echo "TUNNEL_CHANGED=NO"
