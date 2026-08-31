@@ -23,6 +23,7 @@ jobs:
       - name: Execute approved recovery proof
         shell: bash
         run: |
+          # shellcheck disable=SC2016
           set -euo pipefail
 
           expected_host="witness-prod-01"
@@ -50,17 +51,71 @@ jobs:
             git -C "$production_repo" show "HEAD:deployments/cloud-managed/cloudflared/config.yml" >"$cloudflared_head"
             cp "$cloudflared_file" "$cloudflared_worktree"
             # shellcheck disable=SC2016
-            # shellcheck disable=SC2016
+            head_tunnel_key_count="$(awk '$1 == "tunnel:" { count++ } END { print count + 0 }' "$cloudflared_head")"
             head_tunnel_values="$(awk '$1 == "tunnel:" { print $2 }' "$cloudflared_head")"
             # shellcheck disable=SC2016
+            tunnel_key_count="$(awk '$1 == "tunnel:" { count++ } END { print count + 0 }' "$cloudflared_worktree")"
             tunnel_values="$(awk '$1 == "tunnel:" { print $2 }' "$cloudflared_worktree")"
-            [[ "$(printf '%s\n' "$head_tunnel_values" | sed '/^$/d' | wc -l | tr -d ' ')" == "1" && "$head_tunnel_values" == '${CLOUDFLARE_TUNNEL_ID}' ]] || { echo "Cloudflared deployment substitution is invalid."; exit 1; }
-            [[ "$(printf '%s\n' "$tunnel_values" | sed '/^$/d' | wc -l | tr -d ' ')" == "1" ]] || { echo "Cloudflared deployment substitution is invalid."; exit 1; }
+            if [[ "$head_tunnel_key_count" == "1" && "$head_tunnel_values" == '${CLOUDFLARE_TUNNEL_ID}' ]]; then
+              echo "CLOUDFLARED_HEAD_PLACEHOLDER=VALID"
+            else
+              echo "CLOUDFLARED_HEAD_PLACEHOLDER=INVALID"; exit 1
+            fi
+            if [[ "$tunnel_key_count" == "1" && -n "$tunnel_values" ]]; then
+              echo "CLOUDFLARED_PRODUCTION_TUNNEL_COUNT=VALID"
+            else
+              echo "CLOUDFLARED_PRODUCTION_TUNNEL_COUNT=INVALID"; exit 1
+            fi
             production_tunnel="$(printf '%s\n' "$tunnel_values" | sed -n '1p')"
-            [[ "$production_tunnel" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || { echo "Cloudflared deployment substitution is invalid."; exit 1; }
+            if [[ "$production_tunnel" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+              echo "CLOUDFLARED_PRODUCTION_TUNNEL_UUID=VALID"
+            else
+              echo "CLOUDFLARED_PRODUCTION_TUNNEL_UUID=INVALID"; exit 1
+            fi
             sed -E 's/^tunnel:[[:space:]].*$/tunnel: __DEPLOYMENT_TUNNEL__/' "$cloudflared_head" >"${cloudflared_head}.normalized"
             sed -E 's/^tunnel:[[:space:]].*$/tunnel: __DEPLOYMENT_TUNNEL__/' "$cloudflared_worktree" >"${cloudflared_worktree}.normalized"
-            cmp -s "${cloudflared_head}.normalized" "${cloudflared_worktree}.normalized" || { echo "Cloudflared deployment substitution is invalid."; exit 1; }
+            if ! cmp -s "${cloudflared_head}.normalized" "${cloudflared_worktree}.normalized"; then
+              # shellcheck disable=SC2016
+              mapfile -t normalized_diffs < <(awk '
+                NR == FNR { left[FNR] = $0; if (FNR > max) max = FNR; next }
+                { right[FNR] = $0; if (FNR > max) max = FNR }
+                function is_comment(line, trimmed) {
+                  trimmed = line; sub(/^[[:space:]]+/, "", trimmed); sub(/[[:space:]]+$/, "", trimmed)
+                  return trimmed == "" || trimmed ~ /^#/
+                }
+                function classify(line, trimmed, key) {
+                  trimmed = line; sub(/^[[:space:]]+/, "", trimmed); sub(/[[:space:]]+$/, "", trimmed)
+                  sub(/^-[[:space:]]*/, "", trimmed)
+                  if (trimmed == "" || trimmed ~ /^#/) return "NONE|COMMENT_OR_WHITESPACE"
+                  if (match(trimmed, /^[A-Za-z0-9_-]+:/)) key = substr(trimmed, RSTART, RLENGTH - 1); else key = "NONE"
+                  if (trimmed ~ /^service:[[:space:]]*http_status:[[:space:]]*404/) return key "|CATCH_ALL_KEY"
+                  if (key == "connectTimeout" || key == "keepAliveTimeout" || key == "httpHostHeader") return key "|ORIGIN_REQUEST_KEY"
+                  if (key == "hostname") return key "|HOSTNAME_KEY"
+                  if (key == "service") return key "|SERVICE_KEY"
+                  if (key == "credentials-file") return key "|CREDENTIALS_FILE_KEY"
+                  if (key == "metrics") return key "|METRICS_KEY"
+                  return key "|OTHER_YAML_KEY"
+                }
+                END {
+                  for (i = 1; i <= max; i++) if (left[i] != right[i]) {
+                    if (is_comment(left[i]) || is_comment(right[i])) result = "COMMENT_OR_WHITESPACE"; else { candidate = (left[i] != "" ? left[i] : right[i]); result = classify(candidate) }
+                    if (result == "COMMENT_OR_WHITESPACE") result = "NONE|COMMENT_OR_WHITESPACE"
+                    split(result, parts, "|"); print i "|" parts[1] "|" parts[2]
+                  }
+                }
+              ' "${cloudflared_head}.normalized" "${cloudflared_worktree}.normalized")
+              echo "NORMALIZED_DIFF_LINE_COUNT=${#normalized_diffs[@]}"
+              diff_index=0
+              for diff_entry in "${normalized_diffs[@]}"; do
+                diff_index=$((diff_index + 1))
+                IFS='|' read -r diff_line diff_key diff_class <<<"$diff_entry"
+                if [[ -z "$diff_class" ]]; then diff_class="$diff_key"; diff_key="NONE"; fi
+                echo "NORMALIZED_DIFF_${diff_index}_LINE=$diff_line"
+                echo "NORMALIZED_DIFF_${diff_index}_KEY=$diff_key"
+                echo "NORMALIZED_DIFF_${diff_index}_CLASSIFICATION=$diff_class"
+              done
+              echo "CLOUDFLARED_NORMALIZED_STRUCTURE=INVALID"; exit 1
+            fi
             echo "CLOUDFLARED_DEPLOYMENT_SUBSTITUTION=EXPECTED"
           else
             echo "Production repository contains unexpected worktree changes."; exit 1
