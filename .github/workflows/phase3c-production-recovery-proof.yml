@@ -166,8 +166,10 @@ jobs:
           reviewed_services="$(cd "$tooling_repo" && docker compose --env-file "$env_file" -f "$reviewed_compose_file" config --services)"
           grep -qx postgres <<<"$services" || { echo "Expected postgres service is unavailable."; exit 1; }
           [[ "$services" == "$reviewed_services" ]] || { echo "Reviewed and production Compose services differ."; exit 1; }
-          compose_projects="$(docker compose ls --format '{{.Name}}' 2>/dev/null || true)"
-          grep -qx witness-pilot <<<"$compose_projects" || { echo "Active witness-pilot Compose project is unavailable."; exit 1; }
+          mapfile -t active_services < <(docker ps --filter label=com.docker.compose.project=witness-pilot --format '{{.Label "com.docker.compose.service"}}')
+          printf '%s\n' "${active_services[@]}" | grep -qx postgres || { echo "Running witness-pilot postgres service is unavailable."; exit 1; }
+          printf '%s\n' "${active_services[@]}" | grep -qx keycloak || { echo "Running witness-pilot keycloak service is unavailable."; exit 1; }
+          echo "ACTIVE_WITNESS_PILOT=VALID"
 
           if [[ -e "$run_root" ]]; then echo "Recovery run directory already exists; refusing stale-artifact reuse."; exit 1; fi
           mkdir -p "$run_root" "$run_root/config" "$run_root/database" "$run_root/keycloak-config"
