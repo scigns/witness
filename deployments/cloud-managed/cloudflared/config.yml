@@ -39,15 +39,15 @@ ingress:
   # ── Web application ───────────────────────────────────────────────────────
   # Reached by browsers only through the `/witness` route on the apex domain;
   # this hostname is the route's origin, not the address users are given.
-  - hostname: witness-web.pacificdigitalconsultancy.org
+  - hostname: witness-prod-web.pacificdigitalconsultancy.org
     service: http://web:3000
 
   # ── API ───────────────────────────────────────────────────────────────────
-  - hostname: witness-api.pacificdigitalconsultancy.org
+  - hostname: witness-prod-api.pacificdigitalconsultancy.org
     service: http://api:3001
 
   # ── Identity provider ─────────────────────────────────────────────────────
-  - hostname: witness-id.pacificdigitalconsultancy.org
+  - hostname: witness-prod-id.pacificdigitalconsultancy.org
     service: http://keycloak:8080
 
   # Anything else — including a hostname someone points at this tunnel without
