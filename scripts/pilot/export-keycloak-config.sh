@@ -13,7 +13,7 @@ DESTINATION="${1:-$HOME/witness-backups/keycloak-config}"
 mkdir -p "${DESTINATION}"
 chmod 700 "${DESTINATION}"
 umask 077
-STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+STAMP="$(date -u +%Y%m%dT%H%M%S)-$$"
 REALM_EXPORT="${DESTINATION}/witness-realm-${STAMP}.json"
 CLIENT_EXPORT="${DESTINATION}/witness-api-client-${STAMP}.json"
 

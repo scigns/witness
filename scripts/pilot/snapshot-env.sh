@@ -12,7 +12,7 @@ DESTINATION="${1:-$HOME/witness-backups/config}"
 umask 077
 mkdir -p "${DESTINATION}"
 chmod 700 "${DESTINATION}"
-STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+STAMP="$(date -u +%Y%m%dT%H%M%S)-$$"
 SNAPSHOT="${DESTINATION}/witness-env-${STAMP}.snapshot"
 
 install -m 600 "${ENV_FILE}" "${SNAPSHOT}"

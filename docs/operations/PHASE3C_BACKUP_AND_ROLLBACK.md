@@ -64,15 +64,17 @@ was unavailable during this phase. No credentials are stored.
 ## Rollback order for a future domain cutover
 
 1. Stop further cutover changes.
-2. Restore the previous application configuration/build.
-3. Restore Keycloak realm/client configuration if changed.
-4. Restore Tunnel routes.
-5. Restore DNS records.
-6. Verify the legacy identity endpoint.
-7. Verify the legacy API.
-8. Verify the legacy Web application.
-9. Verify login.
-10. Record rollback evidence and checksums.
+2. Restore the verified previous `.env` snapshot, then restart/rebuild every
+   affected service so the restored values are active.
+3. Restore the previous application configuration/build.
+4. Restore Keycloak realm/client configuration if changed.
+5. Restore Tunnel routes.
+6. Restore DNS records.
+7. Verify the legacy identity endpoint.
+8. Verify the legacy API.
+9. Verify the legacy Web application.
+10. Verify login.
+11. Record rollback evidence and checksums.
 
 The domain change itself must not require a database migration or data rollback.
 Image and configuration rollback remain documented but unproven until exercised

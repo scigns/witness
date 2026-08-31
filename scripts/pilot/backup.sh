@@ -63,8 +63,8 @@ unset PGPASSWORD
 mv -- "${WITNESS_ARCHIVE}.tmp" "${WITNESS_ARCHIVE}"
 mv -- "${KEYCLOAK_ARCHIVE}.tmp" "${KEYCLOAK_ARCHIVE}"
 
-sha256sum "${WITNESS_ARCHIVE}" >"${WITNESS_ARCHIVE}.sha256"
-sha256sum "${KEYCLOAK_ARCHIVE}" >"${KEYCLOAK_ARCHIVE}.sha256"
+(cd "${DESTINATION}" && sha256sum "$(basename "${WITNESS_ARCHIVE}")" >"$(basename "${WITNESS_ARCHIVE}").sha256")
+(cd "${DESTINATION}" && sha256sum "$(basename "${KEYCLOAK_ARCHIVE}")" >"$(basename "${KEYCLOAK_ARCHIVE}").sha256")
 chmod 600 "${WITNESS_ARCHIVE}" "${WITNESS_ARCHIVE}.sha256" "${KEYCLOAK_ARCHIVE}" "${KEYCLOAK_ARCHIVE}.sha256"
 
 WITNESS_SIZE="$(du -h "${WITNESS_ARCHIVE}" | cut -f1)"
