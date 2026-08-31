@@ -162,10 +162,15 @@ jobs:
           [[ -f "$reviewed_compose_file" ]] || { echo "Reviewed Compose definition is unavailable."; exit 1; }
           grep -q '^name: witness-pilot$' "$compose_file" || { echo "Unexpected Compose project declaration."; exit 1; }
           grep -q '^name: witness-pilot$' "$reviewed_compose_file" || { echo "Reviewed Compose project declaration differs."; exit 1; }
-          services="$(cd "$production_repo" && docker compose --env-file "$env_file" -f "$compose_file" config --services)"
-          reviewed_services="$(cd "$tooling_repo" && docker compose --env-file "$env_file" -f "$reviewed_compose_file" config --services)"
-          grep -qx postgres <<<"$services" || { echo "Expected postgres service is unavailable."; exit 1; }
-          [[ "$services" == "$reviewed_services" ]] || { echo "Reviewed and production Compose services differ."; exit 1; }
+          cmp -s "$compose_file" "$reviewed_compose_file" || { echo "Reviewed and production Compose definitions differ."; exit 1; }
+          echo "COMPOSE_DEFINITION_MATCH=VALID"
+          production_services="$(cd "$production_repo" && docker compose --env-file "$env_file" -f "$compose_file" config --services | sed '/^[[:space:]]*$/d' | sort -u)"
+          reviewed_services="$(cd "$tooling_repo" && docker compose --env-file "$env_file" -f "$reviewed_compose_file" config --services | sed '/^[[:space:]]*$/d' | sort -u)"
+          [[ "$production_services" == "$reviewed_services" ]] || { echo "Normalized reviewed and production Compose service sets differ."; exit 1; }
+          echo "COMPOSE_SERVICE_SET=VALID"
+          for service in postgres keycloak api web; do
+            grep -qx "$service" <<<"$production_services" || { echo "Required Compose service is unavailable."; exit 1; }
+          done
           mapfile -t active_services < <(docker ps --filter label=com.docker.compose.project=witness-pilot --format '{{.Label "com.docker.compose.service"}}')
           printf '%s\n' "${active_services[@]}" | grep -qx postgres || { echo "Running witness-pilot postgres service is unavailable."; exit 1; }
           printf '%s\n' "${active_services[@]}" | grep -qx keycloak || { echo "Running witness-pilot keycloak service is unavailable."; exit 1; }
