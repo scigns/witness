@@ -60,6 +60,36 @@ Production origins remain explicit and HTTPS-only. Authenticated CORS must never
 continues to validate callback origin relationships and does not derive trust from an arbitrary
 Host header.
 
+## Domain-native application and authentication readiness
+
+The independent application build uses an empty `NEXT_PUBLIC_WITNESS_BASE_PATH`, so the dedicated
+host serves `/`, `/signin`, and all other Next routes at the root of `app.buildwithwitness.com`.
+The existing `/witness` value remains supported for the historical path deployment and rollback
+route; it is a build-time setting, not a runtime redirect.
+
+The browser calls `api.buildwithwitness.com` with an explicit
+`NEXT_PUBLIC_WITNESS_API_URL`. Deployed builds fail closed when that value is absent or is not an
+absolute HTTP(S) URL. The API validates the independent application origin through
+`WITNESS_WEB_ORIGIN` and sends the OIDC callback result to the configured `WITNESS_WEB_BASE_URL`.
+For the independent namespace these are `https://app.buildwithwitness.com` and
+`https://api.buildwithwitness.com/api/v1/auth/callback`, with the issuer at
+`https://id.buildwithwitness.com/realms/witness`.
+
+Witness uses a bearer token in `sessionStorage`, not an authentication cookie. Consequently no
+cross-subdomain cookie (`Domain=.buildwithwitness.com`) is required; the API keeps CORS explicit
+and does not enable credentialed cross-origin cookies. If a future flow introduces cookies, it
+must receive a separate security review for `Secure`, `HttpOnly`, `SameSite`, `Path`, and domain
+scope.
+
+The application is intended to run behind a trusted private ingress. Deployed Express instances
+trust only loopback/private-network proxies for forwarded protocol and address metadata; arbitrary
+client `Host` or forwarded headers are not an identity or authorization source. CSP remains the
+responsibility of the ingress/deployment profile and is not weakened by this readiness change.
+
+This phase proves configuration readiness only. It does not make the independent domain live, alter
+Cloudflare DNS/tunnels, publish the Trust Centre or status service, or retire PDC compatibility
+routes.
+
 ## Portability and Cloudflare boundary
 
 Cloudflare currently provides DNS, the TLS edge, tunnel ingress, and optional CDN/security controls.
