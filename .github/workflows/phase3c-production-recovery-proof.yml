@@ -144,6 +144,15 @@ jobs:
           fi
           production_sha="$(git -C "$production_repo" rev-parse HEAD)"
           [[ "$(git -C "$tooling_repo" rev-parse --verify HEAD)" == "$GITHUB_SHA" ]] || { echo "Reviewed tooling checkout does not match dispatched main revision."; exit 1; }
+          [[ "$production_sha" == "$GITHUB_SHA" ]] || { echo "Production source does not match dispatched main revision."; exit 1; }
+          version="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$production_repo/package.json")"
+          [[ -n "$version" ]] || { echo "Production package version is unavailable."; exit 1; }
+          export WITNESS_BUILD_ID="$production_sha"
+          export WITNESS_VERSION="$version"
+          echo "RECOVERY_BUILD_ID_SOURCE=PRODUCTION_HEAD"
+          echo "RECOVERY_VERSION_SOURCE=PACKAGE_JSON"
+          echo "RECOVERY_BUILD_ID=$production_sha"
+          echo "RECOVERY_VERSION=$version"
 
           compose_file="$production_repo/deployments/cloud-managed/docker-compose.pilot.yml"
           reviewed_compose_file="$tooling_repo/deployments/cloud-managed/docker-compose.pilot.yml"
