@@ -72,8 +72,30 @@ jobs:
             else
               echo "CLOUDFLARED_PRODUCTION_TUNNEL_UUID=INVALID"; exit 1
             fi
-            sed -E 's/^tunnel:[[:space:]].*$/tunnel: __DEPLOYMENT_TUNNEL__/' "$cloudflared_head" >"${cloudflared_head}.normalized"
-            sed -E 's/^tunnel:[[:space:]].*$/tunnel: __DEPLOYMENT_TUNNEL__/' "$cloudflared_worktree" >"${cloudflared_worktree}.normalized"
+            # shellcheck disable=SC2016
+            awk '
+              {
+                line = $0
+                sub(/[[:space:]]+$/, "", line)
+                trimmed = line
+                sub(/^[[:space:]]+/, "", trimmed)
+                if (trimmed == "" || trimmed ~ /^#/) next
+                if (trimmed ~ /^tunnel:[[:space:]]/) { match(line, /^[[:space:]]*/); line = substr(line, 1, RLENGTH) "tunnel: __DEPLOYMENT_TUNNEL__" }
+                print line
+              }
+            ' "$cloudflared_head" >"${cloudflared_head}.normalized"
+            # shellcheck disable=SC2016
+            awk '
+              {
+                line = $0
+                sub(/[[:space:]]+$/, "", line)
+                trimmed = line
+                sub(/^[[:space:]]+/, "", trimmed)
+                if (trimmed == "" || trimmed ~ /^#/) next
+                if (trimmed ~ /^tunnel:[[:space:]]/) { match(line, /^[[:space:]]*/); line = substr(line, 1, RLENGTH) "tunnel: __DEPLOYMENT_TUNNEL__" }
+                print line
+              }
+            ' "$cloudflared_worktree" >"${cloudflared_worktree}.normalized"
             if ! cmp -s "${cloudflared_head}.normalized" "${cloudflared_worktree}.normalized"; then
               # shellcheck disable=SC2016
               mapfile -t normalized_diffs < <(awk '
@@ -104,19 +126,19 @@ jobs:
                   }
                 }
               ' "${cloudflared_head}.normalized" "${cloudflared_worktree}.normalized")
-              echo "NORMALIZED_DIFF_LINE_COUNT=${#normalized_diffs[@]}"
+              echo "EFFECTIVE_CONFIG_DIFF_COUNT=${#normalized_diffs[@]}"
               diff_index=0
               for diff_entry in "${normalized_diffs[@]}"; do
                 diff_index=$((diff_index + 1))
                 IFS='|' read -r diff_line diff_key diff_class <<<"$diff_entry"
                 if [[ -z "$diff_class" ]]; then diff_class="$diff_key"; diff_key="NONE"; fi
-                echo "NORMALIZED_DIFF_${diff_index}_LINE=$diff_line"
-                echo "NORMALIZED_DIFF_${diff_index}_KEY=$diff_key"
-                echo "NORMALIZED_DIFF_${diff_index}_CLASSIFICATION=$diff_class"
+                echo "EFFECTIVE_CONFIG_DIFF_${diff_index}_POSITION=$diff_line"
+                echo "EFFECTIVE_CONFIG_DIFF_${diff_index}_KEY=$diff_key"
+                echo "EFFECTIVE_CONFIG_DIFF_${diff_index}_CLASSIFICATION=$diff_class"
               done
-              echo "CLOUDFLARED_NORMALIZED_STRUCTURE=INVALID"; exit 1
+              echo "CLOUDFLARED_EFFECTIVE_CONFIG=INVALID"; exit 1
             fi
-            echo "CLOUDFLARED_DEPLOYMENT_SUBSTITUTION=EXPECTED"
+            echo "CLOUDFLARED_EFFECTIVE_CONFIG=VALID"
           else
             echo "Production repository contains unexpected worktree changes."; exit 1
           fi
