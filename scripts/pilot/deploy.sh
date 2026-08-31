@@ -19,7 +19,8 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 COMPOSE_FILE="deployments/cloud-managed/docker-compose.pilot.yml"
-COMPOSE=(docker compose --env-file .env -f "$COMPOSE_FILE")
+ENV_FILE="${WITNESS_ENV_FILE:-.env}"
+COMPOSE=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
 API_URL="${WITNESS_PILOT_API_URL:?WITNESS_PILOT_API_URL must be set}"
 WEB_URL="${WITNESS_PILOT_WEB_URL:?WITNESS_PILOT_WEB_URL must be set}"
 HEALTH_TIMEOUT_SECONDS="${WITNESS_DEPLOY_HEALTH_TIMEOUT_SECONDS:-90}"
