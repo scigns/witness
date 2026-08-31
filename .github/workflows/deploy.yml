@@ -52,4 +52,5 @@ jobs:
         env:
           WITNESS_PILOT_API_URL: ${{ vars.WITNESS_PILOT_API_URL }}
           WITNESS_PILOT_WEB_URL: ${{ vars.WITNESS_PILOT_WEB_URL }}
+          WITNESS_ENV_FILE: /home/witness/witness/.env
         run: bash scripts/pilot/deploy.sh
