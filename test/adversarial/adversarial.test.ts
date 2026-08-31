@@ -89,6 +89,7 @@ describe('ATTACK — smuggle an external model provider past the sovereign profi
     // localhost defaults are refused outside development, and that rule is
     // orthogonal to the egress attacks below.
     WITNESS_WEB_ORIGIN: 'https://witness.example.org',
+    WITNESS_PUBLIC_URL: 'https://witness.example.org',
     WITNESS_OIDC_REDIRECT_URI: 'https://api.witness.example.org/api/v1/auth/callback',
   };
 

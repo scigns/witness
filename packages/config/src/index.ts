@@ -47,6 +47,9 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   WITNESS_DEPLOYMENT_PROFILE: z.enum(DEPLOYMENT_PROFILES).default('development'),
   WITNESS_INSTANCE_NAME: z.string().min(1).default('Witness'),
+  // Canonical product landing URL. This is public metadata; service routing
+  // continues to use WITNESS_WEB_ORIGIN and WITNESS_OIDC_REDIRECT_URI.
+  WITNESS_PUBLIC_URL: z.string().optional().default(''),
   WITNESS_DATA_RESIDENCY: z.string().min(1).default('not declared'),
   WITNESS_API_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   WITNESS_WEB_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
@@ -138,6 +141,8 @@ export interface WitnessConfig {
   readonly nodeEnv: 'development' | 'test' | 'production';
   readonly profile: DeploymentProfile;
   readonly instanceName: string;
+  /** Public product URL; distinct from the authenticated application origin. */
+  readonly publicUrl: string;
   readonly dataResidency: string;
   readonly apiPort: number;
   /**
@@ -441,6 +446,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
   // actually reach over TLS.
   if (value.WITNESS_DEPLOYMENT_PROFILE !== 'development') {
     problems.push(
+      ...(value.WITNESS_PUBLIC_URL.trim() === ''
+        ? [
+            'WITNESS_PUBLIC_URL must be set explicitly outside the development profile — ' +
+              'the product identity must not be derived from the application origin.',
+          ]
+        : []),
       ...deployedUrlProblems('WITNESS_WEB_ORIGIN', value.WITNESS_WEB_ORIGIN, {
         requirement:
           'the exact origin the browser sends, used for the CORS policy — the localhost ' +
@@ -453,6 +464,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
       }),
       ...deployedUrlProblems('OIDC_ISSUER', value.OIDC_ISSUER, { skipWhenEmpty: true }),
     );
+  }
+
+  if (value.WITNESS_PUBLIC_URL.trim() !== '') {
+    if (value.WITNESS_DEPLOYMENT_PROFILE === 'development') {
+      try {
+        new URL(value.WITNESS_PUBLIC_URL.trim());
+      } catch {
+        problems.push(
+          `WITNESS_PUBLIC_URL is not a valid absolute URL: ${value.WITNESS_PUBLIC_URL.trim()}`,
+        );
+      }
+    } else {
+      problems.push(...deployedUrlProblems('WITNESS_PUBLIC_URL', value.WITNESS_PUBLIC_URL));
+    }
   }
 
   // ── Hybrid must be deliberate, not accidental ──────────────────────────────
@@ -521,6 +546,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
     nodeEnv: value.NODE_ENV,
     profile: value.WITNESS_DEPLOYMENT_PROFILE,
     instanceName: value.WITNESS_INSTANCE_NAME,
+    publicUrl: value.WITNESS_PUBLIC_URL.trim() !== '' ? value.WITNESS_PUBLIC_URL.trim() : webOrigin,
     dataResidency: value.WITNESS_DATA_RESIDENCY,
     apiPort: value.WITNESS_API_PORT,
     webOrigin,
@@ -601,6 +627,7 @@ export function loadConfigOrExit(env: NodeJS.ProcessEnv = process.env): WitnessC
 export function publicConfig(config: WitnessConfig): Record<string, string | boolean> {
   return {
     instanceName: config.instanceName,
+    publicUrl: config.publicUrl,
     profile: config.profile,
     dataResidency: config.dataResidency,
     externalInferenceEnabled: config.externalInferenceEnabled,

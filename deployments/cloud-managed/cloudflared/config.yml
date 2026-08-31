@@ -13,7 +13,9 @@
 # hostname added in the dashboard without a matching rule reaches nothing.
 #
 # The tunnel UUID and the credentials file are per-deployment and never
-# committed. `cloudflared tunnel create witness-pilot` writes both.
+# committed. `cloudflared tunnel create witness-pilot` writes both. Hostnames
+# below remain the historical pilot route until a separately approved DNS
+# coexistence cutover; see INDEPENDENT_DOMAIN_CUTOVER.md.
 
 tunnel: ${CLOUDFLARE_TUNNEL_ID}
 credentials-file: /etc/cloudflared/credentials.json

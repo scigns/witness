@@ -28,6 +28,7 @@ const oidcBase = {
   KEYCLOAK_CLIENT_ID: 'witness-api',
   JWT_AUDIENCE: 'witness-api',
   WITNESS_WEB_ORIGIN: 'https://pilot.example.org',
+  WITNESS_PUBLIC_URL: 'https://pilot.example.org',
   WITNESS_OIDC_REDIRECT_URI: 'https://api.pilot.example.org/api/v1/auth/callback',
 } satisfies NodeJS.ProcessEnv;
 
@@ -373,6 +374,38 @@ describe('web origin (CORS)', () => {
 });
 
 describe('deployed public addresses', () => {
+  it('accepts the independent Witness production domain contract', () => {
+    const config = loadConfig({
+      ...oidcBase,
+      WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+      WITNESS_PUBLIC_URL: 'https://buildwithwitness.com',
+      WITNESS_WEB_ORIGIN: 'https://app.buildwithwitness.com',
+      WITNESS_WEB_BASE_URL: 'https://app.buildwithwitness.com',
+      OIDC_ISSUER: 'https://id.buildwithwitness.com/realms/witness',
+      WITNESS_OIDC_REDIRECT_URI: 'https://api.buildwithwitness.com/api/v1/auth/callback',
+    });
+    expect(config.publicUrl).toBe('https://buildwithwitness.com');
+    expect(config.webOrigin).toBe('https://app.buildwithwitness.com');
+    expect(config.oidcIssuer).toBe('https://id.buildwithwitness.com/realms/witness');
+  });
+
+  it('refuses a deployed profile that never states the product URL', () => {
+    const { WITNESS_PUBLIC_URL: _omitted, ...withoutPublicUrl } = oidcBase;
+    expect(() =>
+      loadConfig({ ...withoutPublicUrl, WITNESS_DEPLOYMENT_PROFILE: 'sovereign' }),
+    ).toThrow(/WITNESS_PUBLIC_URL must be set explicitly/);
+  });
+
+  it('rejects a malformed independent product URL', () => {
+    expect(() =>
+      loadConfig({
+        ...oidcBase,
+        WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+        WITNESS_PUBLIC_URL: 'buildwithwitness.com',
+      }),
+    ).toThrow(/WITNESS_PUBLIC_URL is not a valid absolute URL/);
+  });
+
   it('refuses a deployed profile that never states the browser origin', () => {
     const { WITNESS_WEB_ORIGIN: _omitted, ...withoutOrigin } = oidcBase;
     expect(() => loadConfig({ ...withoutOrigin, WITNESS_DEPLOYMENT_PROFILE: 'sovereign' })).toThrow(
