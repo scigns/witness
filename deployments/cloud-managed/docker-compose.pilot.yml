@@ -137,6 +137,9 @@ services:
       WITNESS_DATA_RESIDENCY: ${WITNESS_DATA_RESIDENCY:?WITNESS_DATA_RESIDENCY must be set}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       WITNESS_API_PORT: 3001
+      # Product identity is distinct from the browser/API origins and is
+      # required by the production configuration contract.
+      WITNESS_PUBLIC_URL: ${WITNESS_PUBLIC_URL:?WITNESS_PUBLIC_URL must be set}
       WITNESS_WEB_ORIGIN: ${WITNESS_WEB_ORIGIN:?WITNESS_WEB_ORIGIN must be set}
       # Where a signed-in browser is sent back to. Defaults to the origin's
       # root; set it when Witness lives under a path.
