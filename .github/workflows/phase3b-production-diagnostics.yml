@@ -50,14 +50,14 @@ jobs:
           while IFS= read -r container; do
             [[ -z "$container" ]] && continue
             docker inspect --format 'name={{.Name}} image={{.Config.Image}} image_id={{.Image}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} started={{.State.StartedAt}} compose_project={{index .Config.Labels "com.docker.compose.project"}} compose_service={{index .Config.Labels "com.docker.compose.service"}} networks={{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' "$container"
-            docker inspect --format 'mounts={{range .Mounts}}{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}:{{.Destination}} {{end}}' "$container"
+            docker inspect --format 'mounts={{range .Mounts}}type={{.Type}} name={{.Name}} destination={{.Destination}} {{end}}' "$container"
           done < <(docker ps -a --format '{{.Names}}')
 
           echo "== VOLUMES =="
           docker volume ls --format 'name={{.Name}} driver={{.Driver}}'
           while IFS= read -r volume; do
             [[ -z "$volume" ]] && continue
-            docker volume inspect --format 'name={{.Name}} driver={{.Driver}} scope={{.Scope}} labels={{json .Labels}}' "$volume"
+            docker volume inspect --format 'name={{.Name}} driver={{.Driver}} scope={{.Scope}}' "$volume"
           done < <(docker volume ls --format '{{.Name}}')
 
           echo "== ENVIRONMENT SOURCE / VARIABLE PRESENCE =="
@@ -116,8 +116,8 @@ jobs:
             if [[ "$container" == *cloudflared* || "$image" == *cloudflared* ]]; then cloudflared="$container"; break; fi
           done < <(docker ps -a --format '{{.Names}}')
           if [[ -n "$cloudflared" ]]; then
-            docker inspect --format 'container={{.Name}} image={{.Config.Image}} image_id={{.Image}} command={{json .Config.Cmd}}' "$cloudflared"
-            docker inspect --format 'config_mounts={{range .Mounts}}{{if or (contains .Destination "cloudflared") (contains .Destination "config")}}{{.Source}}:{{.Destination}} {{end}}{{end}}' "$cloudflared"
+            docker inspect --format 'container={{.Name}} image={{.Config.Image}} image_id={{.Image}}' "$cloudflared"
+            docker inspect --format 'config_mount_destinations={{range .Mounts}}{{if or (contains .Destination "cloudflared") (contains .Destination "config")}}type={{.Type}} name={{.Name}} destination={{.Destination}} {{end}}{{end}}' "$cloudflared"
             echo "tunnel_id_presence=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$cloudflared" | grep -q '^CLOUDFLARE_TUNNEL_ID=' && echo YES || echo NO)"
             echo "tunnel_credentials_contents=NOT_READ"
           else
@@ -131,9 +131,9 @@ jobs:
             if [[ "$container" == *keycloak* || "$image" == *keycloak* ]]; then keycloak="$container"; break; fi
           done < <(docker ps -a --format '{{.Names}}')
           if [[ -n "$keycloak" ]]; then
-            docker inspect --format 'container={{.Name}} image={{.Config.Image}} image_id={{.Image}} command={{json .Config.Cmd}}' "$keycloak"
+            docker inspect --format 'container={{.Name}} image={{.Config.Image}} image_id={{.Image}}' "$keycloak"
             echo "kcadm_present=$(docker exec "$keycloak" test -x /opt/keycloak/bin/kcadm.sh >/dev/null 2>&1 && echo YES || echo NO)"
-            echo "realm_import_mounts=$(docker inspect --format '{{range .Mounts}}{{if contains .Destination "/import"}}{{.Source}}:{{.Destination}}{{end}}{{end}}' "$keycloak")"
+            echo "realm_import_mount_destinations=$(docker inspect --format '{{range .Mounts}}{{if contains .Destination "/import"}}type={{.Type}} name={{.Name}} destination={{.Destination}}{{end}}{{end}}' "$keycloak")"
             echo "realm= witness (repository-defined; live realm not queried)"
             echo "client=witness-api (repository-defined; live client not queried)"
             echo "admin_console=standard Keycloak console; reachability not probed"
