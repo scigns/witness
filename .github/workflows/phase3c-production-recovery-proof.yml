@@ -124,23 +124,32 @@ jobs:
           echo "ANONYMOUS_VOLUMES="
           while IFS= read -r volume; do
             [[ -n "$volume" ]] || continue
-            attached=""
+            attachments=()
+            witness_attachment=0
             while IFS= read -r container; do
               [[ -n "$container" ]] || continue
+              project="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$container" 2>/dev/null || true)"
+              service="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$container" 2>/dev/null || true)"
+              [[ "$project" == "<no value>" ]] && project=""
+              [[ "$service" == "<no value>" ]] && service=""
               mounts="$(docker inspect --format '{{range .Mounts}}{{if eq .Type "volume"}}{{.Name}}|{{.Destination}}{{println}}{{end}}{{end}}' "$container" 2>/dev/null || true)"
               while IFS='|' read -r mounted_name destination; do
                 [[ "$mounted_name" == "$volume" ]] || continue
-                service="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$container" 2>/dev/null || echo unknown)"
-                attached="${service}:${destination}"
+                project_display="${project:-unknown}"
+                service_display="${service:-unknown}"
+                attachments+=("${project_display}/${service_display}:${destination}")
+                [[ "$project" == "witness-pilot" ]] && witness_attachment=1
               done <<<"$mounts"
             done < <(docker ps -aq)
-            if [[ -n "$attached" ]]; then
+            if (( witness_attachment )); then
               classification="ACTIVE_REQUIRED"
             else
               classification="UNKNOWN"
-              attached="none"
             fi
-            echo "ANONYMOUS_VOLUME=${volume:0:12} ATTACHMENT=$attached CLASSIFICATION=$classification"
+            if ((${#attachments[@]} == 0)); then
+              attachments=("none")
+            fi
+            printf 'ANONYMOUS_VOLUME=%s ATTACHMENTS=%s CLASSIFICATION=%s\n' "${volume:0:12}" "$(IFS=';'; echo "${attachments[*]}")" "$classification"
           done < <(docker volume ls -q | awk 'length($0) == 64 && $0 ~ /^[0-9a-f]+$/')
           echo "CLOUDFLARE_REFRESH=NOT_AVAILABLE"
           echo "LOCAL_TUNNEL_MATCH=UNKNOWN"
