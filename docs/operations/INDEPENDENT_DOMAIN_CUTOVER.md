@@ -48,6 +48,9 @@ DNS record.
 - The configured `/witness` base-path deployment still passes its existing build and callback tests.
 - CORS accepts only the reviewed application origin.
 - OIDC issuer, callback, logout, and cookie behaviour all use the new identity host.
+- The browser API build has an explicit `NEXT_PUBLIC_WITNESS_API_URL`; deployed builds reject a
+  missing or malformed API origin rather than falling back to localhost.
+- Authentication uses a bearer token in session storage; no cross-subdomain cookie is required.
 - API and readiness endpoints do not expose database or secret configuration.
 - PostgreSQL has no public listener or DNS record.
 - Sovereign deployment still starts without Cloudflare or external egress.

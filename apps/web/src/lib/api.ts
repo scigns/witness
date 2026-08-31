@@ -125,7 +125,9 @@ import type {
   PublicPlanCatalogue,
 } from '@witness/contracts';
 
-const BASE_URL = process.env['NEXT_PUBLIC_WITNESS_API_URL'] ?? 'http://localhost:3001';
+import { API_BASE_URL } from './runtime-config';
+
+const BASE_URL = API_BASE_URL;
 
 /**
  * Which deployment this bundle was built for, mirroring the API's

@@ -183,3 +183,26 @@ describe('AuthenticationController — dev-idp/authorize redirect_uri validation
     expect(response.redirect).toHaveBeenCalled();
   });
 });
+
+describe('AuthenticationController — independent application callback', () => {
+  it('returns a successful OIDC callback to the configured root-host application', async () => {
+    const authentication = {
+      handleCallback: vi.fn().mockResolvedValue({ token: 'session-token' }),
+    } as unknown as AuthenticationService;
+    const response = { redirect: vi.fn() } as never;
+    const controller = new AuthenticationController(
+      authentication,
+      {} as IdentityProviderPort,
+      {
+        webBaseUrl: 'https://app.buildwithwitness.com/',
+      } as WitnessConfig,
+    );
+
+    await controller.callback('oidc-code', 'oidc-state', response);
+
+    expect(response.redirect).toHaveBeenCalledWith(
+      302,
+      'https://app.buildwithwitness.com/auth/callback#token=session-token',
+    );
+  });
+});
