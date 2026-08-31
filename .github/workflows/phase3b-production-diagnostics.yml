@@ -1,0 +1,145 @@
+name: Phase 3B production diagnostics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    name: Read-only production inventory
+    # This is the existing production runner. No hosted fallback is allowed.
+    runs-on: [self-hosted, witness-pilot]
+    timeout-minutes: 10
+    steps:
+      - name: Inventory production control plane (read-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expected_host="witness-prod-01"
+          actual_host="$(hostname -s 2>/dev/null || hostname)"
+          if [[ "$actual_host" != "$expected_host" ]]; then
+            echo "Unexpected runner hostname; refusing to inspect any state."
+            echo "Expected: $expected_host"
+            echo "Observed: $actual_host"
+            exit 1
+          fi
+
+          echo "== HOST / REPOSITORY =="
+          echo "hostname=$actual_host"
+          repo="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+          if [[ -n "$repo" ]]; then
+            echo "repository_path=$repo"
+            echo "git_sha=$(git rev-parse HEAD 2>/dev/null || echo unavailable)"
+            echo "git_ref=$(git symbolic-ref --short -q HEAD 2>/dev/null || echo detached)"
+            echo "git_status=$(git status --short 2>/dev/null | wc -l | tr -d ' ') changed_paths"
+            echo "git_remotes=$(git remote 2>/dev/null | tr '\n' ' ')"
+          else
+            echo "repository_path=unavailable"
+          fi
+
+          echo "== DOCKER TOOLING =="
+          docker version --format 'server={{.Server.Version}} client={{.Client.Version}}'
+          docker compose version
+          docker compose ls --all
+
+          echo "== CONTAINERS =="
+          docker ps -a --format 'name={{.Names}} image={{.Image}} image_id={{.ID}} status={{.Status}}'
+          while IFS= read -r container; do
+            [[ -z "$container" ]] && continue
+            docker inspect --format 'name={{.Name}} image={{.Config.Image}} image_id={{.Image}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} started={{.State.StartedAt}} compose_project={{index .Config.Labels "com.docker.compose.project"}} compose_service={{index .Config.Labels "com.docker.compose.service"}} networks={{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' "$container"
+            docker inspect --format 'mounts={{range .Mounts}}{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}:{{.Destination}} {{end}}' "$container"
+          done < <(docker ps -a --format '{{.Names}}')
+
+          echo "== VOLUMES =="
+          docker volume ls --format 'name={{.Name}} driver={{.Driver}}'
+          while IFS= read -r volume; do
+            [[ -z "$volume" ]] && continue
+            docker volume inspect --format 'name={{.Name}} driver={{.Driver}} scope={{.Scope}} labels={{json .Labels}}' "$volume"
+          done < <(docker volume ls --format '{{.Name}}')
+
+          echo "== ENVIRONMENT SOURCE / VARIABLE PRESENCE =="
+          env_files=()
+          for candidate in \
+            "${repo:-}/.env" \
+            "${repo:-}/deployments/cloud-managed/.env" \
+            /opt/witness/.env \
+            /srv/witness/.env \
+            /home/witness/.env \
+            /home/witness/witness/.env; do
+            if [[ -n "$candidate" && -f "$candidate" ]]; then
+              env_files+=("$candidate")
+              stat -c 'env_file=%n mode=%a owner=%U:%G' "$candidate" 2>/dev/null || stat -f 'env_file=%N mode=%Lp owner=%Su:%Sg' "$candidate"
+            fi
+          done
+          if [[ "${#env_files[@]}" -eq 0 ]]; then
+            echo "env_file=not-found-in-known-locations"
+          fi
+
+          required_vars=(
+            WITNESS_PUBLIC_URL WITNESS_WEB_ORIGIN WITNESS_WEB_BASE_URL
+            NEXT_PUBLIC_WITNESS_API_URL NEXT_PUBLIC_WITNESS_BASE_PATH
+            OIDC_ISSUER OIDC_PUBLIC_URL WITNESS_OIDC_REDIRECT_URI
+          )
+          credential_names=(
+            DATABASE_URL POSTGRES_PASSWORD KEYCLOAK_ADMIN_PASSWORD
+            KEYCLOAK_DB_PASSWORD WITNESS_REALM_SEED_PASSWORD
+            CLOUDFLARE_TUNNEL_ID
+          )
+          report_presence() {
+            local variable="$1" present=NO source=none file
+            for file in "${env_files[@]}"; do
+              if grep -qE "^${variable}=" "$file"; then
+                present=YES; source="env_file:$file"; break
+              fi
+            done
+            if [[ "$present" == NO ]]; then
+              while IFS= read -r container; do
+                [[ -z "$container" ]] && continue
+                if docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container" 2>/dev/null | grep -qE "^${variable}="; then
+                  present=YES; source="container_environment"; break
+                fi
+              done < <(docker ps -a --format '{{.Names}}')
+            fi
+            echo "$variable PRESENT=$present SOURCE=$source"
+          }
+          for variable in "${required_vars[@]}"; do report_presence "$variable"; done
+          echo "credential_presence_only:"
+          for variable in "${credential_names[@]}"; do report_presence "$variable"; done
+
+          echo "== CLOUDFLARED =="
+          cloudflared=""
+          while IFS= read -r container; do
+            image="$(docker inspect --format '{{.Config.Image}}' "$container" 2>/dev/null || true)"
+            if [[ "$container" == *cloudflared* || "$image" == *cloudflared* ]]; then cloudflared="$container"; break; fi
+          done < <(docker ps -a --format '{{.Names}}')
+          if [[ -n "$cloudflared" ]]; then
+            docker inspect --format 'container={{.Name}} image={{.Config.Image}} image_id={{.Image}} command={{json .Config.Cmd}}' "$cloudflared"
+            docker inspect --format 'config_mounts={{range .Mounts}}{{if or (contains .Destination "cloudflared") (contains .Destination "config")}}{{.Source}}:{{.Destination}} {{end}}{{end}}' "$cloudflared"
+            echo "tunnel_id_presence=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$cloudflared" | grep -q '^CLOUDFLARE_TUNNEL_ID=' && echo YES || echo NO)"
+            echo "tunnel_credentials_contents=NOT_READ"
+          else
+            echo "cloudflared_container=not-found"
+          fi
+
+          echo "== KEYCLOAK =="
+          keycloak=""
+          while IFS= read -r container; do
+            image="$(docker inspect --format '{{.Config.Image}}' "$container" 2>/dev/null || true)"
+            if [[ "$container" == *keycloak* || "$image" == *keycloak* ]]; then keycloak="$container"; break; fi
+          done < <(docker ps -a --format '{{.Names}}')
+          if [[ -n "$keycloak" ]]; then
+            docker inspect --format 'container={{.Name}} image={{.Config.Image}} image_id={{.Image}} command={{json .Config.Cmd}}' "$keycloak"
+            echo "kcadm_present=$(docker exec "$keycloak" test -x /opt/keycloak/bin/kcadm.sh >/dev/null 2>&1 && echo YES || echo NO)"
+            echo "realm_import_mounts=$(docker inspect --format '{{range .Mounts}}{{if contains .Destination "/import"}}{{.Source}}:{{.Destination}}{{end}}{{end}}' "$keycloak")"
+            echo "realm= witness (repository-defined; live realm not queried)"
+            echo "client=witness-api (repository-defined; live client not queried)"
+            echo "admin_console=standard Keycloak console; reachability not probed"
+          else
+            echo "keycloak_container=not-found"
+          fi
+
+          echo "== SAFETY =="
+          echo "No checkout, pull, reset, compose up/down, restart, stop, rm, volume/network mutation, migration, database query, Keycloak admin action, Cloudflare action, or file write was executed."
