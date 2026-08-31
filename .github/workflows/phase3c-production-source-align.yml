@@ -15,7 +15,7 @@ jobs:
       - name: Checkout reviewed main tooling
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ github.sha }}
           path: phase3c-source-align
           persist-credentials: false
           clean: true
@@ -35,7 +35,7 @@ jobs:
           relative_file="deployments/cloud-managed/cloudflared/config.yml"
           production_file="$production_repo/$relative_file"
           env_file="$production_repo/.env"
-          target_sha="996bde9bf68be6f5095dd170cee3f90483b3adc4"
+          target_sha="${GITHUB_SHA}"
 
           [[ -d "$production_repo/.git" && -f "$env_file" && -f "$production_file" ]] || { echo "Authoritative production repository, .env, or cloudflared config unavailable."; exit 1; }
           [[ "$(git -C "$production_repo" symbolic-ref --short -q HEAD 2>/dev/null || true)" == "main" ]] || { echo "Production repository is not on main."; exit 1; }
@@ -70,7 +70,7 @@ jobs:
           cleanup() { rm -f "$temp_file" "${temp_file}.normalized" "${reviewed_file}.normalized"; }
           trap cleanup EXIT
 
-          git -C "$production_repo" fetch --quiet origin main
+          git -C "$production_repo" fetch --quiet origin "$target_sha"
           git -C "$production_repo" reset --hard --quiet "$target_sha"
           [[ "$(git -C "$production_repo" rev-parse HEAD)" == "$target_sha" ]] || { echo "Production source did not reach the approved revision."; exit 1; }
 
