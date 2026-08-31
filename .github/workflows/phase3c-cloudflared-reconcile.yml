@@ -1,0 +1,105 @@
+name: Phase 3C cloudflared production reconciliation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    name: Reconcile reviewed cloudflared baseline
+    runs-on: [self-hosted, witness-pilot]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reviewed main configuration
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.1.7
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+          path: phase3c-reconcile-source
+
+      - name: Reconcile one production file
+        shell: bash
+        run: |
+          # shellcheck disable=SC2016
+          set -euo pipefail
+
+          [[ "${GITHUB_REF:-}" == "refs/heads/main" ]] || { echo "Reconciliation must be dispatched from main."; exit 1; }
+          expected_host="witness-prod-01"
+          actual_host="$(hostname -s 2>/dev/null || hostname)"
+          [[ "$actual_host" == "$expected_host" ]] || { echo "Unexpected runner hostname; refusing reconciliation."; exit 1; }
+
+          production_repo="/home/witness/witness"
+          relative_file="deployments/cloud-managed/cloudflared/config.yml"
+          production_file="$production_repo/$relative_file"
+          reviewed_repo="$GITHUB_WORKSPACE/phase3c-reconcile-source"
+          reviewed_file="$reviewed_repo/$relative_file"
+          [[ -d "$production_repo/.git" && -f "$production_file" ]] || { echo "Authoritative production repository/file not found."; exit 1; }
+          [[ -f "$reviewed_file" ]] || { echo "Reviewed configuration not found."; exit 1; }
+          [[ "$(git -C "$production_repo" symbolic-ref --short -q HEAD 2>/dev/null || true)" == "main" ]] || { echo "Production repository is not on main."; exit 1; }
+
+          mapfile -t dirty_entries < <(git -C "$production_repo" status --porcelain=v1)
+          echo "PRODUCTION_HEAD=$(git -C "$production_repo" rev-parse HEAD)"
+          echo "DIRTY_ENTRY_COUNT=${#dirty_entries[@]}"
+          [[ ${#dirty_entries[@]} -eq 1 ]] || { echo "Production worktree is not in the approved pre-reconciliation state."; exit 1; }
+          [[ "${dirty_entries[0]}" == " M $relative_file" ]] || { echo "Production worktree has an unexpected dirty path/state."; exit 1; }
+          [[ -z "$(git -C "$production_repo" diff --cached --name-only)" ]] || { echo "Production repository has staged changes."; exit 1; }
+          [[ -z "$(git -C "$production_repo" ls-files --others --exclude-standard)" ]] || { echo "Production repository has untracked files."; exit 1; }
+
+          # Validate reviewed main without emitting configuration values.
+          [[ "$(awk '$1 == "tunnel:" { count++; value=$2 } END { print count ":" value }' "$reviewed_file")" == '1:${CLOUDFLARE_TUNNEL_ID}' ]] || { echo "Reviewed main tunnel declaration is invalid."; exit 1; }
+          for expected_host in witness-prod-web.pacificdigitalconsultancy.org witness-prod-api.pacificdigitalconsultancy.org witness-prod-id.pacificdigitalconsultancy.org; do
+            grep -Fq -- "- hostname: $expected_host" "$reviewed_file" || { echo "Reviewed main hostname baseline is invalid."; exit 1; }
+          done
+          grep -Fq 'service: http://web:3000' "$reviewed_file" || { echo "Reviewed main Web service target is invalid."; exit 1; }
+          grep -Fq 'service: http://api:3001' "$reviewed_file" || { echo "Reviewed main API service target is invalid."; exit 1; }
+          grep -Fq 'service: http://keycloak:8080' "$reviewed_file" || { echo "Reviewed main identity service target is invalid."; exit 1; }
+          grep -Fq 'service: http_status:404' "$reviewed_file" || { echo "Reviewed main catch-all is invalid."; exit 1; }
+          ! grep -Eiq '^[[:space:]]*-[[:space:]]*hostname:.*postgres|^[[:space:]]*service:.*postgres' "$reviewed_file" || { echo "Reviewed main contains forbidden PostgreSQL ingress."; exit 1; }
+
+          tunnel_values="$(awk '$1 == "tunnel:" { print $2 }' "$production_file")"
+          tunnel_count="$(awk '$1 == "tunnel:" { count++ } END { print count + 0 }' "$production_file")"
+          [[ "$tunnel_count" == "1" ]] || { echo "Production tunnel declaration count is invalid."; exit 1; }
+          production_tunnel="$(printf '%s\n' "$tunnel_values" | sed -n '1p')"
+          [[ "$production_tunnel" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || { echo "Production tunnel declaration is invalid."; exit 1; }
+
+          run_tmp="$(mktemp -d)"
+          chmod 700 "$run_tmp"
+          cleanup() { rm -rf "$run_tmp"; }
+          trap cleanup EXIT
+          reconciled="$run_tmp/config.yml"
+          PRODUCTION_TUNNEL="$production_tunnel" awk '
+            {
+              line = $0
+              if (line ~ /^[[:space:]]*tunnel:[[:space:]]/) {
+                match(line, /^[[:space:]]*/)
+                line = substr(line, 1, RLENGTH) "tunnel: " ENVIRON["PRODUCTION_TUNNEL"]
+              }
+              print line
+            }
+          ' "$reviewed_file" >"$reconciled"
+          chmod 600 "$reconciled"
+          mv "$reconciled" "$production_file"
+
+          mapfile -t post_dirty < <(git -C "$production_repo" status --porcelain=v1)
+          [[ ${#post_dirty[@]} -eq 1 && "${post_dirty[0]}" == " M $relative_file" ]] || { echo "Post-reconciliation worktree state is invalid."; exit 1; }
+          [[ -z "$(git -C "$production_repo" diff --cached --name-only)" ]] || { echo "Post-reconciliation staged state is invalid."; exit 1; }
+          [[ -z "$(git -C "$production_repo" ls-files --others --exclude-standard)" ]] || { echo "Post-reconciliation untracked state is invalid."; exit 1; }
+
+          post_tunnel_count="$(awk '$1 == "tunnel:" { count++; value=$2 } END { print count ":" value }' "$production_file")"
+          [[ "$post_tunnel_count" =~ ^1:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || { echo "Post-reconciliation tunnel declaration is invalid."; exit 1; }
+          canonicalize() {
+            awk '{ line=$0; sub(/[[:space:]]+$/, "", line); trimmed=line; sub(/^[[:space:]]+/, "", trimmed); if (trimmed == "" || trimmed ~ /^#/) next; if (trimmed ~ /^tunnel:[[:space:]]/) { match(line, /^[[:space:]]*/); line=substr(line, 1, RLENGTH) "tunnel: __DEPLOYMENT_TUNNEL__" } print line }' "$1"
+          }
+          canonicalize "$reviewed_file" >"$run_tmp/reviewed.normalized"
+          canonicalize "$production_file" >"$run_tmp/production.normalized"
+          cmp -s "$run_tmp/reviewed.normalized" "$run_tmp/production.normalized" || { echo "CLOUDFLARED_EFFECTIVE_CONFIG=INVALID"; exit 1; }
+          echo "CLOUDFLARED_EFFECTIVE_CONFIG=VALID"
+          echo "POST_RECONCILIATION_DIRTY_ENTRY_COUNT=${#post_dirty[@]}"
+          echo "PRODUCTION_CONFIG_CHANGED=YES"
+          echo "APPLICATION_RESTARTED=NO"
+          echo "CLOUDFLARE_CHANGED=NO"
+          echo "DNS_CHANGED=NO"
+          echo "DATABASE_CHANGED=NO"
