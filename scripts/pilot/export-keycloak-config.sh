@@ -26,13 +26,11 @@ docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T keycloak \
 
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T keycloak \
   sh -lc '/opt/keycloak/bin/kcadm.sh get realms/witness \
-  --fields realm,enabled,sslRequired,frontendUrl,attributes,accessTokenLifespan,ssoSessionIdleTimeout,ssoSessionMaxLifespan \
-  -o' > "${REALM_EXPORT}.tmp"
+  --fields realm,enabled,sslRequired,frontendUrl,attributes,accessTokenLifespan,ssoSessionIdleTimeout,ssoSessionMaxLifespan' > "${REALM_EXPORT}.tmp"
 
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T keycloak \
   sh -lc '/opt/keycloak/bin/kcadm.sh get clients -r witness -q clientId=witness-api \
-  --fields id,clientId,enabled,publicClient,redirectUris,webOrigins,attributes,standardFlowEnabled,directAccessGrantsEnabled \
-  -o' > "${CLIENT_EXPORT}.tmp"
+  --fields id,clientId,enabled,publicClient,redirectUris,webOrigins,attributes,standardFlowEnabled,directAccessGrantsEnabled' > "${CLIENT_EXPORT}.tmp"
 
 mv -- "${REALM_EXPORT}.tmp" "${REALM_EXPORT}"
 mv -- "${CLIENT_EXPORT}.tmp" "${CLIENT_EXPORT}"
