@@ -446,6 +446,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
   // actually reach over TLS.
   if (value.WITNESS_DEPLOYMENT_PROFILE !== 'development') {
     problems.push(
+      ...(value.WITNESS_PUBLIC_URL.trim() === ''
+        ? [
+            'WITNESS_PUBLIC_URL must be set explicitly outside the development profile — ' +
+              'the product identity must not be derived from the application origin.',
+          ]
+        : []),
       ...deployedUrlProblems('WITNESS_WEB_ORIGIN', value.WITNESS_WEB_ORIGIN, {
         requirement:
           'the exact origin the browser sends, used for the CORS policy — the localhost ' +

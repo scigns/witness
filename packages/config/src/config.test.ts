@@ -28,6 +28,7 @@ const oidcBase = {
   KEYCLOAK_CLIENT_ID: 'witness-api',
   JWT_AUDIENCE: 'witness-api',
   WITNESS_WEB_ORIGIN: 'https://pilot.example.org',
+  WITNESS_PUBLIC_URL: 'https://pilot.example.org',
   WITNESS_OIDC_REDIRECT_URI: 'https://api.pilot.example.org/api/v1/auth/callback',
 } satisfies NodeJS.ProcessEnv;
 
@@ -386,6 +387,13 @@ describe('deployed public addresses', () => {
     expect(config.publicUrl).toBe('https://buildwithwitness.com');
     expect(config.webOrigin).toBe('https://app.buildwithwitness.com');
     expect(config.oidcIssuer).toBe('https://id.buildwithwitness.com/realms/witness');
+  });
+
+  it('refuses a deployed profile that never states the product URL', () => {
+    const { WITNESS_PUBLIC_URL: _omitted, ...withoutPublicUrl } = oidcBase;
+    expect(() =>
+      loadConfig({ ...withoutPublicUrl, WITNESS_DEPLOYMENT_PROFILE: 'sovereign' }),
+    ).toThrow(/WITNESS_PUBLIC_URL must be set explicitly/);
   });
 
   it('rejects a malformed independent product URL', () => {

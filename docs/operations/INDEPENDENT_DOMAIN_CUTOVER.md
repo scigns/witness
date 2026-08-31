@@ -28,8 +28,9 @@ DNS record.
 ## Coexistence sequence
 
 1. Verify ownership and certificate readiness for the new hostnames without changing existing DNS.
-2. Render a deployment-specific environment from the reviewed secret store. Never commit `.env` or
-   tunnel credentials.
+2. Render a deployment-specific environment from the reviewed secret store. The repository's
+   `independent-domain.env.example` is a cutover-only reference; the active `.env.example` remains aligned
+   with the historical pilot tunnel. Never commit `.env` or tunnel credentials.
 3. Set `WITNESS_PUBLIC_URL`, `WITNESS_WEB_ORIGIN`, `WITNESS_WEB_BASE_URL`,
    `NEXT_PUBLIC_WITNESS_API_URL`, `OIDC_ISSUER`, and `WITNESS_OIDC_REDIRECT_URI` to the independent
    map. Keep `NEXT_PUBLIC_WITNESS_BASE_PATH` empty for the dedicated application hostname.
