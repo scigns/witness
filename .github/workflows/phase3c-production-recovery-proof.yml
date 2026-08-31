@@ -34,7 +34,25 @@ jobs:
           [[ -d "$production_repo/.git" ]] || { echo "Authoritative production repository not found."; exit 1; }
           [[ -d "$tooling_repo/.git" ]] || { echo "Reviewed recovery tooling checkout not found."; exit 1; }
           [[ "$(git -C "$production_repo" symbolic-ref --short -q HEAD 2>/dev/null || true)" == "main" ]] || { echo "Production repository is not on main."; exit 1; }
-          [[ "$(git -C "$production_repo" status --short | wc -l | tr -d ' ')" == "0" ]] || { echo "Production repository is not clean."; exit 1; }
+          mapfile -t dirty_entries < <(git -C "$production_repo" status --porcelain=v1)
+          if [[ ${#dirty_entries[@]} -eq 1 && "${dirty_entries[0]:0:2}" == " M" && "${dirty_entries[0]:3}" == "deployments/cloud-managed/cloudflared/config.yml" ]]; then
+            cloudflared_file="$production_repo/deployments/cloud-managed/cloudflared/config.yml"
+            cloudflared_head="$(mktemp)"
+            cloudflared_worktree="$(mktemp)"
+            git -C "$production_repo" show "HEAD:deployments/cloud-managed/cloudflared/config.yml" >"$cloudflared_head"
+            cp "$cloudflared_file" "$cloudflared_worktree"
+            # shellcheck disable=SC2016
+            tunnel_values="$(awk '$1 == "tunnel:" { print $2 }' "$cloudflared_worktree")"
+            [[ "$(printf '%s\n' "$tunnel_values" | sed '/^$/d' | wc -l | tr -d ' ')" == "1" ]] || { echo "Cloudflared deployment substitution is invalid."; exit 1; }
+            production_tunnel="$(printf '%s\n' "$tunnel_values" | sed -n '1p')"
+            [[ -n "$production_tunnel" && "$production_tunnel" != '${CLOUDFLARE_TUNNEL_ID}' ]] || { echo "Cloudflared deployment substitution is invalid."; exit 1; }
+            sed -E 's/^tunnel:[[:space:]].*$/tunnel: __DEPLOYMENT_TUNNEL__/' "$cloudflared_head" >"${cloudflared_head}.normalized"
+            sed -E 's/^tunnel:[[:space:]].*$/tunnel: __DEPLOYMENT_TUNNEL__/' "$cloudflared_worktree" >"${cloudflared_worktree}.normalized"
+            cmp -s "${cloudflared_head}.normalized" "${cloudflared_worktree}.normalized" || { echo "Cloudflared deployment substitution is invalid."; exit 1; }
+            echo "CLOUDFLARED_DEPLOYMENT_SUBSTITUTION=EXPECTED"
+          else
+            echo "Production repository contains unexpected worktree changes."; exit 1
+          fi
           production_sha="$(git -C "$production_repo" rev-parse HEAD)"
           [[ "$(git -C "$tooling_repo" rev-parse --verify HEAD)" == "$GITHUB_SHA" ]] || { echo "Reviewed tooling checkout does not match dispatched main revision."; exit 1; }
 
@@ -102,8 +120,19 @@ jobs:
           restore_name="witness-phase3c-restore-$$"
           restore_volume="witness-phase3c-restore-data-$$"
           cleanup() {
+            local original_status="$?" cleanup_failed=0
+            set +e
             docker rm -f "$restore_name" >/dev/null 2>&1 || true
+            docker inspect "$restore_name" >/dev/null 2>&1 && cleanup_failed=1
             docker volume rm "$restore_volume" >/dev/null 2>&1 || true
+            docker volume inspect "$restore_volume" >/dev/null 2>&1 && cleanup_failed=1
+            if (( cleanup_failed )); then
+              echo "Disposable recovery cleanup failed; manual cleanup required."
+            fi
+            rm -f "$cloudflared_head" "$cloudflared_worktree" "${cloudflared_head}.normalized" "${cloudflared_worktree}.normalized"
+            trap - EXIT
+            if (( original_status != 0 )); then exit "$original_status"; fi
+            if (( cleanup_failed )); then exit 1; fi
           }
           trap cleanup EXIT
           docker volume create "$restore_volume" >/dev/null
