@@ -1,0 +1,74 @@
+name: Phase 3C production worktree drift diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Read-only production Git metadata
+    runs-on: [self-hosted, witness-pilot]
+    timeout-minutes: 10
+    steps:
+      - name: Inspect authoritative production worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expected_host="witness-prod-01"
+          actual_host="$(hostname -s 2>/dev/null || hostname)"
+          [[ "$actual_host" == "$expected_host" ]] || { echo "Unexpected runner hostname; refusing inspection."; exit 1; }
+
+          production_repo="/home/witness/witness"
+          [[ -d "$production_repo/.git" ]] || { echo "Production repository is unavailable."; exit 1; }
+          [[ "$(git -C "$production_repo" rev-parse --is-inside-work-tree 2>/dev/null)" == true ]] || { echo "Production path is not a Git worktree."; exit 1; }
+
+          echo "HOST=$actual_host"
+          echo "PRODUCTION_REPOSITORY=$production_repo"
+          echo "PRODUCTION_BRANCH=$(git -C "$production_repo" symbolic-ref --short -q HEAD 2>/dev/null || echo detached)"
+          echo "PRODUCTION_HEAD=$(git -C "$production_repo" rev-parse HEAD)"
+          echo "CURRENT_MAIN=$GITHUB_SHA"
+          if git -C "$production_repo" rev-parse --verify origin/main >/dev/null 2>&1; then
+            echo "PRODUCTION_ORIGIN_MAIN=$(git -C "$production_repo" rev-parse origin/main)"
+            relationship="$(git -C "$production_repo" rev-list --left-right --count origin/main...HEAD)"
+            echo "ORIGIN_MAIN_RELATIONSHIP=$relationship"
+          else
+            echo "PRODUCTION_ORIGIN_MAIN=UNAVAILABLE"
+            echo "ORIGIN_MAIN_RELATIONSHIP=UNKNOWN"
+          fi
+
+          dirty_count="$(git -C "$production_repo" status --porcelain=v1 | wc -l | tr -d ' ')"
+          echo "DIRTY_ENTRY_COUNT=$dirty_count"
+          echo "DIRTY_ENTRIES="
+          git -C "$production_repo" status --porcelain=v1 | while IFS= read -r entry; do
+            code="${entry:0:2}"
+            path="${entry:3}"
+            case "$path" in
+              .env|.env.*|*credential*|*secret*|*private*|*.pem|*.key|*password*|*token*|*backup*|*.dump|*.sql|*database*)
+                path="UNTRACKED_SENSITIVE_PATH_REDACTED"
+                ;;
+            esac
+            echo "STATUS=$code PATH=$path"
+          done
+
+          echo "TRACKED_MODIFIED="
+          git -C "$production_repo" diff --name-status | while IFS=$'\t' read -r status path rest; do
+            [[ -n "$path" ]] || continue
+            case "$path" in .env|.env.*|*credential*|*secret*|*private*|*.pem|*.key|*password*|*token*|*backup*|*.dump|*.sql|*database*) path="SENSITIVE_PATH_REDACTED";; esac
+            echo "STATUS=$status PATH=$path"
+          done
+          echo "STAGED_ENTRIES="
+          git -C "$production_repo" diff --cached --name-status | while IFS=$'\t' read -r status path rest; do
+            [[ -n "$path" ]] || continue
+            case "$path" in .env|.env.*|*credential*|*secret*|*private*|*.pem|*.key|*password*|*token*|*backup*|*.dump|*.sql|*database*) path="SENSITIVE_PATH_REDACTED";; esac
+            echo "STATUS=$status PATH=$path"
+          done
+          echo "UNTRACKED_ENTRIES="
+          git -C "$production_repo" ls-files --others --exclude-standard | while IFS= read -r path; do
+            case "$path" in .env|.env.*|*credential*|*secret*|*private*|*.pem|*.key|*password*|*token*|*backup*|*.dump|*.sql|*database*) echo "PATH=UNTRACKED_SENSITIVE_PATH_REDACTED";; *) echo "PATH=$path";; esac
+          done
+          echo "FILE_CONTENTS_READ=NO"
+          echo "PRODUCTION_ACTIONS=NONE"
+          echo "RECOVERY_WORKFLOW_RERUN=NO"
