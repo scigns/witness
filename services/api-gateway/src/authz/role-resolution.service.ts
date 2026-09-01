@@ -116,6 +116,22 @@ export class RoleResolutionService {
     return [...tiers];
   }
 
+  /** Platform-only authority for privileged internal operations such as settlement. */
+  async platformGrantTiers(userId: string): Promise<string[]> {
+    const assignments = await this.prisma.roleAssignment.findMany({
+      where: {
+        userId,
+        scopeType: 'platform',
+        organisationId: null,
+        workspaceId: null,
+      },
+      select: { role: true },
+    });
+    return [
+      ...new Set(assignments.map((assignment) => ROLE_TO_TIER[assignment.role as WitnessRole])),
+    ];
+  }
+
   /**
    * Every tier this user holds in exactly this scope — `admin` included.
    * A workspace scope also honours a `RoleAssignment` on the workspace's

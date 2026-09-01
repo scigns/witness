@@ -15,6 +15,7 @@ import {
   commercialChangeRequestSchema,
   createRecordRequestSchema,
   issueInvoiceRequestSchema,
+  manualSettlementRequestSchema,
   reviewActionSchema,
 } from './index.js';
 
@@ -22,6 +23,7 @@ describe('issueInvoiceRequest', () => {
   const valid = {
     idempotencyKey: '00000000-0000-4000-8000-000000000001',
     billingAccountId: '00000000-0000-4000-8000-000000000002',
+    commercialChangeRequestId: '00000000-0000-4000-8000-000000000003',
     currency: 'AUD',
     customer: { legalName: 'Customer', address: '1 Test Lane', email: 'billing@example.invalid' },
     lines: [
@@ -35,7 +37,7 @@ describe('issueInvoiceRequest', () => {
     dueAt: '2026-09-01T00:00:00.000Z',
   };
 
-  it('accepts bounded invoice facts without client totals or snapshots', () => {
+  it('accepts bounded invoice facts linked to commercial intent without client totals or snapshots', () => {
     expect(issueInvoiceRequestSchema.safeParse(valid).success).toBe(true);
   });
 
@@ -51,6 +53,33 @@ describe('issueInvoiceRequest', () => {
     expect(issueInvoiceRequestSchema.safeParse({ ...valid, invoiceNumber: 'INV-1' }).success).toBe(
       false,
     );
+  });
+});
+
+describe('manualSettlementRequest', () => {
+  const valid = {
+    amountMinor: '10000',
+    currency: 'AUD',
+    receivedAt: '2026-09-01T00:00:00.000Z',
+    paymentMethod: 'MANUAL_BANK_TRANSFER',
+    sourceReference: 'BANK-REFERENCE-1',
+    idempotencyKey: '00000000-0000-4000-8000-000000000004',
+  };
+
+  it('accepts exact provider-neutral manual evidence', () => {
+    expect(manualSettlementRequestSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('rejects unsupported methods, malformed money and client activation authority', () => {
+    expect(
+      manualSettlementRequestSchema.safeParse({ ...valid, paymentMethod: 'CARD' }).success,
+    ).toBe(false);
+    expect(manualSettlementRequestSchema.safeParse({ ...valid, amountMinor: '-1' }).success).toBe(
+      false,
+    );
+    expect(
+      manualSettlementRequestSchema.safeParse({ ...valid, activatePlan: 'ENTERPRISE' }).success,
+    ).toBe(false);
   });
 });
 

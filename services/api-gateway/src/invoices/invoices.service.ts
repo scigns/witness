@@ -58,6 +58,7 @@ function sameIssuanceRequest(row: InvoiceWithLines, request: IssueInvoiceRequest
     row.customerBillingEmailSnapshot === customer.email &&
     row.customerReference === (request.customerReference ?? null) &&
     row.purchaseOrderId === (request.purchaseOrderId ?? null) &&
+    row.commercialChangeRequestId === request.commercialChangeRequestId &&
     row.dueAt?.getTime() === requestedDueAt &&
     row.lines.length === request.lines.length &&
     row.lines.every((line, index) => {
@@ -93,6 +94,7 @@ function toView(row: InvoiceWithLines | InvoiceWithRender): InvoiceView {
     invoiceNumber: row.invoiceNumber,
     customerReference: row.customerReference,
     purchaseOrderId: row.purchaseOrderId,
+    commercialChangeRequestId: row.commercialChangeRequestId,
     supplier: {
       legalName: requiredSnapshot(row.supplierLegalNameSnapshot, 'supplier legal name'),
       businessIdentifier: row.supplierBusinessIdentifierSnapshot,
@@ -119,6 +121,7 @@ function toView(row: InvoiceWithLines | InvoiceWithRender): InvoiceView {
     totalMinor: row.totalMinor.toString(),
     issuedAt: row.issuedAt.toISOString(),
     dueAt: row.dueAt.toISOString(),
+    paidAt: row.paidAt?.toISOString() ?? null,
   };
 }
 
@@ -177,6 +180,44 @@ export class InvoicesService {
               message: 'Invoice currency does not match the billing account.',
             },
           });
+        const commercialChange = await tx.commercialChangeRequest.findFirst({
+          where: {
+            id: request.commercialChangeRequestId,
+            organisationId,
+            billingAccountId: account.id,
+            status: 'PENDING',
+            action: 'CHANGE_PLAN',
+          },
+          include: {
+            sourceSubscription: true,
+          },
+        });
+        if (
+          !commercialChange ||
+          commercialChange.requestedPlanCode === null ||
+          commercialChange.billingInterval === null ||
+          commercialChange.paymentMethod === null ||
+          commercialChange.paymentMethod === 'CARD'
+        ) {
+          throw new BadRequestException({
+            error: {
+              code: 'COMMERCIAL_CHANGE_NOT_INVOICEABLE',
+              message:
+                'Invoice issuance requires a pending paid change using an institutional method.',
+            },
+          });
+        }
+        if (
+          commercialChange.sourceSubscription.updatedAt.getTime() !==
+          commercialChange.sourceSubscriptionUpdatedAt.getTime()
+        ) {
+          throw new ConflictException({
+            error: {
+              code: 'STALE_COMMERCIAL_CHANGE',
+              message: 'The source subscription changed after this commercial request was made.',
+            },
+          });
+        }
         const purchaseOrder = request.purchaseOrderId
           ? await tx.purchaseOrder.findFirst({
               where: { id: request.purchaseOrderId, organisationId, billingAccountId: account.id },
@@ -216,6 +257,35 @@ export class InvoicesService {
             : null,
           at: now,
         });
+        const requestedPlan = await tx.plan.findFirst({
+          where: {
+            code: commercialChange.requestedPlanCode,
+            active: true,
+            quoteBased: false,
+          },
+          include: {
+            prices: {
+              where: {
+                active: true,
+                interval: commercialChange.billingInterval,
+                currency: request.currency,
+              },
+            },
+          },
+        });
+        const requestedPrice = requestedPlan?.prices[0];
+        if (
+          !requestedPlan ||
+          !requestedPrice ||
+          BigInt(requestedPrice.amountMinor) !== draft.subtotal.amountMinor
+        ) {
+          throw new BadRequestException({
+            error: {
+              code: 'INVOICE_PLAN_PRICE_MISMATCH',
+              message: 'Invoice subtotal must match the requested plan price and billing interval.',
+            },
+          });
+        }
         const snapshot = createInvoiceSnapshot({
           supplier: {
             legalName: profile.legalName,
@@ -263,6 +333,7 @@ export class InvoicesService {
             issuanceIdempotencyKey: request.idempotencyKey,
             customerReference: issued.customerReference,
             purchaseOrderId: issued.purchaseOrderId,
+            commercialChangeRequestId: commercialChange.id,
             subtotalMinor: issued.subtotal.amountMinor,
             taxMinor: issued.tax.amountMinor,
             totalMinor: issued.total.amountMinor,

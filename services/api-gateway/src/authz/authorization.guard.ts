@@ -131,6 +131,18 @@ export class AuthorizationGuard implements CanActivate {
       });
     }
 
+    // Money-received confirmation is never available through the unverified
+    // development header, even on localhost. It requires a real session and a
+    // platform-scoped role resolved below.
+    if (required === 'payment:settle' && sessionPrincipal === null) {
+      throw new UnauthorizedException({
+        error: {
+          code: 'VERIFIED_OPERATOR_REQUIRED',
+          message: 'Settlement requires a verified Witness operator session.',
+        },
+      });
+    }
+
     // Development identity is intentionally unverified. Keep invoice
     // surfaces confined to a local socket even when a role header claims admin.
     if (

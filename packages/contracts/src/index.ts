@@ -244,6 +244,7 @@ export interface BillingOverview {
   usage: OrganisationUsage;
   availablePlans: PublicPlan[];
   pendingChange: CommercialChangeView | null;
+  invoices: InvoiceSummaryView[];
 }
 
 // ─── Institutional invoice issuance (C3.3 / #114) ─────────────────────────
@@ -300,6 +301,7 @@ export const issueInvoiceRequestSchema = z
     dueAt: z.string().datetime({ offset: true }),
     customerReference: z.string().trim().min(1).max(200).optional(),
     purchaseOrderId: z.string().uuid().optional(),
+    commercialChangeRequestId: z.string().uuid(),
   })
   .strict();
 export type IssueInvoiceRequest = z.infer<typeof issueInvoiceRequestSchema>;
@@ -323,6 +325,7 @@ export interface InvoiceView {
   invoiceNumber: string;
   customerReference: string | null;
   purchaseOrderId: string | null;
+  commercialChangeRequestId: string | null;
   supplier: {
     legalName: string;
     businessIdentifier: string | null;
@@ -341,6 +344,54 @@ export interface InvoiceView {
   totalMinor: string;
   issuedAt: string;
   dueAt: string;
+  paidAt: string | null;
+}
+
+export interface InvoiceSummaryView {
+  id: string;
+  invoiceNumber: string;
+  status: string;
+  currency: string;
+  totalMinor: string;
+  issuedAt: string;
+  dueAt: string;
+  paidAt: string | null;
+}
+
+export const manualSettlementRequestSchema = z
+  .object({
+    amountMinor: invoiceMoneyMinorSchema,
+    currency: invoiceCurrencySchema,
+    receivedAt: z.string().datetime({ offset: true }),
+    paymentMethod: z.literal('MANUAL_BANK_TRANSFER'),
+    sourceReference: z.string().trim().min(1).max(200),
+    idempotencyKey: z.string().uuid(),
+  })
+  .strict();
+export type ManualSettlementRequest = z.infer<typeof manualSettlementRequestSchema>;
+
+export interface ManualSettlementContextView {
+  invoice: InvoiceView;
+  commercialChange: CommercialChangeView;
+  requestedPlan: PublicPlan;
+}
+
+export interface ManualSettlementResultView {
+  payment: {
+    id: string;
+    status: 'VERIFIED';
+    method: 'MANUAL_BANK_TRANSFER';
+    sourceReference: string;
+    amountMinor: string;
+    currency: string;
+    receivedAt: string;
+    verifiedAt: string;
+  };
+  invoice: InvoiceView;
+  subscription: BillingOverview['subscription'];
+  plan: PublicPlan;
+  resolvedEntitlements: PublicPlanEntitlement[];
+  effectiveAt: string;
 }
 
 export interface InvoiceRenderView extends InvoiceView {

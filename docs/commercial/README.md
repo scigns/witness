@@ -1,5 +1,19 @@
 # Commercial programme
 
+Architecture work for commercial and enterprise administration starts with the
+[`COMMERCIAL_ARCHITECTURE_ASSESSMENT.md`](COMMERCIAL_ARCHITECTURE_ASSESSMENT.md). It inventories the
+implemented foundation, identifies architecture drift and gates production migrations behind the
+proposed organisation commercial aggregate decision.
+
+The reconciled baseline is recorded in the
+[`COMMERCIAL_CAPABILITY_INVENTORY.md`](COMMERCIAL_CAPABILITY_INVENTORY.md),
+[`PRODUCTION_COMMERCIAL_PATH.md`](PRODUCTION_COMMERCIAL_PATH.md), and
+[`PRODUCTION_BILLING_GAP_ASSESSMENT.md`](PRODUCTION_BILLING_GAP_ASSESSMENT.md). The single proposed
+follow-on is documented separately in
+[`NEXT_COMMERCIAL_MILESTONE_RECOMMENDATION.md`](NEXT_COMMERCIAL_MILESTONE_RECOMMENDATION.md); that
+manual-settlement recommendation is now implemented, with production proof governed by its operator
+runbook.
+
 **Owner:** Product Director & Commercial Lead
 **Status:** Controlled Institutional Pilot programme
 **Review:** Monthly during the first 90 days, then quarterly

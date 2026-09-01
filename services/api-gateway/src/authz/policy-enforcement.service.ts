@@ -32,6 +32,7 @@ import { PolicyEngineService } from './policy-engine.service.js';
 import { RoleResolutionService, type ResourceScope } from './role-resolution.service.js';
 
 const SESSION_SUBJECT_PREFIX = 'user:';
+const PLATFORM_ONLY_ACTIONS: ReadonlySet<Action> = new Set(['payment:settle']);
 
 function scopeLabel(scope: ResourceScope): string {
   switch (scope.type) {
@@ -67,8 +68,9 @@ export class PolicyEnforcementService {
 
     let tiers: string[];
     try {
-      tiers =
-        scope.type === 'global'
+      tiers = PLATFORM_ONLY_ACTIONS.has(action)
+        ? await this.roleResolution.platformGrantTiers(userId)
+        : scope.type === 'global'
           ? await this.roleResolution.globalGrantTiers(userId)
           : await this.roleResolution.scopedGrantTiers(userId, scope);
     } catch (error) {

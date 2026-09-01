@@ -253,6 +253,7 @@ p, admin, organisation:create
 p, admin, organisation:update
 p, admin, invoice:create
 p, admin, invoice:render
+p, admin, payment:settle
 p, admin, workspace:read
 p, admin, workspace:create
 p, admin, workspace:update

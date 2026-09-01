@@ -15,7 +15,7 @@ export default function BillingPage({ params }: { params: Promise<{ id: string }
   const { user, ready } = useSession();
   const [overview, setOverview] = useState<BillingOverview | null>(null);
   const [interval, setInterval] = useState<BillingInterval>('MONTHLY');
-  const [method, setMethod] = useState<PaymentMethodChoice>('CARD');
+  const [method, setMethod] = useState<PaymentMethodChoice>('BANK_TRANSFER');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
@@ -151,6 +151,45 @@ export default function BillingPage({ params }: { params: Promise<{ id: string }
             ))}
         </ul>
       </section>
+      <section aria-labelledby="invoices-heading" className="space-y-4">
+        <h2 id="invoices-heading" className="text-xl font-semibold">
+          Invoices
+        </h2>
+        {overview.invoices.length === 0 ? (
+          <p className="text-sm text-[var(--color-ink-muted)]">No invoices have been issued.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-[var(--color-line)]">
+                  <th className="py-2">Invoice</th>
+                  <th>Status</th>
+                  <th>Total</th>
+                  <th>Issued</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overview.invoices.map((invoice) => (
+                  <tr key={invoice.id} className="border-b border-[var(--color-line)]">
+                    <td className="py-2 font-medium">{invoice.invoiceNumber}</td>
+                    <td>
+                      {invoice.status === 'PAID'
+                        ? 'Payment received'
+                        : invoice.status === 'OPEN' || invoice.status === 'OVERDUE'
+                          ? 'Awaiting payment'
+                          : invoice.status}
+                    </td>
+                    <td>
+                      {invoice.currency} {(Number(invoice.totalMinor) / 100).toFixed(2)}
+                    </td>
+                    <td>{new Date(invoice.issuedAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
       <section aria-labelledby="change-heading">
         <h2 id="change-heading" className="text-xl font-semibold">
           Change plan
@@ -171,7 +210,7 @@ export default function BillingPage({ params }: { params: Promise<{ id: string }
           </fieldset>
           <fieldset>
             <legend className="font-medium">Preferred payment method</legend>
-            {(['CARD', 'BANK_TRANSFER', 'INVOICE'] as const).map((value) => (
+            {(['BANK_TRANSFER', 'INVOICE'] as const).map((value) => (
               <label key={value} className="mr-4">
                 <input type="radio" checked={method === value} onChange={() => setMethod(value)} />{' '}
                 {value.replace('_', ' ').toLowerCase()}

@@ -97,6 +97,7 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
 import { WorkspacesService } from './workspaces/workspaces.service.js';
 import { InvoicesController } from './invoices/invoices.controller.js';
 import { InvoicesService } from './invoices/invoices.service.js';
+import { ManualSettlementService } from './invoices/manual-settlement.service.js';
 
 @Module({
   controllers: [
@@ -147,6 +148,7 @@ import { InvoicesService } from './invoices/invoices.service.js';
     CommercialEntitlementService,
     CommercialCatalogueService,
     InvoicesService,
+    ManualSettlementService,
     WorkspacesService,
     UsersService,
     OrganisationInvitationsService,

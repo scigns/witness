@@ -115,13 +115,18 @@ export class CommercialCatalogueService {
           message: 'This organisation has no current subscription.',
         },
       });
-    const [catalogue, resolved, usage, pending] = await Promise.all([
+    const [catalogue, resolved, usage, pending, invoices] = await Promise.all([
       this.catalogue(),
       this.entitlements.forOrganisation(organisationId),
       this.usage.usage(organisationId),
       this.prisma.commercialChangeRequest.findFirst({
         where: { organisationId, status: 'PENDING' },
         orderBy: { requestedAt: 'desc' },
+      }),
+      this.prisma.invoice.findMany({
+        where: { organisationId, status: { not: 'DRAFT' } },
+        orderBy: { issuedAt: 'desc' },
+        take: 20,
       }),
     ]);
     return {
@@ -148,6 +153,16 @@ export class CommercialCatalogueService {
       usage,
       availablePlans: catalogue.plans,
       pendingChange: pending ? changeView(pending) : null,
+      invoices: invoices.map((invoice) => ({
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber!,
+        status: invoice.status,
+        currency: invoice.currency,
+        totalMinor: invoice.totalMinor.toString(),
+        issuedAt: invoice.issuedAt!.toISOString(),
+        dueAt: invoice.dueAt!.toISOString(),
+        paidAt: invoice.paidAt?.toISOString() ?? null,
+      })),
     };
   }
 

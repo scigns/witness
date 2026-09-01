@@ -32,12 +32,14 @@ const DEV_PRINCIPAL: Principal = {
 function service(options: {
   globalGrantTiers?: () => Promise<string[]>;
   scopedGrantTiers?: () => Promise<string[]>;
+  platformGrantTiers?: () => Promise<string[]>;
   grants?: (tier: string, action: string) => Promise<boolean>;
   legacyDecide?: AuthorizationPort['decide'];
 }) {
   const roleResolution = {
     globalGrantTiers: options.globalGrantTiers ?? vi.fn().mockResolvedValue([]),
     scopedGrantTiers: options.scopedGrantTiers ?? vi.fn().mockResolvedValue([]),
+    platformGrantTiers: options.platformGrantTiers ?? vi.fn().mockResolvedValue([]),
   } as unknown as RoleResolutionService;
 
   const policyEngine = {
@@ -108,6 +110,43 @@ describe('PolicyEnforcementService.decide', () => {
 
     expect(globalGrantTiers).toHaveBeenCalledWith('user-1');
     expect(scopedGrantTiers).not.toHaveBeenCalled();
+  });
+
+  it('requires a platform-scoped operator role for settlement, not an organisation admin role', async () => {
+    const platformGrantTiers = vi.fn().mockResolvedValue([]);
+    const scopedGrantTiers = vi.fn().mockResolvedValue(['admin']);
+    const svc = service({
+      platformGrantTiers,
+      scopedGrantTiers,
+      grants: vi.fn().mockResolvedValue(true),
+    });
+
+    const decision = await svc.decide(SESSION_PRINCIPAL, 'payment:settle', {
+      type: 'organisation',
+      organisationId: 'org-1',
+    });
+
+    expect(decision.allowed).toBe(false);
+    expect(platformGrantTiers).toHaveBeenCalledWith('user-1');
+    expect(scopedGrantTiers).not.toHaveBeenCalled();
+  });
+
+  it('permits settlement for a platform-scoped admin through the policy engine', async () => {
+    const svc = service({
+      platformGrantTiers: vi.fn().mockResolvedValue(['admin']),
+      grants: vi
+        .fn()
+        .mockImplementation((tier, action) =>
+          Promise.resolve(tier === 'admin' && action === 'payment:settle'),
+        ),
+    });
+
+    await expect(
+      svc.decide(SESSION_PRINCIPAL, 'payment:settle', {
+        type: 'organisation',
+        organisationId: 'org-1',
+      }),
+    ).resolves.toMatchObject({ allowed: true });
   });
 
   it('ATTACK — role resolution throwing is a denial, never an allow', async () => {

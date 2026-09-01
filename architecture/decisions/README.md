@@ -38,6 +38,7 @@ record of having been wrong is part of the value.
 | [0020](ADR-0020-offline-first-and-low-connectivity.md) | Offline-first and low connectivity | Accepted | **P8** |
 | [0021](ADR-0021-canonical-scope-and-architecture-reconciliation.md) | Canonical scope and architecture reconciliation | Accepted | P1, P6, P7 |
 | [0022](ADR-0022-billing-and-payments-as-replaceable-ports.md) | Billing and payments as replaceable ports | Proposed | P1, P6, P7 |
+| [0023](ADR-0023-organisation-as-the-commercial-aggregate.md) | Organisation as the commercial aggregate | Proposed | P1, P3, P6, P7 |
 
 Bold principles indicate an ADR that is a primary expression of that principle. Changing one of
 those requires Steering Committee approval, and where consent, provenance or Indigenous data

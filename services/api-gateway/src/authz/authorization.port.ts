@@ -35,6 +35,7 @@ export type Action =
   | 'invoice:read'
   | 'invoice:create'
   | 'invoice:render'
+  | 'payment:settle'
   | 'workspace:read'
   | 'workspace:create'
   | 'workspace:update'
