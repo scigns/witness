@@ -32,7 +32,12 @@ import { PolicyEngineService } from './policy-engine.service.js';
 import { RoleResolutionService, type ResourceScope } from './role-resolution.service.js';
 
 const SESSION_SUBJECT_PREFIX = 'user:';
-const PLATFORM_ONLY_ACTIONS: ReadonlySet<Action> = new Set(['payment:settle']);
+const PLATFORM_ONLY_ACTIONS: ReadonlySet<Action> = new Set([
+  'payment:settle',
+  'platform_role:read',
+  'platform_role:write',
+  'platform_role:delete',
+]);
 
 function scopeLabel(scope: ResourceScope): string {
   switch (scope.type) {

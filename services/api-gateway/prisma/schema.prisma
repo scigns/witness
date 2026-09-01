@@ -687,7 +687,8 @@ model WorkspaceMembership {
 /// `assignRole`) — there is no membership concept to check against "no
 /// scope at all". Only `prisma/bootstrap.ts` creates one, for the
 /// deployment's first administrator; see `role-resolution.service.ts`'s
-/// file header for what it unlocks.
+/// file header for what it unlocks. Post-bootstrap changes use the guarded
+/// platform-role API/CLI; recovery is the explicit fail-closed operator path.
 ///
 /// Deliberately does not duplicate membership data (state, timestamps) —
 /// only the identifiers needed to scope and query the assignment itself; the

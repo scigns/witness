@@ -20,8 +20,8 @@
  *   answered that question directly: a `'platform'`-scope `admin` row *does*
  *   grant the global `admin` tier, because that scope means exactly "may act
  *   with no organisation or workspace to check against" and nothing else.
- *   Only `prisma/bootstrap.ts` creates one, for the deployment's first
- *   administrator.
+ *   `prisma/bootstrap.ts` creates the first one. Subsequent changes are made
+ *   only through the platform-role service or its explicit recovery command.
  *
  * - **Scoped** ("what can this user do in *this specific* organisation or
  *   workspace") looks only at assignments matching that exact scope (a
