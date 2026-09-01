@@ -1872,6 +1872,8 @@ export const api = {
 export const authApi = {
   /** Where the browser navigates to start a real sign-in. Not a fetch — a full-page redirect. */
   loginUrl: (): string => `${BASE_URL}/api/v1/auth/login`,
+  registerUrl: (): string => `${BASE_URL}/api/v1/auth/register`,
+  forgotPasswordUrl: (): string => `${BASE_URL}/api/v1/auth/forgot-password`,
 
   me: async (sessionToken: string): Promise<CurrentUserView> => {
     let response: Response;

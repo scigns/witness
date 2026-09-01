@@ -97,7 +97,7 @@ export class AuthenticationService {
     private readonly sessionTtlMinutes: number,
   ) {}
 
-  async startLogin(): Promise<{ redirectUrl: string }> {
+  async startLogin(prompt?: 'create'): Promise<{ redirectUrl: string }> {
     const state = generateState();
     const nonce = generateNonce();
     const codeVerifier = generateCodeVerifier();
@@ -127,9 +127,18 @@ export class AuthenticationService {
       nonce,
       codeChallenge,
       redirectUri: this.redirectUri,
+      ...(prompt === undefined ? {} : { prompt }),
     });
 
     return { redirectUrl: request.url };
+  }
+
+  async startPasswordRecovery(): Promise<{ redirectUrl: string }> {
+    return {
+      redirectUrl: await this.identityProvider.buildPasswordResetUrl({
+        redirectUri: this.redirectUri,
+      }),
+    };
   }
 
   async handleCallback(code: string, state: string): Promise<IssuedSession> {

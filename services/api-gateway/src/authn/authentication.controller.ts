@@ -52,8 +52,28 @@ export class AuthenticationController {
   ) {}
 
   @Get('login')
-  async login(@Res() response: Response): Promise<void> {
-    const { redirectUrl } = await this.authentication.startLogin();
+  async login(
+    @Query('prompt') prompt: string | undefined,
+    @Res() response: Response,
+  ): Promise<void> {
+    if (prompt !== undefined && prompt !== 'create') {
+      throw new BadRequestException({
+        error: { code: 'INVALID_PROMPT', message: 'Unsupported sign-in prompt.' },
+      });
+    }
+    const { redirectUrl } = await this.authentication.startLogin(prompt as 'create' | undefined);
+    response.redirect(302, redirectUrl);
+  }
+
+  @Get('register')
+  async register(@Res() response: Response): Promise<void> {
+    const { redirectUrl } = await this.authentication.startLogin('create');
+    response.redirect(302, redirectUrl);
+  }
+
+  @Get('forgot-password')
+  async forgotPassword(@Res() response: Response): Promise<void> {
+    const { redirectUrl } = await this.authentication.startPasswordRecovery();
     response.redirect(302, redirectUrl);
   }
 
