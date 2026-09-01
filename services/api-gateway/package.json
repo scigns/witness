@@ -17,7 +17,8 @@
     "seed": "prisma generate && tsx prisma/seed.ts",
     "clean": "rm -rf dist *.tsbuildinfo",
     "bootstrap": "prisma generate && tsx prisma/bootstrap.ts",
-    "invite": "prisma generate && tsx prisma/invite.ts"
+    "invite": "prisma generate && tsx prisma/invite.ts",
+    "platform-role": "prisma generate && tsx prisma/platform-role.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1120.0",

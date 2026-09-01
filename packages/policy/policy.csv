@@ -253,6 +253,9 @@ p, admin, organisation:create
 p, admin, organisation:update
 p, admin, invoice:create
 p, admin, invoice:render
+p, admin, platform_role:read
+p, admin, platform_role:write
+p, admin, platform_role:delete
 p, admin, workspace:read
 p, admin, workspace:create
 p, admin, workspace:update

@@ -2465,3 +2465,32 @@ export interface ApiError {
     details?: string;
   };
 }
+
+// ─── Platform authority ─────────────────────────────────────────────────────
+
+export const PLATFORM_ROLES = ['admin'] as const;
+export type PlatformRole = (typeof PLATFORM_ROLES)[number];
+
+export const grantPlatformRoleRequestSchema = z.object({
+  email: z.string().trim().toLowerCase().email('A valid email address is required'),
+  role: z.enum(PLATFORM_ROLES),
+  reason: z.string().trim().min(10, 'A reason of at least 10 characters is required').max(500),
+});
+export type GrantPlatformRoleRequest = z.infer<typeof grantPlatformRoleRequestSchema>;
+
+export const revokePlatformRoleRequestSchema = z.object({
+  reason: z.string().trim().min(10, 'A reason of at least 10 characters is required').max(500),
+});
+export type RevokePlatformRoleRequest = z.infer<typeof revokePlatformRoleRequestSchema>;
+
+export interface PlatformRoleAssignmentView {
+  id: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  accountState: string;
+  oidcLinked: boolean;
+  role: PlatformRole;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -31,12 +31,14 @@ const DEV_PRINCIPAL: Principal = {
 
 function service(options: {
   globalGrantTiers?: () => Promise<string[]>;
+  platformGrantTiers?: () => Promise<string[]>;
   scopedGrantTiers?: () => Promise<string[]>;
   grants?: (tier: string, action: string) => Promise<boolean>;
   legacyDecide?: AuthorizationPort['decide'];
 }) {
   const roleResolution = {
     globalGrantTiers: options.globalGrantTiers ?? vi.fn().mockResolvedValue([]),
+    platformGrantTiers: options.platformGrantTiers ?? vi.fn().mockResolvedValue([]),
     scopedGrantTiers: options.scopedGrantTiers ?? vi.fn().mockResolvedValue([]),
   } as unknown as RoleResolutionService;
 
@@ -108,6 +110,22 @@ describe('PolicyEnforcementService.decide', () => {
 
     expect(globalGrantTiers).toHaveBeenCalledWith('user-1');
     expect(scopedGrantTiers).not.toHaveBeenCalled();
+  });
+
+  it('uses only platform-scoped authority for platform role management', async () => {
+    const platformGrantTiers = vi.fn().mockResolvedValue([]);
+    const globalGrantTiers = vi.fn().mockResolvedValue(['admin']);
+    const svc = service({
+      platformGrantTiers,
+      globalGrantTiers,
+      grants: vi.fn().mockResolvedValue(true),
+    });
+
+    const decision = await svc.decide(SESSION_PRINCIPAL, 'platform_role:write', { type: 'global' });
+
+    expect(decision.allowed).toBe(false);
+    expect(platformGrantTiers).toHaveBeenCalledWith('user-1');
+    expect(globalGrantTiers).not.toHaveBeenCalled();
   });
 
   it('ATTACK — role resolution throwing is a denial, never an allow', async () => {
