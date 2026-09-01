@@ -131,6 +131,16 @@ export class AuthorizationGuard implements CanActivate {
       });
     }
 
+    // Platform authority is never available through the unverified development
+    // header, even on localhost. It requires a real OIDC-backed session.
+    if (required.startsWith('platform_role:') && sessionPrincipal === null) {
+      throw new UnauthorizedException({
+        error: {
+          code: 'VERIFIED_OPERATOR_REQUIRED',
+          message: 'Platform authority requires a verified Witness operator session.',
+        },
+      });
+    }
     // Development identity is intentionally unverified. Keep invoice
     // surfaces confined to a local socket even when a role header claims admin.
     if (

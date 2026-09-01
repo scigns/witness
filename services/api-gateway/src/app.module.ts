@@ -97,6 +97,8 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
 import { WorkspacesService } from './workspaces/workspaces.service.js';
 import { InvoicesController } from './invoices/invoices.controller.js';
 import { InvoicesService } from './invoices/invoices.service.js';
+import { PlatformRolesController } from './platform-roles/platform-roles.controller.js';
+import { PlatformRolesService } from './platform-roles/platform-roles.service.js';
 
 @Module({
   controllers: [
@@ -130,6 +132,7 @@ import { InvoicesService } from './invoices/invoices.service.js';
     PublicCommercialController,
     BillingController,
     InvoicesController,
+    PlatformRolesController,
   ],
   providers: [
     PrismaService,
@@ -147,6 +150,7 @@ import { InvoicesService } from './invoices/invoices.service.js';
     CommercialEntitlementService,
     CommercialCatalogueService,
     InvoicesService,
+    PlatformRolesService,
     WorkspacesService,
     UsersService,
     OrganisationInvitationsService,

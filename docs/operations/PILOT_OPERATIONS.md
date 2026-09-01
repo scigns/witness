@@ -17,13 +17,13 @@ For the target-state, full-scale operator experience see
 
 Five components, on one node:
 
-| Component | What it is | Exposed |
-|---|---|---|
-| `proxy` | Caddy — terminates TLS, obtains and renews certificates | 80, 443 |
-| `web` | Next.js standalone server | via proxy only |
-| `api` | NestJS API gateway | via proxy only |
-| `keycloak` | The identity provider (ADR-0007) | via proxy only |
-| `postgres` | The system of record (ADR-0004) | **not exposed at all** |
+| Component  | What it is                                              | Exposed                |
+| ---------- | ------------------------------------------------------- | ---------------------- |
+| `proxy`    | Caddy — terminates TLS, obtains and renews certificates | 80, 443                |
+| `web`      | Next.js standalone server                               | via proxy only         |
+| `api`      | NestJS API gateway                                      | via proxy only         |
+| `keycloak` | The identity provider (ADR-0007)                        | via proxy only         |
+| `postgres` | The system of record (ADR-0004)                         | **not exposed at all** |
 
 The database publishes no port. It is reachable only from the compose network.
 Publishing 5432 "just for a moment" is how an internal database becomes an
@@ -120,6 +120,9 @@ It refuses to run once any organisation exists.
 
 ## Onboarding a pilot user
 
+Platform-scoped authority is managed separately; see
+[`PLATFORM_ROLE_MANAGEMENT_RUNBOOK.md`](PLATFORM_ROLE_MANAGEMENT_RUNBOOK.md).
+
 Two steps, in this order.
 
 1. Create the person in Keycloak (or federate your directory to it) with a
@@ -139,7 +142,7 @@ provider with a verified email that matches. An invitation grants nothing to
 anyone who cannot already authenticate.
 
 Roles: `admin`, `facilitator`, `contributor`, `reviewer`, `participant`,
-`reader`. Adding someone to a *workspace* is done in the application, on the
+`reader`. Adding someone to a _workspace_ is done in the application, on the
 workspace page, by an administrator.
 
 ## Secrets rotation
@@ -197,7 +200,7 @@ That reasoning does **not** extend to evidence attachments (audio, document
 and image bytes): they live in R2/S3-compatible object storage, not
 Postgres, and are original source content — not a rebuildable projection.
 The Postgres dump carries each attachment's key and SHA-256 checksum, which
-lets a restore *verify* the object storage side still holds the right
+lets a restore _verify_ the object storage side still holds the right
 bytes; it does not itself contain those bytes. Restoring the dump onto a
 fresh instance without also having the original bucket (or a copy of it)
 available leaves every evidence attachment 404ing.
@@ -273,7 +276,7 @@ Witness's tenancy model is one deployment per customer: `organisation:create`
 is a one-time bootstrap step (`services/api-gateway/prisma/bootstrap.ts`)
 that refuses to run against a database that already holds an organisation, so
 a live deployment never holds more than one customer's data. That makes the
-backup above *also* the tenant-export mechanism — there is no per-organisation
+backup above _also_ the tenant-export mechanism — there is no per-organisation
 filtering step to build, because the whole database already is the tenant's
 data, nothing else.
 
@@ -319,7 +322,7 @@ the live security smoke test asserts this against the running instance.
 - `GET /health` — liveness. Does no I/O, so a database blip cannot cause a
   restart loop across every replica.
 - `GET /ready` — readiness. Checks PostgreSQL and the identity provider, and
-  names the capabilities this build does *not* implement.
+  names the capabilities this build does _not_ implement.
 
 Neither exposes a secret. Alert on `/ready` reporting `down`, not on `/health`.
 
@@ -377,7 +380,7 @@ pointed at the tunnel without a matching rule reaches nothing.
 `/witness` on a domain whose `/` belongs to another site, three things follow
 and all three are required:
 
-- the frontend is *built* with `NEXT_PUBLIC_WITNESS_BASE_PATH=/witness`, because
+- the frontend is _built_ with `NEXT_PUBLIC_WITNESS_BASE_PATH=/witness`, because
   every asset URL and route carries the prefix and that is decided at build time;
 - the API is given `WITNESS_WEB_BASE_URL` including the path, or the OIDC
   callback sends signed-in browsers to the other site's root;
