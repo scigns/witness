@@ -63,6 +63,14 @@ export default function SignInPage() {
         >
           Sign in
         </a>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <a href={authApi.forgotPasswordUrl()} className="underline">
+            Forgot password?
+          </a>
+          <a href={authApi.registerUrl()} className="underline">
+            New to Witness? Create account
+          </a>
+        </div>
       </Card>
     </div>
   );

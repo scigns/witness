@@ -137,6 +137,7 @@ export class KeycloakOidcAdapter extends IdentityProviderPort {
     nonce: string;
     codeChallenge: string;
     redirectUri: string;
+    prompt?: 'create';
   }): Promise<AuthorizationRequest> {
     const discovery = await this.discover();
 
@@ -149,8 +150,18 @@ export class KeycloakOidcAdapter extends IdentityProviderPort {
     url.searchParams.set('nonce', input.nonce);
     url.searchParams.set('code_challenge', input.codeChallenge);
     url.searchParams.set('code_challenge_method', 'S256');
+    if (input.prompt !== undefined) url.searchParams.set('prompt', input.prompt);
 
     return { url: url.toString(), state: input.state };
+  }
+
+  async buildPasswordResetUrl(input: { redirectUri: string }): Promise<string> {
+    const discovery = await this.discover();
+    const endpoint = new URL(discovery.authorization_endpoint);
+    endpoint.pathname = endpoint.pathname.replace(/\/auth$/, '/forgot-credentials');
+    endpoint.searchParams.set('client_id', this.clientId);
+    endpoint.searchParams.set('redirect_uri', input.redirectUri);
+    return endpoint.toString();
   }
 
   async exchangeCode(input: {

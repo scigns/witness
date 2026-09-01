@@ -30,6 +30,10 @@ class StubIdentityProvider extends IdentityProviderPort {
     return { url: `https://idp.example/authorize?state=${input.state}`, state: input.state };
   }
 
+  async buildPasswordResetUrl() {
+    return 'https://idp.example/forgot-credentials';
+  }
+
   async exchangeCode() {
     return { idToken: 'stub-id-token' };
   }
