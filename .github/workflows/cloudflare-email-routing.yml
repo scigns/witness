@@ -1,0 +1,35 @@
+name: Cloudflare Email Routing
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Inspect is read-only; apply may create a destination or missing rules
+        required: true
+        default: inspect
+        type: choice
+        options:
+          - inspect
+          - apply
+
+permissions:
+  contents: read
+
+jobs:
+  email-routing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: pnpm/action-setup@f2b2b233b538f500472c7274c7012f57857d8ce0 # v4.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Inspect or apply Email Routing
+        run: pnpm cloudflare:email:${{ inputs.action }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_EMAIL_ROUTING_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          WITNESS_EMAIL_ROUTING_DESTINATION: ${{ secrets.WITNESS_EMAIL_ROUTING_DESTINATION }}
