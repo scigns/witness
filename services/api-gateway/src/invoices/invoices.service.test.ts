@@ -11,6 +11,7 @@ const row = {
   invoiceNumber: 'INV-00000001',
   customerReference: null,
   purchaseOrderId: null,
+  commercialChangeRequestId: '00000000-0000-4000-8000-000000000004',
   supplierLegalNameSnapshot: 'Supplier',
   supplierBusinessIdentifierSnapshot: null,
   supplierAddressSnapshot: '1 Supplier Lane',
@@ -24,6 +25,7 @@ const row = {
   totalMinor: 1000n,
   issuedAt: new Date('2026-08-28T00:00:00Z'),
   dueAt: new Date('2026-09-28T00:00:00Z'),
+  paidAt: null,
   lines: [
     {
       description: 'Work',
@@ -63,6 +65,22 @@ describe('InvoicesService retrieval boundaries', () => {
         findFirst: vi.fn().mockResolvedValue({ id: row.billingAccountId, currency: 'AUD' }),
       },
       purchaseOrder: { findFirst: vi.fn().mockResolvedValue(null) },
+      commercialChangeRequest: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: row.commercialChangeRequestId,
+          requestedPlanCode: 'institutional',
+          billingInterval: 'MONTHLY',
+          paymentMethod: 'INVOICE',
+          sourceSubscriptionUpdatedAt: new Date('2026-08-27T00:00:00Z'),
+          sourceSubscription: { updatedAt: new Date('2026-08-27T00:00:00Z') },
+        }),
+      },
+      plan: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: '00000000-0000-4000-8000-000000000005',
+          prices: [{ amountMinor: 1000n }],
+        }),
+      },
       organisation: { findUnique: vi.fn().mockResolvedValue({ id: row.organisationId }) },
       actor: { findFirst: vi.fn().mockResolvedValue(actor) },
       auditEvent: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
@@ -89,6 +107,7 @@ describe('InvoicesService retrieval boundaries', () => {
     );
     const request = {
       idempotencyKey: created.issuanceIdempotencyKey,
+      commercialChangeRequestId: row.commercialChangeRequestId,
       billingAccountId: row.billingAccountId,
       currency: 'AUD',
       customer: { legalName: 'Customer', address: '2 Customer Lane' },

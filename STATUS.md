@@ -1,6 +1,6 @@
 # Status
 
-**Last updated:** 2026-08-26 (Commercial Foundation C2)
+**Last updated:** 2026-09-01 (Controlled Commercial Settlement Release)
 **Updated by:** Engineering
 **Update rule:** every pull request that changes the state of a workstream updates this file.
 Staleness here is a defect — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -29,8 +29,8 @@ built. It is learning whether institutions can configure, facilitate and
 repeat useful pilots with limited developer intervention.
 
 **Overall health:** 🟢 Controlled pilot release candidate
-**Current platform release:** 0.3.0 preparation
-**Production main:** deployed from merge commit `8534751`
+**Current platform release:** 0.4.0 release candidate
+**Production main:** deployment verification pending for the 0.4.0 release candidate
 **Primary company objective:** first paid institutional customer.
 **Second company objective:** first paid renewal by an institutional customer. A completed renewal
 decision that results in `PAUSE` or `END` is valid evaluation evidence, but is not renewal success.
@@ -78,6 +78,7 @@ does **not** mean that every capability described within it is absent.
 | General-availability / v1.0 hardening     | ⚪ Not complete                            |
 | Commercial domain foundation (C1)         | 🟢 Implemented and validated               |
 | Pricing and self-service upgrade UX (C2)  | 🟢 Implemented and validated               |
+| Manual settlement and paid activation     | 🟢 Implemented; production proof pending   |
 
 ---
 

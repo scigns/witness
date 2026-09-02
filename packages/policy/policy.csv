@@ -253,6 +253,7 @@ p, admin, organisation:create
 p, admin, organisation:update
 p, admin, invoice:create
 p, admin, invoice:render
+p, admin, payment:settle
 p, admin, platform_role:read
 p, admin, platform_role:write
 p, admin, platform_role:delete

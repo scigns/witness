@@ -123,6 +123,9 @@ import type {
   CommercialChangeRequest,
   CommercialChangeView,
   PublicPlanCatalogue,
+  ManualSettlementContextView,
+  ManualSettlementRequest,
+  ManualSettlementResultView,
 } from '@witness/contracts';
 
 import { API_BASE_URL } from './runtime-config';
@@ -348,6 +351,28 @@ export const api = {
   ): Promise<CommercialChangeView> =>
     request(
       `/api/v1/organisations/${encodeURIComponent(organisationId)}/billing/change-requests`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  getManualSettlementContext: (
+    organisationId: string,
+    invoiceId: string,
+    user: ActingUser,
+  ): Promise<ManualSettlementContextView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/invoices/${encodeURIComponent(invoiceId)}/settlement`,
+      user,
+    ),
+
+  recordManualSettlement: (
+    organisationId: string,
+    invoiceId: string,
+    body: ManualSettlementRequest,
+    user: ActingUser,
+  ): Promise<ManualSettlementResultView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/invoices/${encodeURIComponent(invoiceId)}/settlements`,
       user,
       { method: 'POST', body: JSON.stringify(body) },
     ),

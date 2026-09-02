@@ -97,6 +97,7 @@ import { WorkspacesController } from './workspaces/workspaces.controller.js';
 import { WorkspacesService } from './workspaces/workspaces.service.js';
 import { InvoicesController } from './invoices/invoices.controller.js';
 import { InvoicesService } from './invoices/invoices.service.js';
+import { ManualSettlementService } from './invoices/manual-settlement.service.js';
 import { PlatformRolesController } from './platform-roles/platform-roles.controller.js';
 import { PlatformRolesService } from './platform-roles/platform-roles.service.js';
 
@@ -150,6 +151,7 @@ import { PlatformRolesService } from './platform-roles/platform-roles.service.js
     CommercialEntitlementService,
     CommercialCatalogueService,
     InvoicesService,
+    ManualSettlementService,
     PlatformRolesService,
     WorkspacesService,
     UsersService,

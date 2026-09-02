@@ -98,9 +98,9 @@ sql(`
   WHERE id = '${invoiceA}';
   INSERT INTO payment
     (id, organisation_id, billing_account_id, invoice_id, payment_method_id,
-    method, source_reference, amount_minor, currency, received_at, updated_at)
+    method, source_reference, settlement_idempotency_key, amount_minor, currency, received_at, updated_at)
   VALUES ('${paymentA}', '${organisationA}', '${accountA}', '${invoiceA}', '${methodA}',
-          'MANUAL_BANK_TRANSFER', 'source-${suffix}', 11000, 'AUD', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+          'MANUAL_BANK_TRANSFER', 'source-${suffix}', '${paymentA}', 11000, 'AUD', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 `);
 
 expectRejected(
@@ -216,9 +216,9 @@ expectRejected(
   'cross-tenant payment/invoice',
   `
   INSERT INTO payment (id, organisation_id, billing_account_id, invoice_id, payment_method_id,
-    method, source_reference, amount_minor, currency, received_at, updated_at)
+    method, source_reference, settlement_idempotency_key, amount_minor, currency, received_at, updated_at)
   VALUES ('${invoiceB}', '${organisationB}', '${accountB}', '${invoiceA}', '${methodB}',
-    'MANUAL_BANK_TRANSFER', 'wrong-invoice-${suffix}', 11000, 'AUD', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    'MANUAL_BANK_TRANSFER', 'wrong-invoice-${suffix}', '${invoiceB}', 11000, 'AUD', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 `,
 );
 
@@ -226,9 +226,9 @@ expectRejected(
   'duplicate payment evidence identity',
   `
   INSERT INTO payment (id, organisation_id, billing_account_id, invoice_id, payment_method_id,
-    method, source_reference, amount_minor, currency, received_at, updated_at)
+    method, source_reference, settlement_idempotency_key, amount_minor, currency, received_at, updated_at)
   VALUES ('${invoiceB}', '${organisationA}', '${accountA}', '${invoiceA}', '${methodA}',
-    'MANUAL_BANK_TRANSFER', 'source-${suffix}', 11000, 'AUD', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    'MANUAL_BANK_TRANSFER', 'source-${suffix}', '${invoiceB}', 11000, 'AUD', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 `,
 );
 

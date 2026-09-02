@@ -12,6 +12,48 @@ own subsection, regardless of size — those changes carry obligations for opera
 
 ---
 
+## [0.4.0] — 2026-09-01 — Controlled Commercial Settlement Release
+
+> **Witness Institutional Pilot — provider-neutral paid activation under explicit operator control.**
+>
+> This release adds manual settlement for reviewed institutional invoices. It does not add checkout,
+> Stripe, provider webhooks or automated evidence of money movement.
+
+### Added
+
+- Organisation-scoped linkage from a pending paid commercial change request to its invoice.
+- Platform-operator manual settlement API and minimal internal settlement page.
+- Exactly-once payment evidence through organisation-scoped idempotency and reference constraints.
+- Transactional transition from verified payment to PAID invoice, APPLIED commercial request, ACTIVE
+  subscription and evaluator-visible purchased capabilities.
+- Hash-chained `payment.settled`, `invoice.paid` and `subscription.activated` audit events.
+- Truthful customer invoice states without an unsupported “Pay now” or card-checkout claim.
+
+### Security and migration
+
+- Settlement requires a verified OIDC session and platform-scoped `payment:settle` authority;
+  organisation administrator authority is insufficient.
+- Cross-organisation invoice/payment linkage is rejected at application and database boundaries.
+- Migration `20260901090000_manual_settlement_activation` is additive. It links invoices to commercial
+  intent and adds payment idempotency constraints without changing existing subscription state.
+- No payment-provider credentials or new infrastructure configuration are required.
+
+### Operator actions required
+
+- Apply Prisma migrations through the normal deployment workflow.
+- Confirm the existing billing profile is complete without printing its values.
+- Confirm an explicitly approved platform operator account exists before attempting settlement. Do
+  not grant platform authority implicitly as part of deployment.
+- Run the synthetic settlement smoke before processing any real institutional receipt.
+
+### Known limitations
+
+- External receipt verification is manual and remains the operator's responsibility.
+- Partial payments, overpayments, refunds, reversals, chargebacks and renewal automation are not
+  implemented.
+- Card checkout, Stripe and provider webhooks are not implemented.
+- ADR-0023 remains Proposed; this release does not change tenancy architecture or add PostgreSQL RLS.
+
 ## [0.3.0] — 2026-08-23 — Institutional Pilot Release
 
 > **Witness Institutional Pilot Release — client-ready controlled pilot workflows.**

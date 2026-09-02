@@ -7,7 +7,7 @@
 Platform authority is the global authority to operate Witness itself. It is represented by the
 existing `RoleAssignment` model with `scopeType = platform`, no organisation or workspace ID, and
 currently the `admin` role. Platform-only capabilities such as commercial settlement resolve from
-this scope when their separately approved feature policy is installed.
+this scope through their separately approved feature policy.
 
 **Platform authority is not an organisation entitlement.** An organisation administrator manages
 their institution only. Organisation membership and platform authority are independent records;
@@ -69,9 +69,8 @@ This calls `DELETE /api/v1/platform/role-assignments/:userId`. It removes only t
 assignment. The account and all organisation memberships remain unchanged. The service refuses to
 remove the last active, OIDC-linked platform administrator.
 
-After revocation, verify the former operator receives `403` from the list route. Once the separately
-approved settlement feature is installed, also verify they cannot resolve `payment:settle`. Verify
-their ordinary organisation access separately.
+After revocation, verify the former operator receives `403` from the list route and cannot resolve
+`payment:settle`. Verify their ordinary organisation access separately.
 
 ## Controlled recovery provisioning
 
@@ -110,8 +109,7 @@ To verify authority without settling an invoice:
 1. authenticate normally through OIDC;
 2. call `GET /api/v1/platform/role-assignments` and expect `200`;
 3. confirm an organisation-only administrator receives `403`;
-4. after the settlement feature is separately approved and installed, use settlement-context access,
-   without submitting a settlement, to confirm `payment:settle`;
+4. use settlement-context access, without submitting a settlement, to confirm `payment:settle`;
 5. verify development-header impersonation receives `401`.
 
 For safe rotation, grant and verify the replacement first, then revoke the outgoing operator. If all

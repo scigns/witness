@@ -254,6 +254,7 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'invoice:read',
     'invoice:create',
     'invoice:render',
+    'payment:settle',
     'platform_role:read',
     'platform_role:write',
     'platform_role:delete',

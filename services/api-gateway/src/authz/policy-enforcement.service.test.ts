@@ -112,6 +112,43 @@ describe('PolicyEnforcementService.decide', () => {
     expect(scopedGrantTiers).not.toHaveBeenCalled();
   });
 
+  it('requires a platform-scoped operator role for settlement, not an organisation admin role', async () => {
+    const platformGrantTiers = vi.fn().mockResolvedValue([]);
+    const scopedGrantTiers = vi.fn().mockResolvedValue(['admin']);
+    const svc = service({
+      platformGrantTiers,
+      scopedGrantTiers,
+      grants: vi.fn().mockResolvedValue(true),
+    });
+
+    const decision = await svc.decide(SESSION_PRINCIPAL, 'payment:settle', {
+      type: 'organisation',
+      organisationId: 'org-1',
+    });
+
+    expect(decision.allowed).toBe(false);
+    expect(platformGrantTiers).toHaveBeenCalledWith('user-1');
+    expect(scopedGrantTiers).not.toHaveBeenCalled();
+  });
+
+  it('permits settlement for a platform-scoped admin through the policy engine', async () => {
+    const svc = service({
+      platformGrantTiers: vi.fn().mockResolvedValue(['admin']),
+      grants: vi
+        .fn()
+        .mockImplementation((tier, action) =>
+          Promise.resolve(tier === 'admin' && action === 'payment:settle'),
+        ),
+    });
+
+    await expect(
+      svc.decide(SESSION_PRINCIPAL, 'payment:settle', {
+        type: 'organisation',
+        organisationId: 'org-1',
+      }),
+    ).resolves.toMatchObject({ allowed: true });
+  });
+
   it('uses only platform-scoped authority for platform role management', async () => {
     const platformGrantTiers = vi.fn().mockResolvedValue([]);
     const globalGrantTiers = vi.fn().mockResolvedValue(['admin']);
@@ -126,6 +163,21 @@ describe('PolicyEnforcementService.decide', () => {
     expect(decision.allowed).toBe(false);
     expect(platformGrantTiers).toHaveBeenCalledWith('user-1');
     expect(globalGrantTiers).not.toHaveBeenCalled();
+  });
+
+  it('makes payment settlement follow platform role grant and revocation', async () => {
+    let tiers = ['admin'];
+    const svc = service({
+      platformGrantTiers: vi.fn().mockImplementation(() => Promise.resolve(tiers)),
+      grants: vi.fn().mockResolvedValue(true),
+    });
+    await expect(
+      svc.decide(SESSION_PRINCIPAL, 'payment:settle', { type: 'global' }),
+    ).resolves.toMatchObject({ allowed: true });
+    tiers = [];
+    await expect(
+      svc.decide(SESSION_PRINCIPAL, 'payment:settle', { type: 'global' }),
+    ).resolves.toMatchObject({ allowed: false });
   });
 
   it('ATTACK — role resolution throwing is a denial, never an allow', async () => {

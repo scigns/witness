@@ -150,14 +150,20 @@ implementation is gated by observed customer demand after C3.
 
 ### C3.3 — Reconcile manual bank transfers
 
+**Implementation status (2026-09-01):** Implemented and repository-validated; controlled production
+deployment and operational proof remain outstanding.
+
 - **Objective:** Let an authorised administrator record settlement and activate/renew service.
-- **Scope:** Manual adapter, reconciliation command/UI, payment history, transactional state changes.
+- **Scope:** Provider-neutral settlement service, internal API/UI, exact-payment reconciliation,
+  payment history, stale-intent protection and transactional state changes.
 - **Non-goals:** Bank API integration or physical fund splitting.
 - **Dependencies:** C3.2.
 - **Likely files:** payment application service, admin route, audit catalogue.
 - **Data model:** Payment references and reconciliation metadata, no bank credentials.
-- **Security:** Privileged action, dual-review option documented, no secrets in audit.
-- **Tests:** partial/duplicate/overpayment, atomic invoice/payment/subscription transition, audit chain.
+- **Security:** Verified platform-scoped operator action distinct from organisation admin; no secrets
+  in audit. Dual review remains a future enhancement.
+- **Tests:** exact/partial/duplicate/overpayment, replay, cross-organisation, stale intent, atomic
+  invoice/payment/subscription transition, effective entitlements and audit chain.
 - **Acceptance:** Recorded receipt marks invoice PAID and activates entitlements exactly once.
 - **Documentation:** Reconciliation and correction runbook.
 

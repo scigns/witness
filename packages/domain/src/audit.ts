@@ -33,6 +33,9 @@ export const AUDIT_ACTIONS = [
   'subscription.created',
   'subscription.change_requested',
   'invoice.issued',
+  'payment.settled',
+  'invoice.paid',
+  'subscription.activated',
   'entitlement.overridden',
   'workspace.created',
   'workspace.details_updated',
@@ -194,6 +197,7 @@ export const AUDIT_SUBJECT_TYPES = [
   'resource',
   'subscription',
   'invoice',
+  'payment',
 ] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 

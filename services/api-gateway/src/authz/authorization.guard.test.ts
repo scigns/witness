@@ -191,6 +191,34 @@ describe('AuthorizationGuard — development invoice containment', () => {
     ).rejects.toMatchObject({ response: { error: { code: 'DEVELOPMENT_ACCESS_LOCAL_ONLY' } } });
   });
 });
+
+describe('AuthorizationGuard — settlement identity', () => {
+  it('never accepts the unverified development header for payment settlement', async () => {
+    const guard = new AuthorizationGuard(
+      fakeReflector('payment:settle'),
+      {
+        authenticate: vi.fn().mockResolvedValue({
+          subject: 'dev:Forged Operator',
+          displayName: 'Forged Operator',
+          kind: 'human',
+          roles: ['admin'],
+        }),
+      } as never,
+      { authenticate: vi.fn().mockResolvedValue(null) } as never,
+      fakePolicyEnforcement(),
+    );
+
+    await expect(
+      guard.canActivate(
+        fakeContext({
+          headers: { 'x-witness-dev-user': 'Forged Operator|admin' },
+          params: { organisationId: 'org-1' },
+        }),
+      ),
+    ).rejects.toMatchObject({ response: { error: { code: 'VERIFIED_OPERATOR_REQUIRED' } } });
+  });
+});
+
 describe('AuthorizationGuard — platform authority identity', () => {
   it('never accepts the unverified development header for platform role mutation', async () => {
     const guard = new AuthorizationGuard(

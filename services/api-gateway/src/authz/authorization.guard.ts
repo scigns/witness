@@ -132,8 +132,12 @@ export class AuthorizationGuard implements CanActivate {
     }
 
     // Platform authority is never available through the unverified development
-    // header, even on localhost. It requires a real OIDC-backed session.
-    if (required.startsWith('platform_role:') && sessionPrincipal === null) {
+    // header, even on localhost. Settlement and platform-role management require
+    // a real OIDC-backed session and a platform-scoped role resolved below.
+    if (
+      (required === 'payment:settle' || required.startsWith('platform_role:')) &&
+      sessionPrincipal === null
+    ) {
       throw new UnauthorizedException({
         error: {
           code: 'VERIFIED_OPERATOR_REQUIRED',
