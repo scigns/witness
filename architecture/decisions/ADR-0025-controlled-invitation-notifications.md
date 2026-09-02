@@ -19,8 +19,9 @@ invitation, verified identity email and server-enforced membership/role.
 
 ## Decision
 
-Administrator invitation creates a durable `pending` notification record after the authorization
-transaction commits. Witness sends a plain-text onboarding message through the already-approved
+Administrator invitation creates the user, membership, role and durable `pending` notification
+record in one authorization transaction. Witness begins delivery only after that transaction
+commits, sending a plain-text onboarding message through the already-approved
 Brevo SMTP relay on port 2525. The message names the organisation, invited email, role, activation
 URL and support contact, but contains no credential or bearer token.
 

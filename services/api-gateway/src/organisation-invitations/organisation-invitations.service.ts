@@ -342,25 +342,15 @@ export class OrganisationInvitationsService {
       where: { organisationId_userId: { organisationId, userId } },
     });
     const attemptCount = (current?.attemptCount ?? 0) + 1;
+    let result: { readonly messageId: string | null };
     try {
-      const result = await this.mailer.sendInvitation({
+      result = await this.mailer.sendInvitation({
         to: email,
         organisationName,
         invitedEmail: email,
         role,
         activationUrl,
       });
-      await this.prisma.invitationNotification.update({
-        where: { organisationId_userId: { organisationId, userId } },
-        data: { status: 'sent', attemptCount, lastError: null, sentAt: now, updatedAt: now },
-      });
-      await this.appendNotificationAudit(userId, 'user.invitation_notification_sent', actor, now, {
-        organisationId,
-        membershipId,
-        attemptCount: String(attemptCount),
-        messageId: result.messageId ?? '',
-      });
-      return 'sent';
     } catch (error) {
       const message =
         error instanceof Error ? error.message.slice(0, 500) : 'SMTP delivery failed.';
@@ -373,13 +363,26 @@ export class OrganisationInvitationsService {
         'user.invitation_notification_failed',
         actor,
         now,
-        {
-          organisationId,
-          membershipId,
-          attemptCount: String(attemptCount),
-        },
+        { organisationId, membershipId, attemptCount: String(attemptCount) },
       );
       return 'failed';
+    }
+
+    // SMTP acceptance is authoritative for delivery status. Persistence or
+    // audit failures must surface to operators and must never rewrite a
+    // successfully accepted message as `failed`.
+    {
+      await this.prisma.invitationNotification.update({
+        where: { organisationId_userId: { organisationId, userId } },
+        data: { status: 'sent', attemptCount, lastError: null, sentAt: now, updatedAt: now },
+      });
+      await this.appendNotificationAudit(userId, 'user.invitation_notification_sent', actor, now, {
+        organisationId,
+        membershipId,
+        attemptCount: String(attemptCount),
+        messageId: result.messageId ?? '',
+      });
+      return 'sent';
     }
   }
 

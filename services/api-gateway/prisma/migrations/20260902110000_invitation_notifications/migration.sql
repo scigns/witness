@@ -25,3 +25,6 @@ ALTER TABLE "invitation_notification"
 ALTER TABLE "invitation_notification"
     ADD CONSTRAINT "invitation_notification_user_id_fkey"
     FOREIGN KEY ("user_id") REFERENCES "witness_user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "invitation_notification"
+    ADD CONSTRAINT "invitation_notification_membership_id_fkey"
+    FOREIGN KEY ("membership_id") REFERENCES "organisation_membership"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

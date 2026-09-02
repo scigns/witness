@@ -43,6 +43,13 @@ const booleanish = z
   .optional()
   .transform((value) => value === 'true' || value === '1');
 
+const booleanishDefault = (fallback: 'true' | 'false') =>
+  z
+    .string()
+    .optional()
+    .default(fallback)
+    .transform((value) => value === 'true' || value === '1');
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   WITNESS_DEPLOYMENT_PROFILE: z.enum(DEPLOYMENT_PROFILES).default('development'),
@@ -89,8 +96,8 @@ const schema = z.object({
   KEYCLOAK_SMTP_REPLY_TO: z.string().optional().default('support@buildwithwitness.com'),
   KEYCLOAK_SMTP_USER: z.string().optional().default(''),
   KEYCLOAK_SMTP_PASSWORD: z.string().optional().default(''),
-  KEYCLOAK_SMTP_STARTTLS: booleanish,
-  KEYCLOAK_SMTP_SSL: booleanish,
+  KEYCLOAK_SMTP_STARTTLS: booleanishDefault('true'),
+  KEYCLOAK_SMTP_SSL: booleanishDefault('false'),
 
   // Evidence attachments are stored as bytes in Postgres (ADR-0011: the
   // database is the whole system of record, so `scripts/ops/backup.sh`
@@ -365,6 +372,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
     value.S3_ENDPOINT.trim() !== '' ||
     value.S3_ACCESS_KEY_ID.trim() !== '' ||
     value.S3_SECRET_ACCESS_KEY.trim() !== '';
+
+  if (
+    value.NODE_ENV === 'production' &&
+    !value.KEYCLOAK_SMTP_STARTTLS &&
+    !value.KEYCLOAK_SMTP_SSL
+  ) {
+    problems.push(
+      'Production SMTP must use TLS: set KEYCLOAK_SMTP_STARTTLS=true or KEYCLOAK_SMTP_SSL=true.',
+    );
+  }
 
   // ── ADR-0009: the sovereign profile makes zero external calls ──────────────
   if (value.WITNESS_DEPLOYMENT_PROFILE === 'sovereign') {
