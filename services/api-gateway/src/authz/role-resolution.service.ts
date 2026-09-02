@@ -116,7 +116,7 @@ export class RoleResolutionService {
     return [...tiers];
   }
 
-  /** Platform-only authority for privileged internal operations such as settlement. */
+  /** Platform-only authority for privileged internal operations. */
   async platformGrantTiers(userId: string): Promise<string[]> {
     const assignments = await this.prisma.roleAssignment.findMany({
       where: {
@@ -127,6 +127,7 @@ export class RoleResolutionService {
       },
       select: { role: true },
     });
+
     return [
       ...new Set(assignments.map((assignment) => ROLE_TO_TIER[assignment.role as WitnessRole])),
     ];

@@ -45,7 +45,12 @@ export abstract class IdentityProviderPort {
     nonce: string;
     codeChallenge: string;
     redirectUri: string;
+    /** OIDC prompt hint used for provider-native registration. */
+    prompt?: 'create';
   }): Promise<AuthorizationRequest>;
+
+  /** Build the provider-native reset-credentials entry point. */
+  abstract buildPasswordResetUrl(input: { redirectUri: string }): Promise<string>;
 
   /**
    * Exchange an authorization code for tokens. Returns the raw ID token

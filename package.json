@@ -46,7 +46,10 @@
     "test:invariants": "turbo run build && vitest run test/invariants",
     "test:adversarial": "turbo run build && vitest run test/adversarial",
     "bootstrap": "pnpm --filter @witness/api run bootstrap",
-    "invite": "pnpm --filter @witness/api run invite"
+    "invite": "pnpm --filter @witness/api run invite",
+    "cloudflare:email:inspect": "tsx scripts/cloudflare/inspect-email-routing.ts",
+    "cloudflare:email:apply": "tsx scripts/cloudflare/configure-email-routing.ts --apply",
+    "test:cloudflare:email": "vitest run test/infrastructure/email-routing.test.ts"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.9",

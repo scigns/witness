@@ -31,15 +31,15 @@ const DEV_PRINCIPAL: Principal = {
 
 function service(options: {
   globalGrantTiers?: () => Promise<string[]>;
-  scopedGrantTiers?: () => Promise<string[]>;
   platformGrantTiers?: () => Promise<string[]>;
+  scopedGrantTiers?: () => Promise<string[]>;
   grants?: (tier: string, action: string) => Promise<boolean>;
   legacyDecide?: AuthorizationPort['decide'];
 }) {
   const roleResolution = {
     globalGrantTiers: options.globalGrantTiers ?? vi.fn().mockResolvedValue([]),
-    scopedGrantTiers: options.scopedGrantTiers ?? vi.fn().mockResolvedValue([]),
     platformGrantTiers: options.platformGrantTiers ?? vi.fn().mockResolvedValue([]),
+    scopedGrantTiers: options.scopedGrantTiers ?? vi.fn().mockResolvedValue([]),
   } as unknown as RoleResolutionService;
 
   const policyEngine = {

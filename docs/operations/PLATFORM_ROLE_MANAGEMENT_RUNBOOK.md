@@ -6,7 +6,8 @@
 
 Platform authority is the global authority to operate Witness itself. It is represented by the
 existing `RoleAssignment` model with `scopeType = platform`, no organisation or workspace ID, and
-currently the `admin` role. It grants the platform policy tier that includes `payment:settle`.
+currently the `admin` role. Platform-only capabilities such as commercial settlement resolve from
+this scope through their separately approved feature policy.
 
 **Platform authority is not an organisation entitlement.** An organisation administrator manages
 their institution only. Organisation membership and platform authority are independent records;

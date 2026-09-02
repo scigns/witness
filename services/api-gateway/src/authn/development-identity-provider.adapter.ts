@@ -127,6 +127,7 @@ export class DevelopmentIdentityProviderAdapter extends IdentityProviderPort {
     nonce: string;
     codeChallenge: string;
     redirectUri: string;
+    prompt?: 'create';
   }): Promise<AuthorizationRequest> {
     const url = new URL(`${this.issuer}/authorize`);
     url.searchParams.set('state', input.state);
@@ -135,6 +136,12 @@ export class DevelopmentIdentityProviderAdapter extends IdentityProviderPort {
     url.searchParams.set('redirect_uri', input.redirectUri);
 
     return Promise.resolve({ url: url.toString(), state: input.state });
+  }
+
+  buildPasswordResetUrl(): Promise<string> {
+    return Promise.reject(
+      new Error('Password recovery is unavailable in the development identity provider.'),
+    );
   }
 
   async exchangeCode(input: {
