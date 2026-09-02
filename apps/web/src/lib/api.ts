@@ -454,6 +454,17 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  resendOrganisationInvitation: (
+    organisationId: string,
+    userId: string,
+    user: ActingUser,
+  ): Promise<{ status: 'pending' | 'sent' | 'failed' }> =>
+    request<{ status: 'pending' | 'sent' | 'failed' }>(
+      `/api/v1/organisations/${organisationId}/users/${userId}/invitation/resend`,
+      user,
+      { method: 'POST' },
+    ),
+
   listOrganisationMemberships: (
     organisationId: string,
     user: ActingUser,

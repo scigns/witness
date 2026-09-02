@@ -67,6 +67,7 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
   const [inviteDisplayName, setInviteDisplayName] = useState('');
   const [inviteRole, setInviteRole] = useState('');
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+  const [lastInvited, setLastInvited] = useState<{ userId: string; email: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -189,9 +190,23 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
       setInviteRole('');
       setInviteMessage(
         `${invited.displayName} was added to this organisation as ${invited.role}. They can sign ` +
-          `in once they authenticate with ${invited.email}.`,
+          `in once they authenticate with ${invited.email}. Notification: ${invited.notificationStatus}.`,
       );
+      setLastInvited({ userId: invited.userId, email: invited.email });
       await load({ current: false });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resendInvitation = async () => {
+    if (lastInvited === null) return;
+    setBusy(true);
+    try {
+      const result = await api.resendOrganisationInvitation(id, lastInvited.userId, user);
+      setInviteMessage(`Invitation notification for ${lastInvited.email}: ${result.status}.`);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
@@ -475,13 +490,23 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
             </div>
             <p className="text-xs text-[var(--color-ink-muted)]">
               Registers a Witness account, adds it to this organisation and assigns the chosen role,
-              all at once. There is no invitation email yet — the person activates their account by
-              signing in through the identity provider with this exact email address.
+              all at once. Witness sends onboarding instructions separately; activation still
+              requires the identity provider to verify this exact email address.
             </p>
             <Button type="submit" variant="primary" disabled={busy || inviteRole === ''}>
               {busy ? 'Inviting…' : 'Invite to this organisation'}
             </Button>
           </form>
+          {lastInvited !== null && (
+            <button
+              type="button"
+              onClick={() => void resendInvitation()}
+              disabled={busy}
+              className="text-sm underline disabled:opacity-50"
+            >
+              Resend invitation notification
+            </button>
+          )}
         </Card>
       </section>
 

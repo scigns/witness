@@ -24,7 +24,7 @@
  * assigned their role through the two existing endpoints separately.
  */
 
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import {
@@ -37,23 +37,31 @@ import {
   toRoleAssignmentId,
   toUserId,
 } from '@witness/domain';
+import type { Actor } from '@witness/domain';
 import type { InviteOrganisationUserRequest, OrganisationInvitationView } from '@witness/contracts';
 
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import type { Principal } from '../authz/authorization.port.js';
+import { MailerService } from '../infrastructure/mailer.js';
+import { WITNESS_CONFIG } from '../tokens.js';
+import type { WitnessConfig } from '@witness/config';
 
 @Injectable()
 export class OrganisationInvitationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly mailer?: MailerService,
+    @Optional() @Inject(WITNESS_CONFIG) private readonly config?: WitnessConfig,
+  ) {}
 
   async invite(
     organisationId: string,
     request: InviteOrganisationUserRequest,
     principal: Principal,
   ): Promise<OrganisationInvitationView> {
-    await this.requireOrganisation(organisationId);
+    const organisation = await this.requireOrganisation(organisationId);
 
     // Normalise before the duplicate check so 'Name@Example.com' and
     // 'name@example.com' collide here rather than at the unique-constraint
@@ -62,6 +70,12 @@ export class OrganisationInvitationsService {
     const existing = await this.prisma.user.findUnique({ where: { email } });
 
     if (existing !== null) {
+      const orphanMembership = await this.prisma.organisationMembership.findUnique({
+        where: { organisationId_userId: { organisationId, userId: existing.id } },
+      });
+      if (existing.accountState === 'invited' && orphanMembership === null) {
+        return this.attachExistingInvitation(organisation, existing, request, principal);
+      }
       throw new ConflictException({
         error: {
           code: 'DUPLICATE_EMAIL',
@@ -151,7 +165,31 @@ export class OrganisationInvitationsService {
         roleOutcome.event,
         now,
       );
+
+      await tx.invitationNotification.create({
+        data: {
+          id: randomUUID(),
+          organisationId,
+          userId: userOutcome.user.id,
+          membershipId: membershipOutcome.membership.id,
+          recipientEmail: userOutcome.user.email,
+          status: 'pending',
+          attemptCount: 0,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
     });
+
+    const notificationStatus = await this.deliver(
+      organisationId,
+      userOutcome.user.id,
+      userOutcome.user.email,
+      organisation.name,
+      roleOutcome.assignment.role,
+      membershipOutcome.membership.id,
+      actor,
+    );
 
     return {
       userId: userOutcome.user.id,
@@ -162,13 +200,208 @@ export class OrganisationInvitationsService {
       membershipId: membershipOutcome.membership.id,
       role: roleOutcome.assignment.role,
       createdAt: userOutcome.user.createdAt.toISOString(),
+      notificationStatus,
     };
   }
 
-  private async requireOrganisation(organisationId: string): Promise<void> {
+  private async attachExistingInvitation(
+    organisation: { id: string; name: string },
+    existing: {
+      id: string;
+      email: string;
+      displayName: string;
+      accountState: string;
+      createdAt: Date;
+    },
+    request: InviteOrganisationUserRequest,
+    principal: Principal,
+  ): Promise<OrganisationInvitationView> {
+    const actor = await resolveActor(this.prisma, principal);
+    const now = new Date();
+    const membershipOutcome = addOrganisationMember({
+      id: toOrganisationMembershipId(randomUUID()),
+      organisationId: toOrganisationId(organisation.id),
+      userId: toUserId(existing.id),
+      addedBy: actor,
+      at: now,
+    });
+    const roleOutcome = assignRole({
+      id: toRoleAssignmentId(randomUUID()),
+      userId: toUserId(existing.id),
+      role: request.role,
+      scope: { type: 'organisation', organisationId: toOrganisationId(organisation.id) },
+      membershipState: membershipOutcome.membership.state,
+      assignedBy: actor,
+      at: now,
+    });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.organisationMembership.create({ data: { ...membershipOutcome.membership } });
+      await appendAuditEvent(
+        tx,
+        'organisation_membership',
+        membershipOutcome.membership.id,
+        membershipOutcome.event,
+        now,
+      );
+      await tx.roleAssignment.create({
+        data: {
+          id: roleOutcome.assignment.id,
+          scopeType: 'organisation',
+          organisationId: organisation.id,
+          userId: existing.id,
+          role: roleOutcome.assignment.role,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+      await appendAuditEvent(
+        tx,
+        'role_assignment',
+        roleOutcome.assignment.id,
+        roleOutcome.event,
+        now,
+      );
+      await tx.invitationNotification.create({
+        data: {
+          id: randomUUID(),
+          organisationId: organisation.id,
+          userId: existing.id,
+          membershipId: membershipOutcome.membership.id,
+          recipientEmail: existing.email,
+          status: 'pending',
+          attemptCount: 0,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+    });
+    const notificationStatus = await this.deliver(
+      organisation.id,
+      existing.id,
+      existing.email,
+      organisation.name,
+      roleOutcome.assignment.role,
+      membershipOutcome.membership.id,
+      actor,
+    );
+    return {
+      userId: existing.id,
+      email: existing.email,
+      displayName: existing.displayName,
+      accountState: existing.accountState as 'invited',
+      organisationId: organisation.id,
+      membershipId: membershipOutcome.membership.id,
+      role: roleOutcome.assignment.role,
+      createdAt: existing.createdAt.toISOString(),
+      notificationStatus,
+    };
+  }
+
+  async resend(
+    organisationId: string,
+    userId: string,
+    principal: Principal,
+  ): Promise<{ readonly status: 'pending' | 'sent' | 'failed' }> {
+    const organisation = await this.requireOrganisation(organisationId);
+    const row = await this.prisma.invitationNotification.findUnique({
+      where: { organisationId_userId: { organisationId, userId } },
+      include: { user: true },
+    });
+    if (row === null) throw new NotFoundException('Invitation notification not found.');
+    const role = await this.prisma.roleAssignment.findFirst({
+      where: { organisationId, userId, scopeType: 'organisation' },
+      select: { role: true },
+    });
+    if (role === null) throw new NotFoundException('Invitation role not found.');
+    const actor = await resolveActor(this.prisma, principal);
+    const status = await this.deliver(
+      organisationId,
+      userId,
+      row.user.email,
+      organisation.name,
+      role.role,
+      row.membershipId,
+      actor,
+    );
+    return { status };
+  }
+
+  private async deliver(
+    organisationId: string,
+    userId: string,
+    email: string,
+    organisationName: string,
+    role: string,
+    membershipId: string,
+    actor: Actor,
+  ): Promise<'pending' | 'sent' | 'failed'> {
+    if (this.mailer === undefined || this.config === undefined) return 'pending';
+    const now = new Date();
+    const activationUrl = new URL('activate', this.config.webBaseUrl).toString();
+    const current = await this.prisma.invitationNotification.findUnique({
+      where: { organisationId_userId: { organisationId, userId } },
+    });
+    const attemptCount = (current?.attemptCount ?? 0) + 1;
+    let result: { readonly messageId: string | null };
+    try {
+      result = await this.mailer.sendInvitation({
+        to: email,
+        organisationName,
+        invitedEmail: email,
+        role,
+        activationUrl,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message.slice(0, 500) : 'SMTP delivery failed.';
+      await this.prisma.invitationNotification.update({
+        where: { organisationId_userId: { organisationId, userId } },
+        data: { status: 'failed', attemptCount, lastError: message, updatedAt: now },
+      });
+      await this.appendNotificationAudit(
+        userId,
+        'user.invitation_notification_failed',
+        actor,
+        now,
+        { organisationId, membershipId, attemptCount: String(attemptCount) },
+      );
+      return 'failed';
+    }
+
+    // SMTP acceptance is authoritative for delivery status. Persistence or
+    // audit failures must surface to operators and must never rewrite a
+    // successfully accepted message as `failed`.
+    {
+      await this.prisma.invitationNotification.update({
+        where: { organisationId_userId: { organisationId, userId } },
+        data: { status: 'sent', attemptCount, lastError: null, sentAt: now, updatedAt: now },
+      });
+      await this.appendNotificationAudit(userId, 'user.invitation_notification_sent', actor, now, {
+        organisationId,
+        membershipId,
+        attemptCount: String(attemptCount),
+        messageId: result.messageId ?? '',
+      });
+      return 'sent';
+    }
+  }
+
+  private async appendNotificationAudit(
+    userId: string,
+    action: 'user.invitation_notification_sent' | 'user.invitation_notification_failed',
+    actor: Actor,
+    at: Date,
+    metadata: Record<string, string>,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await appendAuditEvent(tx, 'user', userId, { action, actor, metadata }, at);
+    });
+  }
+
+  private async requireOrganisation(organisationId: string): Promise<{ id: string; name: string }> {
     const exists = await this.prisma.organisation.findUnique({
       where: { id: organisationId },
-      select: { id: true },
+      select: { id: true, name: true },
     });
 
     if (exists === null) {
@@ -179,5 +412,6 @@ export class OrganisationInvitationsService {
         },
       });
     }
+    return exists;
   }
 }

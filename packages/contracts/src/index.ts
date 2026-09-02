@@ -1548,6 +1548,7 @@ export interface OrganisationInvitationView {
   membershipId: string;
   role: WitnessRole;
   createdAt: string;
+  notificationStatus: 'pending' | 'sent' | 'failed';
 }
 
 export interface WorkspaceMembershipView {

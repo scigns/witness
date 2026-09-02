@@ -37,6 +37,7 @@ function fakePrisma() {
   const roleAssignments: Record<string, unknown>[] = [];
   const actors: Record<string, unknown>[] = [];
   const auditEvents: Record<string, unknown>[] = [];
+  const invitationNotifications: Record<string, unknown>[] = [];
 
   const prisma = {
     organisation: {
@@ -56,6 +57,18 @@ function fakePrisma() {
       },
     },
     organisationMembership: {
+      findUnique: async ({
+        where,
+      }: {
+        where: { organisationId_userId: { organisationId: string; userId: string } };
+      }) => {
+        const row = memberships.find(
+          (m) =>
+            m['organisationId'] === where.organisationId_userId.organisationId &&
+            m['userId'] === where.organisationId_userId.userId,
+        );
+        return row === undefined ? null : { ...row };
+      },
       create: async ({ data }: { data: Record<string, unknown> }) => {
         memberships.push({ ...data });
         return { ...data };
@@ -91,6 +104,12 @@ function fakePrisma() {
         return { ...data };
       },
     },
+    invitationNotification: {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        invitationNotifications.push({ ...data });
+        return { ...data };
+      },
+    },
     $transaction: async <T>(fn: (tx: typeof prisma) => Promise<T>) => fn(prisma),
   };
 
@@ -100,6 +119,7 @@ function fakePrisma() {
     memberships,
     roleAssignments,
     auditEvents,
+    invitationNotifications,
   };
 }
 
@@ -118,6 +138,7 @@ describe('OrganisationInvitationsService', () => {
     expect(result.accountState).toBe('invited');
     expect(result.organisationId).toBe(ORGANISATION_ID);
     expect(result.role).toBe('facilitator');
+    expect(result.notificationStatus).toBe('pending');
 
     expect(users).toHaveLength(1);
     expect(memberships).toHaveLength(1);

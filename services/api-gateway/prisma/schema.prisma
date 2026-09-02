@@ -146,6 +146,7 @@ model Organisation {
   purchaseOrders               PurchaseOrder[]
   paymentMethods               PaymentMethod[]
   payments                     Payment[]
+  invitationNotifications     InvitationNotification[]
 
   @@map("organisation")
 }
@@ -536,9 +537,34 @@ model User {
   ownedActionItems          ActionItem[]             @relation("ActionItemOwner")
   facilitatedAgendaItems    AgendaItem[]
   uploadedResources         Resource[]
+  invitationNotifications  InvitationNotification[]
 
   @@index([accountState])
   @@map("witness_user")
+}
+
+/// Delivery state for an organisation invitation. This is deliberately
+/// separate from account authority: mail is a notification, while the
+/// invitation, verified identity and membership remain the authorization
+/// contract. A failed delivery never removes the invited account.
+model InvitationNotification {
+  id             String       @id @db.Uuid
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  userId         String       @map("user_id") @db.Uuid
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  membershipId   String       @map("membership_id") @db.Uuid
+  recipientEmail String       @map("recipient_email") @db.VarChar(320)
+  status         String       @db.VarChar(16)
+  attemptCount   Int          @default(0) @map("attempt_count")
+  lastError     String?      @map("last_error") @db.VarChar(500)
+  sentAt        DateTime?    @map("sent_at") @db.Timestamptz(6)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organisationId, userId])
+  @@index([status, updatedAt])
+  @@map("invitation_notification")
 }
 
 /// The stable connection between an external identity provider's subject and

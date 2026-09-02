@@ -43,6 +43,13 @@ const booleanish = z
   .optional()
   .transform((value) => value === 'true' || value === '1');
 
+const booleanishDefault = (fallback: 'true' | 'false') =>
+  z
+    .string()
+    .optional()
+    .default(fallback)
+    .transform((value) => value === 'true' || value === '1');
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   WITNESS_DEPLOYMENT_PROFILE: z.enum(DEPLOYMENT_PROFILES).default('development'),
@@ -78,6 +85,19 @@ const schema = z.object({
   // when empty, same pattern as WITNESS_WEB_ORIGIN below.
   WITNESS_OIDC_REDIRECT_URI: z.string().optional().default(''),
   WITNESS_SESSION_TTL_MINUTES: z.coerce.number().int().min(1).default(480),
+
+  // Application notifications use the same approved Brevo relay as Keycloak.
+  // Credentials are optional in development so local tests do not need mail;
+  // production delivery failures are recorded on the invitation instead.
+  KEYCLOAK_SMTP_HOST: z.string().optional().default('smtp-relay.brevo.com'),
+  KEYCLOAK_SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(2525),
+  KEYCLOAK_SMTP_FROM: z.string().optional().default('support@buildwithwitness.com'),
+  KEYCLOAK_SMTP_FROM_DISPLAY_NAME: z.string().optional().default('Witness'),
+  KEYCLOAK_SMTP_REPLY_TO: z.string().optional().default('support@buildwithwitness.com'),
+  KEYCLOAK_SMTP_USER: z.string().optional().default(''),
+  KEYCLOAK_SMTP_PASSWORD: z.string().optional().default(''),
+  KEYCLOAK_SMTP_STARTTLS: booleanishDefault('true'),
+  KEYCLOAK_SMTP_SSL: booleanishDefault('false'),
 
   // Evidence attachments are stored as bytes in Postgres (ADR-0011: the
   // database is the whole system of record, so `scripts/ops/backup.sh`
@@ -177,6 +197,17 @@ export interface WitnessConfig {
   readonly jwtAudience: string;
   readonly oidcRedirectUri: string;
   readonly sessionTtlMinutes: number;
+  readonly smtp: {
+    readonly host: string;
+    readonly port: number;
+    readonly from: string;
+    readonly fromDisplayName: string;
+    readonly replyTo: string;
+    readonly user: string;
+    readonly password: string;
+    readonly starttls: boolean;
+    readonly ssl: boolean;
+  };
   readonly maxEvidenceAttachmentMb: number;
   readonly localLlmUrl: string;
   readonly localLlmModel: string;
@@ -341,6 +372,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
     value.S3_ENDPOINT.trim() !== '' ||
     value.S3_ACCESS_KEY_ID.trim() !== '' ||
     value.S3_SECRET_ACCESS_KEY.trim() !== '';
+
+  if (
+    value.NODE_ENV === 'production' &&
+    !value.KEYCLOAK_SMTP_STARTTLS &&
+    !value.KEYCLOAK_SMTP_SSL
+  ) {
+    problems.push(
+      'Production SMTP must use TLS: set KEYCLOAK_SMTP_STARTTLS=true or KEYCLOAK_SMTP_SSL=true.',
+    );
+  }
 
   // ── ADR-0009: the sovereign profile makes zero external calls ──────────────
   if (value.WITNESS_DEPLOYMENT_PROFILE === 'sovereign') {
@@ -567,6 +608,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
         ? value.WITNESS_OIDC_REDIRECT_URI.trim()
         : `http://localhost:${value.WITNESS_API_PORT}/api/v1/auth/callback`,
     sessionTtlMinutes: value.WITNESS_SESSION_TTL_MINUTES,
+    smtp: {
+      host: value.KEYCLOAK_SMTP_HOST,
+      port: value.KEYCLOAK_SMTP_PORT,
+      from: value.KEYCLOAK_SMTP_FROM.trim(),
+      fromDisplayName: value.KEYCLOAK_SMTP_FROM_DISPLAY_NAME.trim(),
+      replyTo: value.KEYCLOAK_SMTP_REPLY_TO.trim(),
+      user: value.KEYCLOAK_SMTP_USER.trim(),
+      password: value.KEYCLOAK_SMTP_PASSWORD,
+      starttls: value.KEYCLOAK_SMTP_STARTTLS,
+      ssl: value.KEYCLOAK_SMTP_SSL,
+    },
     maxEvidenceAttachmentMb: value.WITNESS_MAX_EVIDENCE_ATTACHMENT_MB,
     localLlmUrl: value.WITNESS_LOCAL_LLM_URL,
     localLlmModel: value.WITNESS_LOCAL_LLM_MODEL,
