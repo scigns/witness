@@ -14,8 +14,7 @@ import { ErrorNotice } from '@/components/ui';
 
 const REASON_MESSAGES: Record<string, string> = {
   unknown_identity:
-    'Your identity is verified, but it is not linked to a Witness account yet. ' +
-    'Create your account, then request access to an organisation from its administrator.',
+    'This account does not yet have access to Witness. If your organisation invited you, use the invitation link. Otherwise, request access from your organisation administrator.',
   account_suspended: 'This account has been suspended. Contact an administrator.',
   account_deactivated: 'This account has been deactivated. Contact an administrator.',
   invalid_callback: 'The sign-in could not be completed. Please try again.',
