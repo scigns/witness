@@ -21,7 +21,9 @@
  * already holding, instead of a blank tab.
  */
 
-const CACHE_NAME = 'witness-shell-v1';
+// Bump whenever shell auth/session rendering changes so an older cached
+// document cannot show a signed-out Home beside authenticated navigation.
+const CACHE_NAME = 'witness-shell-v2';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

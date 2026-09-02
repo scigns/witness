@@ -150,6 +150,27 @@ export default function DashboardPage() {
       (workspace) => workspace.role !== null && REVIEW_ROLES.has(workspace.role),
     ) ?? false;
 
+  // Keep the Home CTA aligned with the shell while the real application
+  // session is loading or being retried. Rendering “Sign in” during that
+  // interval creates a false split-brain state for an authenticated user.
+  if (authStatus === 'loading') {
+    return (
+      <div className="space-y-5" role="status" aria-live="polite">
+        <p className="text-sm text-[var(--color-ink-muted)]">Checking your Witness session…</p>
+      </div>
+    );
+  }
+
+  if (authStatus === 'error') {
+    return (
+      <div className="space-y-5" role="status" aria-live="polite">
+        <p className="text-sm text-[var(--color-ink-muted)]">
+          We could not verify your Witness session. Please wait a moment and try again.
+        </p>
+      </div>
+    );
+  }
+
   if (authStatus !== 'authenticated' || currentUser === null) {
     return (
       <div className="space-y-5">

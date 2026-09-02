@@ -21,6 +21,7 @@ import type { CurrentUserView } from '@witness/contracts';
 import { ApiError, authApi } from './api';
 
 const STORAGE_KEY = 'witness.auth.sessionToken';
+const LOGOUT_EVENT_KEY = 'witness.auth.logout';
 
 /**
  * `'unauthenticated'` means "no session, or one that will never become
@@ -64,6 +65,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       setStatus('unauthenticated');
     }
+  }, []);
+
+  // sessionStorage is intentionally tab-scoped, so a logout in one tab would
+  // otherwise leave another tab presenting stale authenticated UI. Broadcast
+  // only a logout signal; never send the bearer token or any session material.
+  useEffect(() => {
+    const clearLocalSession = () => {
+      try {
+        window.sessionStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // Non-fatal.
+      }
+      setToken(null);
+      setCurrentUser(null);
+      setErrorMessage(null);
+      setStatus('unauthenticated');
+    };
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === LOGOUT_EVENT_KEY) clearLocalSession();
+    };
+
+    window.addEventListener('storage', onStorage);
+    const channel =
+      typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('witness-auth');
+    channel?.addEventListener('message', (event: MessageEvent) => {
+      if (event.data === 'logout') clearLocalSession();
+    });
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      channel?.close();
+    };
   }, []);
 
   useEffect(() => {
@@ -151,8 +185,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         try {
           window.sessionStorage.removeItem(STORAGE_KEY);
+          window.localStorage.setItem(LOGOUT_EVENT_KEY, String(Date.now()));
         } catch {
           // Non-fatal.
+        }
+        if (typeof BroadcastChannel !== 'undefined') {
+          const channel = new BroadcastChannel('witness-auth');
+          channel.postMessage('logout');
+          channel.close();
         }
         setToken(null);
         setCurrentUser(null);
