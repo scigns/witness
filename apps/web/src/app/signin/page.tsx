@@ -67,8 +67,14 @@ export default function SignInPage() {
           <a href={authApi.forgotPasswordUrl()} className="underline">
             Forgot password?
           </a>
-          <a href={authApi.registerUrl()} className="underline">
-            New to Witness? Create account
+          <a href={authApi.loginUrl()} className="underline">
+            Have an invitation? Activate your account
+          </a>
+          <a
+            href="mailto:support@buildwithwitness.com?subject=Witness%20access%20request"
+            className="underline"
+          >
+            Need access? Request access
           </a>
         </div>
       </Card>
