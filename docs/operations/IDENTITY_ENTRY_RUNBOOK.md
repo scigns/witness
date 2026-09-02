@@ -1,6 +1,6 @@
 # Identity entry runbook
 
-**Status:** Implemented in application; production Keycloak email delivery requires operator configuration
+**Status:** Implemented and deployed; production email delivery is configured, end-to-end recovery acceptance remains pending
 
 **Owner:** Witness Platform Operations
 
@@ -32,7 +32,17 @@ realm.
 
 Password reset and email verification require Keycloak SMTP to be configured through the production
 secret/configuration process. Never place SMTP credentials in Witness source, logs, or this runbook.
-The expected sender is an approved Witness system mailbox, such as `hello@buildwithwitness.com`.
+Production Brevo SMTP transport over port 2525 has been demonstrated through STARTTLS, authenticated
+submission, and provider acceptance. End-to-end mailbox delivery remains a human acceptance step.
+
+The canonical controlled recovery identity is `hello@buildwithwitness.com`. This is a Cloudflare
+Email Routing alias forwarding to the approved destination; it is not an independent mailbox.
+Do not use or document `witness-test@buildwithwitness.com` as a recovery identity unless that address
+is explicitly provisioned in a future controlled test environment.
+
+The expected sender is an approved Witness system identity such as `hello@buildwithwitness.com` or
+another deployment-approved sender configured in Keycloak SMTP. Sender identity and recovery-recipient
+identity are distinct concerns and must not be inferred from one another.
 
 ## Witness linking rules
 
@@ -43,6 +53,26 @@ must grant organisation access; matching an email domain never auto-joins an org
 
 No registration or password reset can grant an organisation role, platform role, or
 `payment:settle` authority.
+
+## Controlled production recovery acceptance
+
+Use `hello@buildwithwitness.com` for the controlled human acceptance flow unless a separately approved
+synthetic identity has been provisioned.
+
+1. Open the production sign-in page.
+2. Use **Create account** if the identity does not exist, or **Forgot password?** if it does.
+3. Confirm the generic recovery response does not disclose whether an account exists.
+4. Confirm the recovery email reaches the forwarding destination for `hello@buildwithwitness.com`.
+5. Open the reset link without copying the link or token into logs, issues, chat, or test output.
+6. Set a test-only password.
+7. Sign in through the normal production OIDC flow.
+8. Confirm the previous password is rejected where applicable.
+9. Confirm the used reset link cannot be replayed.
+10. Record only PASS/FAIL evidence and safe correlation identifiers; never record credentials,
+    authorization codes, reset tokens, or the reset URL.
+
+Human acceptance is not complete until receipt, reset-link use, password change, post-reset login,
+and replay rejection have all been observed.
 
 ## Current operator onboarding
 
