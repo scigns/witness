@@ -28,6 +28,12 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
+# Compose interpolates required API variables before selecting the keycloak
+# service for `exec`. Supply factual non-secret values so a Keycloak-only
+# diagnostic does not fail because API build metadata is absent from the shell.
+export WITNESS_VERSION="${WITNESS_VERSION:-$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')}"
+export WITNESS_BUILD_ID="${WITNESS_BUILD_ID:-$(git rev-parse HEAD)}"
+
 read_env() {
   local key="$1"
   if [[ -n "${!key-}" ]]; then
@@ -56,8 +62,6 @@ PY
 TEST_EMAIL="$(read_env WITNESS_KEYCLOAK_RECOVERY_TEST_EMAIL)"
 [[ -n "$TEST_EMAIL" ]] || TEST_EMAIL="hello@buildwithwitness.com"
 
-# Authenticate from the container's existing bootstrap environment. Credentials
-# stay inside the container process and stdout is suppressed.
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
   sh -lc '/opt/keycloak/bin/kcadm.sh config credentials \
     --server http://keycloak:8080 --realm master \
@@ -69,7 +73,6 @@ REALM_SMTP_JSON="$({
     sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM --fields smtpServer";
 })"
 
-# Inspect only non-secret SMTP metadata. Never print the auth user/password.
 printf '%s' "$REALM_SMTP_JSON" | python3 -c '
 import json,sys
 smtp=(json.load(sys.stdin).get("smtpServer") or {})
@@ -83,8 +86,6 @@ if smtp:
 '
 SMTP_PRESENT="$(printf '%s' "$REALM_SMTP_JSON" | python3 -c 'import json,sys; print("yes" if (json.load(sys.stdin).get("smtpServer") or {}) else "no")')"
 
-# Keycloak deliberately returns a generic forgot-password response for unknown
-# addresses. Check only the canonical exact address and never list arbitrary users.
 USER_STATE="$({
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
     sh -lc "/opt/keycloak/bin/kcadm.sh get users -r '$REALM' -q exact=true -q email='$TEST_EMAIL' --fields enabled,emailVerified";
@@ -106,7 +107,6 @@ SMTP_PASSWORD="$(read_env KEYCLOAK_SMTP_PASSWORD)"
 SMTP_STARTTLS="$(read_env KEYCLOAK_SMTP_STARTTLS)"
 SMTP_SSL="$(read_env KEYCLOAK_SMTP_SSL)"
 
-# Preserve the Brevo secret names already used by Witness production operations.
 [[ -n "$SMTP_USER" ]] || SMTP_USER="$(read_env BREVO_SMTP_LOGIN)"
 [[ -n "$SMTP_PASSWORD" ]] || SMTP_PASSWORD="$(read_env BREVO_SMTP_KEY)"
 [[ -n "$SMTP_HOST" ]] || SMTP_HOST="smtp-relay.brevo.com"
@@ -124,8 +124,6 @@ if ((${#missing[@]})); then
   exit 1
 fi
 
-# Build the patch locally and stream it over stdin. The temporary container file
-# is deleted even if kcadm fails; the JSON is never printed.
 python3 - "$SMTP_HOST" "$SMTP_PORT" "$SMTP_FROM" "$SMTP_FROM_NAME" \
   "$SMTP_REPLY_TO" "$SMTP_USER" "$SMTP_PASSWORD" "$SMTP_STARTTLS" "$SMTP_SSL" <<'PY' |
 import json, sys
