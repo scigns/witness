@@ -561,19 +561,14 @@ model IdentityLink {
   @@map("identity_link")
 }
 
-/// A signed-in session. `tokenHash` is a SHA-256 hash of the opaque bearer
-/// token handed to the browser — the raw token is never persisted, the same
+/// A signed-in session. `tokenHash` is a SHA-256 hash of the opaque session
+/// token — the raw token is never persisted, the same
 /// reasoning as never storing a password: a database read must not be
 /// enough to impersonate a session.
 ///
-/// Delivered as a bearer token rather than a cookie deliberately: the
-/// browser already calls the API directly, cross-origin, from a different
-/// port (`main.ts`'s CORS configuration predates this capability) — a
-/// cross-site cookie would need `SameSite=None; Secure`, which requires
-/// HTTPS everywhere including local development. A bearer token sent via
-/// `Authorization` header (mirroring the existing, now-superseded-in-
-/// production `X-Witness-Dev-User` header shape) avoids that without
-/// changing the application's deployment topology.
+/// Browser sessions use a host-only HttpOnly cookie. Bearer presentation is
+/// retained as a separate mechanism for service/API clients. The database
+/// authority and tenant/RBAC resolution are identical for both transports.
 model AuthSession {
   id        String @id @db.Uuid
   tokenHash String @unique @map("token_hash") @db.VarChar(64)

@@ -20,6 +20,7 @@ import { loadConfigOrExit } from '@witness/config';
 import { AppModule } from './app.module.js';
 import { BUILD_INFO } from './build-info.js';
 import { StructuredLogger } from './observability/structured-logger.js';
+import { csrfOriginProtection } from './authn/csrf-origin.js';
 
 async function bootstrap(): Promise<void> {
   const config = loadConfigOrExit();
@@ -59,15 +60,9 @@ async function bootstrap(): Promise<void> {
   // Narrow, explicit, and never `*` — a permissive CORS policy left in place is
   // one of the most common ways an internal API becomes a public one.
   //
-  // `credentials: false` remains correct even with real sessions (Milestone
-  // 1.3): the session token travels as an `Authorization: Bearer` header, set
-  // explicitly by the frontend after the OIDC callback, never as a cookie —
-  // see `schema.prisma`'s `AuthSession` model for why a cross-origin cookie
-  // was rejected. `credentials: true` would be needed only if a cookie were
-  // in play; it is not, so it stays off.
   app.enableCors({
     origin: config.webOrigin,
-    credentials: false,
+    credentials: true,
     // The development impersonation header is allowed only where an adapter
     // exists to read it. Outside development it is already inert — nothing is
     // bound that would honour it — but advertising it in
@@ -78,6 +73,12 @@ async function bootstrap(): Promise<void> {
         ? ['Content-Type', 'X-Witness-Dev-User', 'Authorization']
         : ['Content-Type', 'Authorization'],
   });
+
+  // Cookie authentication needs an explicit CSRF boundary. SameSite=Lax is
+  // defence-in-depth; every cookie-authenticated unsafe request must also
+  // carry the exact configured application Origin. Bearer-only API clients
+  // remain a separate mechanism and are not given browser CSRF semantics.
+  app.use(csrfOriginProtection(config.webOrigin));
 
   // Behind the pilot's ingress, every connection Express sees arrives over
   // plaintext HTTP from something on the same machine or the same private

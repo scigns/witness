@@ -1,8 +1,8 @@
 /**
  * App-shell service worker (low-connectivity Level 2).
  *
- * Deliberately narrow: cache-first for this origin's own static build
- * assets and page shells, network-only for everything else. In particular:
+ * Deliberately narrow: cache-first for this origin's hashed static build
+ * assets, network-only for everything else. In particular:
  *
  *  - Never intercepts a cross-origin request. The API and identity provider
  *    live on separate hostnames (witness-api.*, witness-id.*) specifically
@@ -15,15 +15,13 @@
  *    write offline would be a second, uncoordinated queue with no
  *    idempotency key and no visible pending state.
  *
- * What this buys: the app shell (HTML entry, JS/CSS bundles) loads from
- * cache when the network is down or slow, so a participant on a bad
- * connection sees the page and can act on whatever the offline queue is
- * already holding, instead of a blank tab.
+ * What this buys: immutable JS/CSS assets remain available on poor links
+ * without ever persisting session-dependent HTML.
  */
 
 // Bump whenever shell auth/session rendering changes so an older cached
 // document cannot show a signed-out Home beside authenticated navigation.
-const CACHE_NAME = 'witness-shell-v2';
+const CACHE_NAME = 'witness-shell-v3';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -48,10 +46,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Static, hashed build assets: cache-first, they never change under the
-  // same URL. Page navigations: network-first with a cache fallback, so a
-  // signed-in user always sees fresh content when online and the shell
-  // still loads when they are not.
+  // Static, hashed build assets are safe cache-first: they never change under
+  // the same URL and contain no response data for a particular session.
   const isStaticAsset = url.pathname.includes('/_next/static/');
 
   if (isStaticAsset) {
@@ -70,17 +66,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => caches.match(request).then((cached) => cached ?? caches.match('/'))),
-    );
-  }
+  // Cookie-authenticated HTML can vary by browser session. Never persist or
+  // replay navigation responses; offline support is limited to hashed assets.
 });

@@ -109,10 +109,7 @@ export class AuthorizationGuard implements CanActivate {
 
     // A real, verified session always wins when present — the dev header is
     // a fallback for local iteration, never a competing source of truth.
-    const authorizationHeader = request.headers['authorization'];
-    const sessionPrincipal = await this.sessionAuthenticator.authenticate(
-      Array.isArray(authorizationHeader) ? authorizationHeader[0] : authorizationHeader,
-    );
+    const sessionPrincipal = await this.sessionAuthenticator.authenticate(request as never);
 
     const devHeader = request.headers['x-witness-dev-user'];
     const principal =

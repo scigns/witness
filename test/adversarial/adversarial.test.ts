@@ -10,6 +10,7 @@
  * this, and it was refused."
  */
 
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -31,6 +32,33 @@ import {
 } from '@witness/domain';
 import { loadConfig } from '@witness/config';
 import { DevelopmentAuthorizationAdapter } from '../../services/api-gateway/src/authz/development.adapter.js';
+
+describe('ATTACK — recover or replay browser session material', () => {
+  const authSource = readFileSync('apps/web/src/lib/auth.tsx', 'utf8');
+  const apiSource = readFileSync('apps/web/src/lib/api.ts', 'utf8');
+  const callbackSource = readFileSync('apps/web/src/app/auth/callback/page.tsx', 'utf8');
+  const serviceWorker = readFileSync('apps/web/public/sw.js', 'utf8');
+
+  it('cannot read or write browser session credentials in web storage or URL handling', () => {
+    expect(authSource).toContain('removeItem(LEGACY_SESSION_STORAGE_KEY)');
+    expect(authSource + apiSource + callbackSource).not.toMatch(
+      /sessionStorage\.(getItem|setItem)/,
+    );
+    expect(callbackSource).not.toContain('#token=');
+    expect(callbackSource).not.toContain('location.hash');
+  });
+
+  it('cannot receive a credential through cross-tab messaging', () => {
+    expect(authSource).toContain("postMessage('session-invalidated')");
+    expect(authSource).not.toMatch(/postMessage\([^)]*token/i);
+  });
+
+  it('cannot replay session-specific HTML from the service-worker cache', () => {
+    expect(serviceWorker).toContain("url.pathname.includes('/_next/static/')");
+    expect(serviceWorker).not.toContain("request.mode === 'navigate'");
+    expect(serviceWorker).not.toMatch(/cache\.put\([^\n]*\/api\/v1/i);
+  });
+});
 
 const hash = (input: string): string => {
   let h = 0x811c9dc5;

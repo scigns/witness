@@ -27,6 +27,8 @@ import { PrismaService } from '../infrastructure/prisma.service.js';
 import { SessionService } from '../authn/session.service.js';
 import { RoleResolutionService } from './role-resolution.service.js';
 import type { Principal } from './authorization.port.js';
+import type { Request } from 'express';
+import { sessionToken } from '../authn/browser-session.js';
 
 @Injectable()
 export class SessionAuthenticator {
@@ -36,14 +38,12 @@ export class SessionAuthenticator {
     private readonly roleResolution: RoleResolutionService,
   ) {}
 
-  /** `authorizationHeader` is the raw `Authorization` header value, e.g. `'Bearer <token>'`. */
-  async authenticate(authorizationHeader: string | undefined): Promise<Principal | null> {
-    if (authorizationHeader === undefined) return null;
-
-    const [scheme, token] = authorizationHeader.split(' ');
-    if (scheme?.toLowerCase() !== 'bearer' || token === undefined || token.trim() === '') {
-      return null;
-    }
+  async authenticate(request: Request | string | undefined): Promise<Principal | null> {
+    const token =
+      typeof request === 'string' || request === undefined
+        ? sessionToken({ headers: { authorization: request } } as Request)
+        : sessionToken(request);
+    if (token === null) return null;
 
     const userId = await this.sessions.resolveUserId(token);
     if (userId === null) return null;
