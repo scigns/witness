@@ -70,6 +70,9 @@ export default function SignInPage() {
           <a href={authApi.loginUrl()} className="underline">
             Have an invitation? Activate your account
           </a>
+          <p className="basis-full text-xs text-[var(--color-ink-muted)]">
+            Invited users must authenticate with the exact email address their organisation added.
+          </p>
           <a
             href="mailto:support@buildwithwitness.com?subject=Witness%20access%20request"
             className="underline"
