@@ -54,4 +54,14 @@ export class OrganisationInvitationsController {
       throw error;
     }
   }
+
+  @Post(':userId/invitation/resend')
+  @Requires('user:create')
+  async resend(
+    @Param('organisationId') organisationId: string,
+    @Param('userId') userId: string,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<{ readonly status: 'pending' | 'sent' | 'failed' }> {
+    return this.invitations.resend(organisationId, userId, request.principal!);
+  }
 }

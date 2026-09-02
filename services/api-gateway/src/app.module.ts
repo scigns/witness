@@ -100,6 +100,7 @@ import { InvoicesService } from './invoices/invoices.service.js';
 import { ManualSettlementService } from './invoices/manual-settlement.service.js';
 import { PlatformRolesController } from './platform-roles/platform-roles.controller.js';
 import { PlatformRolesService } from './platform-roles/platform-roles.service.js';
+import { MailerService } from './infrastructure/mailer.js';
 
 @Module({
   controllers: [
@@ -153,6 +154,7 @@ import { PlatformRolesService } from './platform-roles/platform-roles.service.js
     InvoicesService,
     ManualSettlementService,
     PlatformRolesService,
+    MailerService,
     WorkspacesService,
     UsersService,
     OrganisationInvitationsService,

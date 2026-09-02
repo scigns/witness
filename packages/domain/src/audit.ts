@@ -41,6 +41,8 @@ export const AUDIT_ACTIONS = [
   'workspace.details_updated',
   'user.created',
   'user.invited',
+  'user.invitation_notification_sent',
+  'user.invitation_notification_failed',
   'organisation_membership.created',
   'organisation_membership.state_changed',
   'workspace_membership.created',

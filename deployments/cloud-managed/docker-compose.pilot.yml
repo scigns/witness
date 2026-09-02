@@ -149,6 +149,17 @@ services:
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-witness-api}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-witness-api}
       WITNESS_SESSION_TTL_MINUTES: ${WITNESS_SESSION_TTL_MINUTES:-480}
+      # Application invitation mail shares the approved Keycloak/Brevo relay.
+      # Secrets are supplied only through the operator environment.
+      KEYCLOAK_SMTP_HOST: ${KEYCLOAK_SMTP_HOST:-smtp-relay.brevo.com}
+      KEYCLOAK_SMTP_PORT: ${KEYCLOAK_SMTP_PORT:-2525}
+      KEYCLOAK_SMTP_FROM: ${KEYCLOAK_SMTP_FROM:-support@buildwithwitness.com}
+      KEYCLOAK_SMTP_FROM_DISPLAY_NAME: ${KEYCLOAK_SMTP_FROM_DISPLAY_NAME:-Witness}
+      KEYCLOAK_SMTP_REPLY_TO: ${KEYCLOAK_SMTP_REPLY_TO:-support@buildwithwitness.com}
+      KEYCLOAK_SMTP_USER: ${KEYCLOAK_SMTP_USER:-${BREVO_SMTP_LOGIN:-}}
+      KEYCLOAK_SMTP_PASSWORD: ${KEYCLOAK_SMTP_PASSWORD:-${BREVO_SMTP_KEY:-}}
+      KEYCLOAK_SMTP_STARTTLS: ${KEYCLOAK_SMTP_STARTTLS:-true}
+      KEYCLOAK_SMTP_SSL: ${KEYCLOAK_SMTP_SSL:-false}
       WITNESS_MAX_EVIDENCE_ATTACHMENT_MB: ${WITNESS_MAX_EVIDENCE_ATTACHMENT_MB:-200}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
       # StoragePort (S3-compatible object storage — Cloudflare R2 in

@@ -40,6 +40,7 @@ record of having been wrong is part of the value.
 | [0022](ADR-0022-billing-and-payments-as-replaceable-ports.md) | Billing and payments as replaceable ports | Proposed | P1, P6, P7 |
 | [0023](ADR-0023-organisation-as-the-commercial-aggregate.md) | Organisation as the commercial aggregate | Proposed | P1, P3, P6, P7 |
 | [0024](ADR-0024-server-managed-browser-sessions.md) | Server-managed browser sessions | Proposed | P1, P6, P7 |
+| [0025](ADR-0025-controlled-invitation-notifications.md) | Controlled invitation notifications | Proposed | P1, P6, P7 |
 
 Bold principles indicate an ADR that is a primary expression of that principle. Changing one of
 those requires Steering Committee approval, and where consent, provenance or Indigenous data
