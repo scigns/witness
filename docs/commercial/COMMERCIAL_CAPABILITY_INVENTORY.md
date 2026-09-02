@@ -159,7 +159,7 @@ A dash means no artifact exists.
 
 | Capability | State | Implementation evidence and known gap |
 |---|---|---|
-| Transactional email | `DOCUMENTED_ONLY` | Notification worker README/phase placeholder; organisation invite explicitly creates state without sending mail |
+| Transactional email | `PARTIAL` | Controlled organisation invitation notifications use the approved Brevo SMTP relay with durable pending/sent/failed state and resend; Keycloak recovery remains provider-owned |
 | Billing email | `ABSENT` | Billing email exists only as supplier/customer invoice snapshot data |
 | Invoice email | `ABSENT` | No sender/template/job/delivery evidence |
 | Renewal email | `DOCUMENTED_ONLY` | Operational mailbox/process aspirations only |
