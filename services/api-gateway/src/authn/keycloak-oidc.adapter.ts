@@ -161,6 +161,8 @@ export class KeycloakOidcAdapter extends IdentityProviderPort {
     endpoint.pathname = endpoint.pathname.replace(/\/auth$/, '/forgot-credentials');
     endpoint.searchParams.set('client_id', this.clientId);
     endpoint.searchParams.set('redirect_uri', input.redirectUri);
+    endpoint.searchParams.set('response_type', 'code');
+    endpoint.searchParams.set('scope', 'openid');
     return endpoint.toString();
   }
 
