@@ -25,8 +25,7 @@ class StubIdentityProvider extends IdentityProviderPort {
     emailVerified: true,
     name: 'Invited Person',
   };
-
-  async buildAuthorizationRequest(input: { state: string }) {
+  async buildAuthorizationRequest(input: { state: string; [key: string]: unknown }) {
     return { url: `https://idp.example/authorize?state=${input.state}`, state: input.state };
   }
 
@@ -687,6 +686,18 @@ describe('AuthenticationService — atomic single-use state consumption', () => 
 });
 
 describe('AuthenticationService — login-attempt retention', () => {
+  it('starts password recovery through the provider reset-credentials endpoint', async () => {
+    const { prisma, authLoginAttempts } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await expect(service.startPasswordRecovery()).resolves.toEqual({
+      redirectUrl: 'https://idp.example/forgot-credentials',
+    });
+    expect(authLoginAttempts).toHaveLength(0);
+  });
+
   it('starting a new sign-in purges expired login attempts', async () => {
     const { prisma, authLoginAttempts } = fakePrisma();
     const idp = new StubIdentityProvider();

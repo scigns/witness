@@ -86,7 +86,7 @@ describe('KeycloakOidcAdapter — discovery', () => {
     expect(new URL(request.url).searchParams.get('prompt')).toBe('create');
   });
 
-  it('builds the provider reset-credentials URL without exposing application secrets', async () => {
+  it('builds the provider reset-credentials URL with required OIDC parameters', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(VALID_DISCOVERY_DOCUMENT));
 
     const url = new URL(
@@ -96,8 +96,10 @@ describe('KeycloakOidcAdapter — discovery', () => {
     );
 
     expect(url.pathname).toBe('/realms/witness/protocol/openid-connect/forgot-credentials');
+    expect(url.searchParams.get('response_type')).toBe('code');
     expect(url.searchParams.get('client_id')).toBe(CLIENT_ID);
     expect(url.searchParams.get('redirect_uri')).toBe('http://localhost:3001/api/v1/auth/callback');
+    expect(url.searchParams.get('scope')).toBe('openid');
     expect(url.searchParams.has('client_secret')).toBe(false);
   });
 
