@@ -50,7 +50,12 @@ export abstract class IdentityProviderPort {
   }): Promise<AuthorizationRequest>;
 
   /** Build the provider-native reset-credentials entry point. */
-  abstract buildPasswordResetUrl(input: { redirectUri: string }): Promise<string>;
+  abstract buildPasswordResetUrl(input: {
+    state: string;
+    nonce: string;
+    codeChallenge: string;
+    redirectUri: string;
+  }): Promise<string>;
 
   /**
    * Exchange an authorization code for tokens. Returns the raw ID token

@@ -155,7 +155,12 @@ export class KeycloakOidcAdapter extends IdentityProviderPort {
     return { url: url.toString(), state: input.state };
   }
 
-  async buildPasswordResetUrl(input: { redirectUri: string }): Promise<string> {
+  async buildPasswordResetUrl(input: {
+    state: string;
+    nonce: string;
+    codeChallenge: string;
+    redirectUri: string;
+  }): Promise<string> {
     const discovery = await this.discover();
     const endpoint = new URL(discovery.authorization_endpoint);
     endpoint.pathname = endpoint.pathname.replace(/\/auth$/, '/forgot-credentials');
@@ -163,6 +168,10 @@ export class KeycloakOidcAdapter extends IdentityProviderPort {
     endpoint.searchParams.set('redirect_uri', input.redirectUri);
     endpoint.searchParams.set('response_type', 'code');
     endpoint.searchParams.set('scope', 'openid');
+    endpoint.searchParams.set('state', input.state);
+    endpoint.searchParams.set('nonce', input.nonce);
+    endpoint.searchParams.set('code_challenge', input.codeChallenge);
+    endpoint.searchParams.set('code_challenge_method', 'S256');
     return endpoint.toString();
   }
 

@@ -91,6 +91,9 @@ describe('KeycloakOidcAdapter — discovery', () => {
 
     const url = new URL(
       await adapter().buildPasswordResetUrl({
+        state: 'state-1',
+        nonce: 'nonce-1',
+        codeChallenge: 'challenge-1',
         redirectUri: 'http://localhost:3001/api/v1/auth/callback',
       }),
     );
@@ -100,6 +103,10 @@ describe('KeycloakOidcAdapter — discovery', () => {
     expect(url.searchParams.get('client_id')).toBe(CLIENT_ID);
     expect(url.searchParams.get('redirect_uri')).toBe('http://localhost:3001/api/v1/auth/callback');
     expect(url.searchParams.get('scope')).toBe('openid');
+    expect(url.searchParams.get('state')).toBe('state-1');
+    expect(url.searchParams.get('nonce')).toBe('nonce-1');
+    expect(url.searchParams.get('code_challenge')).toBe('challenge-1');
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256');
     expect(url.searchParams.has('client_secret')).toBe(false);
   });
 

@@ -134,8 +134,27 @@ export class AuthenticationService {
   }
 
   async startPasswordRecovery(): Promise<{ redirectUrl: string }> {
+    const state = generateState();
+    const nonce = generateNonce();
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = codeChallengeFor(codeVerifier);
+
+    await this.prisma.authLoginAttempt.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+    await this.prisma.authLoginAttempt.create({
+      data: {
+        state,
+        nonce,
+        codeVerifier,
+        redirectUri: this.redirectUri,
+        expiresAt: new Date(Date.now() + LOGIN_ATTEMPT_TTL_MINUTES * 60_000),
+      },
+    });
+
     return {
       redirectUrl: await this.identityProvider.buildPasswordResetUrl({
+        state,
+        nonce,
+        codeChallenge,
         redirectUri: this.redirectUri,
       }),
     };
