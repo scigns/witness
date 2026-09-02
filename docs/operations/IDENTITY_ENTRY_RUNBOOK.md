@@ -1,6 +1,7 @@
 # Identity entry runbook
 
-**Status:** Implemented and deployed; production email delivery is configured, end-to-end recovery acceptance remains pending
+**Status:** Implemented and deployed; production email delivery is configured; recovery acceptance
+remains pending
 
 **Owner:** Witness Platform Operations
 
@@ -41,8 +42,8 @@ Do not use or document `witness-test@buildwithwitness.com` as a recovery identit
 is explicitly provisioned in a future controlled test environment.
 
 The expected sender is an approved Witness system identity such as `hello@buildwithwitness.com` or
-another deployment-approved sender configured in Keycloak SMTP. Sender identity and recovery-recipient
-identity are distinct concerns and must not be inferred from one another.
+another deployment-approved sender configured in Keycloak SMTP. Sender identity and
+recovery-recipient identity are distinct concerns and must not be inferred from one another.
 
 ## Witness linking rules
 

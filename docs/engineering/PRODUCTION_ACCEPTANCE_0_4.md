@@ -64,9 +64,10 @@ Repository, deployment, issues and current-state documents tell the same story.
 
 **Priority:** P0
 
-The canonical controlled recovery identity is `hello@buildwithwitness.com`. It is a Cloudflare Email
-Routing alias and not an independent mailbox. Do not use `witness-test@buildwithwitness.com` unless it
-is explicitly provisioned in a future test environment.
+The canonical controlled recovery identity is
+`hello@buildwithwitness.com`. It is a Cloudflare Email Routing alias and not an independent mailbox.
+Do not use `witness-test@buildwithwitness.com` unless it is explicitly provisioned in a future test
+environment.
 
 Verify:
 
@@ -230,7 +231,9 @@ Do not show `Pay now` while no hosted checkout exists.
 
 ## Gate 7 — pilot value and renewal
 
-Reconcile and implement issue #119.
+Issue #119 is implemented by the controlled value measurement method, existing baseline/evaluation
+templates, the renewal-decision template and the synthetic three-archetype walkthrough. Close #119
+once the documentation changes containing all of those artefacts merge and repository gates pass.
 
 Capture a before/during/after baseline for each pilot. Include administrative effort, time to approved
 record, evidence/decision retrieval, corrections, support effort, unresolved trust concerns and
@@ -272,15 +275,18 @@ Review acceptance criteria before changing issue state.
 | --- | --- | --- |
 | #107 | OPEN_AND_VALID | Keep as commercialisation umbrella until paid/renewal outcomes close |
 | #108 | IMPLEMENTED_NEEDS_HUMAN_ACCEPTANCE | Confirm reusable commercial pack approval |
-| #112 | IMPLEMENTED_NEEDS_VERIFICATION | Persistence is merged and current migration chain deployed; attach evidence/close if criteria satisfied |
-| #115 | IMPLEMENTED_NEEDS_VERIFICATION | Reconcile PR #183 against reconciliation criteria and production synthetic proof |
-| #116 | IMPLEMENTED_NEEDS_VERIFICATION | Prove exactly-once activation in production-safe synthetic acceptance |
+| #112 | STALE_SHOULD_CLOSE | Closed 2026-09-02 with implementation/migration evidence |
+| #115 | IMPLEMENTED_NEEDS_VERIFICATION | Production-safe synthetic reconciliation proof remains |
+| #116 | IMPLEMENTED_NEEDS_VERIFICATION | Production-safe exactly-once proof remains |
 | #117 | IMPLEMENTED_NEEDS_VERIFICATION | Complete full commercial IDOR/role matrix |
 | #118 | OPEN_AND_VALID | Re-prove recovery with current paid commercial state |
-| #119 | OPEN_AND_VALID | Implement pilot value/renewal framework |
+| #119 | IMPLEMENTED_NEEDS_VERIFICATION | Close after value/renewal documentation PR passes |
 | #120 | FUTURE_ROADMAP | Do not implement provider until customer evidence triggers it |
-| #128/#131/#133 | IMPLEMENTED_NEEDS_VERIFICATION | Separate independent-domain readiness from legacy-route production compatibility |
-| #140 | IMPLEMENTED_NEEDS_VERIFICATION | Reconcile parent issue against subsequent recovery controls and drill evidence |
+| #128/#131/#133 | IMPLEMENTED_NEEDS_VERIFICATION | Verify independent-domain production acceptance |
+| #140 | IMPLEMENTED_NEEDS_VERIFICATION | Reconcile parent issue against recovery/drill evidence |
+| #191 | OPEN_AND_VALID | Complete identity lifecycle human acceptance |
+| #192 | OPEN_AND_VALID | Complete full institutional tenant/RBAC regression |
+| #193 | OPEN_AND_VALID | Complete facilitator golden-path rehearsal after P0 gates |
 
 ## Release decision
 
