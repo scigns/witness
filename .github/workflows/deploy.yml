@@ -54,3 +54,13 @@ jobs:
           WITNESS_PILOT_WEB_URL: ${{ vars.WITNESS_PILOT_WEB_URL }}
           WITNESS_ENV_FILE: /home/witness/witness/.env
         run: bash scripts/pilot/deploy.sh
+
+      # Password recovery is a Keycloak realm capability, not an API health
+      # check. Keep this diagnostic non-mutating: it reports whether the live
+      # realm has SMTP configured and whether the canonical recovery identity
+      # exists/enabled/verified, without exposing SMTP credentials or user IDs.
+      - name: Diagnose Keycloak recovery email
+        continue-on-error: true
+        env:
+          WITNESS_ENV_FILE: /home/witness/witness/.env
+        run: bash scripts/pilot/reconcile-keycloak-email.sh check
