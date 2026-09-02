@@ -1,32 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Reconcile the production Keycloak realm's password-recovery email settings.
+# Diagnose or reconcile the production Keycloak realm's recovery-email settings.
 #
-# Why this exists:
-# - Keycloak realm imports do not overwrite an already-initialised realm.
-# - SMTP belongs to the realm, not to the Witness API.
-# - direct SMTP transport success does not prove Keycloak is configured to use it.
-#
-# Secrets are read from the deployment env file and sent to kcadm over stdin as
-# JSON. They are never echoed, placed on the host command line, or written to a
-# repository file.
-#
-# Supported deployment variables:
-#   KEYCLOAK_SMTP_HOST
-#   KEYCLOAK_SMTP_PORT
-#   KEYCLOAK_SMTP_FROM
-#   KEYCLOAK_SMTP_FROM_DISPLAY_NAME   (optional)
-#   KEYCLOAK_SMTP_REPLY_TO            (optional)
-#   KEYCLOAK_SMTP_USER                (or BREVO_SMTP_LOGIN)
-#   KEYCLOAK_SMTP_PASSWORD            (or BREVO_SMTP_KEY)
-#   KEYCLOAK_SMTP_STARTTLS            (default true)
-#   KEYCLOAK_SMTP_SSL                 (default false)
-#   WITNESS_KEYCLOAK_RECOVERY_TEST_EMAIL (optional exact identity check)
+# Realm import does not overwrite an already-initialised realm, so production
+# password recovery requires an explicit reconciliation path. SMTP secrets are
+# never echoed, placed on the host command line, or written to a repository file.
 #
 # Usage:
-#   scripts/pilot/reconcile-keycloak-email.sh check
-#   scripts/pilot/reconcile-keycloak-email.sh apply
+#   bash scripts/pilot/reconcile-keycloak-email.sh check
+#   bash scripts/pilot/reconcile-keycloak-email.sh apply
 
 cd "$(git rev-parse --show-toplevel)"
 
@@ -45,8 +28,6 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
-# Read dotenv values without sourcing arbitrary shell code. Existing process
-# environment wins, allowing secret-manager injection to override the file.
 read_env() {
   local key="$1"
   if [[ -n "${!key-}" ]]; then
@@ -54,7 +35,7 @@ read_env() {
     return 0
   fi
   python3 - "$ENV_FILE" "$key" <<'PY'
-import os, sys
+import sys
 path, wanted = sys.argv[1], sys.argv[2]
 with open(path, encoding="utf-8") as fh:
     for raw in fh:
@@ -72,6 +53,50 @@ with open(path, encoding="utf-8") as fh:
 PY
 }
 
+TEST_EMAIL="$(read_env WITNESS_KEYCLOAK_RECOVERY_TEST_EMAIL)"
+[[ -n "$TEST_EMAIL" ]] || TEST_EMAIL="hello@buildwithwitness.com"
+
+# Authenticate from the container's existing bootstrap environment. Credentials
+# stay inside the container process and stdout is suppressed.
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
+  sh -lc '/opt/keycloak/bin/kcadm.sh config credentials \
+    --server http://keycloak:8080 --realm master \
+    --user "$KC_BOOTSTRAP_ADMIN_USERNAME" \
+    --password "$KC_BOOTSTRAP_ADMIN_PASSWORD"' >/dev/null
+
+# Inspect only non-secret SMTP metadata. Never export the password/user value.
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
+  sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM --fields smtpServer" |
+  python3 - <<'PY'
+import json, sys
+realm = json.load(sys.stdin)
+smtp = realm.get("smtpServer") or {}
+print("[keycloak-email] smtp_config_present=" + ("yes" if smtp else "no"))
+if smtp:
+    print("[keycloak-email] smtp_host=" + str(smtp.get("host", "missing")))
+    print("[keycloak-email] smtp_port=" + str(smtp.get("port", "missing")))
+    print("[keycloak-email] smtp_from=" + str(smtp.get("from", "missing")))
+    print("[keycloak-email] smtp_starttls=" + str(smtp.get("starttls", "missing")))
+    print("[keycloak-email] smtp_ssl=" + str(smtp.get("ssl", "missing")))
+PY
+
+# Keycloak deliberately returns a generic forgot-password response for unknown
+# addresses. Check only the canonical exact address and never list arbitrary users.
+USER_STATE="$({
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
+    sh -lc "/opt/keycloak/bin/kcadm.sh get users -r '$REALM' -q exact=true -q email='$TEST_EMAIL' --fields enabled,emailVerified";
+} | python3 -c 'import json,sys; u=json.load(sys.stdin); print("absent" if len(u)==0 else "ambiguous" if len(u)!=1 else "present_enabled_verified" if u[0].get("enabled") and u[0].get("emailVerified") else "present_not_ready")')"
+echo "[keycloak-email] recovery_identity=$USER_STATE"
+
+if [[ "$MODE" == "check" ]]; then
+  SMTP_PRESENT="$({
+    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
+      sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM --fields smtpServer";
+  } | python3 -c 'import json,sys; print("yes" if (json.load(sys.stdin).get("smtpServer") or {}) else "no")')"
+  [[ "$SMTP_PRESENT" == "yes" && "$USER_STATE" == "present_enabled_verified" ]]
+  exit
+fi
+
 SMTP_HOST="$(read_env KEYCLOAK_SMTP_HOST)"
 SMTP_PORT="$(read_env KEYCLOAK_SMTP_PORT)"
 SMTP_FROM="$(read_env KEYCLOAK_SMTP_FROM)"
@@ -81,10 +106,8 @@ SMTP_USER="$(read_env KEYCLOAK_SMTP_USER)"
 SMTP_PASSWORD="$(read_env KEYCLOAK_SMTP_PASSWORD)"
 SMTP_STARTTLS="$(read_env KEYCLOAK_SMTP_STARTTLS)"
 SMTP_SSL="$(read_env KEYCLOAK_SMTP_SSL)"
-TEST_EMAIL="$(read_env WITNESS_KEYCLOAK_RECOVERY_TEST_EMAIL)"
 
-# Backwards-compatible mapping for the production Brevo secret names already
-# used by Witness operations. The provider remains replaceable.
+# Preserve the Brevo secret names already used by Witness production operations.
 [[ -n "$SMTP_USER" ]] || SMTP_USER="$(read_env BREVO_SMTP_LOGIN)"
 [[ -n "$SMTP_PASSWORD" ]] || SMTP_PASSWORD="$(read_env BREVO_SMTP_KEY)"
 [[ -n "$SMTP_HOST" ]] || SMTP_HOST="smtp-relay.brevo.com"
@@ -93,53 +116,17 @@ TEST_EMAIL="$(read_env WITNESS_KEYCLOAK_RECOVERY_TEST_EMAIL)"
 [[ -n "$SMTP_SSL" ]] || SMTP_SSL="false"
 
 missing=()
-[[ -n "$SMTP_HOST" ]] || missing+=(KEYCLOAK_SMTP_HOST)
-[[ -n "$SMTP_PORT" ]] || missing+=(KEYCLOAK_SMTP_PORT)
 [[ -n "$SMTP_FROM" ]] || missing+=(KEYCLOAK_SMTP_FROM)
 [[ -n "$SMTP_USER" ]] || missing+=(KEYCLOAK_SMTP_USER/BREVO_SMTP_LOGIN)
 [[ -n "$SMTP_PASSWORD" ]] || missing+=(KEYCLOAK_SMTP_PASSWORD/BREVO_SMTP_KEY)
 if ((${#missing[@]})); then
-  echo "[keycloak-email] configuration incomplete: ${missing[*]}" >&2
+  echo "[keycloak-email] cannot apply; missing: ${missing[*]}" >&2
   echo "[keycloak-email] no realm change was attempted" >&2
   exit 1
 fi
 
-# Authenticate kcadm using the existing Keycloak container bootstrap environment.
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
-  sh -lc '/opt/keycloak/bin/kcadm.sh config credentials \
-    --server http://keycloak:8080 --realm master \
-    --user "$KC_BOOTSTRAP_ADMIN_USERNAME" \
-    --password "$KC_BOOTSTRAP_ADMIN_PASSWORD"' >/dev/null
-
-# Report only whether the realm already has an SMTP map; never export the map,
-# because it contains the password.
-SMTP_PRESENT="$({
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
-    sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM --fields smtpServer";
-} | python3 -c 'import json,sys; d=json.load(sys.stdin); print("yes" if d.get("smtpServer") else "no")')"
-echo "[keycloak-email] realm=$REALM smtp_config_present=$SMTP_PRESENT"
-
-# An exact user check is useful because Keycloak deliberately gives a generic
-# forgot-password response for unknown addresses. Never list arbitrary users.
-if [[ -n "$TEST_EMAIL" ]]; then
-  USER_COUNT="$({
-    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
-      sh -lc "/opt/keycloak/bin/kcadm.sh get users -r '$REALM' -q exact=true -q email='$TEST_EMAIL' --fields id,enabled,emailVerified";
-  } | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')"
-  case "$USER_COUNT" in
-    1) echo "[keycloak-email] recovery_identity=present" ;;
-    0) echo "[keycloak-email] recovery_identity=absent" ;;
-    *) echo "[keycloak-email] recovery_identity=ambiguous count=$USER_COUNT"; exit 1 ;;
-  esac
-fi
-
-if [[ "$MODE" == "check" ]]; then
-  [[ "$SMTP_PRESENT" == "yes" ]] || exit 1
-  exit 0
-fi
-
-# Construct the realm patch locally, pass it over stdin, and remove the
-# container-side temporary file even if kcadm fails. The JSON is never printed.
+# Build the patch locally and stream it over stdin. The temporary container file
+# is deleted even if kcadm fails; the JSON is never printed.
 python3 - "$SMTP_HOST" "$SMTP_PORT" "$SMTP_FROM" "$SMTP_FROM_NAME" \
   "$SMTP_REPLY_TO" "$SMTP_USER" "$SMTP_PASSWORD" "$SMTP_STARTTLS" "$SMTP_SSL" <<'PY' |
 import json, sys
@@ -165,9 +152,11 @@ PY
 
 echo "[keycloak-email] realm SMTP configuration reconciled"
 
-# Verify presence only. Do not print the resulting SMTP map.
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
-  sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM --fields smtpServer" |
-  python3 -c 'import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d.get("smtpServer") else 1)'
+# Apply mode is not complete unless the exact recovery identity exists and is
+# enabled/verified. Do not create identities implicitly during SMTP repair.
+if [[ "$USER_STATE" != "present_enabled_verified" ]]; then
+  echo "[keycloak-email] SMTP applied but recovery identity is not ready: $USER_STATE" >&2
+  exit 1
+fi
 
 echo "[keycloak-email] verification=pass"
