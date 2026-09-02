@@ -1,10 +1,15 @@
 # ADR-0024: Server-managed browser sessions
 
-- **Status:** Proposed
-- **Date:** 2026-09-02
-- **Decision owners:** Identity, Security, Frontend Architecture
-- **Issue:** #199
-- **Principles:** P1, P6, P7
+| | |
+|---|---|
+| **Status** | Proposed |
+| **Date** | 2026-09-02 |
+| **Deciders** | Identity, Security, Frontend Architecture |
+| **Consulted** | Repository governance and automated security review |
+| **Informed** | Witness operators and application users |
+| **Supersedes** | None |
+| **Related** | Issue #199; issue #198 |
+| **Principles engaged** | P1, P6, P7 |
 
 ## Context
 
@@ -60,15 +65,41 @@ longer reads or sends it. There are not two indefinite browser authorities.
 
 ## Consequences
 
+### Positive
+
 - All tabs automatically present one server-managed browser session.
 - JavaScript and cross-tab messages cannot read or transport the session credential.
 - XSS can still act with the user's ambient authority while executing, but cannot exfiltrate the
   HttpOnly token for reuse elsewhere.
+
+### Negative
+
 - Cookie authentication requires credentialed CORS and maintained Origin checks.
 - Keycloak SSO lifetime remains distinct from Witness application-session lifetime; RP-initiated
   Keycloak logout remains governed separately by issue #198.
+
+### Neutral
+
 - Local HTTP development uses the same host-only cookie without `Secure`; deployed profiles fail
   closed to HTTPS-only cookie transport.
+
+### Risks accepted
+
+- An XSS executing in the application origin can issue requests with ambient cookie authority,
+  although it cannot read and export the credential. Content-security and input controls remain
+  required independently of the session transport.
+
+## Compliance and enforcement
+
+CI enforces this decision through API session, CSRF, callback, adversarial browser-storage and
+service-worker cache tests. Changes to browser authentication transport require an ADR update and
+the normal security review gates.
+
+## Reversal
+
+Reversal requires a replacement server-managed browser-session mechanism that preserves shared
+tab state, server revocation, credential confidentiality and CSRF protection. Reintroducing a
+browser-readable bearer credential is not an acceptable rollback.
 
 ## Alternatives rejected
 
