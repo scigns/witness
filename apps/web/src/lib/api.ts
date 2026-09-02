@@ -149,25 +149,6 @@ const DEPLOYMENT_PROFILE = process.env.WITNESS_BUILD_PROFILE ?? 'development';
 
 export const IS_DEVELOPMENT_BUILD = DEPLOYMENT_PROFILE === 'development';
 
-/**
- * Shared with `lib/auth.tsx`, which owns the lifecycle of this value. Read
- * directly here because `request` is a plain function called from server-ish
- * and client code alike, and threading a React context through every call site
- * would change several hundred lines to move one header.
- */
-const SESSION_TOKEN_STORAGE_KEY = 'witness.auth.sessionToken';
-
-function sessionToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
-  } catch {
-    // Storage can be unavailable (private mode, blocked cookies). No session
-    // is a valid answer; a thrown exception here is not.
-    return null;
-  }
-}
-
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -185,19 +166,12 @@ export interface ActingUser {
 }
 
 /**
- * A real signed-in session always wins. The dev header is a stand-in for one,
- * and sending both would let the two disagree about who is acting. Shared by
- * every request helper below, including the two (`requestMultipart`,
- * `requestBlob`) that cannot go through `request()` itself because it always
- * sends JSON.
+ * Browser authentication is an HttpOnly cookie and therefore deliberately
+ * unavailable here. The development header remains a local-only stand-in.
  */
 function authHeaders(user: ActingUser | null): Record<string, string> {
   const headers: Record<string, string> = {};
-  const token = sessionToken();
-
-  if (token !== null) {
-    headers['Authorization'] = `Bearer ${token}`;
-  } else if (user !== null && IS_DEVELOPMENT_BUILD) {
+  if (user !== null && IS_DEVELOPMENT_BUILD) {
     headers['X-Witness-Dev-User'] = `${user.name}|${user.role}`;
   }
 
@@ -250,6 +224,7 @@ async function request<T>(path: string, user: ActingUser | null, init?: RequestI
       ...init,
       headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
       cache: 'no-store',
+      credentials: 'include',
     });
   } catch {
     // A network failure and an API error are genuinely different problems with
@@ -291,6 +266,7 @@ async function requestMultipart<T>(
       headers: authHeaders(user),
       body: formData,
       cache: 'no-store',
+      credentials: 'include',
     });
   } catch {
     throw new ApiError(
@@ -309,7 +285,11 @@ async function requestBlob(path: string, user: ActingUser | null): Promise<Blob>
   let response: Response;
 
   try {
-    response = await fetch(`${BASE_URL}${path}`, { headers: authHeaders(user), cache: 'no-store' });
+    response = await fetch(`${BASE_URL}${path}`, {
+      headers: authHeaders(user),
+      cache: 'no-store',
+      credentials: 'include',
+    });
   } catch {
     throw new ApiError(
       `Cannot reach the Witness API at ${BASE_URL}. Is it running? Try: make app`,
@@ -1731,11 +1711,9 @@ export const api = {
   /**
    * Fetch an export and hand back the bytes and the server's filename.
    *
-   * This cannot be a plain `<a href>`. A navigation carries cookies, and the
-   * session travels as an `Authorization: Bearer` header — so a link to the
-   * export URL is an unauthenticated request, and a deployed instance answers
-   * it with 401. The export must be fetched with the session attached and
-   * then saved from memory.
+   * This cannot be a plain `<a href>` because the browser cookie is host-only
+   * to the API and attachment error handling must remain explicit. Fetch with
+   * credentials, then save the returned bytes from memory.
    *
    * The filename comes from the response's `Content-Disposition` rather than
    * being rebuilt here, so the name on disk is the one the server recorded.
@@ -1749,17 +1727,13 @@ export const api = {
   ): Promise<{ blob: Blob; filename: string }> => {
     const url = `${BASE_URL}${reportPath(workspaceId, sessionId)}/${encodeURIComponent(reportId)}/export?format=${format}`;
     const headers: Record<string, string> = {};
-    const token = sessionToken();
-
-    if (token !== null) {
-      headers['Authorization'] = `Bearer ${token}`;
-    } else if (user !== null && IS_DEVELOPMENT_BUILD) {
+    if (user !== null && IS_DEVELOPMENT_BUILD) {
       headers['X-Witness-Dev-User'] = `${user.name}|${user.role}`;
     }
 
     let response: Response;
     try {
-      response = await fetch(url, { headers, cache: 'no-store' });
+      response = await fetch(url, { headers, cache: 'no-store', credentials: 'include' });
     } catch {
       throw new ApiError(`Cannot reach the Witness API at ${BASE_URL}.`, 0, 'API_UNREACHABLE');
     }
@@ -1889,10 +1863,8 @@ export const api = {
 };
 
 /**
- * The real, signed-in session (BUILD_ROADMAP.md Milestone 1.3) — separate
- * from `api` above, which sends the Developer Preview's unverified
- * `X-Witness-Dev-User` header. These calls send a verified bearer session
- * token instead, and never touch that header.
+ * Real browser session endpoints. Authentication is the API's host-only
+ * HttpOnly cookie; these calls never receive or expose its opaque value.
  */
 export const authApi = {
   /** Where the browser navigates to start a real sign-in. Not a fetch — a full-page redirect. */
@@ -1900,7 +1872,7 @@ export const authApi = {
   registerUrl: (): string => `${BASE_URL}/api/v1/auth/register`,
   forgotPasswordUrl: (): string => `${BASE_URL}/api/v1/auth/forgot-password`,
 
-  me: async (sessionToken: string): Promise<CurrentUserView> => {
+  me: async (): Promise<CurrentUserView> => {
     let response: Response;
 
     // On a poor mobile connection a request can be accepted by the network
@@ -1915,8 +1887,8 @@ export const authApi = {
 
     try {
       response = await fetch(`${BASE_URL}/api/v1/me`, {
-        headers: { Authorization: `Bearer ${sessionToken}` },
         cache: 'no-store',
+        credentials: 'include',
         signal: timeoutController.signal,
       });
     } catch {
@@ -1952,19 +1924,16 @@ export const authApi = {
   },
 
   /** A person editing their own profile — same no-guard reasoning as `me`. */
-  updateProfile: async (
-    sessionToken: string,
-    body: UpdateOwnProfileRequest,
-  ): Promise<CurrentUserView> => {
+  updateProfile: async (body: UpdateOwnProfileRequest): Promise<CurrentUserView> => {
     let response: Response;
 
     try {
       response = await fetch(`${BASE_URL}/api/v1/me`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${sessionToken}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify(body),
       });
     } catch {
@@ -1989,16 +1958,15 @@ export const authApi = {
     return (await response.json()) as CurrentUserView;
   },
 
-  logout: async (sessionToken: string): Promise<void> => {
+  logout: async (): Promise<void> => {
     try {
-      await fetch(`${BASE_URL}/api/v1/auth/logout`, {
+      const response = await fetch(`${BASE_URL}/api/v1/auth/logout`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${sessionToken}` },
+        credentials: 'include',
       });
+      await throwOnError(response);
     } catch {
-      // Sign-out is a local action first (the token is discarded client-side
-      // regardless) — a network failure here must not trap the user in a
-      // signed-in-looking state they cannot leave.
+      throw new ApiError(`Cannot reach the Witness API at ${BASE_URL}.`, 0, 'API_UNREACHABLE');
     }
   },
 };

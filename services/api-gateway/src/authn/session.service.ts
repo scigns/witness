@@ -1,10 +1,8 @@
 /**
  * Session issuance and validation.
  *
- * The bearer token handed to the browser is never itself persisted — only
- * its SHA-256 hash, the same reasoning as never storing a password (see the
- * `AuthSession` model's own comment in `schema.prisma` for why a bearer
- * token rather than a cookie).
+ * The opaque session token is never itself persisted — only its SHA-256
+ * hash, the same reasoning as never storing a password.
  */
 
 import { Injectable } from '@nestjs/common';

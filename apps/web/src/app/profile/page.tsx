@@ -14,8 +14,6 @@ import { ApiError, authApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { Avatar, Button, Card, ErrorNotice } from '@/components/ui';
 
-const STORAGE_KEY = 'witness.auth.sessionToken';
-
 export default function ProfilePage() {
   const { status, currentUser } = useAuth();
 
@@ -41,16 +39,10 @@ export default function ProfilePage() {
   }
 
   const save = async () => {
-    const token = sessionStorage.getItem(STORAGE_KEY);
-    if (token === null) {
-      setError('Your session has expired. Sign in again.');
-      return;
-    }
-
     setSaving(true);
     setSaved(false);
     try {
-      await authApi.updateProfile(token, { bio: bio.trim() === '' ? null : bio.trim() });
+      await authApi.updateProfile({ bio: bio.trim() === '' ? null : bio.trim() });
       setSaved(true);
       setError(null);
       // `useAuth`'s CurrentUserView is only refetched on mount — reload so

@@ -16,8 +16,8 @@ import { DevelopmentIdentityProviderAdapter } from './development-identity-provi
 import type { IdentityProviderPort } from './identity-provider.port.js';
 import type { SessionService, SessionLookupResult } from './session.service.js';
 
-function fakeRequest(authorizationHeader: string | undefined) {
-  return { headers: { authorization: authorizationHeader } } as never;
+function fakeRequest(authorizationHeader: string | undefined, cookie?: string) {
+  return { headers: { authorization: authorizationHeader, cookie } } as never;
 }
 
 function fakeAuthentication(getCurrentUserResult: CurrentUserResult) {
@@ -120,6 +120,26 @@ describe('CurrentUserController — error mapping', () => {
 
     await expect(controller.me(fakeRequest('Bearer valid-token'))).resolves.toEqual(view);
   });
+
+  it('resolves the same current-user view from the browser session cookie', async () => {
+    const view = {
+      id: 'user-1',
+      displayName: 'Real User',
+      email: 'real@example.com',
+      accountState: 'active' as const,
+      organisations: [],
+      workspaces: [],
+    };
+    const sessions = fakeSessions({ status: 'valid', userId: 'user-1' });
+    const controller = new CurrentUserController(
+      fakeAuthentication({ status: 'ok', view }),
+      sessions,
+    );
+    await expect(
+      controller.me(fakeRequest(undefined, 'witness_session=shared-token')),
+    ).resolves.toEqual(view);
+    expect(sessions.resolveSession).toHaveBeenCalledWith('shared-token');
+  });
 });
 
 describe('AuthenticationController — dev-idp/authorize redirect_uri validation', () => {
@@ -187,22 +207,53 @@ describe('AuthenticationController — dev-idp/authorize redirect_uri validation
 describe('AuthenticationController — independent application callback', () => {
   it('returns a successful OIDC callback to the configured root-host application', async () => {
     const authentication = {
-      handleCallback: vi.fn().mockResolvedValue({ token: 'session-token' }),
+      handleCallback: vi.fn().mockResolvedValue({
+        token: 'session-token',
+        expiresAt: new Date('2030-01-01T00:00:00Z'),
+      }),
     } as unknown as AuthenticationService;
-    const response = { redirect: vi.fn() } as never;
+    const response = { redirect: vi.fn(), cookie: vi.fn() } as never;
     const controller = new AuthenticationController(
       authentication,
       {} as IdentityProviderPort,
       {
         webBaseUrl: 'https://app.buildwithwitness.com/',
+        profile: 'hybrid',
       } as WitnessConfig,
     );
 
     await controller.callback('oidc-code', 'oidc-state', response);
 
-    expect(response.redirect).toHaveBeenCalledWith(
-      302,
-      'https://app.buildwithwitness.com/auth/callback#token=session-token',
+    expect(response.cookie).toHaveBeenCalledWith('witness_session', 'session-token', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      expires: new Date('2030-01-01T00:00:00Z'),
+    });
+    expect(response.redirect).toHaveBeenCalledWith(302, 'https://app.buildwithwitness.com/');
+    expect(JSON.stringify(response.redirect.mock.calls)).not.toContain('session-token');
+  });
+
+  it('revokes server authority and expires the host-only browser cookie on logout', async () => {
+    const signOut = vi.fn().mockResolvedValue(undefined);
+    const controller = new AuthenticationController(
+      { signOut } as unknown as AuthenticationService,
+      {} as IdentityProviderPort,
+      { profile: 'hybrid' } as WitnessConfig,
     );
+    const response = { clearCookie: vi.fn() } as never;
+
+    await expect(
+      controller.logout(fakeRequest(undefined, 'witness_session=shared-token'), response),
+    ).resolves.toEqual({ ok: true });
+
+    expect(signOut).toHaveBeenCalledWith('shared-token');
+    expect(response.clearCookie).toHaveBeenCalledWith('witness_session', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+    });
   });
 });

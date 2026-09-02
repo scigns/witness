@@ -53,6 +53,14 @@ describe('SessionService', () => {
     expect(JSON.stringify(stored)).not.toContain(token);
   });
 
+  it('rotates the opaque credential on every login to prevent fixation', async () => {
+    const { prisma } = fakePrisma();
+    const service = new SessionService(prisma);
+    const first = await service.issue('user-1', 60);
+    const second = await service.issue('user-1', 60);
+    expect(second.token).not.toBe(first.token);
+  });
+
   it('returns null for an unknown token', async () => {
     const { prisma } = fakePrisma();
     const service = new SessionService(prisma);
@@ -77,6 +85,18 @@ describe('SessionService', () => {
 
     // Revoking again (already-signed-out) must not throw.
     await expect(service.revoke(token)).resolves.not.toThrow();
+  });
+
+  it('gives two tabs the same server authority and denies every new request after revocation', async () => {
+    const { prisma } = fakePrisma();
+    const service = new SessionService(prisma);
+    const { token } = await service.issue('user-1', 60);
+
+    await expect(service.resolveUserId(token)).resolves.toBe('user-1'); // Tab A
+    await expect(service.resolveUserId(token)).resolves.toBe('user-1'); // newly opened Tab B
+    await service.revoke(token);
+    await expect(service.resolveUserId(token)).resolves.toBeNull(); // stale Tab B request
+    await expect(service.resolveUserId(token)).resolves.toBeNull(); // new Tab C
   });
 
   describe('resolveSession — distinguishing "never signed in" from "session expired"', () => {

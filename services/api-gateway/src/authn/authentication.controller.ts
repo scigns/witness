@@ -42,6 +42,7 @@ import {
 import { DevelopmentIdentityProviderAdapter } from './development-identity-provider.adapter.js';
 import { IdentityProviderPort } from './identity-provider.port.js';
 import { SessionService } from './session.service.js';
+import { BROWSER_SESSION_COOKIE, sessionToken } from './browser-session.js';
 
 @Controller('api/v1/auth')
 export class AuthenticationController {
@@ -85,13 +86,15 @@ export class AuthenticationController {
   ): Promise<void> {
     try {
       const session = await this.authentication.handleCallback(code ?? '', state ?? '');
-      // Relative to the web application's base URL, not the bare origin:
-      // Witness may be served under a path on a domain whose root belongs to
-      // something else, and a signed-in browser must land on Witness. See
-      // `webBaseUrl` in @witness/config for why it always ends in a slash.
-      const target = new URL('auth/callback', this.config.webBaseUrl);
-      target.hash = `token=${session.token}`;
-      response.redirect(302, target.toString());
+      response.cookie(BROWSER_SESSION_COOKIE, session.token, {
+        httpOnly: true,
+        secure: this.config.profile !== 'development',
+        sameSite: 'lax',
+        path: '/',
+        expires: session.expiresAt,
+      });
+      // The opaque Witness session never enters a URL or frontend JavaScript.
+      response.redirect(302, this.config.webBaseUrl);
     } catch (error) {
       const reason = error instanceof AuthenticationDeniedError ? error.reason : 'invalid_callback';
       const target = new URL('auth/error', this.config.webBaseUrl);
@@ -101,11 +104,20 @@ export class AuthenticationController {
   }
 
   @Post('logout')
-  async logout(@Req() request: Request): Promise<{ ok: true }> {
-    const token = bearerToken(request);
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<{ ok: true }> {
+    const token = sessionToken(request);
     if (token !== null) {
       await this.authentication.signOut(token);
     }
+    response.clearCookie(BROWSER_SESSION_COOKIE, {
+      httpOnly: true,
+      secure: this.config.profile !== 'development',
+      sameSite: 'lax',
+      path: '/',
+    });
     // Idempotent by design: signing out with no session, or a session that
     // was already invalid, is not an error — the caller's intent (be signed
     // out) is already satisfied.
@@ -228,7 +240,7 @@ export class CurrentUserController {
   }
 
   private async requireSessionUserId(request: Request): Promise<string> {
-    const token = bearerToken(request);
+    const token = sessionToken(request);
     if (token === null) {
       throw new UnauthorizedException({
         error: { code: 'UNAUTHENTICATED', message: 'No valid session. Sign in first.' },
@@ -280,17 +292,4 @@ function toCurrentUserView(currentUser: CurrentUserResult): CurrentUserView {
         },
       });
   }
-}
-
-function bearerToken(request: Request): string | null {
-  const header = request.headers['authorization'];
-  const value = Array.isArray(header) ? header[0] : header;
-  if (value === undefined) return null;
-
-  const [scheme, token] = value.split(' ');
-  if (scheme?.toLowerCase() !== 'bearer' || token === undefined || token.trim() === '') {
-    return null;
-  }
-
-  return token;
 }
