@@ -64,13 +64,15 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
     --user "$KC_BOOTSTRAP_ADMIN_USERNAME" \
     --password "$KC_BOOTSTRAP_ADMIN_PASSWORD"' >/dev/null
 
-# Inspect only non-secret SMTP metadata. Never export the password/user value.
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
-  sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM --fields smtpServer" |
-  python3 - <<'PY'
-import json, sys
-realm = json.load(sys.stdin)
-smtp = realm.get("smtpServer") or {}
+REALM_SMTP_JSON="$({
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
+    sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM --fields smtpServer";
+})"
+
+# Inspect only non-secret SMTP metadata. Never print the auth user/password.
+printf '%s' "$REALM_SMTP_JSON" | python3 -c '
+import json,sys
+smtp=(json.load(sys.stdin).get("smtpServer") or {})
 print("[keycloak-email] smtp_config_present=" + ("yes" if smtp else "no"))
 if smtp:
     print("[keycloak-email] smtp_host=" + str(smtp.get("host", "missing")))
@@ -78,7 +80,8 @@ if smtp:
     print("[keycloak-email] smtp_from=" + str(smtp.get("from", "missing")))
     print("[keycloak-email] smtp_starttls=" + str(smtp.get("starttls", "missing")))
     print("[keycloak-email] smtp_ssl=" + str(smtp.get("ssl", "missing")))
-PY
+'
+SMTP_PRESENT="$(printf '%s' "$REALM_SMTP_JSON" | python3 -c 'import json,sys; print("yes" if (json.load(sys.stdin).get("smtpServer") or {}) else "no")')"
 
 # Keycloak deliberately returns a generic forgot-password response for unknown
 # addresses. Check only the canonical exact address and never list arbitrary users.
@@ -89,10 +92,6 @@ USER_STATE="$({
 echo "[keycloak-email] recovery_identity=$USER_STATE"
 
 if [[ "$MODE" == "check" ]]; then
-  SMTP_PRESENT="$({
-    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
-      sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM --fields smtpServer";
-  } | python3 -c 'import json,sys; print("yes" if (json.load(sys.stdin).get("smtpServer") or {}) else "no")')"
   [[ "$SMTP_PRESENT" == "yes" && "$USER_STATE" == "present_enabled_verified" ]]
   exit
 fi
@@ -152,8 +151,6 @@ PY
 
 echo "[keycloak-email] realm SMTP configuration reconciled"
 
-# Apply mode is not complete unless the exact recovery identity exists and is
-# enabled/verified. Do not create identities implicitly during SMTP repair.
 if [[ "$USER_STATE" != "present_enabled_verified" ]]; then
   echo "[keycloak-email] SMTP applied but recovery identity is not ready: $USER_STATE" >&2
   exit 1
