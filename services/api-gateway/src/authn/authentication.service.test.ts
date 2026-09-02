@@ -695,7 +695,8 @@ describe('AuthenticationService — login-attempt retention', () => {
     await expect(service.startPasswordRecovery()).resolves.toEqual({
       redirectUrl: 'https://idp.example/forgot-credentials',
     });
-    expect(authLoginAttempts).toHaveLength(0);
+    expect(authLoginAttempts).toHaveLength(1);
+    expect(authLoginAttempts[0]).toMatchObject({ redirectUri: REDIRECT_URI });
   });
 
   it('starting a new sign-in purges expired login attempts', async () => {
