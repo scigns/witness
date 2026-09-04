@@ -1,28 +1,47 @@
 :root {
   color-scheme: light;
 
-  /* Authoritative Witness colour system. */
-  --color-ink: #172a2f;
-  --color-muted: #53666a;
-  --color-paper: #f7f4ec;
-  --color-surface: #ffffff;
-  --color-surface-subtle: #eef1ec;
-  --color-border: #c8cfca;
-  --color-primary: #075f63;
-  --color-primary-hover: #064c50;
-  --color-primary-ink: #ffffff;
-  --color-accent: #754d08;
-  --color-accent-soft: #f1e3c5;
-  --color-success: #23643b;
-  --color-warning: #915d00;
-  --color-danger: #a33636;
-  --color-focus: #075f63;
+  /* Witness Brand Book v1.0 primitives (docs/brand/). Reference only — components
+     consume the semantic roles below, not these directly. Kept as literal hex
+     rather than var() indirection because the palette-contrast test in
+     test/foundation.test.tsx reads --color-* values with a `#rrggbb` regex. */
+  --witness-ink: #1b1917;
+  --witness-graphite: #46423d;
+  --witness-ash: #8a857d;
+  --witness-mist: #dcd6cc;
+  --witness-bone: #f5f2ed;
+  --witness-gesso: #fffdf9;
+  --witness-ember: #c1481d;
+  --witness-blush: #e3b4a2;
+  --witness-ochre: #f1cd8e;
 
-  /* System-first editorial typography. */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-editorial: ui-serif, Georgia, Cambria, "Times New Roman", serif;
-  --font-size-display: clamp(2.5rem, 7vw, 4.75rem);
-  --font-size-h2: clamp(2rem, 4vw, 3.25rem);
+  /* Semantic UI roles, mapped to the primitives above. */
+  --color-ink: #1b1917; /* witness-ink: primary text */
+  --color-muted: #46423d; /* witness-graphite: secondary/muted text (Ash fails AA for text) */
+  --color-quiet: #8a857d; /* witness-ash: decorative/non-text use only, ~3.3:1 on paper */
+  --color-paper: #f5f2ed; /* witness-bone: dominant ground */
+  --color-surface: #fffdf9; /* witness-gesso: panels — never pure #fff */
+  --color-surface-subtle: #f5f2ed; /* witness-bone, nested inside a gesso panel */
+  --color-border: #dcd6cc; /* witness-mist: hairlines/dividers */
+  --color-primary: #1b1917; /* witness-ink: primary action is Ink, not Ember */
+  --color-primary-hover: #46423d; /* witness-graphite */
+  --color-primary-ink: #f5f2ed; /* witness-bone: text on Ink, never pure #fff */
+  --color-accent: #46423d; /* witness-graphite: restrained labels — not the 2% Ember accent */
+  --color-accent-soft: #e3b4a2; /* witness-blush: passive/supporting highlight (e.g. evidence) */
+  --color-attention: #c1481d; /* witness-ember: live/unresolved/needs-attention ONLY */
+  --color-data: #f1cd8e; /* witness-ochre: rare — data series/painted imagery only */
+  --color-focus: #1b1917; /* witness-ink */
+
+  /* Newsreader (display), IBM Plex Sans (interface/body), IBM Plex Mono
+     (evidence/metadata only). Self-hosted via next/font/local, src/lib/fonts.ts —
+     see Brand Book 06. Fallback stacks only cover a font-load failure. */
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-editorial: var(--font-newsreader), ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "IBM Plex Mono", "SFMono-Regular", Consolas,
+    monospace;
+  --font-size-display: clamp(2.5rem, 7vw, 4rem);
+  --font-size-h2: clamp(2rem, 4vw, 2.75rem);
   --font-size-h3: clamp(1.25rem, 2vw, 1.5rem);
   --font-size-body: 1rem;
   --font-size-small: 0.875rem;
@@ -44,8 +63,9 @@
   --space-16: 4rem;
   --space-24: 6rem;
 
+  /* Brand Book: maximum 4px radius. */
   --radius-small: 0.25rem;
-  --radius-medium: 0.5rem;
+  --radius-medium: 0.25rem;
   --content-wide: 75rem;
   --content-reading: 44rem;
 }
@@ -252,7 +272,6 @@ summary:focus-visible,
   padding: 1.25rem max(1rem, calc((100vw - 75rem) / 2));
   border-block: 1px solid var(--color-border);
   background: var(--color-surface);
-  box-shadow: 0 0.75rem 1.5rem rgb(23 42 47 / 12%);
 }
 .mobile-links {
   display: grid;
@@ -288,7 +307,7 @@ main {
 .working-verbs .feature-card h3 { margin-bottom: var(--space-3); }
 .audience-summary { color: var(--color-ink); font-weight: 700; }
 .trust-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.pacific-line { font-family: var(--font-editorial); font-size: var(--font-size-h3); font-weight: 600; }
+.pacific-line { font-family: var(--font-editorial); font-style: italic; font-size: clamp(1.375rem, 3vw, 1.625rem); font-weight: 400; letter-spacing: -0.01em; }
 .open-source-note { color: var(--color-muted); }
 .open-source-note a { color: var(--color-primary); font-weight: 700; text-decoration-thickness: 0.0625rem; text-underline-offset: var(--space-1); }
 .product-preview { display: grid; gap: var(--space-4); }
@@ -315,24 +334,32 @@ main {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+/* A record identifier ("Decision #08"), not a human-authored section label —
+   the one eyebrow use that is a machine fact, so it takes the evidence typeface. */
+.eyebrow-mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+}
 h1 {
   max-width: 18ch;
   margin: 0;
   font-family: var(--font-editorial);
   font-size: var(--font-size-display);
-  font-weight: 600;
+  font-weight: 400;
   line-height: var(--line-height-tight);
-  letter-spacing: -0.025em;
+  letter-spacing: -0.035em;
 }
 h2 {
   font-family: var(--font-editorial);
   font-size: var(--font-size-h2);
-  font-weight: 600;
+  font-weight: 400;
   line-height: var(--line-height-heading);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 h3 {
   font-size: var(--font-size-h3);
+  font-weight: 500;
   line-height: var(--line-height-heading);
 }
 .promise {
@@ -395,9 +422,9 @@ h3 {
 }
 .stat dd {
   margin: var(--space-1) 0 0;
-  font-family: var(--font-editorial);
+  font-family: var(--font-mono);
   font-size: var(--font-size-h2);
-  font-weight: 600;
+  font-weight: 500;
   line-height: var(--line-height-tight);
 }
 .cta-group {
@@ -458,9 +485,10 @@ h3 {
 }
 .provenance-kind {
   color: var(--color-muted);
+  font-family: var(--font-mono);
   font-size: var(--font-size-label);
-  font-weight: 750;
-  letter-spacing: 0.06em;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 .provenance-node small {

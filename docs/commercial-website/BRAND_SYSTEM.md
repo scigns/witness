@@ -1,8 +1,8 @@
 # Witness Commercial Website Brand System
 
 **Owner:** Brand, Product and Design
-**Status:** MKT-02E brand accessibility and responsive review verified
-**Last reviewed:** 2026-09-04
+**Status:** MKT-03L Brand Book reconciliation — `VERIFIED COMPLETE`
+**Last reviewed:** 2026-09-05
 
 ## Positioning
 
@@ -47,81 +47,96 @@ apps/marketing/public/brand/
 
 Only `witness-logo.png` currently exists. The marketing `WitnessLogo` component references the
 manifested canonical path and declares intrinsic dimensions to avoid layout shift. The PNG has an
-opaque white background; the shell therefore presents it on a deliberate white surface. A separate
-approved variant will be required before any future dark presentation is introduced.
+opaque white background baked into the raster; the shell presents it on the closest Brand Book
+token (Gesso `#FFFDF9`), which is a near-white the Brand Book permits, so the mismatch against the
+asset's true `#FFFFFF` is not visible. A transparent or Gesso-baked variant would remove this
+dependency; see MKT-03L's `BRAND ASSET REQUIRED` note below. A separate approved variant will be
+required before any future dark presentation is introduced.
 
 ## Colour system
 
-The marketing site uses one restrained, authoritative light presentation. Tokens live in
-`apps/marketing/src/app/globals.css`; components must use semantic tokens instead of page-specific
-hex values.
+**Reconciled to the Brand Book (MKT-03L, 2026-09-05).** The marketing site previously used an
+independently-designed ocean-green/warm-paper palette. Tokens live in
+`apps/marketing/src/app/globals.css` as two layers: the nine `--witness-*` Brand Book primitives
+(§05), and semantic `--color-*` roles that components consume, mapped onto those primitives.
 
-| Token | Value | Use |
-| --- | --- | --- |
-| `--color-ink` | `#172a2f` | Primary text and high-authority detail |
-| `--color-muted` | `#53666a` | Secondary copy |
-| `--color-paper` | `#f7f4ec` | Warm page background |
-| `--color-surface` | `#ffffff` | Header, footer, cards and logo-safe surfaces |
-| `--color-surface-subtle` | `#eef1ec` | Quiet grouped content |
-| `--color-border` | `#c8cfca` | Structural dividers and control edges |
-| `--color-primary` | `#075f63` | Primary actions, links and focus |
-| `--color-primary-hover` | `#064c50` | Primary hover/active emphasis |
-| `--color-primary-ink` | `#ffffff` | Text on primary |
-| `--color-accent` | `#754d08` | Evidence labels and restrained emphasis |
-| `--color-accent-soft` | `#f1e3c5` | Evidence-emphasis backgrounds |
-| `--color-success` | `#23643b` | Explicitly labelled positive state |
-| `--color-warning` | `#915d00` | Explicitly labelled caution state |
-| `--color-danger` | `#a33636` | Explicitly labelled destructive/error state |
+| Token | Value | Brand Book primitive | Use |
+| --- | --- | --- | --- |
+| `--color-ink` | `#1b1917` | Ink | Primary text |
+| `--color-muted` | `#46423d` | Graphite | Secondary/muted text |
+| `--color-quiet` | `#8a857d` | Ash | Decorative only — see contrast note below |
+| `--color-paper` | `#f5f2ed` | Bone | Dominant page ground |
+| `--color-surface` | `#fffdf9` | Gesso | Panels, header, footer, cards |
+| `--color-surface-subtle` | `#f5f2ed` | Bone | Quiet grouped content nested in a Gesso panel |
+| `--color-border` | `#dcd6cc` | Mist | Hairlines/dividers |
+| `--color-primary` | `#1b1917` | Ink | Primary actions, links, focus — not Ember |
+| `--color-primary-hover` | `#46423d` | Graphite | Primary hover/active emphasis |
+| `--color-primary-ink` | `#f5f2ed` | Bone | Text on primary (never pure white) |
+| `--color-accent` | `#46423d` | Graphite | Eyebrow/field labels — restrained, not the 2% accent |
+| `--color-accent-soft` | `#e3b4a2` | Blush | Passive/supporting highlight (e.g. evidence) |
+| `--color-attention` | `#c1481d` | Ember | Live/unresolved/needs-attention **only** — ~2% of a page |
+| `--color-data` | `#f1cd8e` | Ochre | Rare — data series/painted imagery only |
 
-Status colours never carry meaning alone. Pair them with a label, icon, border or other semantic
-cue. Borders may be intentionally low contrast when they are decorative; interactive control
-boundaries require additional shape, text and focus treatment.
+`--color-success`/`--color-warning`/`--color-danger` were removed: they were defined but never
+consumed anywhere in the marketing app, and the Brand Book has no red/green status-pair concept.
+`--color-attention` (Ember) is defined for a genuine future live/unresolved state; nothing on the
+current static homepage represents one, so it is intentionally unused rather than forced onto
+content that isn't actually live — see the MKT-03L audit below.
 
 ## Verified contrast
 
-Ratios were calculated using the WCAG relative-luminance formula and are enforced for the core text
-pairs in the marketing test suite.
+Ratios use the WCAG relative-luminance formula and are enforced for the core text pairs in the
+marketing test suite (`test/foundation.test.tsx`).
 
 | Pair | Ratio | Result |
 | --- | ---: | --- |
-| Ink on paper | 13.56:1 | AAA |
-| Muted on paper | 5.50:1 | AA |
-| Ink on surface | 14.91:1 | AAA |
-| Muted on surface | 6.04:1 | AA |
-| White on primary | 7.43:1 | AAA |
-| White on primary hover | 9.73:1 | AAA |
-| Primary on paper | 6.76:1 | AA |
-| Accent on paper | 6.77:1 | AA |
+| Ink on paper | 15.70:1 | AAA |
+| Graphite (muted/accent) on paper | 8.93:1 | AAA |
+| Ink on surface (Gesso) | 17.25:1 | AAA |
+| Graphite on surface (Gesso) | 9.81:1 | AAA |
+| Bone (primary-ink) on primary (Ink) | 15.70:1 | AAA |
+| Bone on primary-hover (Graphite) | 8.93:1 | AAA |
+| Graphite on accent-soft (Blush) | 5.37:1 | AA |
 
-The focus ring uses primary against white or paper (7.43:1 and 6.76:1). Header and footer use the
-white surface so the approved logo's opaque white rectangle reads as a deliberate part of the shell.
+**Guardrail:** Ember on Bone is 4.46:1 — just under the 4.5:1 AA threshold for normal text. Ash on
+Bone is 3.28:1, well under it. Neither is used as a text colour on Bone in this implementation;
+Ember is reserved for non-text/large-scale attention use and Ash for decorative use only. Do not
+introduce Ember or Ash as small body/label text on a Bone background without re-verifying contrast.
 
 ## Typography
 
-No external font or tracking request is introduced. Body, navigation, labels and controls use the
-native system sans stack. Display and H1/H2 text use the native editorial serif stack (Georgia and
-platform equivalents) to add institutional warmth without a font download.
+**Reconciled to the Brand Book (MKT-03L).** Newsreader (display), IBM Plex Sans
+(interface/body/navigation/buttons) and IBM Plex Mono (evidence/metadata only) are self-hosted via
+`next/font/local` — see `apps/marketing/src/lib/fonts.ts` and `apps/marketing/src/fonts/README.md`
+for source, license (SIL OFL 1.1) and the reasoning for self-hosting instead of a font CDN. No
+runtime request leaves the deployment for these assets.
 
 | Role | Definition |
 | --- | --- |
-| Display / H1 | Editorial serif, 600, `clamp(2.5rem, 7vw, 4.75rem)`, 1.08 line height |
-| H2 | Editorial serif, 600, `clamp(2rem, 4vw, 3.25rem)`, 1.2 line height |
-| H3 | System sans, `clamp(1.25rem, 2vw, 1.5rem)`, 1.2 line height |
-| Body | System sans, 1rem, 1.65 line height |
-| Small | System sans, 0.875rem |
-| Label / eyebrow | System sans, 0.8125rem, tracked uppercase, 750 |
-| Navigation | System sans, 0.9375rem, 650 |
-| Button | System sans, 0.9375rem, 750 |
+| Display / H1 | Newsreader, 400, `clamp(2.5rem, 7vw, 4rem)`, tracking -3.5%, 1.08 line height |
+| H2 | Newsreader, 400, `clamp(2rem, 4vw, 2.75rem)`, tracking -2.5%, 1.2 line height |
+| Pull-quote (`.pacific-line`) | Newsreader italic, 400, ~26px, tracking -1% |
+| H3 / subhead | IBM Plex Sans, 500, `clamp(1.25rem, 2vw, 1.5rem)`, 1.2 line height |
+| Body | IBM Plex Sans, 400, 1rem, 1.65 line height |
+| Small | IBM Plex Sans, 0.875rem |
+| Label / eyebrow (human-authored) | IBM Plex Sans, 0.8125rem, tracked uppercase, 750 |
+| Record ID / field label / metric (`.eyebrow-mono`, `.provenance-kind`, `Stat` value) | IBM Plex Mono, 500, tracked uppercase |
+| Navigation | IBM Plex Sans, 0.9375rem, 650 |
+| Button | IBM Plex Sans, 0.9375rem, 750 |
 
-Keep body copy near the `44rem` reading-width token. Headings are editorial rather than excessively
-heavy; uppercase is reserved for short labels.
+Mono is reserved for machine-generated facts — record identifiers ("Decision #08"), diagram field
+labels ("EVIDENCE", "DECISION") and metric values (186, 54, 18...) — never for human-authored prose
+or section eyebrows. Keep body copy near the `44rem` reading-width token.
 
 ## Spacing and layout
 
 The spacing rhythm is based on 4 pixels: `--space-1` (4), `--space-2` (8), `--space-3` (12),
 `--space-4` (16), `--space-6` (24), `--space-8` (32), `--space-12` (48), `--space-16` (64), and
 `--space-24` (96). Prefer these tokens and responsive interpolation between adjacent steps. The wide
-container is `75rem`; the reading measure is `44rem`.
+container is `75rem`; the reading measure is `44rem`. `--radius-small` and `--radius-medium` are
+both `0.25rem` (4px) — the Brand Book's stated maximum; `--radius-medium` was previously `0.5rem`
+(8px) and has been reduced. The one prior box-shadow (mobile navigation panel) was removed in
+favour of its existing hairline Mist border, per "no card shadows."
 
 ## Dark-mode decision
 
@@ -137,14 +152,17 @@ commercial primitives: `Button`, `LinkButton`, `Card`, `Eyebrow`, `SectionHeadin
 `Section`, `Callout`, `Badge`, `FeatureCard`, `Stat`, and `CTAGroup`. They accept ordinary native
 attributes and content; they do not require a client boundary or runtime package.
 
-- Primary actions use ocean green with white text for conversion actions.
-- Secondary actions use a visible primary-colour border for exploration.
+- Primary actions use Ink with Bone text for conversion actions — not Ember, per the Brand Book.
+- Secondary actions use a visible primary-colour (Ink) border for exploration.
 - Tertiary actions remain underlined so they are identifiable without colour.
 - All actions expose hover, focus-visible, active, and disabled/`aria-disabled` treatments.
 - Buttons retain a minimum 44-pixel height; CTA groups wrap and become full-width on narrow screens.
-- Cards use a structural border and white surface, without floating elevation.
-- Callouts use both an ochre edge and a warm background; badges use text, shape and border.
-- `Stat` produces description-list terms and values when placed inside a `dl`.
+- Cards use a structural Mist border and Gesso surface, without floating elevation, at the Brand
+  Book's 4px maximum radius.
+- Callouts use a Graphite edge and a Blush background (passive support, not an Ember alert); badges
+  use text, shape and border.
+- `Stat` produces description-list terms and values when placed inside a `dl`; the value renders in
+  Mono as a machine-generated metric.
 
 Use these primitives before introducing page-specific class combinations. Card content and status
 meaning must remain explicit in text; do not use colour alone.
@@ -156,9 +174,10 @@ The signature system is implemented in `components/provenance.tsx` as `Provenanc
 `EvidenceRelationshipDiagram`. It uses semantic HTML and CSS only: no graph library, client runtime,
 canvas or animation.
 
-Nodes always print their kind and label. Dashed borders distinguish sources/contributions, an ochre
-edge plus warm fill identifies evidence, and stronger ocean borders identify decisions/actions/
-outcomes. Connectors include visually hidden relationship text. Linear chains retain their order on
+Nodes always print their kind and label — in Mono, as a diagram field label. Dashed borders
+distinguish sources/contributions, a Graphite edge plus Blush fill identifies evidence (passive
+support, not an Ember alert), and stronger Ink borders identify decisions/actions/outcomes.
+Connectors include visually hidden relationship text. Linear chains retain their order on
 small screens; branching sources stack before the resulting evidence chain. Each complete diagram
 requires a concise accessible label and description.
 
@@ -177,6 +196,33 @@ colours, fonts, logo treatment or animation were added.
 MKT-03C through MKT-03F retain this system for the synthetic product preview, audience cards, trust
 pillars, open-infrastructure statement and final CTA. Product relationships remain the primary visual
 idea; no dashboard chart language, third-party chart library or new brand exception was introduced.
+
+## MKT-03L — Brand Book reconciliation audit (2026-09-05)
+
+Audit of `apps/marketing` against `docs/brand/Witness Brand Book.pdf` v1.0, before the fixes this
+milestone applied. `AFTER` reflects this milestone's implementation.
+
+| Area | Before | After | Notes |
+| --- | --- | --- | --- |
+| Colour palette | CONFLICT | COMPLIANT | Independent ocean-green/warm-paper system replaced with the nine Brand Book primitives and a semantic role mapping. |
+| Typography | CONFLICT | COMPLIANT | System sans + Georgia serif replaced with self-hosted Newsreader/IBM Plex Sans/IBM Plex Mono. |
+| Logo | PARTIAL | PARTIAL | Artwork itself was already unaltered/human-approved (COMPLIANT); its opaque-white background sits on Gesso rather than a matching asset — see `BRAND ASSET REQUIRED` below. |
+| Buttons/CTA | CONFLICT | COMPLIANT | Primary action moved from ocean-green to Ink/Bone; Ember not used as a default action colour anywhere. |
+| Ember usage | N/A | COMPLIANT | `--color-attention` (Ember) is defined but deliberately unused — nothing on the static homepage is a genuine live/unresolved state, and inventing one would overclaim. |
+| Cards/radius/shadow | CONFLICT | COMPLIANT | Radius capped at 4px (was 8px); the one box-shadow (mobile nav panel) removed in favour of its existing hairline border. |
+| Provenance diagrams | CONFLICT (colour) / COMPLIANT (structure) | COMPLIANT | Structure was already semantic HTML/CSS with no canvas/client runtime, matching "hairline diagrams." Colour and field-label typography (now Mono) reconciled. |
+| Product preview | CONFLICT (colour/type) / COMPLIANT (structure) | COMPLIANT | Already list-first (time/actor/state-shaped); metric values and record IDs now render in Mono as machine facts. |
+| Homepage copy/voice | PARTIAL | COMPLIANT | Voice was already plain/factual; added the Brand Book's positioning line ("the evidence layer for work that has to be provable") into the hero, and an "Evidence governance" eyebrow, without discarding the existing approved sentence. |
+| Imagery | NOT APPLICABLE | NOT APPLICABLE | The homepage uses no imagery today (text and CSS/HTML diagrams only), so there is nothing to violate. The Brand Book's three painted-evidence canvases are not present in the repository. |
+| Sign-in / application surfaces | OUT OF SCOPE | OUT OF SCOPE | `apps/web` (the authenticated product) has its own, separate design-token system, not touched here. Reconciling it is auth-adjacent UI work and belongs in its own reviewed change, not bundled into this marketing-only milestone. |
+
+### Brand asset required
+
+**YES.** The Brand Book's three painted-evidence canvases (Ash/primary, Blush/secondary,
+Ember/punctuation — Brand Book §07) are not present anywhere in the repository, and the approved
+logo PNG has an opaque `#FFFFFF` background baked into the raster rather than a transparent or
+Gesso-matched one. Neither was fabricated to fill the gap; the homepage continues to use no imagery
+rather than substitute stock or generated art, consistent with the Brand Book's imagery guardrails.
 
 ## MKT-02 requirements
 

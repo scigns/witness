@@ -36,7 +36,7 @@ export function ProductPreview() {
       <div className="product-preview-detail">
         <Card>
           <div className="preview-record-heading">
-            <p className="eyebrow">Decision #08</p>
+            <p className="eyebrow eyebrow-mono">Decision #08</p>
             <Badge>Approved</Badge>
           </div>
           <h3>Adopt revised complaints process</h3>
@@ -48,7 +48,7 @@ export function ProductPreview() {
           </ul>
         </Card>
         <Card>
-          <p className="eyebrow">Action #21</p>
+          <p className="eyebrow eyebrow-mono">Action #21</p>
           <h3>Implement revised service process</h3>
           <p className="preview-muted">Linked to Decision #08</p>
         </Card>
