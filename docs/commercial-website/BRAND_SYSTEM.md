@@ -4,6 +4,12 @@
 **Status:** MKT-03L Brand Book reconciliation — `VERIFIED COMPLETE`
 **Last reviewed:** 2026-09-05
 
+**Canonical authority:** [`docs/brand/Witness Brand Book.pdf`](../brand/Witness%20Brand%20Book.pdf)
+(companion: [`docs/brand/BRAND_BOOK.md`](../brand/BRAND_BOOK.md)). This document records this
+programme's implementation status against that Brand Book; where they conflict, the Brand Book wins
+per [`docs/brand/README.md`](../brand/README.md)'s precedence rule. See MKT-03L for the reconciliation
+audit.
+
 ## Positioning
 
 Witness should feel institutional, human, globally credible and technically rigorous. It should not

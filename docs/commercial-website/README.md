@@ -18,6 +18,10 @@ record. The broader positioning remains **institutional memory with provenance b
 ## Source-of-truth hierarchy
 
 - The repository and verified production observations describe current implementation.
+- [`docs/brand/Witness Brand Book.pdf`](../brand/Witness%20Brand%20Book.pdf) (companion:
+  [`docs/brand/BRAND_BOOK.md`](../brand/BRAND_BOOK.md)) is the canonical visual and voice authority
+  for this website, the product UI, sign-in/onboarding and all transactional email. `BRAND_SYSTEM.md`
+  in this directory records this programme's implementation status against it, not a competing system.
 - This directory describes commercial-website programme state and direction.
 - [`VISION.md`](../../VISION.md) remains the canonical product definition.
 - Accepted architecture decisions remain authoritative for product and deployment constraints.

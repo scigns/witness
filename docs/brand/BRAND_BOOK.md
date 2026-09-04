@@ -1,24 +1,31 @@
 # Witness Brand Book
 
-**Version:** 1.0  
-**Year:** 2026  
+**Owner:** Brand, Product and Design
+**Status:** Canonical — companion to `docs/brand/Witness Brand Book.pdf`
+**Version:** 1.0
+**Year:** 2026
 **Website:** buildwithwitness.com
 
 > The record that holds up - identity, language, and craft for an evidence layer.
 
-This Markdown companion makes the Brand Book searchable in the repository. The designed PDF remains the visual authority for layout, logo examples, imagery treatment and composition.
+This Markdown companion makes the Brand Book searchable in the repository. The designed PDF
+remains the visual authority for layout, logo examples, imagery treatment and composition.
 
 ## How to use this book
 
-Witness exists to make work provable. The brand should be as disciplined as the product: a quiet, warm, evidentiary voice, one accent of heat, and painted imagery used sparingly - never decoration for its own sake.
+Witness exists to make work provable. The brand should be as disciplined as the product: a
+quiet, warm, evidentiary voice, one accent of heat, and painted imagery used sparingly - never
+decoration for its own sake.
 
 ## 01 - Positioning: What Witness is
 
-Witness is the evidence layer for work that has to be provable. It watches the work as it happens, captures what actually occurred, and keeps an unbroken record anyone can stand behind.
+Witness is the evidence layer for work that has to be provable. It watches the work as it
+happens, captures what actually occurred, and keeps an unbroken record anyone can stand behind.
 
 ### The job
 
-Turn scattered activity - captures, runs, sign-offs, field reports - into one account of record that survives scrutiny.
+Turn scattered activity - captures, runs, sign-offs, field reports - into one account of record
+that survives scrutiny.
 
 ### What it replaces
 
@@ -26,7 +33,8 @@ Screenshot folders, spreadsheet trackers, and the sentence "trust me, it happene
 
 ### Who it's for
 
-The operator who does the work, the engineer who instruments it, and the risk or compliance reader who has to accept it.
+The operator who does the work, the engineer who instruments it, and the risk or compliance
+reader who has to accept it.
 
 ### The promise
 
@@ -38,22 +46,33 @@ Nothing gets lost, nothing gets embellished. If Witness says it happened, it hap
 
 ## 02 - Brand idea: Bearing witness is an act of care
 
-To witness something is to pay it attention - to stay present, notice honestly, and be able to say afterward what happened. That is a human posture before it is a technical one. Witness the product should feel the same way: attentive, unhurried, on your side. Rigor without coldness.
+To witness something is to pay it attention - to stay present, notice honestly, and be able to
+say afterward what happened. That is a human posture before it is a technical one. Witness the
+product should feel the same way: attentive, unhurried, on your side. Rigor without coldness.
 
-1. **Present, not surveilling.** We are on the side of the person doing the work. The record protects them first.
-2. **Plain over impressive.** Evidence loses force when it is dressed up. We state, we don't sell.
-3. **Nothing unaccounted for.** Gaps get named, not hidden. An honest "unknown" builds more trust than a confident guess.
-4. **Built to be read later.** Every artifact assumes a future stranger. Clarity now is kindness then.
+1. **Present, not surveilling.** We are on the side of the person doing the work. The record
+   protects them first.
+2. **Plain over impressive.** Evidence loses force when it is dressed up. We state, we don't
+   sell.
+3. **Nothing unaccounted for.** Gaps get named, not hidden. An honest "unknown" builds more
+   trust than a confident guess.
+4. **Built to be read later.** Every artifact assumes a future stranger. Clarity now is
+   kindness then.
 
 ## 03 - Voice: Warm, exact, unbothered
 
-Witness sounds like a steady colleague who has read the whole file. Short sentences. Concrete nouns. No hedging, no hype, no jargon smuggled in as authority.
+Witness sounds like a steady colleague who has read the whole file. Short sentences. Concrete
+nouns. No hedging, no hype, no jargon smuggled in as authority.
 
-- **Plain-spoken:** use the word the user would use. "Signed off," not "attested." If a term is unavoidable, define it once, in-line.
-- **Specific:** name the thing, the time, the actor. "Verified 14 of 16 steps at 4:02 PM" beats "verification complete."
-- **Calm under fault:** errors are information, not alarm. Say what broke, what it means, and the one next move.
+- **Plain-spoken:** use the word the user would use. "Signed off," not "attested." If a term is
+  unavoidable, define it once, in-line.
+- **Specific:** name the thing, the time, the actor. "Verified 14 of 16 steps at 4:02 PM" beats
+  "verification complete."
+- **Calm under fault:** errors are information, not alarm. Say what broke, what it means, and
+  the one next move.
 - **Credit the human:** the person did the work; Witness only recorded it. Write in that order.
-- **Never overclaim:** no "guaranteed," "bulletproof," or "100%." Our credibility is the product; don't spend it on adjectives.
+- **Never overclaim:** no "guaranteed," "bulletproof," or "100%." Our credibility is the
+  product; don't spend it on adjectives.
 
 ### Tonal range
 
@@ -75,27 +94,36 @@ Exclamation marks, emoji, "Oops!", courtroom metaphors, watchdog language.
 
 ### 40-word boilerplate
 
-Witness is the evidence layer for work that has to be provable. It records what happened as it happens, verifies it, and keeps one account of record your team, your auditors, and your customers can all read.
+Witness is the evidence layer for work that has to be provable. It records what happened as it
+happens, verifies it, and keeps one account of record your team, your auditors, and your
+customers can all read.
 
 ## 04 - Logo: The mark & its lockups
 
-The mark stays as it is: a broken ring with three circles pushed through it - three points of view meeting around one shared center. Protect it. The setting changes: room around it, one of three sizes, and Newsreader as the wordmark beside it.
+The mark stays as it is: a broken ring with three circles pushed through it - three points of
+view meeting around one shared center. Protect it. The setting changes: room around it, one of
+three sizes, and Newsreader as the wordmark beside it.
 
 - **Mark only:** app icon, favicon, avatar.
 - **Stacked:** covers, sign-in.
 - **Horizontal:** product chrome.
 - **With Ember dot:** live record only.
 - **Clear space:** one punched-circle diameter on all sides.
-- **Sizes:** 20px mark in app chrome, 30px stacked on nav, 58px+ on covers. Below 16px, mark only.
-- **Placement:** top-left in product, bottom-left on covers. Ring opening remains lower-right; never rotate.
+- **Sizes:** 20px mark in app chrome, 30px stacked on nav, 58px+ on covers. Below 16px, mark
+  only.
+- **Placement:** top-left in product, bottom-left on covers. Ring opening remains lower-right;
+  never rotate.
 
 ### Logo misuse
 
-Do not stretch, condense, skew, re-track, place over active brushwork, recolor, add shadow/glow/outline, or place in a lock-up box. Ink or Bone only. Never Ember except for the separate live-record dot.
+Do not stretch, condense, skew, re-track, place over active brushwork, recolor, add
+shadow/glow/outline, or place in a lock-up box. Ink or Bone only. Never Ember except for the
+separate live-record dot.
 
 ## 05 - Color: Ash, bone, and one ember
 
-The palette is a warm grayscale built from ash and gessoed bone, with a single fire orange reserved for what matters right now.
+The palette is a warm grayscale built from ash and gessoed bone, with a single fire orange
+reserved for what matters right now.
 
 | Token | Hex | Use |
 | --- | --- | --- |
@@ -111,11 +139,13 @@ The palette is a warm grayscale built from ash and gessoed bone, with a single f
 
 ### Ratio
 
-Roughly 90% neutral, 8% ink-on-dark inversion, 2% Ember. If more than one Ember element competes on a page, one is wrong.
+Roughly 90% neutral, 8% ink-on-dark inversion, 2% Ember. If more than one Ember element competes
+on a page, one is wrong.
 
 ### Color use
 
-Primary action is Ink, not Ember. Ember is for the thing that needs attention, not the default button color. Let Bone dominate. Use Ink-field inversion for moments of emphasis.
+Primary action is Ink, not Ember. Ember is for the thing that needs attention, not the default
+button color. Let Bone dominate. Use Ink-field inversion for moments of emphasis.
 
 Do not use red/green success-failure pairs, gradients, pure `#000` or pure `#FFF`.
 
@@ -143,27 +173,34 @@ Plex Sans carries tables, forms, navigation and body copy.
 
 Machine metadata, IDs, timestamps and labels. Field labels: 11/16, uppercase, +16% tracking.
 
-**Rule:** Mono is not decoration. It signals machine-generated fact. If a human wrote it, it is not mono.
+**Rule:** Mono is not decoration. It signals machine-generated fact. If a human wrote it, it is
+not mono.
 
 ### Setting and spacing
 
-Headings balance; body wraps pretty. Left-align everywhere. Never center body copy and never justify. Use an 8px base grid and 1px Mist hairlines instead of boxes and shadows.
+Headings balance; body wraps pretty. Left-align everywhere. Never center body copy and never
+justify. Use an 8px base grid and 1px Mist hairlines instead of boxes and shadows.
 
 ## 07 - Imagery: Painted evidence
 
-Three canvases carry the emotional register: figures standing together, made of marks. They represent the human side of the record - many small observations adding up to something recognisable. Use them at cover scale or not at all.
+Three canvases carry the emotional register: figures standing together, made of marks. They
+represent the human side of the record - many small observations adding up to something
+recognisable. Use them at cover scale or not at all.
 
 - **Ash - primary:** default for covers, sign-in and any hero. Cool, quiet, high Bone content.
 - **Blush - secondary:** people-facing moments such as onboarding, customer stories and hiring.
-- **Ember - punctuation:** rare; one high-energy moment per campaign, such as launches or keynotes.
+- **Ember - punctuation:** rare; one high-energy moment per campaign, such as launches or
+  keynotes.
 
 ### Crop & scale
 
-Crop into the paint until figures read as texture, not illustration. Full-bleed or nothing. No floating rounded thumbnails, drop shadows or paint inside cards.
+Crop into the paint until figures read as texture, not illustration. Full-bleed or nothing. No
+floating rounded thumbnails, drop shadows or paint inside cards.
 
 ### Type over paint
 
-Only over the quietest third of the canvas, or over a flat Ink scrim at 40-70%. Never tint the artwork or overlay a color wash.
+Only over the quietest third of the canvas, or over a flat Ink scrim at 40-70%. Never tint the
+artwork or overlay a color wash.
 
 ### Treatments, in order
 
@@ -196,7 +233,8 @@ Hairline rules, no card shadows, 4px radius maximum. Gesso panels on Bone ground
 
 ### Motion
 
-120-180ms, ease-out, opacity and 4px translate only. The live dot breathes at 2s. Nothing bounces.
+120-180ms, ease-out, opacity and 4px translate only. The live dot breathes at 2s. Nothing
+bounces.
 
 ### Density
 
@@ -228,6 +266,12 @@ Records are lists first. Show time, actor and state on every row before anything
 
 ## Application to Brevo and commercial communications
 
-The voice and visual rules above apply to Witness emails and templates sent through Brevo, including authentication, invitations, password recovery, onboarding, product notices, demonstrations, enquiries and future lifecycle/commercial campaigns.
+The voice and visual rules above apply to Witness emails and templates sent through Brevo,
+including authentication, invitations, password recovery, onboarding, product notices,
+demonstrations, enquiries and future lifecycle/commercial campaigns.
 
-Email-client reliability and accessibility take precedence over fragile visual tricks. Where Newsreader or IBM Plex cannot be reliably rendered, use a robust fallback while preserving hierarchy, spacing, color semantics and voice. Primary email CTAs should be Ink, not Ember. Ember is reserved for live/unresolved/attention states. Never use hype, emoji, exclamation marks or unsupported security/compliance claims.
+Email-client reliability and accessibility take precedence over fragile visual tricks. Where
+Newsreader or IBM Plex cannot be reliably rendered, use a robust fallback while preserving
+hierarchy, spacing, color semantics and voice. Primary email CTAs should be Ink, not Ember.
+Ember is reserved for live/unresolved/attention states. Never use hype, emoji, exclamation
+marks or unsupported security/compliance claims.
