@@ -211,6 +211,13 @@ RC1 is `witness-marketing:efba8b7` with local content-addressable image ID
 A registry digest cannot exist until an approved registry push occurs. Preview deployment must use
 this image or rebuild the same clean commit and record its immutable registry digest.
 
+### CW-033 — External verification never substitutes for privileged baseline evidence
+
+Public DNS, TLS, headers and OIDC discovery may close their specific gates, but they do not establish
+Cloudflare record/Tunnel IDs, server image IDs, effective Keycloak client values or authenticated
+flows. MKT-03J remains `NO-GO` until an authorised operator records those values and uses only an
+approved synthetic account and mailbox.
+
 ## Proposed
 
 ### CW-024 — Canonical public/app route contract

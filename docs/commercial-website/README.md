@@ -392,3 +392,12 @@ Remote preview provisioning remains blocked by absent Cloudflare/Tunnel credenti
 server access. Repository release readiness is 100%; remote marketing readiness is 25%; auth cutover
 readiness is 50%; production cutover readiness is 33.3%. Production apex changes: `NONE`; indexing:
 `OFF`; cutover: `NOT EXECUTED`.
+
+## MKT-03J external verification record
+
+MKT-03J is `VERIFIED COMPLETE` as an external verification and operator-handoff milestone. Public
+checks on 2026-09-04 confirmed active HTTPS for apex, app, API and identity, app-only credentialed API
+CORS, and the `witness` realm's public OIDC endpoints. `preview` and `www` remain unprovisioned.
+Privileged Cloudflare, server, Keycloak-admin and synthetic account/mailbox access was unavailable;
+therefore remote preview/browser QA, exact rollback identifiers and real auth flows remain human
+gates. Cutover recommendation: `NO-GO`; production changes: `NONE`; indexing: `OFF`.

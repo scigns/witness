@@ -89,3 +89,19 @@ Do not copy secrets or the full production environment into the change ticket.
 No Cloudflare/DigitalOcean credential variables were available in the local environment. Production
 SSH was not retried after the known public-key failure. Consequently no DNS, Tunnel, Worker or server
 identifier in the worksheet is inferred or fabricated.
+
+## MKT-03J public observation — 2026-09-04
+
+| Host | Public result | SSL | Privileged identifiers |
+| --- | --- | --- | --- |
+| `buildwithwitness.com` | Cloudflare-proxied HTTPS `200`; current product | ACTIVE | HUMAN ACTION REQUIRED |
+| `app.buildwithwitness.com` | Cloudflare-proxied HTTPS `200`; current product | ACTIVE | HUMAN ACTION REQUIRED |
+| `api.buildwithwitness.com` | HTTPS active; `/` `404`; app-only credentialed CORS | ACTIVE | HUMAN ACTION REQUIRED |
+| `id.buildwithwitness.com` | HTTPS `302` to admin; realm discovery valid | ACTIVE | HUMAN ACTION REQUIRED |
+| `preview.buildwithwitness.com` | DNS absent | NOT PROVISIONED | HUMAN ACTION REQUIRED |
+| `www.buildwithwitness.com` | DNS absent | NOT PROVISIONED | Not authorised |
+
+Access inventory: Cloudflare `NO`; DigitalOcean/production server `NO`; SSH `NO` (known key rejection,
+not retried); Keycloak admin `NO`; approved synthetic account `NO`; synthetic mailbox `NO`. The local
+`cloudflared` binary is not control-plane authorization. Exact apex rollback remains unavailable and
+the cutover recommendation is `NO-GO`.

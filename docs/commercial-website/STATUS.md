@@ -125,3 +125,11 @@ separation, indexability, conversion and trust surfaces do not yet exist.
   abuse and privacy risk.
 - Treating Cloudflare dashboard state or documentation as verified control evidence could lead to
   inaccurate trust claims.
+
+## MKT-03J status
+
+`VERIFIED COMPLETE` for verification/handoff; `CUTOVER STATUS: NOT EXECUTED`. Apex, app, API and
+identity HTTPS are active. Preview and `www` do not resolve. No usable Cloudflare, production-server,
+Keycloak-admin, synthetic-account or synthetic-mailbox access was present. Remote marketing readiness
+remains 25%, auth cutover readiness 50%, rollback readiness 25%, and overall production cutover
+readiness is 28.6% (6/21 gates). `CUTOVER RECOMMENDATION: NO-GO`.

@@ -127,3 +127,13 @@ WITNESS_MARKETING_SITE_URL=https://buildwithwitness.com
 WITNESS_MARKETING_ENV=production
 WITNESS_MARKETING_INDEXABLE=false
 ```
+
+## MKT-03J operator handoff
+
+The preview remains absent. An authorised operator must deploy the immutable RC1 (or an immutable
+registry build from source `efba8b7`) as `witness-marketing-preview` on the existing application
+network, with only the three documented preview variables, then add only
+`preview.buildwithwitness.com` to the existing Tunnel with service
+`http://witness-marketing-preview:3000`. Record the container/image/digest/network, DNS record ID,
+Tunnel/public-hostname IDs, SSL state and removal command. Do not edit apex, app, API, identity or
+`www`. Run the documented HTTPS probes and remote browser command only after DNS and TLS are active.

@@ -77,7 +77,10 @@ explicitly verified.
 20. Complete MKT-04 and the highest-value MKT-05 pages before expanding route count.
 21. **MKT-03I — mainline alignment, preview deployment and RC1 — `VERIFIED COMPLETE`.** Clean
     current-main release source and immutable local RC1 pass; remote preview remains human-gated.
-22. Build synthetic demo, conversion, packaging, trust, onboarding, content and analytics in milestone
+22. **MKT-03J — external preview, auth and production baseline verification — `VERIFIED COMPLETE`.**
+    Public endpoints were verified and exact privileged operator actions recorded; preview, effective
+    control-plane state and synthetic auth remain blocked, so the cutover recommendation is `NO-GO`.
+23. Build synthetic demo, conversion, packaging, trust, onboarding, content and analytics in milestone
    order, advancing partial existing capabilities only after their own acceptance checks.
 
 ## First small pull request

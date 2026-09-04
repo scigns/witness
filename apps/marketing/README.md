@@ -71,3 +71,6 @@ After an HTTPS preview exists, run the same suite remotely without starting a lo
 WITNESS_MARKETING_E2E_BASE_URL=https://preview.buildwithwitness.com \
   pnpm --filter @witness/marketing test:e2e
 ```
+
+MKT-03J confirmed that the preview hostname still has no DNS and therefore no remote suite was run.
+RC1 remains local-only and no production route or indexing setting changed.

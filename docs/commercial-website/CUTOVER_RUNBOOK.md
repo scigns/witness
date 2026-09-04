@@ -398,3 +398,57 @@ Readiness scores after MKT-03I:
 - Production cutover readiness: 5 of 15 gates `READY` (33.3%).
 
 Production apex changes: `NONE`. Indexing: `OFF`. Cutover status: `NOT EXECUTED`.
+
+### MKT-03J external gate matrix
+
+| # | Gate | Classification | Evidence / exact next action |
+| --- | --- | --- | --- |
+| 1 | Clean current-main source | READY | Clean release branch based on `a361a4f` |
+| 2 | Immutable RC1 | READY | `witness-marketing:efba8b7`, local image ID recorded |
+| 3 | Local RC1 QA | READY | Local HTTP and six-width browser QA passed |
+| 4 | Preview deployed | HUMAN ACTION REQUIRED | Deploy isolated RC1 container; record immutable digest |
+| 5 | Preview HTTPS | BLOCKED | Requires preview deployment, Tunnel hostname and DNS |
+| 6 | Remote browser QA | BLOCKED | Run remote suite only after HTTPS succeeds |
+| 7 | Preview SSL | BLOCKED | Confirm Universal SSL after proxied hostname exists |
+| 8 | Apex rollback baseline | HUMAN ACTION REQUIRED | Record exact DNS/Tunnel/Worker/origin IDs |
+| 9 | Production server baseline | HUMAN ACTION REQUIRED | Run the read-only commands in the baseline document |
+| 10 | App independent operation | HUMAN ACTION REQUIRED | Complete approved synthetic end-to-end browser test |
+| 11 | API CORS/CSRF | READY | Live CORS is app-only/credentialed; aligned source tests pass |
+| 12 | Effective Keycloak config | HUMAN ACTION REQUIRED | Export/read client values and compare exact values below |
+| 13 | Login | HUMAN ACTION REQUIRED | Synthetic account required |
+| 14 | Cookie scope | HUMAN ACTION REQUIRED | Inspect authenticated `witness_session` in browser |
+| 15 | Logout | HUMAN ACTION REQUIRED | Synthetic authenticated session required |
+| 16 | Password reset | HUMAN ACTION REQUIRED | Approved synthetic mailbox required |
+| 17 | Invitation | HUMAN ACTION REQUIRED | Synthetic organisation/user and mailbox required |
+| 18 | `www` DNS/rule readiness | READY | Exact design and rollback prepared; not executed |
+| 19 | `www` SSL readiness | BLOCKED | DNS absent; confirm certificate before rule activation |
+| 20 | Apex SSL | READY | Public HTTPS returned `200` through Cloudflare |
+| 21 | Final production approval | HUMAN ACTION REQUIRED | Separate MKT-03K approval not requested |
+
+Readiness: repository release 100%; remote marketing 25%; auth cutover 50%; rollback 25%; production
+cutover 6/21 (28.6%). `CUTOVER RECOMMENDATION: NO-GO`.
+
+#### Exact privileged handoff
+
+1. On the approved server, deploy `witness-marketing-preview` from an immutable registry digest built
+   from `efba8b7`, attach it to the existing Tunnel-reachable network, expose only container port 3000,
+   and verify its internal `/health`. Supply no database, API or Keycloak secrets.
+2. In Cloudflare Dashboard → `buildwithwitness.com` → Zero Trust → Networks → Tunnels → the existing
+   production Tunnel → Public Hostnames, add hostname `preview`, domain `buildwithwitness.com`, type
+   `HTTP`, URL `witness-marketing-preview:3000`. Confirm the generated proxied DNS record and Universal
+   SSL; record DNS record ID, Tunnel ID, public-hostname ID and origin service. Do not touch other hosts.
+3. In Cloudflare Dashboard → DNS → Records and Workers & Pages/Routes, record apex/app/API/id record
+   IDs, types, targets, proxy, TTL and Worker routes. In the Tunnel public-hostname view record Tunnel
+   ID and origin services. Capture the current apex restoration target verbatim.
+4. In Keycloak realm `witness` → Clients → `witness-api`, record Root/Home URL, exact redirect URI,
+   Web Origin and logout settings. Expected app URLs are `https://app.buildwithwitness.com/`, callback
+   `https://api.buildwithwitness.com/api/v1/auth/callback`, with no marketing Web Origin or wildcard.
+5. With an approved synthetic account/mailbox, execute login, cookie inspection, logout, reset and
+   invitation checks. Record outcomes only—never credentials or tokens.
+
+After preview TLS is active, verify `/`, `/health`, `/robots.txt` and `/sitemap.xml`, then run:
+
+```sh
+WITNESS_MARKETING_E2E_BASE_URL=https://preview.buildwithwitness.com \
+  pnpm --filter @witness/marketing test:e2e
+```
