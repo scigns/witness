@@ -7,6 +7,7 @@ Deployable, user-facing applications.
 
 | App | Purpose | Status |
 |---|---|---|
+| `marketing/` | Independent public commercial website | MKT-01A foundation verified; not deployed |
 | [`web/`](web/) | The main application — sessions, review queue, search, graph, provenance | Not started |
 | [`admin-console/`](admin-console/) | Tenant, consent, retention, model and user administration | Not started |
 | [`docs-site/`](docs-site/) | Documentation site, built from `docs/` and shipped in the offline bundle | Not started |

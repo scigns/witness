@@ -22,17 +22,31 @@ set -euo pipefail
 
 BUDGET_KB=200
 
-built=$(find apps -name '.next' -type d 2>/dev/null | head -1 || true)
-if [ -z "$built" ]; then
-  echo "No frontend build output yet — budget check skipped."
-  exit 0
+# Accept explicit application directories so a multi-app workspace never checks
+# whichever `.next` directory happens to be found first. With no arguments,
+# check the known frontend applications that have been built by the repository
+# build gate.
+if [ "$#" -gt 0 ]; then
+  app_dirs=("$@")
+else
+  app_dirs=(apps/web apps/marketing)
 fi
+
+checked=0
+
+for app_dir in "${app_dirs[@]}"; do
+  built="$app_dir/.next"
+  if [ ! -d "$built" ]; then
+    echo "No build output at $built — budget check skipped for $app_dir."
+    continue
+  fi
+  checked=$((checked + 1))
 
 manifest="$built/app-build-manifest.json"
 if [ ! -f "$manifest" ]; then
   echo "::warning::$manifest not found — cannot measure per-route initial JS."
   echo "Budget check skipped. This is a gap, not a pass."
-  exit 0
+  continue
 fi
 
 # Emits "<route> <gzipped-bytes>" per route.
@@ -67,7 +81,7 @@ PY
 worst_route=""
 worst_bytes=0
 
-echo "Gzipped initial JS per route:"
+echo "[$app_dir] Gzipped initial JS per route:"
 while read -r route bytes; do
   [ -z "$route" ] && continue
   printf '  %-32s %s KB\n' "$route" "$((bytes / 1024))"
@@ -79,10 +93,10 @@ done <<< "$report"
 
 kb=$((worst_bytes / 1024))
 echo
-echo "Worst route: ${worst_route} — ${kb} KB gzipped / ${BUDGET_KB} KB budget"
+echo "[$app_dir] Worst route: ${worst_route} — ${kb} KB gzipped / ${BUDGET_KB} KB budget"
 
 if [ "$kb" -gt "$BUDGET_KB" ]; then
-  echo "::error::Bundle budget exceeded on ${worst_route}. See ADR-0020."
+  echo "::error::Bundle budget exceeded for ${app_dir} on ${worst_route}. See ADR-0020."
   echo
   echo "Do not raise the budget. It exists for users on intermittent, metered"
   echo "connections — principle P8. Reduce the route's payload instead:"
@@ -93,3 +107,8 @@ if [ "$kb" -gt "$BUDGET_KB" ]; then
 fi
 
 echo "Within budget."
+done
+
+if [ "$checked" -eq 0 ]; then
+  echo "No frontend build output yet — budget check skipped."
+fi
