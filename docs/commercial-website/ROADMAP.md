@@ -23,6 +23,7 @@ explicitly verified.
 | MKT-03G Domain and Launch Readiness | `VERIFIED COMPLETE` | Runbook and 11.1% production dry run prepared; cutover is not ready/executed and human gates remain |
 | MKT-03H Preview, Auth and Cutover Gate Closure | `VERIFIED COMPLETE` | Repository readiness 90%; production readiness 30%; remote preview and human production checks remain |
 | MKT-03I Mainline Alignment, Preview Deployment & RC1 | `VERIFIED COMPLETE` | Current-main clean source and immutable RC1 verified; remote preview blocked; production readiness 33.3% |
+| MKT-03L Brand Book Reconciliation | `VERIFIED COMPLETE` | Palette/typography/radius reconciled to the Brand Book; independent of the cutover track — no production/routing change |
 | MKT-04 Platform & How It Works | `NOT STARTED` | No routes |
 | MKT-05 Solutions | `NOT STARTED` | Sector material exists as non-canonical context; no routes |
 | MKT-06 Synthetic Demo | `NOT STARTED` | Product has synthetic development data, but no unauthenticated guided demo |

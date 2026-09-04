@@ -84,11 +84,11 @@ export default function MarketingHomepage() {
   return (
     <div className="homepage">
       <Section id="hero" className="home-hero">
-        <Eyebrow>Witness</Eyebrow>
+        <Eyebrow>Evidence governance</Eyebrow>
         <h1>Make important decisions traceable.</h1>
         <p className="hero-lede">
-          Witness connects evidence, consultation, decisions and actions into an accountable
-          institutional record.
+          Witness is the evidence layer for work that has to be provable. It connects evidence,
+          consultation, decisions and actions into an accountable institutional record.
         </p>
         <CTAGroup aria-label="Homepage actions">
           <LinkButton href={demoUrl.href}>Book a demonstration</LinkButton>

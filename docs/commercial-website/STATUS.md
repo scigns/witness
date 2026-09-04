@@ -59,6 +59,10 @@ separation, indexability, conversion and trust surfaces do not yet exist.
   rollback worksheet, local production/noindex candidate and updated dry run — `VERIFIED COMPLETE`.
 - MKT-03I current-main alignment, clean release source, full workspace/security verification,
   immutable container RC1 and local RC1 smoke/browser QA — `VERIFIED COMPLETE`.
+- MKT-03L Brand Book reconciliation: canonical palette/typography/radius replace the prior
+  independent design system, self-hosted Newsreader/IBM Plex fonts, homepage positioning line, full
+  test/lint/typecheck/build/bundle-budget/six-width browser QA — `VERIFIED COMPLETE`. See
+  `docs/commercial-website/BRAND_SYSTEM.md`'s MKT-03L section for the area-by-area audit.
 
 ## In progress
 
