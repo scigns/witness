@@ -1,0 +1,27 @@
+{
+  "name": "@witness/marketing",
+  "version": "0.1.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "description": "Independent public commercial website for Witness.",
+  "scripts": {
+    "build": "NODE_ENV=production next build",
+    "dev": "next dev -p ${WITNESS_MARKETING_PORT:-3002}",
+    "start": "NODE_ENV=production next start -p ${WITNESS_MARKETING_PORT:-3002}",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "node e2e/brand-review.mjs",
+    "lint": "eslint src test",
+    "clean": "rm -rf .next coverage *.tsbuildinfo"
+  },
+  "dependencies": {
+    "next": "^15.5.24",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.2.5",
+    "vitest": "^2.1.8"
+  }
+}
