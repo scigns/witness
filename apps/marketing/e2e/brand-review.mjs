@@ -35,7 +35,8 @@ function startServer() {
 async function assertPage(page, width, path) {
   await page.setViewportSize({ width, height: 900 });
   const response = await page.goto(`${baseURL}${path}`, { waitUntil: 'domcontentloaded' });
-  if (!response || !response.ok()) throw new Error(`${path} returned HTTP ${response?.status() ?? 'unknown'}`);
+  if (!response || !response.ok())
+    throw new Error(`${path} returned HTTP ${response?.status() ?? 'unknown'}`);
 
   const state = await page.evaluate(() => {
     const logo = document.querySelector('.brand-logo');
@@ -57,7 +58,9 @@ async function assertPage(page, width, path) {
   });
 
   if (state.pageWidth > state.viewportWidth) {
-    throw new Error(`${path} overflows at ${width}px (${state.pageWidth} > ${state.viewportWidth})`);
+    throw new Error(
+      `${path} overflows at ${width}px (${state.pageWidth} > ${state.viewportWidth})`,
+    );
   }
   if (!state.header || !state.main || !state.footer || state.headings !== 1) {
     throw new Error(`${path} landmark or heading contract failed at ${width}px`);
@@ -74,7 +77,8 @@ async function assertPage(page, width, path) {
 
   const isMobile = width < 992;
   if (isMobile && state.mobileNav !== 'block') throw new Error(`Mobile menu missing at ${width}px`);
-  if (!isMobile && state.desktopNav === 'none') throw new Error(`Desktop nav missing at ${width}px`);
+  if (!isMobile && state.desktopNav === 'none')
+    throw new Error(`Desktop nav missing at ${width}px`);
 
   if (isMobile) await page.locator('.mobile-navigation summary').click();
 
@@ -93,10 +97,13 @@ async function assertKeyboard(page) {
     throw new Error('First keyboard stop is not the skip link');
   }
   for (let index = 0; index < 12; index += 1) {
-    if (await page.locator('header .logo-link').evaluate((node) => node === document.activeElement)) break;
+    if (await page.locator('header .logo-link').evaluate((node) => node === document.activeElement))
+      break;
     await page.keyboard.press('Tab');
   }
-  if (!(await page.locator('header .logo-link').evaluate((node) => node === document.activeElement))) {
+  if (
+    !(await page.locator('header .logo-link').evaluate((node) => node === document.activeElement))
+  ) {
     throw new Error('Logo home link is not in keyboard order');
   }
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -136,7 +143,9 @@ try {
     await page.screenshot({ path: `${artifacts}/brand-${width}.png`, fullPage: true });
   }
   await assertKeyboard(page);
-  console.log(`Marketing browser review passed at ${viewports.join(', ')}px; screenshots: ${artifacts}`);
+  console.log(
+    `Marketing browser review passed at ${viewports.join(', ')}px; screenshots: ${artifacts}`,
+  );
 } catch (error) {
   console.error(error instanceof Error ? error.stack : error);
   process.exitCode = 1;
