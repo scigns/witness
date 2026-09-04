@@ -1,0 +1,52 @@
+<!-- Subject: {{ params.gapSubjectLine }} (e.g. "2 steps missing evidence in Acme Council") -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Witness</title>
+<style>
+  body, table, td { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+  body { margin: 0; padding: 0; background-color: #f5f2ed; }
+  .witness-body p { margin: 0 0 16px; color: #46423d; font-family: Georgia, 'Times New Roman', serif; font-size: 16px; line-height: 1.6; }
+  .witness-body p:last-child { margin-bottom: 0; }
+  .witness-body a { display: inline-block; padding: 12px 20px; background-color: #1b1917; color: #f5f2ed; font-weight: 600; text-decoration: none; border-radius: 4px; }
+  .witness-body p.witness-meta { font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace; font-size: 13px; color: #46423d; letter-spacing: 0.02em; }
+</style>
+</head>
+<body>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f2ed;">
+  <tr>
+    <td align="center" style="padding: 40px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+        <tr>
+          <td style="padding: 0 8px 24px;">
+            <span style="font-family: Georgia, 'Times New Roman', serif; font-size: 22px; font-weight: 400; letter-spacing: -0.01em; color: #1b1917;">Witness</span>
+          </td>
+        </tr>
+        <tr>
+          <td class="witness-body" style="background-color:#fffdf9; border:1px solid #dcd6cc; border-radius:4px; padding: 32px;">
+            <!-- Brand Book §03 "Gap found" example, used verbatim. gapClause is the
+                 whole subject+verb phrase, pre-composed by the caller ("Two steps
+                 have" / "One step has") — resist the urge to split this into a count
+                 plus a hardcoded "steps have" here; that breaks the singular case.
+                 Name the gap, don't hide it — no "compliance violation" framing. -->
+            <p>{{ params.gapClause }} no evidence attached. Add it now, or mark why it's missing.</p>
+            <p><a href="{{ params.link }}">Review gaps</a></p>
+            <p class="witness-meta">{{ params.organisationName }} &middot; As of {{ params.asOfDate }}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 24px 8px 0;">
+            <p style="margin:0; font-family: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif; font-size: 13px; line-height: 1.6; color: #8a857d;">
+              Witness is the evidence layer for work that has to be provable.<br>
+              This is a transactional message about your organisation's records.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

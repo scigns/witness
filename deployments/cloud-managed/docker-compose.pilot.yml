@@ -83,6 +83,13 @@ services:
       WITNESS_REALM_SEED_PASSWORD: ${WITNESS_REALM_SEED_PASSWORD:?WITNESS_REALM_SEED_PASSWORD must be set}
     volumes:
       - ../../infrastructure/docker/init/keycloak:/opt/keycloak/data/import:ro
+      # Brand Book email theme (docs/brand/EMAIL_SYSTEM.md); selected by the
+      # realm import's "emailTheme": "witness". On an already-bootstrapped
+      # realm this mount alone has no effect — importing does not overwrite an
+      # initialised realm, matching every other realm-setting change in this
+      # file — so production requires the same approved Keycloak admin action
+      # (set the realm's Email Theme to "witness") documented there.
+      - ../../infrastructure/docker/keycloak-theme/witness:/opt/keycloak/themes/witness:ro
     depends_on:
       postgres: { condition: service_healthy }
     healthcheck:

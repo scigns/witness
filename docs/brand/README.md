@@ -79,6 +79,10 @@ and guardrails. Email implementation must remain accessible and robust across cl
 client limitations prevent exact typography, preserve hierarchy, color semantics, spacing and
 voice rather than forcing fragile rendering.
 
+See [`EMAIL_SYSTEM.md`](./EMAIL_SYSTEM.md) for the implementation record: what actually sends email
+today (audited, not assumed), the rebranded Keycloak theme, and source-controlled reference
+templates for future application-generated email.
+
 ## Logo
 
 Protect the supplied Witness mark and approved lockups. Do not stretch, recolor, rotate, add

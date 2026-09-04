@@ -1,0 +1,11 @@
+Subject: {{ params.requesterName }} sent {{ params.itemLabel }} for your sign-off
+
+{{ params.requesterName }} sent {{ params.itemLabel }} for your sign-off.
+
+Review and sign off: {{ params.link }}
+
+{{ params.itemLabel }} · Submitted {{ params.submittedAt }} · By {{ params.requesterName }}
+
+--
+Witness is the evidence layer for work that has to be provable.
+This is a transactional message about a record awaiting your review.
