@@ -48,6 +48,10 @@ while IFS= read -r file; do
     clean="${target%%#*}"     # strip anchor
     clean="${clean%/}"        # a trailing slash is a directory link
     [ -z "$clean" ] && continue
+    # Markdown link targets percent-encode reserved characters (e.g. a space in a
+    # filename becomes %20); git ls-files reports the literal path, so decode before
+    # comparing or any tracked file with a space or other encoded character 404s here.
+    clean=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.unquote(sys.argv[1]))' "$clean")
 
     resolved=$(python3 -c 'import os,sys; print(os.path.normpath(os.path.join(sys.argv[1], sys.argv[2])))' "$dir" "$clean" 2>/dev/null) || resolved="$dir/$clean"
 

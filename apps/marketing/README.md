@@ -5,6 +5,10 @@ navigation, responsive header, native mobile disclosure, footer and layout primi
 the canonical metadata, robots, sitemap and structured-data foundation. MKT-02 adds the local brand,
 interaction and provenance systems. It is not deployed and is not the final commercial homepage.
 
+Visual identity and voice here are governed by
+[`docs/brand/Witness Brand Book.pdf`](../../docs/brand/Witness%20Brand%20Book.pdf) — see
+[`docs/brand/README.md`](../../docs/brand/README.md) for the precedence rule.
+
 ## Commands
 
 - `pnpm --filter @witness/marketing dev` — local server on port 3002 by default.
