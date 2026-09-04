@@ -105,7 +105,7 @@ were checked by hand against this and against `BRAND_BOOK.md`'s "Voice in use" t
 
 Every email (Keycloak-sent or reference template) shares one wrapper: a plain-text "Witness"
 wordmark, a Gesso panel with a 1px Mist border and 4px radius on a Bone page background, one Ink/Bone
-CTA button per email, and a small Ash-colored footer line carrying the 40-word boilerplate plus a
+CTA button per email, and a small Graphite footer line carrying the 40-word boilerplate plus a
 calm "if you weren't expecting this" note. No card shadows, no gradients, no logo image (see
 "Known limitations" below).
 
@@ -119,7 +119,12 @@ calm "if you weren't expecting this" note. No card shadows, no gradients, no log
 | Body text | Graphite | `#46423d` |
 | Primary text / button background | Ink | `#1b1917` |
 | Button text | Bone | `#f5f2ed` |
-| Footer text | Ash | `#8a857d` |
+| Footer text | Graphite | `#46423d` |
+
+Ash (`#8a857d`) is intentionally **not** used as email text: at 3.28:1 on Bone it fails WCAG AA for
+small text (needs 4.5:1). An earlier draft of the footer used it anyway before a CodeRabbit review
+caught the inconsistency against this document's own guardrail — fixed to Graphite (8.93:1)
+throughout before merge.
 
 Ember is not used anywhere in email. Nothing in a transactional account email is a "live" state in
 the Brand Book's sense (that's a product-UI concept — an in-progress record), and forcing it in would
