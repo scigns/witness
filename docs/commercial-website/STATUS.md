@@ -7,7 +7,7 @@ Last updated: 2026-09-04
 
 ## Current phase
 
- MKT-03H Preview, Auth and Cutover Gate Closure — `VERIFIED COMPLETE` for repository preparation
+ MKT-03I Mainline Alignment, Preview Deployment & Release Candidate — `VERIFIED COMPLETE`
 
 ## Programme health
 
@@ -57,6 +57,8 @@ separation, indexability, conversion and trust surfaces do not yet exist.
 - MKT-03G domain and cutover runbook preparation — `VERIFIED COMPLETE`; cutover not executed.
 - MKT-03H CORS reconciliation, app-host audit, Keycloak/cookie contract, exact preview/`www` plan,
   rollback worksheet, local production/noindex candidate and updated dry run — `VERIFIED COMPLETE`.
+- MKT-03I current-main alignment, clean release source, full workspace/security verification,
+  immutable container RC1 and local RC1 smoke/browser QA — `VERIFIED COMPLETE`.
 
 ## In progress
 
@@ -71,11 +73,11 @@ separation, indexability, conversion and trust surfaces do not yet exist.
   plus human approval.
 - This branch predates `origin/main`'s production cookie-session security change and must be aligned
   through normal review before any deployment candidate is produced.
-- Local Docker image creation is blocked while the Docker daemon is unavailable.
+- Remote preview remains blocked by unavailable Cloudflare/Tunnel credentials and production SSH.
 
 ## Next recommended task
 
-- Provision and verify the isolated noindex preview and complete the MKT-03H human-only gates. MKT-04A
+- Provision and verify the isolated noindex preview and complete the MKT-03I human-only gates. MKT-04A
   may proceed separately without changing production routing.
 
 ## Known technical debt

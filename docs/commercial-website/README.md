@@ -1,7 +1,7 @@
 # Witness Commercial Website Programme
 
 **Owner:** Product, Commercial and Engineering
-**Status:** MKT-03H gate-closure preparation verified; production cutover not executed
+**Status:** MKT-03I release candidate verified; production cutover not executed
 **Last reviewed:** 2026-09-04
 
 This directory is the persistent programme memory for turning
@@ -373,3 +373,22 @@ creation was blocked by the unavailable local Docker daemon, so the recorded tar
 evidence rather than a deployable release. Remote preview and authenticated production browser checks
 remain human gates. Repository readiness is 90%; production cutover readiness is 30%. Production
 apex changes: `NONE`; cutover status: `NOT EXECUTED`.
+
+## MKT-03I implementation record
+
+The commercial programme was isolated from the stale release branch and applied to
+`feat/commercial-site-launch-readiness`, created directly from current `origin/main` at `a361a4f`.
+The old branch's unrelated sign-in and auth-error page edits were not transferred. The aligned branch
+retains current main's credentialed app-only CORS, exact-Origin CSRF protection, host-only HttpOnly
+API session cookie, app-root callback and app-host invitation link.
+
+The full Node 22 `pnpm verify` gate passes, as do focused security/auth/invitation tests, marketing
+browser QA, bundle budget, documentation lint and links. Marketing RC1 is
+`witness-marketing:efba8b7`, local image ID
+`sha256:3a4d8696d7b4f72f9ecb666db358bb3c17ffd1f0f39e84348754a48d48253190`.
+Local container smoke and six-width browser QA pass with indexing off and no cookies or auth redirect.
+
+Remote preview provisioning remains blocked by absent Cloudflare/Tunnel credentials and production
+server access. Repository release readiness is 100%; remote marketing readiness is 25%; auth cutover
+readiness is 50%; production cutover readiness is 33.3%. Production apex changes: `NONE`; indexing:
+`OFF`; cutover: `NOT EXECUTED`.

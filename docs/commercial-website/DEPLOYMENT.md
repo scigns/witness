@@ -69,9 +69,10 @@ MKT-03H retains the standalone container architecture and specifies
 container, Tunnel public-hostname, HTTPS smoke, remote browser and reversible removal steps are in
 [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md). No preview hostname has been provisioned.
 
-The local production/noindex standalone candidate passed `/`, `/health`, `/robots.txt` and
-`/sitemap.xml`. Docker image creation was attempted but the local Docker daemon was unavailable; an
-approved build host must build from a clean reviewed commit and record the immutable digest. See
+The current-main production/noindex RC1 passed `/`, `/health`, `/robots.txt`, `/sitemap.xml` and the
+six-width browser suite in its container. The image is `witness-marketing:efba8b7`, with local image
+ID `sha256:3a4d8696d7b4f72f9ecb666db358bb3c17ffd1f0f39e84348754a48d48253190`.
+An approved registry push or equivalent preview-host build must record the registry digest. See
 [`CURRENT_PRODUCTION_BASELINE.md`](CURRENT_PRODUCTION_BASELINE.md) for the production restoration
 worksheet.
 

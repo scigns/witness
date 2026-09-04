@@ -330,21 +330,25 @@ Do not call the preview ready until these real HTTPS checks pass.
 9. Record the DNS and rule IDs. Roll back by disabling the rule and removing the `www` placeholder
    record; this never restores `www` as a second site.
 
-### Local cutover candidate
+### Marketing release candidate RC1
 
-- Identifier: `witness-marketing-mkt-03h-91fcab2-dirty.tar.gz`.
-- Source commit: `91fcab216a5506f5f7ecd425a40a21e3ec127602` plus documented uncommitted
-  commercial-site changes.
-- SHA-256: `8a6abda3c352ba2335f735b8be952ca31e623c43c6e6e9b318f00bead465ca08`.
-- Built: `2026-09-04T11:38:02+08:00` with production URL/environment and indexing off.
-- Standalone health/homepage/robots/sitemap smoke: `PASS`.
-- Local browser QA: `PASS`; remote browser QA: `BLOCKED` pending preview.
-- Docker image: `BLOCKED` because the local Docker daemon is unavailable. Build and record the image
-  digest on an approved build host after the commercial changes are committed/rebased.
+- Base main: `a361a4f29fbff687faa0c42d6466452377a6e782`.
+- Source commit: `efba8b7` on `feat/commercial-site-launch-readiness`.
+- Image: `witness-marketing:efba8b7`.
+- Local content-addressable image ID:
+  `sha256:3a4d8696d7b4f72f9ecb666db358bb3c17ffd1f0f39e84348754a48d48253190`.
+- Registry digest: not available because RC1 has not been pushed; record it if preview deployment
+  publishes the image to an approved registry.
+- Built: `2026-09-04T07:53:03Z`, Linux arm64, Node 22 Bookworm runtime.
+- Build configuration: canonical production URL, production environment, indexing off.
+- Container: `witness-marketing-rc1`, tested on loopback port 3019 and then stopped.
+- Homepage, health, robots and sitemap: `PASS`.
+- Canonical/noindex/no-auth-redirect/no-cookie checks: `PASS`.
+- RC1 browser QA at 320, 375, 430, 768, 1024 and 1440: `PASS`.
+- Remote browser QA: `BLOCKED` pending preview provisioning.
 
-The tarball is a local verification artifact in `/tmp`, not a deployable production release, because
-its source tree is dirty. The eventual candidate must use a clean reviewed commit and immutable image
-digest.
+RC1 is reproducible from a clean source commit and immutable local image ID. It has not been pushed
+or deployed and is not authorised for the production apex.
 
 ### MKT-03H dry run
 
@@ -364,3 +368,33 @@ digest.
 Repository readiness is 9 of 10 MKT-03H preparation requirements (90%); the missing remote preview is
 external. Production cutover readiness is 3 of 10 areas `READY` (30%). MKT-03H repository work can be
 verified complete, but cutover remains not ready and not executed.
+
+### MKT-03I dry run
+
+| Gate | Classification | Evidence/next gate |
+| --- | --- | --- |
+| Current-main clean source | READY | Fresh branch from `a361a4f`; stale auth edits excluded |
+| Immutable marketing RC1 | READY | Tagged image and content-addressable ID recorded |
+| Local RC1 QA | READY | HTTP, headers and six-width browser suite pass |
+| Remote preview | HUMAN ACTION REQUIRED | No Cloudflare credentials, Tunnel access or server SSH available |
+| Remote browser QA | BLOCKED | Requires the HTTPS preview |
+| Apex rollback baseline | HUMAN ACTION REQUIRED | External state recorded; exact dashboard/server IDs remain |
+| App independent operation | HUMAN ACTION REQUIRED | Repository contract passes; synthetic browser login required |
+| API CORS/CSRF | READY | Current-main source and focused tests pass; live headers agree |
+| Identity/Keycloak | HUMAN ACTION REQUIRED | Health and entrypoints pass; effective client values require access |
+| Auth/cookie flow | HUMAN ACTION REQUIRED | Source/tests pass; deployed cookie requires browser inspection |
+| Password reset | HUMAN ACTION REQUIRED | Construction/tests pass; synthetic mailbox flow required |
+| Invitation flow | HUMAN ACTION REQUIRED | App activation URL/tests pass; synthetic mailbox flow required |
+| `www` readiness | READY | Exact DNS/rule/SSL/rollback instructions prepared; not executed |
+| SSL | HUMAN ACTION REQUIRED | Existing hosts work; preview and `www` coverage absent/unverified |
+| Final production approval | HUMAN ACTION REQUIRED | Not requested or granted |
+
+Readiness scores after MKT-03I:
+
+- Repository release readiness: 100% (clean current-main source, full verification and immutable RC1).
+- Remote marketing readiness: 25% (deployment path/runner ready; hostname, HTTPS and remote QA absent).
+- Auth cutover readiness: 50% (source, tests and live entrypoints ready; effective config and synthetic
+  end-to-end flows remain).
+- Production cutover readiness: 5 of 15 gates `READY` (33.3%).
+
+Production apex changes: `NONE`. Indexing: `OFF`. Cutover status: `NOT EXECUTED`.

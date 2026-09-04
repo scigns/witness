@@ -48,6 +48,15 @@ Approved logo files, when supplied, belong in `public/brand/`; the current shell
 the approved `witness-logo.png` artwork there. The component preserves its intrinsic dimensions and
 does not apply filters or colour transforms.
 
+## Release candidate
+
+MKT-03I RC1 was built from current-main-aligned source `efba8b7` as
+`witness-marketing:efba8b7`. Its local content-addressable image ID is
+`sha256:3a4d8696d7b4f72f9ecb666db358bb3c17ffd1f0f39e84348754a48d48253190`.
+It uses the canonical production URL and production environment with indexing explicitly off. Local
+HTTP/header smoke and all six browser widths pass. It has not been pushed, preview-deployed or routed
+to the production apex.
+
 ## Browser review
 
 The focused MKT-02E browser review uses the existing `playwright-core` development dependency and an

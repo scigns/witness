@@ -197,6 +197,20 @@ Retain the standalone Next.js Node image for `preview.buildwithwitness.com`. Pro
 preview hostname/Tunnel mapping to that container, keep indexing off and preserve apex canonical
 metadata. Do not adopt Pages merely to avoid the existing Docker/Cloudflare architecture.
 
+### CW-031 — Align commercial work by clean cherry-pick, not stale merge
+
+Create `feat/commercial-site-launch-readiness` from current `origin/main` and apply only the scoped
+commercial changes. Exclude unrelated local auth-page edits and never merge the old bearer-session
+implementation over the server-managed cookie design. RC images are built from a clean source commit
+and named with that commit rather than `latest`.
+
+### CW-032 — Local image ID is RC1 identity until registry publication
+
+RC1 is `witness-marketing:efba8b7` with local content-addressable image ID
+`sha256:3a4d8696d7b4f72f9ecb666db358bb3c17ffd1f0f39e84348754a48d48253190`.
+A registry digest cannot exist until an approved registry push occurs. Preview deployment must use
+this image or rebuild the same clean commit and record its immutable registry digest.
+
 ## Proposed
 
 ### CW-024 — Canonical public/app route contract

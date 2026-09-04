@@ -17,7 +17,7 @@ cutover because dashboard state can change after this repository record is revie
 | API | Cloudflare-proxied; `/health` and `/ready` HTTP 200 |
 | Identity | Cloudflare-proxied; HTTPS responds and Keycloak is healthy through API readiness |
 | `www` | No A/CNAME answer |
-| Preview | No remote preview verified |
+| Preview | No remote preview verified; no Cloudflare credentials are available locally |
 | API build | `0.4.0`, build `6afc203238aa9ed2058dfbc819aca021107ff3d5` |
 | API profile | `hybrid`; instance `Witness Production (witness-prod-01)` |
 
@@ -71,3 +71,21 @@ sed -n '1,180p' deployments/cloud-managed/cloudflared/config.yml
 ```
 
 Do not copy secrets or the full production environment into the change ticket.
+
+## MKT-03I release baseline
+
+| Item | Value |
+| --- | --- |
+| Base main | `a361a4f29fbff687faa0c42d6466452377a6e782` |
+| Marketing source | `efba8b7` |
+| Image tag | `witness-marketing:efba8b7` |
+| Local image ID | `sha256:3a4d8696d7b4f72f9ecb666db358bb3c17ffd1f0f39e84348754a48d48253190` |
+| Image created | `2026-09-04T07:53:03Z` |
+| Architecture | Linux arm64; Node 22 Bookworm |
+| Registry digest | Not available; image was not pushed |
+| Local RC1 | Verified and stopped; no production routing |
+| Preview identifiers | `HUMAN ACTION REQUIRED` |
+
+No Cloudflare/DigitalOcean credential variables were available in the local environment. Production
+SSH was not retried after the known public-key failure. Consequently no DNS, Tunnel, Worker or server
+identifier in the worksheet is inferred or fabricated.

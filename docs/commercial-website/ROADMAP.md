@@ -22,6 +22,7 @@ explicitly verified.
 | MKT-03 Homepage | `VERIFIED COMPLETE` | MKT-03A through MKT-03F verified; production cutover not executed |
 | MKT-03G Domain and Launch Readiness | `VERIFIED COMPLETE` | Runbook and 11.1% production dry run prepared; cutover is not ready/executed and human gates remain |
 | MKT-03H Preview, Auth and Cutover Gate Closure | `VERIFIED COMPLETE` | Repository readiness 90%; production readiness 30%; remote preview and human production checks remain |
+| MKT-03I Mainline Alignment, Preview Deployment & RC1 | `VERIFIED COMPLETE` | Current-main clean source and immutable RC1 verified; remote preview blocked; production readiness 33.3% |
 | MKT-04 Platform & How It Works | `NOT STARTED` | No routes |
 | MKT-05 Solutions | `NOT STARTED` | Sector material exists as non-canonical context; no routes |
 | MKT-06 Synthetic Demo | `NOT STARTED` | Product has synthetic development data, but no unauthenticated guided demo |
@@ -74,7 +75,9 @@ explicitly verified.
 19. **MKT-03H — preview, auth and cutover gate closure — `VERIFIED COMPLETE`.** CORS drift is
     reconciled, exact host/security/deployment contracts are recorded and production readiness is 30%.
 20. Complete MKT-04 and the highest-value MKT-05 pages before expanding route count.
-21. Build synthetic demo, conversion, packaging, trust, onboarding, content and analytics in milestone
+21. **MKT-03I — mainline alignment, preview deployment and RC1 — `VERIFIED COMPLETE`.** Clean
+    current-main release source and immutable local RC1 pass; remote preview remains human-gated.
+22. Build synthetic demo, conversion, packaging, trust, onboarding, content and analytics in milestone
    order, advancing partial existing capabilities only after their own acceptance checks.
 
 ## First small pull request
