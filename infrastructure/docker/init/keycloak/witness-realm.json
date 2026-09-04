@@ -1,6 +1,8 @@
 {
   "realm": "witness",
   "enabled": true,
+  "displayName": "Witness",
+  "emailTheme": "witness",
   "sslRequired": "external",
   "registrationAllowed": true,
   "resetPasswordAllowed": true,

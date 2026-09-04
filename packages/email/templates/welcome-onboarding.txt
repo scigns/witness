@@ -1,0 +1,11 @@
+Subject: Welcome to Witness
+
+Welcome to Witness, {{ params.recipientName }}.
+
+No records yet. The first one starts the moment you begin work.
+
+Go to Witness: {{ params.appLink }}
+
+--
+Witness is the evidence layer for work that has to be provable.
+This is a transactional message about your new account.

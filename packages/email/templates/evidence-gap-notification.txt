@@ -1,0 +1,11 @@
+Subject: {{ params.gapSubjectLine }}
+
+{{ params.gapClause }} no evidence attached. Add it now, or mark why it's missing.
+
+Review gaps: {{ params.link }}
+
+{{ params.organisationName }} · As of {{ params.asOfDate }}
+
+--
+Witness is the evidence layer for work that has to be provable.
+This is a transactional message about your organisation's records.

@@ -22,6 +22,8 @@ record. The broader positioning remains **institutional memory with provenance b
   [`docs/brand/BRAND_BOOK.md`](../brand/BRAND_BOOK.md)) is the canonical visual and voice authority
   for this website, the product UI, sign-in/onboarding and all transactional email. `BRAND_SYSTEM.md`
   in this directory records this programme's implementation status against it, not a competing system.
+  [`docs/brand/EMAIL_SYSTEM.md`](../brand/EMAIL_SYSTEM.md) records the same for transactional
+  email — including which email actually sends today, audited rather than assumed.
 - This directory describes commercial-website programme state and direction.
 - [`VISION.md`](../../VISION.md) remains the canonical product definition.
 - Accepted architecture decisions remain authoritative for product and deployment constraints.

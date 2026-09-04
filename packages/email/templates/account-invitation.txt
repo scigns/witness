@@ -1,0 +1,14 @@
+Subject: {{ params.inviterName }} invited you to join {{ params.organisationName }} in Witness
+
+{{ params.inviterName }} invited you to join {{ params.organisationName }} in Witness.
+
+Witness is the evidence layer for work that has to be provable. Once you're in, your record is
+where you left it.
+
+Accept invitation: {{ params.invitationLink }}
+
+Invited by {{ params.inviterName }} · Expires {{ params.expiryDate }}
+
+--
+Witness is the evidence layer for work that has to be provable.
+If you weren't expecting this invitation, you can ignore this message.

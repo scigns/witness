@@ -45,6 +45,12 @@ The expected sender is an approved Witness system identity such as `hello@buildw
 another deployment-approved sender configured in Keycloak SMTP. Sender identity and
 recovery-recipient identity are distinct concerns and must not be inferred from one another.
 
+The realm definition also sets `"emailTheme": "witness"`
+(`infrastructure/docker/keycloak-theme/witness/`), which rebrands these emails to the Brand Book —
+see `docs/brand/EMAIL_SYSTEM.md` for what was changed and how it was verified against a real
+Keycloak instance. Like the settings above, this has no effect on an already-initialised production
+realm until applied through the same approved Keycloak administration mechanism.
+
 ## Witness linking rules
 
 After a verified OIDC callback, Witness links the identity only to an existing invited Witness user.

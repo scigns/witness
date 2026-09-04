@@ -1,0 +1,9 @@
+Subject: {{ params.subjectLine }}
+
+{{ params.messageBody }}
+
+{{ params.ctaLabel }}: {{ params.ctaLink }}
+
+--
+Witness is the evidence layer for work that has to be provable.
+This is a transactional message about your account.
