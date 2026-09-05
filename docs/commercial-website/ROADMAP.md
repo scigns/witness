@@ -24,7 +24,7 @@ explicitly verified.
 | MKT-03H Preview, Auth and Cutover Gate Closure | `VERIFIED COMPLETE` | Repository readiness 90%; production readiness 30%; remote preview and human production checks remain |
 | MKT-03I Mainline Alignment, Preview Deployment & RC1 | `VERIFIED COMPLETE` | Current-main clean source and immutable RC1 verified; remote preview blocked; production readiness 33.3% |
 | MKT-03L Brand Book Reconciliation | `VERIFIED COMPLETE` | Palette/typography/radius reconciled to the Brand Book; independent of the cutover track — no production/routing change |
-| MKT-04 Platform & How It Works | `NOT STARTED` | No routes |
+| MKT-04 Platform & How It Works | `VERIFIED COMPLETE` | Six routes live: `/platform`, `/how-it-works`, `/why-witness`, `/platform/evidence`, `/platform/decisions`, `/platform/institutional-memory` |
 | MKT-05 Solutions | `NOT STARTED` | Sector material exists as non-canonical context; no routes |
 | MKT-06 Synthetic Demo | `NOT STARTED` | Product has synthetic development data, but no unauthenticated guided demo |
 | MKT-07 Conversion Infrastructure | `NOT STARTED` | No public forms, Turnstile or lead workflow |
@@ -75,14 +75,17 @@ explicitly verified.
     production cutover remains unexecuted and human-gated.
 19. **MKT-03H — preview, auth and cutover gate closure — `VERIFIED COMPLETE`.** CORS drift is
     reconciled, exact host/security/deployment contracts are recorded and production readiness is 30%.
-20. Complete MKT-04 and the highest-value MKT-05 pages before expanding route count.
+20. **MKT-04 — platform story pages — `VERIFIED COMPLETE`.** Six routes grounded in
+    `packages/domain`'s actual implemented lifecycles, not aspirational copy; navigation wired only
+    to routes that now exist.
 21. **MKT-03I — mainline alignment, preview deployment and RC1 — `VERIFIED COMPLETE`.** Clean
     current-main release source and immutable local RC1 pass; remote preview remains human-gated.
 22. **MKT-03J — external preview, auth and production baseline verification — `VERIFIED COMPLETE`.**
     Public endpoints were verified and exact privileged operator actions recorded; preview, effective
     control-plane state and synthetic auth remain blocked, so the cutover recommendation is `NO-GO`.
-23. Build synthetic demo, conversion, packaging, trust, onboarding, content and analytics in milestone
-   order, advancing partial existing capabilities only after their own acceptance checks.
+23. Build the highest-value MKT-05 pages, then synthetic demo, conversion, packaging, trust,
+    onboarding and analytics in milestone order, advancing partial existing capabilities only after
+    their own acceptance checks.
 
 ## First small pull request
 

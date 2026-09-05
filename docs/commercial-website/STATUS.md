@@ -63,6 +63,19 @@ separation, indexability, conversion and trust surfaces do not yet exist.
   independent design system, self-hosted Newsreader/IBM Plex fonts, homepage positioning line, full
   test/lint/typecheck/build/bundle-budget/six-width browser QA — `VERIFIED COMPLETE`. See
   `docs/commercial-website/BRAND_SYSTEM.md`'s MKT-03L section for the area-by-area audit.
+- MKT-04A-F platform story pages — `/platform`, `/how-it-works`, `/why-witness`,
+  `/platform/evidence`, `/platform/decisions`, `/platform/institutional-memory` — `VERIFIED
+  COMPLETE`. Content is grounded in `packages/domain`'s actual implemented lifecycles (evidence
+  draft/submitted/withdrawn, decision proposed/confirmed/superseded/reversed, commitment and action
+  states) and `VISION.md`, not aspirational copy; deliberately does not claim the evidence review
+  states (`under_review`/`validated`/`rejected`) that are declared but not yet wired to a mutator.
+  Primary/footer navigation now links `/platform` and `/how-it-works` since those routes are real;
+  `test/foundation.test.tsx` asserts every remaining nav label with no route stays non-interactive.
+- MKT-04G verification — `VERIFIED COMPLETE`: lint, typecheck, 19 unit tests (one h1 per page,
+  canonical metadata, no cross-links to fake routes), production build (102 KB First Load JS,
+  unchanged), bundle-budget check, and real six-width Chrome browser QA extended to cover all seven
+  content routes (was homepage + fixture only) — caught and fixed a real CSS Grid stretch bug on
+  one page's badge before it shipped. Indexing remains `OFF`.
 
 ## In progress
 
@@ -81,8 +94,10 @@ separation, indexability, conversion and trust surfaces do not yet exist.
 
 ## Next recommended task
 
-- Provision and verify the isolated noindex preview and complete the MKT-03I human-only gates. MKT-04A
-  may proceed separately without changing production routing.
+- Provision and verify the isolated noindex preview and complete the MKT-03I human-only gates.
+  MKT-04 is complete; the next content milestone is MKT-05 (Solutions) or MKT-09 (Trust Centre) per
+  `ROADMAP.md`'s dependency ordering, and may proceed separately without changing production
+  routing.
 
 ## Known technical debt
 

@@ -5,6 +5,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import MarketingHomepage from '../src/app/page';
+import PlatformPage, { metadata as platformMetadata } from '../src/app/platform/page';
+import HowItWorksPage, { metadata as howItWorksMetadata } from '../src/app/how-it-works/page';
+import WhyWitnessPage, { metadata as whyWitnessMetadata } from '../src/app/why-witness/page';
+import EvidencePage, { metadata as evidenceMetadata } from '../src/app/platform/evidence/page';
+import DecisionsPage, { metadata as decisionsMetadata } from '../src/app/platform/decisions/page';
+import InstitutionalMemoryPage, {
+  metadata as institutionalMemoryMetadata,
+} from '../src/app/platform/institutional-memory/page';
 import robots from '../src/app/robots';
 import sitemap from '../src/app/sitemap';
 import { GET } from '../src/app/health/route';
@@ -141,12 +149,19 @@ describe('independent marketing foundation', () => {
       expect.arrayContaining([
         '/',
         '#main-content',
+        '/platform',
+        '/how-it-works',
         'https://app.buildwithwitness.com/signin',
         'mailto:hello@buildwithwitness.com?subject=Witness%20demonstration%20request',
         'https://github.com/scigns/witness',
       ]),
     );
-    expect(hrefs.some((href) => href.startsWith('/platform'))).toBe(false);
+    // MKT-04A/B built /platform and /how-it-works, so those are wired now — everything
+    // else on the primary nav (Solutions, Resources, Pricing, Trust) still has no route.
+    expect(hrefs.some((href) => href.startsWith('/solutions'))).toBe(false);
+    expect(hrefs.some((href) => href.startsWith('/pricing'))).toBe(false);
+    expect(hrefs.some((href) => href.startsWith('/trust'))).toBe(false);
+    expect(hrefs.some((href) => href.startsWith('/resources'))).toBe(false);
   });
 
   it('keeps preview origins out of canonical metadata and requires explicit production indexing', () => {
@@ -329,5 +344,88 @@ describe('independent marketing foundation', () => {
     expect(html).toContain('provenance-node-source');
     expect(html).toContain('provenance-node-decision');
     expect(html).toContain('<span class="visually-hidden">leads to</span>');
+  });
+
+  describe('MKT-04 platform story pages', () => {
+    const pages = [
+      { name: 'platform', Page: PlatformPage, metadata: platformMetadata, path: '/platform' },
+      {
+        name: 'how-it-works',
+        Page: HowItWorksPage,
+        metadata: howItWorksMetadata,
+        path: '/how-it-works',
+      },
+      {
+        name: 'why-witness',
+        Page: WhyWitnessPage,
+        metadata: whyWitnessMetadata,
+        path: '/why-witness',
+      },
+      {
+        name: 'platform/evidence',
+        Page: EvidencePage,
+        metadata: evidenceMetadata,
+        path: '/platform/evidence',
+      },
+      {
+        name: 'platform/decisions',
+        Page: DecisionsPage,
+        metadata: decisionsMetadata,
+        path: '/platform/decisions',
+      },
+      {
+        name: 'platform/institutional-memory',
+        Page: InstitutionalMemoryPage,
+        metadata: institutionalMemoryMetadata,
+        path: '/platform/institutional-memory',
+      },
+    ] as const;
+
+    it.each(pages)(
+      '$name renders exactly one h1 and safe canonical metadata',
+      ({ Page, metadata, path }) => {
+        const html = renderToStaticMarkup(
+          <MarketingShell>
+            <Page />
+          </MarketingShell>,
+        );
+
+        expect(html.match(/<h1/g)).toHaveLength(1);
+        expect(html).not.toMatch(/href="\/platform\/[a-z-]+\/[a-z-]+/); // no accidental nested fake routes
+        expect(metadata.alternates?.canonical).toBe(`https://buildwithwitness.com${path}`);
+        // Every page inherits the fail-closed default (config.indexable is false outside an
+        // explicit production build) via createMarketingMetadata, never an explicit override
+        // that would fight it.
+        expect(metadata.robots).toEqual({ index: false, follow: false });
+      },
+    );
+
+    it('cross-links only to routes that exist in this app', () => {
+      const realRoutes = new Set([
+        '/',
+        '/platform',
+        '/how-it-works',
+        '/why-witness',
+        '/platform/evidence',
+        '/platform/decisions',
+        '/platform/institutional-memory',
+        '/brand/witness-logo.png', // next/image priority preload on the header logo, every page
+      ]);
+      for (const { Page } of pages) {
+        const html = renderToStaticMarkup(
+          <MarketingShell>
+            <Page />
+          </MarketingShell>,
+        );
+        const hrefs = [...html.matchAll(/href="([^"]+)"/g)].flatMap((match) =>
+          match[1] === undefined ? [] : [match[1]],
+        );
+        for (const href of hrefs) {
+          if (href.startsWith('/') && href !== '#main-content') {
+            expect(realRoutes.has(href), `${href} is not a real route`).toBe(true);
+          }
+        }
+      }
+    });
   });
 });
