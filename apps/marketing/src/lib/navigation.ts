@@ -11,7 +11,7 @@ export interface NavigationGroup {
 export const marketingNavigation = {
   primary: [
     { label: 'Platform', href: '/platform' },
-    { label: 'Solutions', href: null },
+    { label: 'Solutions', href: '/solutions' },
     { label: 'Resources', href: null },
     { label: 'Pricing', href: null },
     { label: 'Trust', href: null },
@@ -28,10 +28,10 @@ export const marketingNavigation = {
     {
       label: 'Solutions',
       items: [
-        { label: 'Government', href: null },
-        { label: 'International development', href: null },
-        { label: 'Research', href: null },
-        { label: 'Consultation', href: null },
+        { label: 'Government', href: '/solutions/government' },
+        { label: 'International development', href: '/solutions/international-development' },
+        { label: 'Research', href: '/solutions/research' },
+        { label: 'Consultation', href: '/solutions/consultation' },
       ],
     },
     {

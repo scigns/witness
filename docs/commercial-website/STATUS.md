@@ -76,6 +76,17 @@ separation, indexability, conversion and trust surfaces do not yet exist.
   unchanged), bundle-budget check, and real six-width Chrome browser QA extended to cover all seven
   content routes (was homepage + fixture only) — caught and fixed a real CSS Grid stretch bug on
   one page's badge before it shipped. Indexing remains `OFF`.
+- MKT-05 Solutions — `VERIFIED COMPLETE`: `/solutions` hub plus four differentiated sector pages
+  (government, international development, research, consultation) built from the already-approved
+  homepage audience copy and `VISION.md`, explicitly not from `docs/product/SECTOR_APPLICATIONS.md`
+  (non-canonical, ADR-0021, covers unrelated sectors — a unit test asserts none of its terms appear).
+  Primary/footer navigation now links `/solutions` and its four children. 26 unit tests, production
+  build (102 KB First Load JS, unchanged), bundle-budget check, docs:lint/links/headers, and
+  six-width Chrome QA across all twelve content routes all pass. No inline styling or hex colours
+  introduced anywhere — every page composes only already-reconciled shared components and CSS
+  classes, so Brand Book colour/typography compliance holds by construction. CTAs use the
+  established "Book a demonstration" / "Explore Witness" / "How Witness works" vocabulary; no new
+  conversion forms (MKT-07's scope).
 
 ## In progress
 
@@ -95,7 +106,7 @@ separation, indexability, conversion and trust surfaces do not yet exist.
 ## Next recommended task
 
 - Provision and verify the isolated noindex preview and complete the MKT-03I human-only gates.
-  MKT-04 is complete; the next content milestone is MKT-05 (Solutions) or MKT-09 (Trust Centre) per
+  MKT-04 and MKT-05 are complete; the next content milestone is MKT-06 (Synthetic Demo) per
   `ROADMAP.md`'s dependency ordering, and may proceed separately without changing production
   routing.
 

@@ -13,6 +13,19 @@ import DecisionsPage, { metadata as decisionsMetadata } from '../src/app/platfor
 import InstitutionalMemoryPage, {
   metadata as institutionalMemoryMetadata,
 } from '../src/app/platform/institutional-memory/page';
+import SolutionsPage, { metadata as solutionsMetadata } from '../src/app/solutions/page';
+import GovernmentSolutionPage, {
+  metadata as governmentMetadata,
+} from '../src/app/solutions/government/page';
+import InternationalDevelopmentSolutionPage, {
+  metadata as internationalDevelopmentMetadata,
+} from '../src/app/solutions/international-development/page';
+import ResearchSolutionPage, {
+  metadata as researchMetadata,
+} from '../src/app/solutions/research/page';
+import ConsultationSolutionPage, {
+  metadata as consultationMetadata,
+} from '../src/app/solutions/consultation/page';
 import robots from '../src/app/robots';
 import sitemap from '../src/app/sitemap';
 import { GET } from '../src/app/health/route';
@@ -151,14 +164,18 @@ describe('independent marketing foundation', () => {
         '#main-content',
         '/platform',
         '/how-it-works',
+        '/solutions',
+        '/solutions/government',
+        '/solutions/international-development',
+        '/solutions/research',
+        '/solutions/consultation',
         'https://app.buildwithwitness.com/signin',
         'mailto:hello@buildwithwitness.com?subject=Witness%20demonstration%20request',
         'https://github.com/scigns/witness',
       ]),
     );
-    // MKT-04A/B built /platform and /how-it-works, so those are wired now — everything
-    // else on the primary nav (Solutions, Resources, Pricing, Trust) still has no route.
-    expect(hrefs.some((href) => href.startsWith('/solutions'))).toBe(false);
+    // MKT-04/05 built /platform, /how-it-works and /solutions/*, so those are wired now —
+    // Resources, Pricing and Trust on the primary nav still have no route.
     expect(hrefs.some((href) => href.startsWith('/pricing'))).toBe(false);
     expect(hrefs.some((href) => href.startsWith('/trust'))).toBe(false);
     expect(hrefs.some((href) => href.startsWith('/resources'))).toBe(false);
@@ -409,6 +426,11 @@ describe('independent marketing foundation', () => {
         '/platform/evidence',
         '/platform/decisions',
         '/platform/institutional-memory',
+        '/solutions', // MarketingShell's footer links these on every page, MKT-04 pages included
+        '/solutions/government',
+        '/solutions/international-development',
+        '/solutions/research',
+        '/solutions/consultation',
         '/brand/witness-logo.png', // next/image priority preload on the header logo, every page
       ]);
       for (const { Page } of pages) {
@@ -424,6 +446,100 @@ describe('independent marketing foundation', () => {
           if (href.startsWith('/') && href !== '#main-content') {
             expect(realRoutes.has(href), `${href} is not a real route`).toBe(true);
           }
+        }
+      }
+    });
+  });
+
+  describe('MKT-05 solution pages', () => {
+    const pages = [
+      { name: 'solutions', Page: SolutionsPage, metadata: solutionsMetadata, path: '/solutions' },
+      {
+        name: 'solutions/government',
+        Page: GovernmentSolutionPage,
+        metadata: governmentMetadata,
+        path: '/solutions/government',
+      },
+      {
+        name: 'solutions/international-development',
+        Page: InternationalDevelopmentSolutionPage,
+        metadata: internationalDevelopmentMetadata,
+        path: '/solutions/international-development',
+      },
+      {
+        name: 'solutions/research',
+        Page: ResearchSolutionPage,
+        metadata: researchMetadata,
+        path: '/solutions/research',
+      },
+      {
+        name: 'solutions/consultation',
+        Page: ConsultationSolutionPage,
+        metadata: consultationMetadata,
+        path: '/solutions/consultation',
+      },
+    ] as const;
+
+    it.each(pages)(
+      '$name renders exactly one h1 and safe canonical metadata',
+      ({ Page, metadata, path }) => {
+        const html = renderToStaticMarkup(
+          <MarketingShell>
+            <Page />
+          </MarketingShell>,
+        );
+
+        expect(html.match(/<h1/g)).toHaveLength(1);
+        expect(metadata.alternates?.canonical).toBe(`https://buildwithwitness.com${path}`);
+        expect(metadata.robots).toEqual({ index: false, follow: false });
+      },
+    );
+
+    it('cross-links only to routes that exist in this app', () => {
+      const realRoutes = new Set([
+        '/',
+        '/platform',
+        '/how-it-works',
+        '/why-witness',
+        '/platform/evidence',
+        '/platform/decisions',
+        '/platform/institutional-memory',
+        '/solutions',
+        '/solutions/government',
+        '/solutions/international-development',
+        '/solutions/research',
+        '/solutions/consultation',
+        '/brand/witness-logo.png',
+      ]);
+      for (const { Page } of pages) {
+        const html = renderToStaticMarkup(
+          <MarketingShell>
+            <Page />
+          </MarketingShell>,
+        );
+        const hrefs = [...html.matchAll(/href="([^"]+)"/g)].flatMap((match) =>
+          match[1] === undefined ? [] : [match[1]],
+        );
+        for (const href of hrefs) {
+          if (href.startsWith('/') && href !== '#main-content') {
+            expect(realRoutes.has(href), `${href} is not a real route`).toBe(true);
+          }
+        }
+      }
+    });
+
+    it('does not source content from the non-canonical sector applications document', () => {
+      // ADR-0021 / docs/product/SECTOR_APPLICATIONS.md is explicitly out of product scope and
+      // covers different sectors entirely (disaster response, health, agriculture) — these pages
+      // are built from VISION.md and the already-approved homepage audience copy instead.
+      for (const { Page } of pages) {
+        const html = renderToStaticMarkup(
+          <MarketingShell>
+            <Page />
+          </MarketingShell>,
+        );
+        for (const term of ['disaster response', 'humanitarian coordination', 'geospatial']) {
+          expect(html.toLowerCase()).not.toContain(term);
         }
       }
     });

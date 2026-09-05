@@ -25,7 +25,7 @@ explicitly verified.
 | MKT-03I Mainline Alignment, Preview Deployment & RC1 | `VERIFIED COMPLETE` | Current-main clean source and immutable RC1 verified; remote preview blocked; production readiness 33.3% |
 | MKT-03L Brand Book Reconciliation | `VERIFIED COMPLETE` | Palette/typography/radius reconciled to the Brand Book; independent of the cutover track — no production/routing change |
 | MKT-04 Platform & How It Works | `VERIFIED COMPLETE` | Six routes live: `/platform`, `/how-it-works`, `/why-witness`, `/platform/evidence`, `/platform/decisions`, `/platform/institutional-memory` |
-| MKT-05 Solutions | `NOT STARTED` | Sector material exists as non-canonical context; no routes |
+| MKT-05 Solutions | `VERIFIED COMPLETE` | `/solutions` hub plus `/solutions/{government,international-development,research,consultation}`, differentiated per sector |
 | MKT-06 Synthetic Demo | `NOT STARTED` | Product has synthetic development data, but no unauthenticated guided demo |
 | MKT-07 Conversion Infrastructure | `NOT STARTED` | No public forms, Turnstile or lead workflow |
 | MKT-08 Commercial Packaging | `DESIGN / PLANNING` | Product `/pricing` exists; public packaging and claim verification remain |
@@ -83,9 +83,11 @@ explicitly verified.
 22. **MKT-03J — external preview, auth and production baseline verification — `VERIFIED COMPLETE`.**
     Public endpoints were verified and exact privileged operator actions recorded; preview, effective
     control-plane state and synthetic auth remain blocked, so the cutover recommendation is `NO-GO`.
-23. Build the highest-value MKT-05 pages, then synthetic demo, conversion, packaging, trust,
-    onboarding and analytics in milestone order, advancing partial existing capabilities only after
-    their own acceptance checks.
+23. **MKT-05 — solutions pages — `VERIFIED COMPLETE`.** Four differentiated sector pages plus a
+    hub, built from already-approved homepage copy and `VISION.md` — explicitly not from the
+    non-canonical `docs/product/SECTOR_APPLICATIONS.md`.
+24. Build the synthetic demo, then conversion, packaging, trust, onboarding and analytics in
+    milestone order, advancing partial existing capabilities only after their own acceptance checks.
 
 ## First small pull request
 
