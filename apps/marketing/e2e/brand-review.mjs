@@ -19,6 +19,11 @@ const contentPaths = [
   '/platform/evidence',
   '/platform/decisions',
   '/platform/institutional-memory',
+  '/solutions',
+  '/solutions/government',
+  '/solutions/international-development',
+  '/solutions/research',
+  '/solutions/consultation',
 ];
 
 async function waitForServer() {
