@@ -11,6 +11,15 @@ const chromePath =
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const viewports = [320, 375, 430, 768, 1024, 1440];
 const artifacts = process.env.MKT_E2E_ARTIFACT_DIR ?? '/tmp/witness-marketing-e2e';
+const contentPaths = [
+  '/',
+  '/platform',
+  '/how-it-works',
+  '/why-witness',
+  '/platform/evidence',
+  '/platform/decisions',
+  '/platform/institutional-memory',
+];
 
 async function waitForServer() {
   const deadline = Date.now() + 30_000;
@@ -137,8 +146,11 @@ try {
   browser = await chromium.launch({ executablePath: chromePath, headless: true });
   const page = await browser.newPage();
   for (const width of viewports) {
-    await assertPage(page, width, '/');
-    await page.screenshot({ path: `${artifacts}/home-${width}.png`, fullPage: true });
+    for (const contentPath of contentPaths) {
+      await assertPage(page, width, contentPath);
+      const slug = contentPath === '/' ? 'home' : contentPath.slice(1).replace(/\//g, '-');
+      await page.screenshot({ path: `${artifacts}/${slug}-${width}.png`, fullPage: true });
+    }
     await assertPage(page, width, '/brand-fixture');
     await page.screenshot({ path: `${artifacts}/brand-${width}.png`, fullPage: true });
   }
