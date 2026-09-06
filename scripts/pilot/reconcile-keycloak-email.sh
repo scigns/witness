@@ -70,8 +70,13 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
 
 REALM_SMTP_JSON="$({
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
-    sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM --fields smtpServer";
-})"
+    sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM";
+} | python3 -c 'import json,sys; r=json.load(sys.stdin); json.dump({"smtpServer": r.get("smtpServer") or {}}, sys.stdout)')"
+# kcadm's own --fields smtpServer projection returns {} unconditionally for
+# this nested object on this Keycloak version regardless of actual realm
+# content (reproduced: a realm with a fully populated smtpServer still
+# reports {} via --fields). Fetch the full realm and project client-side
+# instead of trusting kcadm's field selection for this field.
 
 printf '%s' "$REALM_SMTP_JSON" | python3 -c '
 import json,sys
@@ -124,8 +129,18 @@ if ((${#missing[@]})); then
   exit 1
 fi
 
-python3 - "$SMTP_HOST" "$SMTP_PORT" "$SMTP_FROM" "$SMTP_FROM_NAME" \
-  "$SMTP_REPLY_TO" "$SMTP_USER" "$SMTP_PASSWORD" "$SMTP_STARTTLS" "$SMTP_SSL" <<'PY' |
+# kcadm update only persists top-level fields it is given; a bare
+# {"smtpServer": {...}} patch on a realm whose smtpServer was previously
+# empty silently no-ops (observed: exit 0, smtpServer left as {}). Fetch the
+# full realm representation, splice smtpServer into it on the host (the
+# Keycloak container has no python3), and PUT the whole thing back so the
+# write actually sticks.
+CURRENT_REALM_JSON="$({
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
+    sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM"
+})"
+
+MERGED_REALM_JSON="$(printf '%s' "$CURRENT_REALM_JSON" | python3 -c '
 import json, sys
 host, port, sender, sender_name, reply_to, user, password, starttls, ssl = sys.argv[1:]
 smtp = {
@@ -142,34 +157,20 @@ if sender_name:
     smtp["fromDisplayName"] = sender_name
 if reply_to:
     smtp["replyTo"] = reply_to
-json.dump({"smtpServer": smtp}, sys.stdout)
-PY
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
-    sh -lc 'set -eu; patch="$(mktemp)"; full="$(mktemp)"; trap "rm -f \"$patch\" \"$full\"" EXIT
-      cat >"$patch"
-      # kcadm update only persists top-level fields it is given; a bare
-      # {"smtpServer": {...}} patch on a realm whose smtpServer was previously
-      # empty silently no-ops (observed: exit 0, smtpServer left as {}).
-      # Read the full realm representation, splice smtpServer into it, and
-      # PUT the whole thing back so the write actually sticks.
-      /opt/keycloak/bin/kcadm.sh get realms/'"$REALM"' >"$full"
-      python3 -c "
-import json, sys
-with open(sys.argv[1]) as fh:
-    realm = json.load(fh)
-with open(sys.argv[2]) as fh:
-    patch = json.load(fh)
-realm.update(patch)
-with open(sys.argv[1], \"w\") as fh:
-    json.dump(realm, fh)
-" "$full" "$patch"
-      /opt/keycloak/bin/kcadm.sh update realms/'"$REALM"' -f "$full" >/dev/null'
+realm = json.load(sys.stdin)
+realm["smtpServer"] = smtp
+json.dump(realm, sys.stdout)
+' "$SMTP_HOST" "$SMTP_PORT" "$SMTP_FROM" "$SMTP_FROM_NAME" \
+  "$SMTP_REPLY_TO" "$SMTP_USER" "$SMTP_PASSWORD" "$SMTP_STARTTLS" "$SMTP_SSL")"
+
+printf '%s' "$MERGED_REALM_JSON" | docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
+  sh -lc 'set -eu; f="$(mktemp)"; trap "rm -f \"$f\"" EXIT; cat >"$f"; /opt/keycloak/bin/kcadm.sh update realms/'"$REALM"' -f "$f" >/dev/null'
 
 echo "[keycloak-email] realm SMTP configuration reconciled"
 
 SMTP_NOW_PRESENT="$({
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
-    sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM --fields smtpServer"
+    sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM"
 } | python3 -c 'import json,sys; print("yes" if (json.load(sys.stdin).get("smtpServer") or {}) else "no")')"
 if [[ "$SMTP_NOW_PRESENT" != "yes" ]]; then
   echo "[keycloak-email] update reported success but smtpServer is still empty on re-read" >&2
