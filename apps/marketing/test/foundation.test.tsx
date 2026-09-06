@@ -26,6 +26,7 @@ import ResearchSolutionPage, {
 import ConsultationSolutionPage, {
   metadata as consultationMetadata,
 } from '../src/app/solutions/consultation/page';
+import DemoPage, { metadata as demoMetadata } from '../src/app/demo/page';
 import robots from '../src/app/robots';
 import sitemap from '../src/app/sitemap';
 import { GET } from '../src/app/health/route';
@@ -154,6 +155,7 @@ describe('independent marketing foundation', () => {
     expect(marketingNavigation.primary.map((item) => item.label)).toEqual([
       'Platform',
       'Solutions',
+      'Demo',
       'Resources',
       'Pricing',
       'Trust',
@@ -169,6 +171,7 @@ describe('independent marketing foundation', () => {
         '/solutions/international-development',
         '/solutions/research',
         '/solutions/consultation',
+        '/demo',
         'https://app.buildwithwitness.com/signin',
         'mailto:hello@buildwithwitness.com?subject=Witness%20demonstration%20request',
         'https://github.com/scigns/witness',
@@ -431,6 +434,7 @@ describe('independent marketing foundation', () => {
         '/solutions/international-development',
         '/solutions/research',
         '/solutions/consultation',
+        '/demo', // MarketingShell's primary nav links this on every page, MKT-06 on
         '/brand/witness-logo.png', // next/image priority preload on the header logo, every page
       ]);
       for (const { Page } of pages) {
@@ -509,6 +513,7 @@ describe('independent marketing foundation', () => {
         '/solutions/international-development',
         '/solutions/research',
         '/solutions/consultation',
+        '/demo',
         '/brand/witness-logo.png',
       ]);
       for (const { Page } of pages) {
@@ -541,6 +546,100 @@ describe('independent marketing foundation', () => {
         for (const term of ['disaster response', 'humanitarian coordination', 'geospatial']) {
           expect(html.toLowerCase()).not.toContain(term);
         }
+      }
+    });
+  });
+
+  describe('MKT-06 synthetic demo', () => {
+    it('renders exactly one h1, the synthetic disclosure, and safe canonical metadata', () => {
+      const html = renderToStaticMarkup(
+        <MarketingShell>
+          <DemoPage />
+        </MarketingShell>,
+      );
+
+      expect(html.match(/<h1/g)).toHaveLength(1);
+      expect(html).toContain('Synthetic demonstration');
+      expect(html).toContain('fictional and illustrative');
+      expect(demoMetadata.alternates?.canonical).toBe('https://buildwithwitness.com/demo');
+      expect(demoMetadata.robots).toEqual({ index: false, follow: false });
+    });
+
+    it('names no real organisation, customer, or pilot partner', () => {
+      const html = renderToStaticMarkup(
+        <MarketingShell>
+          <DemoPage />
+        </MarketingShell>,
+      );
+      // Real names this programme must never use in synthetic content, regardless of
+      // capitalisation or context — see docs/commercial-website/DECISIONS.md.
+      const forbidden = [
+        'SPC',
+        'Ministry of Justice',
+        'DFAT',
+        'FTA',
+        'SPREP',
+        'Fiji',
+        'Pacific Community',
+      ];
+      for (const name of forbidden) {
+        expect(html).not.toContain(name);
+      }
+    });
+
+    it('does not import the product application, auth, session, protected API, or a graphing library', () => {
+      const contents = readFileSync(join(process.cwd(), 'src/app/demo/page.tsx'), 'utf8');
+      expect(contents).not.toMatch(/apps\/web|@witness\/web|lib\/auth|lib\/session|lib\/api/);
+      expect(contents).not.toMatch(/d3|chart\.js|recharts|visx|three\b/i);
+      expect(contents).not.toMatch(/document\.cookie|credentials:\s*['"]include['"]|fetch\(/);
+    });
+
+    it('cross-links only to routes that exist in this app', () => {
+      const realRoutes = new Set([
+        '/',
+        '/platform',
+        '/how-it-works',
+        '/why-witness',
+        '/platform/evidence',
+        '/platform/decisions',
+        '/platform/institutional-memory',
+        '/solutions',
+        '/solutions/government',
+        '/solutions/international-development',
+        '/solutions/research',
+        '/solutions/consultation',
+        '/demo',
+        '/brand/witness-logo.png',
+      ]);
+      const html = renderToStaticMarkup(
+        <MarketingShell>
+          <DemoPage />
+        </MarketingShell>,
+      );
+      const hrefs = [...html.matchAll(/href="([^"]+)"/g)].flatMap((match) =>
+        match[1] === undefined ? [] : [match[1]],
+      );
+      for (const href of hrefs) {
+        if (href.startsWith('/') && href !== '#main-content') {
+          expect(realRoutes.has(href), `${href} is not a real route`).toBe(true);
+        }
+      }
+    });
+
+    it('uses only real consent category names from packages/domain, not invented labels', () => {
+      const html = renderToStaticMarkup(
+        <MarketingShell>
+          <DemoPage />
+        </MarketingShell>,
+      );
+      // packages/domain/src/consent-template.ts CONSENT_CATEGORIES, human-readable form.
+      for (const category of [
+        'Participation',
+        'Audio recording',
+        'Internal use',
+        'Attributed quotation',
+      ]) {
+        expect(html).toContain(category);
       }
     });
   });

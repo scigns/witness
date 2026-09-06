@@ -8,6 +8,13 @@ This runbook prepares the eventual move from the current product-served apex to 
 marketing origin. It is a planning and verification document only. Cloudflare, DNS, Tunnel, Keycloak,
 cookies, CORS/CSRF, production environment and indexing are not changed by this milestone.
 
+**Preview state changed after this runbook's dated sections below were written.** Every "preview
+absent" / "HUMAN ACTION REQUIRED — provision preview" reference in the MKT-03G/H/I/J sections that
+follow described the state as of their own dates and is superseded: the preview is live as of
+2026-09-05. Read `CURRENT_PRODUCTION_BASELINE.md`'s "MKT-06 pre-flight re-verification" section for
+the current, verified state before relying on anything preview-related below — the dated sections
+are kept as history, not corrected in place.
+
 ## Canonical host policy
 
 - Canonical public domain: `https://buildwithwitness.com`

@@ -87,31 +87,72 @@ separation, indexability, conversion and trust surfaces do not yet exist.
   classes, so Brand Book colour/typography compliance holds by construction. CTAs use the
   established "Book a demonstration" / "Explore Witness" / "How Witness works" vocabulary; no new
   conversion forms (MKT-07's scope).
+- MKT-06 Synthetic Demo — `VERIFIED COMPLETE`: `/demo` walks one fictional "Service Improvement
+  Programme" record end to end (session/consent, evidence, finding/recommendation, decision,
+  commitment/action, provenance, later reconstruction), grounded in `packages/domain` — see the
+  domain-truth audit below. "Approval" is deliberately not shown as its own entity: `Decision` uses
+  `confirmed`/`confirmedBy`, not `approved` (that status belongs to the separate `Report`
+  aggregate), so the demo labels the moment "Sign-off: confirmed by..." rather than inventing an
+  Approval object. Consent categories shown (participation, audio_recording, internal_use,
+  attributed_quotation) are the exact `CONSENT_CATEGORIES` from
+  `packages/domain/src/consent-template.ts`, not invented labels. "Finding" and "Recommendation"
+  are explicitly captioned as the narrative bridge a person writes between evidence and a decision,
+  not persisted records — they only ever existed as `ProvenanceKind` diagram labels, in this
+  repository or the already-shipped MKT-04/05 pages. First and only use of Ember on the site: the
+  one action item that is genuinely in progress. "Demo" added to primary navigation (no prior
+  placeholder existed for it, unlike Platform/Solutions). 31 unit tests (including an automated
+  check that no real organisation/customer name appears), production build (102 KB First Load JS,
+  unchanged), bundle-budget check, docs:lint/links/headers, six-width Chrome QA across all
+  thirteen content routes, and a targeted keyboard-navigation check (skip link first, no traps,
+  every link reachable) all pass. No production database, Keycloak, or API dependency — static
+  synthetic content only.
 
 ## In progress
 
-- External preview, authenticated browser proof and final Cloudflare/Keycloak baseline remain
-  approval-gated production-readiness work; production cutover remains unexecuted.
+- Authenticated browser proof and final Cloudflare/Keycloak baseline remain approval-gated
+  production-readiness work; production cutover remains unexecuted.
+- The remote preview is live (see "Remote preview — resolved" below) but serves a build from before
+  MKT-04/05/06; redeploying it with current `main` is tracked as its own next step, not blocked.
+
+## Remote preview — resolved 2026-09-05
+
+**Corrects prior entries in this file, `DEPLOYMENT.md` and `CUTOVER_RUNBOOK.md` that said no preview
+existed and that Cloudflare/SSH access was unavailable — both were true as of 2026-09-04 and are no
+longer true.** Verified directly, not assumed:
+
+- `https://preview.buildwithwitness.com` responds `200` on `/`, `/health` and `/sitemap.xml`;
+  `/robots.txt` returns `Disallow: /`.
+- SSH to `witness@167.172.72.70` now succeeds (previously `Permission denied (publickey)`).
+- The Cloudflare Tunnel ingress (read on the host) proxies `preview.buildwithwitness.com` to
+  `witness-marketing-preview:3000` only, isolated, with an explicit deny-by-default catch-all — no
+  other host's routing was touched to add it.
+- The running container is `witness-marketing:preview-efba8b7`
+  (`sha256:5bd75298c879de0fa381464104053f0281d9a3123f145a6dd88636b537b05bc8`), env
+  `WITNESS_MARKETING_ENV=preview`, `WITNESS_MARKETING_INDEXABLE=false` — correctly configured, but
+  built from `efba8b7`, i.e. before MKT-04, MKT-05 and MKT-06. `/platform`, `/solutions` and
+  `/how-it-works` all return `404` on the live preview today.
+- Production apex cutover is intentionally still gated on rollback proof and human approval; nothing
+  above changes that.
 
 ## Blocked
 
-- Isolated Cloudflare preview provisioning requires a new approved project/hostname and credentials;
-  this is intentionally human-gated for MKT-01D.
-- Production apex cutover is intentionally gated on later architecture, preview and rollback proof
-  plus human approval.
+- Production apex cutover is intentionally gated on rollback proof and human approval.
 - This branch predates `origin/main`'s production cookie-session security change and must be aligned
   through normal review before any deployment candidate is produced.
-- Remote preview remains blocked by unavailable Cloudflare/Tunnel credentials and production SSH.
 
 ## Next recommended task
 
-- Provision and verify the isolated noindex preview and complete the MKT-03I human-only gates.
-  MKT-04 and MKT-05 are complete; the next content milestone is MKT-06 (Synthetic Demo) per
-  `ROADMAP.md`'s dependency ordering, and may proceed separately without changing production
-  routing.
+- Redeploy the marketing preview container with current `main` (MKT-04/05/06 included) using the
+  same isolated, already-approved pattern recorded above, then complete the MKT-03I human-only
+  gates. This may proceed separately without changing production routing. MKT-07 (Conversion
+  Infrastructure) is the next content milestone per `ROADMAP.md`; it is not started here and
+  should not be inferred from this branch's other changes.
 
 ## Known technical debt
 
+- `apps/marketing/src/app/sitemap.ts` has listed only `/` since MKT-01C and was not extended for
+  MKT-04, MKT-05 or MKT-06's new routes. Indexing is `noindex`-gated regardless, so this has no
+  live SEO effect today; left out of scope here to keep this change to the demo milestone.
 - Apex and app domains serve the same product application.
 - Product metadata is globally `noindex`; no public SEO foundation exists.
 - `packages/ui` is not implemented; the marketing foundation intentionally uses local minimal CSS.
@@ -122,14 +163,14 @@ separation, indexability, conversion and trust surfaces do not yet exist.
   visual-regression baselines or a general route crawler.
 - Dependency review can be skipped when GitHub's dependency graph is unavailable.
 - No `www` redirect/canonical handling exists.
-- No remote preview exists; provisioning one is deliberately deferred until the human Cloudflare gate
-  is approved.
+- The remote preview exists and is correctly configured (isolated, noindex) but serves a build from
+  before MKT-04/05/06 — see "Remote preview — resolved" above.
 - Future navigation labels are non-interactive until their routes contain reviewed content.
 - The mobile disclosure has structural and browser interaction coverage at six viewport widths.
 - Marketing metadata uses a fixed canonical production origin while deployment URLs remain
   environment-configurable; production indexing also requires an explicit environment and URL match.
-- No Cloudflare Pages/Workers project or remote preview exists in the repository; deployment is
-  documented against the standalone container boundary.
+- No Cloudflare Pages/Workers project exists; deployment is a standalone container behind the
+  existing Tunnel, documented above and in `DEPLOYMENT.md`.
 - No dedicated remote deployment workflow exists yet because the required Cloudflare project,
   hostname and credential contract have not been approved.
 - The supplied `apps/web/public/Witness Logo_.png` path was not present in this checkout; the existing

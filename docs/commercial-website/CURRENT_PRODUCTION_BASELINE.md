@@ -1,8 +1,9 @@
 # Witness Production Baseline for Marketing Cutover
 
 **Owner:** Engineering and Operations
-**Status:** Partially verified; human Cloudflare and host access required
-**Last reviewed:** 2026-09-04
+**Status:** Host/SSH access restored 2026-09-05; preview live but stale (pre-MKT-04/05/06);
+Cloudflare dashboard access (DNS record IDs, Worker routes) still requires a human operator
+**Last reviewed:** 2026-09-05
 
 This worksheet records the restoration target before the marketing apex cutover. It is not authority
 to change production. Copy the completed values into the approved change ticket immediately before
@@ -105,3 +106,50 @@ Access inventory: Cloudflare `NO`; DigitalOcean/production server `NO`; SSH `NO`
 not retried); Keycloak admin `NO`; approved synthetic account `NO`; synthetic mailbox `NO`. The local
 `cloudflared` binary is not control-plane authorization. Exact apex rollback remains unavailable and
 the cutover recommendation is `NO-GO`.
+
+## MKT-06 pre-flight re-verification — 2026-09-05
+
+**Access has changed since MKT-03J (2026-09-04) above.** Re-verified directly before assuming
+either state, per standing instruction not to assume:
+
+- SSH to `witness@167.172.72.70` now succeeds (was `Permission denied (publickey)`). Read-only
+  commands only were run — no production mutation.
+- `git -C /home/witness/witness rev-parse HEAD` → `d39b293f6477d3ecb9799862e39efef2a17acf51`
+  (`Merge pull request #181`), 67 commits behind current `main`. This is the checked-out repo
+  commit, not the running API's own build version (`0.4.0`, build `6afc203...`, recorded above) —
+  the two can differ when a container hasn't been rebuilt since a later checkout, which is what
+  this is.
+- `docker ps` on the host (bypassing `docker compose ps`, which fails locally on two undefined env
+  vars the deploy pipeline sets at deploy time, not present in a static checkout):
+
+  | Container | Image | Status |
+  | --- | --- | --- |
+  | `witness-pilot-web-1` | `witness-pilot-web` | healthy |
+  | `witness-pilot-api-1` | `witness-pilot-api` | healthy |
+  | `witness-pilot-keycloak-1` | `quay.io/keycloak/keycloak:26.0` | healthy |
+  | `witness-marketing-preview` | `witness-marketing:preview-efba8b7` | healthy, up since 2026-09-04T14:49:16Z |
+  | `witness-pilot-postgres-1` | `pgvector/pgvector:pg16` | healthy |
+  | `witness-pilot-cloudflared-1` | `cloudflare/cloudflared:latest` | up |
+  | `witness-pilot-ollama-1` | `ollama/ollama:latest` | healthy |
+
+- `witness-marketing-preview` image digest:
+  `sha256:5bd75298c879de0fa381464104053f0281d9a3123f145a6dd88636b537b05bc8`; env
+  `NODE_ENV=production`, `WITNESS_MARKETING_SITE_URL=https://preview.buildwithwitness.com`,
+  `WITNESS_MARKETING_ENV=preview`, `WITNESS_MARKETING_INDEXABLE=false`; network `witness-pilot`
+  (the existing application network — no new network created).
+- Cloudflare Tunnel ingress (`deployments/cloud-managed/cloudflared/config.yml` on the host, tunnel
+  `35391ae3-9882-4f35-8f47-e1c1b3f31fb7`) routes `preview.buildwithwitness.com` to
+  `http://witness-marketing-preview:3000` only, with an explicit deny-by-default catch-all rule
+  after it. No other hostname's rule was changed to add this one.
+- External checks (from outside the host, ordinary HTTPS): `/` → `200`, `/health` → `200`,
+  `/sitemap.xml` → `200`, `/robots.txt` → `Disallow: /`. `/platform`, `/solutions` and
+  `/how-it-works` → `404` (the deployed `efba8b7` build predates all three).
+- Cloudflare dashboard-only facts (DNS record IDs, Worker routes, exact SSL certificate coverage)
+  remain `HUMAN ACTION REQUIRED` — SSH and `docker`/`git` access do not substitute for Cloudflare
+  API/dashboard access, and none was used or assumed here.
+
+**Updated access inventory:** SSH `YES` (read-only used); Docker on host `YES` (read-only used);
+Cloudflare dashboard/API `NO`; Keycloak admin API `NOT RE-TESTED`; approved synthetic account `NO`;
+synthetic mailbox `NO`. This does not change the `NO-GO` cutover recommendation — apex cutover
+depends on gates unrelated to SSH/Docker access (Keycloak config verification, synthetic auth
+flows, `www` provisioning, final MKT-03K approval), none of which this re-verification touched.

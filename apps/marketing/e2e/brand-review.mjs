@@ -24,6 +24,7 @@ const contentPaths = [
   '/solutions/international-development',
   '/solutions/research',
   '/solutions/consultation',
+  '/demo',
 ];
 
 async function waitForServer() {

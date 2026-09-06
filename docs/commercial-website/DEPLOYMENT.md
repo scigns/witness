@@ -1,8 +1,9 @@
 # Witness Commercial Website Deployment
 
 **Owner:** Engineering, Operations and Product
-**Status:** MKT-01D repository hardening complete; isolated preview provisioning pending
-**Last reviewed:** 2026-09-04
+**Status:** MKT-01D repository hardening complete; isolated preview provisioned and live, serving a
+build from before MKT-04/05/06 — see `CURRENT_PRODUCTION_BASELINE.md`'s 2026-09-05 verification
+**Last reviewed:** 2026-09-05
 
 ## Selected architecture
 
@@ -67,12 +68,16 @@ stable health payload. No product cookies, auth redirect or customer data may be
 MKT-03H retains the standalone container architecture and specifies
 `preview.buildwithwitness.com` → Cloudflare Tunnel → isolated marketing container. The exact build,
 container, Tunnel public-hostname, HTTPS smoke, remote browser and reversible removal steps are in
-[`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md). No preview hostname has been provisioned.
+[`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md). The preview hostname is provisioned and live as of
+2026-09-05, running the `witness-marketing:preview-efba8b7` image — see
+`CURRENT_PRODUCTION_BASELINE.md` for the verified state. It has not yet been redeployed with
+current `main`, so MKT-04/05/06 routes are not present on it today.
 
 The current-main production/noindex RC1 passed `/`, `/health`, `/robots.txt`, `/sitemap.xml` and the
 six-width browser suite in its container. The image is `witness-marketing:efba8b7`, with local image
-ID `sha256:3a4d8696d7b4f72f9ecb666db358bb3c17ffd1f0f39e84348754a48d48253190`.
-An approved registry push or equivalent preview-host build must record the registry digest. See
+ID `sha256:3a4d8696d7b4f72f9ecb666db358bb3c17ffd1f0f39e84348754a48d48253190` — this is the exact
+build now running as the live preview. An approved registry push or equivalent preview-host build
+must record the registry digest for future deployments. See
 [`CURRENT_PRODUCTION_BASELINE.md`](CURRENT_PRODUCTION_BASELINE.md) for the production restoration
 worksheet.
 
@@ -128,12 +133,16 @@ WITNESS_MARKETING_ENV=production
 WITNESS_MARKETING_INDEXABLE=false
 ```
 
-## MKT-03J operator handoff
+## MKT-03J operator handoff — completed 2026-09-05
 
-The preview remains absent. An authorised operator must deploy the immutable RC1 (or an immutable
-registry build from source `efba8b7`) as `witness-marketing-preview` on the existing application
-network, with only the three documented preview variables, then add only
-`preview.buildwithwitness.com` to the existing Tunnel with service
-`http://witness-marketing-preview:3000`. Record the container/image/digest/network, DNS record ID,
-Tunnel/public-hostname IDs, SSL state and removal command. Do not edit apex, app, API, identity or
-`www`. Run the documented HTTPS probes and remote browser command only after DNS and TLS are active.
+The steps below were executed by an authorised operator and verified directly (see
+`CURRENT_PRODUCTION_BASELINE.md`): `witness-marketing-preview` runs the `efba8b7` build on the
+existing application network with exactly the three documented preview variables
+(`WITNESS_MARKETING_ENV=preview`, `WITNESS_MARKETING_INDEXABLE=false`, and the preview site URL);
+`preview.buildwithwitness.com` is the only new Tunnel ingress rule added, pointing at
+`http://witness-marketing-preview:3000`; no other hostname's routing changed. HTTPS, `/health` and
+`/sitemap.xml` all verified live.
+
+**Remaining:** the deployed image predates MKT-04/05/06, so those routes aren't live yet. The next
+operator action is rebuilding and redeploying `witness-marketing-preview` from current `main` using
+this exact same pattern — not a new approval, a repeat of an already-approved one.
