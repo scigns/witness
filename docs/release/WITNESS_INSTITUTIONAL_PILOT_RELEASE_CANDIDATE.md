@@ -60,7 +60,7 @@ full MKT-06 synthetic demo and preview-state reconciliation content.
 | 15 | Client pilot runbook | READY | [`CLIENT_PILOT_RUNBOOK.md`](CLIENT_PILOT_RUNBOOK.md) |
 | 16 | Final human release approval | HUMAN ACTION REQUIRED | Not requested |
 
-**Technical release readiness: 6 of 16 gates READY, 2 PARTIAL, 8 HUMAN ACTION REQUIRED — not a
+**Technical release readiness: 5 of 16 gates READY, 2 PARTIAL, 9 HUMAN ACTION REQUIRED — not a
 percentage this document will round up.**
 
 ## Redeploy the preview (gate 2)
