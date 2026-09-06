@@ -12,6 +12,7 @@ export const marketingNavigation = {
   primary: [
     { label: 'Platform', href: '/platform' },
     { label: 'Solutions', href: '/solutions' },
+    { label: 'Demo', href: '/demo' },
     { label: 'Resources', href: null },
     { label: 'Pricing', href: null },
     { label: 'Trust', href: null },

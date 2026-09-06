@@ -37,8 +37,12 @@ The application requires no secrets and makes no protected API calls.
   to a demonstration-request email addressed to the established `hello@buildwithwitness.com` role.
 
 Navigation labels for unbuilt pages are retained as structured configuration but render as
-non-interactive planned text. Only the home page, verified app sign-in, demo email and public source
-repository are linked, so the shell exposes no intentionally broken routes.
+non-interactive planned text until their route exists — see `src/lib/navigation.ts`. As of MKT-06,
+real routes are linked for the home page, `/platform` and its `/platform/evidence`,
+`/platform/decisions`, `/platform/institutional-memory` children, `/how-it-works`, `/why-witness`,
+`/solutions` and its four sector children, `/demo`, verified app sign-in, the demo-request email
+and the public source repository. Resources, Pricing and Trust remain non-interactive; the shell
+exposes no intentionally broken routes.
 
 `output: 'standalone'` and `Dockerfile` keep the application portable behind the existing Cloudflare
 edge without selecting or provisioning a live Cloudflare deployment. MKT-01D documents the preview
@@ -58,16 +62,24 @@ MKT-03I RC1 was built from current-main-aligned source `efba8b7` as
 `witness-marketing:efba8b7`. Its local content-addressable image ID is
 `sha256:3a4d8696d7b4f72f9ecb666db358bb3c17ffd1f0f39e84348754a48d48253190`.
 It uses the canonical production URL and production environment with indexing explicitly off. Local
-HTTP/header smoke and all six browser widths pass. It has not been pushed, preview-deployed or routed
-to the production apex.
+HTTP/header smoke and all six browser widths pass.
+
+**This exact image is the one now running as the live `preview.buildwithwitness.com` container**
+(`witness-marketing-preview`, verified 2026-09-05 — see `CURRENT_PRODUCTION_BASELINE.md`'s MKT-06
+pre-flight re-verification). It predates MKT-04, MKT-05 and MKT-06, so `/platform`, `/solutions`
+and `/demo` are not live there yet; redeploying the container with current `main` is the next
+operator action, using the same already-approved pattern. It has not been pushed to a registry or
+routed to the production apex.
 
 ## Browser review
 
-The focused MKT-02E browser review uses the existing `playwright-core` development dependency and an
-installed Chrome/Chromium executable. It starts only the marketing dev server on port 3002, tests `/`
-at six widths, verifies keyboard behaviour and exercises the unlinked noindex `/brand-fixture` route.
-Override the browser path with `WITNESS_MARKETING_CHROMIUM`. Failure screenshots are written outside
-the repository to `/tmp/witness-marketing-e2e` (or `MKT_E2E_ARTIFACT_DIR`).
+The repository-owned browser review uses the existing `playwright-core` development dependency and
+an installed Chrome/Chromium executable. It starts the marketing dev server on port 3002, tests
+every real content route (`/`, `/platform` and its children, `/how-it-works`, `/why-witness`,
+`/solutions` and its children, `/demo`) at six widths, verifies keyboard behaviour, and separately
+exercises the unlinked noindex `/brand-fixture` route. Override the browser path with
+`WITNESS_MARKETING_CHROMIUM`. Failure screenshots are written outside the repository to
+`/tmp/witness-marketing-e2e` (or `MKT_E2E_ARTIFACT_DIR`).
 
 After an HTTPS preview exists, run the same suite remotely without starting a local server:
 
@@ -76,5 +88,6 @@ WITNESS_MARKETING_E2E_BASE_URL=https://preview.buildwithwitness.com \
   pnpm --filter @witness/marketing test:e2e
 ```
 
-MKT-03J confirmed that the preview hostname still has no DNS and therefore no remote suite was run.
-RC1 remains local-only and no production route or indexing setting changed.
+The preview hostname is live (verified 2026-09-05), but running this against it today would fail
+on every MKT-04/05/06 route — the deployed image is the stale `efba8b7` RC1 above. Re-run this
+remote check after the preview container is redeployed with current `main`.

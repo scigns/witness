@@ -26,7 +26,7 @@ explicitly verified.
 | MKT-03L Brand Book Reconciliation | `VERIFIED COMPLETE` | Palette/typography/radius reconciled to the Brand Book; independent of the cutover track — no production/routing change |
 | MKT-04 Platform & How It Works | `VERIFIED COMPLETE` | Six routes live: `/platform`, `/how-it-works`, `/why-witness`, `/platform/evidence`, `/platform/decisions`, `/platform/institutional-memory` |
 | MKT-05 Solutions | `VERIFIED COMPLETE` | `/solutions` hub plus `/solutions/{government,international-development,research,consultation}`, differentiated per sector |
-| MKT-06 Synthetic Demo | `NOT STARTED` | Product has synthetic development data, but no unauthenticated guided demo |
+| MKT-06 Synthetic Demo | `VERIFIED COMPLETE` | `/demo` — a fictional programme record traced end to end, grounded in `packages/domain` |
 | MKT-07 Conversion Infrastructure | `NOT STARTED` | No public forms, Turnstile or lead workflow |
 | MKT-08 Commercial Packaging | `DESIGN / PLANNING` | Product `/pricing` exists; public packaging and claim verification remain |
 | MKT-09 Trust Centre | `NOT STARTED` | Extensive internal evidence exists; no publishable trust surface |
@@ -86,8 +86,12 @@ explicitly verified.
 23. **MKT-05 — solutions pages — `VERIFIED COMPLETE`.** Four differentiated sector pages plus a
     hub, built from already-approved homepage copy and `VISION.md` — explicitly not from the
     non-canonical `docs/product/SECTOR_APPLICATIONS.md`.
-24. Build the synthetic demo, then conversion, packaging, trust, onboarding and analytics in
-    milestone order, advancing partial existing capabilities only after their own acceptance checks.
+24. **MKT-06 — synthetic demo — `VERIFIED COMPLETE`.** `/demo` traces one fictional programme
+    record end to end. No fictional "Approval" domain object was introduced — `Decision` already
+    has `confirmed`/`confirmedBy`; consent categories shown are the exact set from
+    `packages/domain/src/consent-template.ts`.
+25. Build conversion infrastructure, then packaging, trust, onboarding and analytics in milestone
+    order, advancing partial existing capabilities only after their own acceptance checks.
 
 ## First small pull request
 
