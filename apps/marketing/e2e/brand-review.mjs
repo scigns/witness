@@ -53,6 +53,19 @@ async function assertPage(page, width, path) {
   if (!response || !response.ok())
     throw new Error(`${path} returned HTTP ${response?.status() ?? 'unknown'}`);
 
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const logo = document.querySelector('.brand-logo');
+        if (!logo || logo.complete) {
+          resolve();
+          return;
+        }
+        logo.addEventListener('load', resolve, { once: true });
+        logo.addEventListener('error', resolve, { once: true });
+      }),
+  );
+
   const state = await page.evaluate(() => {
     const logo = document.querySelector('.brand-logo');
     return {
