@@ -18,7 +18,7 @@ cutover because dashboard state can change after this repository record is revie
 | API | Cloudflare-proxied; `/health` and `/ready` HTTP 200 |
 | Identity | Cloudflare-proxied; HTTPS responds and Keycloak is healthy through API readiness |
 | `www` | No A/CNAME answer |
-| Preview | No remote preview verified; no Cloudflare credentials are available locally |
+| Preview | **Superseded 2026-09-05 — see "MKT-06 pre-flight re-verification" below.** This row is the 2026-09-04 snapshot: no remote preview verified, no Cloudflare credentials locally. Now live, on a stale build. |
 | API build | `0.4.0`, build `6afc203238aa9ed2058dfbc819aca021107ff3d5` |
 | API profile | `hybrid`; instance `Witness Production (witness-prod-01)` |
 
@@ -36,7 +36,7 @@ In Cloudflare Dashboard → `buildwithwitness.com`, complete every blank before 
 | `api` | `REQUIRES HUMAN CLOUDFLARE VERIFICATION` | Observed yes | `REQUIRES HUMAN CLOUDFLARE VERIFICATION` | `REQUIRES HUMAN CLOUDFLARE VERIFICATION` | API gateway |
 | `id` | `REQUIRES HUMAN CLOUDFLARE VERIFICATION` | Observed yes | `REQUIRES HUMAN CLOUDFLARE VERIFICATION` | `REQUIRES HUMAN CLOUDFLARE VERIFICATION` | Keycloak |
 | `www` | Absent | N/A | None observed | None observed | Permanent redirect only |
-| `preview` | Absent | N/A | None observed | None observed | Future marketing preview |
+| `preview` | `REQUIRES HUMAN CLOUDFLARE VERIFICATION` for the exact DNS record ID | Observed yes (`server: cloudflare` on live responses) | None observed | `preview.buildwithwitness.com → witness-marketing-preview:3000`, read directly from the host's `cloudflared/config.yml` 2026-09-05 — not dashboard-verified, but the source config itself | `witness-marketing-preview` container, stale `efba8b7` build — see "MKT-06 pre-flight re-verification" below |
 
 Dashboard path: **DNS → Records** for record/target/proxy state; **Rules → Redirect Rules** for rule
 IDs and precedence; **Zero Trust → Networks → Tunnels → Public Hostnames** for effective Tunnel
@@ -58,9 +58,14 @@ Record all values immediately before the change:
 - [ ] `www` DNS record and Redirect Rule IDs once created.
 - [ ] Preview DNS/Tunnel/deployment identifiers and removal command.
 
-Read-only SSH to the documented production host failed with `Permission denied (publickey)` from the
-current environment, so container image IDs and the rendered Tunnel ingress could not be recorded.
-An authorised operator must run:
+**Superseded 2026-09-05.** SSH to the documented production host now succeeds (was
+`Permission denied (publickey)`) — see "MKT-06 pre-flight re-verification" below, which already
+recorded the checked-out repo commit, the running container list, the marketing preview's exact
+image digest, and the rendered Tunnel ingress from that access. Still outstanding from the list
+above: exact `witness-pilot-web`/`witness-pilot-api` image digests (only their image names were
+recorded, not `docker image inspect` output), and every Cloudflare-dashboard-only fact (DNS record
+IDs, Worker route/version, TTL) — those still need a human operator with Cloudflare access, not
+just SSH. The original commands remain correct for capturing what's still missing:
 
 ```sh
 cd /home/witness/witness

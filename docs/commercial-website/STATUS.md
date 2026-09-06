@@ -124,13 +124,19 @@ longer true.** Verified directly, not assumed:
   `/robots.txt` returns `Disallow: /`.
 - SSH to `witness@167.172.72.70` now succeeds (previously `Permission denied (publickey)`).
 - The Cloudflare Tunnel ingress (read on the host) proxies `preview.buildwithwitness.com` to
-  `witness-marketing-preview:3000` only, isolated, with an explicit deny-by-default catch-all — no
-  other host's routing was touched to add it.
+  `witness-marketing-preview:3000` only, with an explicit deny-by-default catch-all — no other
+  host's Tunnel routing was touched to add it.
 - The running container is `witness-marketing:preview-efba8b7`
   (`sha256:5bd75298c879de0fa381464104053f0281d9a3123f145a6dd88636b537b05bc8`), env
   `WITNESS_MARKETING_ENV=preview`, `WITNESS_MARKETING_INDEXABLE=false` — correctly configured, but
   built from `efba8b7`, i.e. before MKT-04, MKT-05 and MKT-06. `/platform`, `/solutions` and
   `/how-it-works` all return `404` on the live preview today.
+- **Not isolated at the network layer**: the container runs on the shared `witness-pilot` Docker
+  network, the same one `postgres`/`api`/`keycloak` use — not a dedicated network. It carries no
+  credentials and its code never calls those services, but network-layer reachability is not the
+  same as an application never using it. Giving it a dedicated network (with `cloudflared` attached
+  to both) is a real hardening opportunity, not done here — this only corrects language, not the
+  deployment.
 - Production apex cutover is intentionally still gated on rollback proof and human approval; nothing
   above changes that.
 
@@ -163,8 +169,9 @@ longer true.** Verified directly, not assumed:
   visual-regression baselines or a general route crawler.
 - Dependency review can be skipped when GitHub's dependency graph is unavailable.
 - No `www` redirect/canonical handling exists.
-- The remote preview exists and is correctly configured (isolated, noindex) but serves a build from
-  before MKT-04/05/06 — see "Remote preview — resolved" above.
+- The remote preview exists and is correctly configured (noindex, no secrets, Tunnel-isolated
+  hostname; shares the `witness-pilot` Docker network rather than a dedicated one) but serves a
+  build from before MKT-04/05/06 — see "Remote preview — resolved" above.
 - Future navigation labels are non-interactive until their routes contain reviewed content.
 - The mobile disclosure has structural and browser interaction coverage at six viewport widths.
 - Marketing metadata uses a fixed canonical production origin while deployment URLs remain
