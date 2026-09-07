@@ -45,9 +45,9 @@ ENV WITNESS_MARKETING_INDEXABLE=${WITNESS_MARKETING_INDEXABLE}
 
 WORKDIR /app
 
-COPY --from=build /repo/apps/marketing/.next/standalone ./
-COPY --from=build /repo/apps/marketing/.next/static ./apps/marketing/.next/static
-COPY --from=build /repo/apps/marketing/public ./apps/marketing/public
+COPY --from=build --chown=node:node /repo/apps/marketing/.next/standalone ./
+COPY --from=build --chown=node:node /repo/apps/marketing/.next/static ./apps/marketing/.next/static
+COPY --from=build --chown=node:node /repo/apps/marketing/public ./apps/marketing/public
 
 USER node
 
