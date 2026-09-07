@@ -237,9 +237,10 @@ to be understood years later. Precision and pacing create the premium quality; o
 
 ### Painted evidence usage
 
-- Homepage hero: the approved Blush canvas is used once at cover scale as an uncropped field beside
-  the editorial statement. A bottom-weighted 68% Ink scrim protects only its small caption; type is
-  not placed over active brushwork.
+- Homepage hero: the approved Blush canvas is used once as a deliberately cropped field beside the
+  editorial statement. The crop changes framing only; the artwork is not recoloured or filtered. A
+  bottom-weighted 68% Ink scrim protects only its small caption; type is not placed over active
+  brushwork.
 - Homepage transition: the Ember/Ochre source canvas appears once as a thin full-width band before
   the institutional-audience section. It is punctuation, not a reusable pattern or card image.
 - Why Witness: the Blush canvas is ghosted at 18% behind the opening argument, within the Brand
