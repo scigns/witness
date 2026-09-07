@@ -5,7 +5,7 @@ import { PageContainer } from './page-container';
 import { WitnessLogo } from './witness-logo';
 
 export function PublicFooter() {
-  const { appUrl, demoUrl } = marketingSiteConfig();
+  const { appUrl, demoUrl, pricingUrl } = marketingSiteConfig();
 
   return (
     <footer className="site-footer">
@@ -18,7 +18,8 @@ export function PublicFooter() {
             <p>Institutional memory with provenance by design.</p>
           </div>
           <div className="footer-actions">
-            <a href={demoUrl.href}>Talk to Witness</a>
+            <a href={pricingUrl.href}>View plans</a>
+            <a href={demoUrl.href}>Discuss a pilot</a>
             <a href={appUrl.href}>Sign in</a>
           </div>
         </div>

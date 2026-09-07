@@ -106,7 +106,7 @@ async function assertPage(page, width, path) {
 
   if (isMobile) await page.locator('.mobile-navigation summary').click();
 
-  for (const label of ['Book a demo', 'Sign in']) {
+  for (const label of ['View plans', 'Sign in']) {
     const scope = isMobile ? page.locator('.mobile-navigation') : page.locator('.header-actions');
     const locator = scope.getByText(label, { exact: true });
     if (!(await locator.isVisible())) throw new Error(`${label} is not visible at ${width}px`);
@@ -148,7 +148,7 @@ async function assertKeyboard(page) {
   if (!(await page.locator('.mobile-navigation').evaluate((node) => node.hasAttribute('open')))) {
     throw new Error('Mobile menu is not keyboard operable');
   }
-  for (const label of ['Sign in', 'Book a demo']) {
+  for (const label of ['Sign in', 'View plans']) {
     if (!(await page.locator('.mobile-navigation').getByText(label, { exact: true }).isVisible())) {
       throw new Error(`${label} is not reachable in the mobile menu`);
     }
