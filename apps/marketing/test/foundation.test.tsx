@@ -92,7 +92,7 @@ describe('independent marketing foundation', () => {
     expect(html).toContain('Institutional Transformation Programme');
     expect(html).toContain('Adopt revised complaints process');
     expect(html).toContain('Action #21');
-    expect(html).toContain('Talk to Witness');
+    expect(html).toContain('Discuss a pilot');
     for (const title of [
       'Government',
       'International Development',
@@ -139,7 +139,7 @@ describe('independent marketing foundation', () => {
     expect(html).toContain('href="#main-content"');
     expect(html).toContain('Skip to main content');
     expect(html).toContain('Sign in');
-    expect(html).toContain('Book a demo');
+    expect(html).toContain('View plans');
   });
 
   it('exposes links only for destinations that work today', () => {
@@ -169,7 +169,8 @@ describe('independent marketing foundation', () => {
         '/solutions/research',
         '/solutions/consultation',
         'https://app.buildwithwitness.com/signin',
-        'mailto:hello@buildwithwitness.com?subject=Witness%20demonstration%20request',
+        'https://app.buildwithwitness.com/pricing',
+        'mailto:hello@buildwithwitness.com?subject=Witness%20institutional%20pilot%20enquiry',
         'https://github.com/scigns/witness',
       ]),
     );
@@ -189,6 +190,7 @@ describe('independent marketing foundation', () => {
     expect(preview.deploymentUrl.href).toBe('https://preview.example/');
     expect(preview.canonicalOrigin.href).toBe('https://buildwithwitness.com/');
     expect(preview.appUrl.href).toBe('https://app.buildwithwitness.com/signin');
+    expect(preview.pricingUrl.href).toBe('https://app.buildwithwitness.com/pricing');
     expect(robots()).toEqual({ rules: { userAgent: '*', disallow: '/' } });
     expect(sitemap()[0]?.url).toBe('https://buildwithwitness.com/');
 

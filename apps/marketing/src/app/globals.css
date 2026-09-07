@@ -338,6 +338,10 @@ main {
 }
 .home-hero h1 { max-width: 13ch; }
 .hero-lede { max-width: 34rem; margin: var(--space-8) 0; font-size: clamp(1.125rem, 2vw, 1.5rem); line-height: 1.5; }
+.hero-commercial-note { max-width: 38rem; margin: var(--space-5) 0 0; color: var(--color-muted); font-size: var(--font-size-small); }
+.hero-assurance { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-6); margin: var(--space-6) 0 0; padding: var(--space-5) 0 0; border-top: 1px solid var(--color-border); list-style: none; color: var(--color-ink); font-size: var(--font-size-small); font-weight: 650; }
+.hero-assurance li { position: relative; padding-inline-start: var(--space-4); }
+.hero-assurance li::before { position: absolute; top: 0.62em; left: 0; width: 0.3rem; height: 0.3rem; background: var(--color-accent); content: ''; }
 .problem-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-8); max-width: 50rem; margin: var(--space-8) 0 0; padding: 0; list-style: none; }
 .problem-list li { padding: var(--space-4) 0 var(--space-4) var(--space-6); border-inline-start: var(--space-1) solid var(--color-accent); color: var(--color-ink); }
 .feature-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-4); margin-top: var(--space-8); }
