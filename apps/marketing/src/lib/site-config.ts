@@ -26,7 +26,7 @@ export function marketingSiteConfig(
   const pricingUrl = new URL('/pricing', appUrl);
   const demoUrl = new URL(
     environment['WITNESS_MARKETING_DEMO_URL'] ??
-      'mailto:hello@buildwithwitness.com?subject=Witness%20demonstration%20request',
+      'mailto:hello@buildwithwitness.com?subject=Witness%20institutional%20pilot%20enquiry',
   );
 
   if (deploymentUrl.protocol !== 'http:' && deploymentUrl.protocol !== 'https:') {

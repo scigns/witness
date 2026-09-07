@@ -170,7 +170,7 @@ describe('independent marketing foundation', () => {
         '/solutions/consultation',
         'https://app.buildwithwitness.com/signin',
         'https://app.buildwithwitness.com/pricing',
-        'mailto:hello@buildwithwitness.com?subject=Witness%20demonstration%20request',
+        'mailto:hello@buildwithwitness.com?subject=Witness%20institutional%20pilot%20enquiry',
         'https://github.com/scigns/witness',
       ]),
     );
