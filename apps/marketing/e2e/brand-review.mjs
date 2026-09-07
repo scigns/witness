@@ -53,6 +53,15 @@ async function assertPage(page, width, path) {
   if (!response || !response.ok())
     throw new Error(`${path} returned HTTP ${response?.status() ?? 'unknown'}`);
 
+  await page.locator('header .brand-logo').evaluate(
+    (logo) =>
+      logo.complete ||
+      new Promise((resolve, reject) => {
+        logo.addEventListener('load', resolve, { once: true });
+        logo.addEventListener('error', reject, { once: true });
+      }),
+  );
+
   const state = await page.evaluate(() => {
     const logo = document.querySelector('.brand-logo');
     return {
@@ -102,6 +111,8 @@ async function assertPage(page, width, path) {
     const locator = scope.getByText(label, { exact: true });
     if (!(await locator.isVisible())) throw new Error(`${label} is not visible at ${width}px`);
   }
+
+  if (isMobile) await page.locator('.mobile-navigation summary').click();
 }
 
 async function assertKeyboard(page) {

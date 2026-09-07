@@ -39,7 +39,7 @@ export default function SolutionsPage() {
   const { demoUrl } = marketingSiteConfig();
 
   return (
-    <div className="foundation-page">
+    <div className="foundation-page solutions-page">
       <div className="foundation-heading">
         <Eyebrow>Solutions</Eyebrow>
         <h1>Designed for organisations carrying important decisions forward.</h1>

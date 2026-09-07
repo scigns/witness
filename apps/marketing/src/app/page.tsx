@@ -84,21 +84,26 @@ export default function MarketingHomepage() {
   return (
     <div className="homepage">
       <Section id="hero" className="home-hero">
-        <Eyebrow>Evidence governance</Eyebrow>
-        <h1>Make important decisions traceable.</h1>
-        <p className="hero-lede">
-          Witness is the evidence layer for work that has to be provable. It connects evidence,
-          consultation, decisions and actions into an accountable institutional record.
-        </p>
-        <CTAGroup aria-label="Homepage actions">
-          <LinkButton href={demoUrl.href}>Book a demonstration</LinkButton>
-          <LinkButton href="#how-it-works" variant="secondary">
-            Explore Witness
-          </LinkButton>
-          <LinkButton href={appUrl.href} variant="tertiary">
-            Sign in
-          </LinkButton>
-        </CTAGroup>
+        <div className="hero-copy">
+          <Eyebrow>Evidence governance</Eyebrow>
+          <h1>Make important decisions traceable.</h1>
+          <p className="hero-lede">
+            Witness is the evidence layer for work that has to be provable. It connects evidence,
+            consultation, decisions and actions into an accountable institutional record.
+          </p>
+          <CTAGroup aria-label="Homepage actions">
+            <LinkButton href={demoUrl.href}>Book a demonstration</LinkButton>
+            <LinkButton href="#how-it-works" variant="secondary">
+              Explore Witness
+            </LinkButton>
+            <LinkButton href={appUrl.href} variant="tertiary">
+              Sign in
+            </LinkButton>
+          </CTAGroup>
+        </div>
+        <div className="hero-art" aria-hidden="true">
+          <span>Painted evidence / Blush canvas</span>
+        </div>
       </Section>
 
       <Section id="problem" className="homepage-section">
@@ -175,7 +180,7 @@ export default function MarketingHomepage() {
           ))}
         </div>
       </Section>
-      <Section id="provenance" className="homepage-section">
+      <Section id="provenance" className="homepage-section ink-section">
         <SectionHeading
           eyebrow="Provenance by design"
           title="Don't just store the decision. Preserve its story."
