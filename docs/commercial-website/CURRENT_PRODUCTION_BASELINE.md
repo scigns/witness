@@ -158,3 +158,39 @@ Cloudflare dashboard/API `NO`; Keycloak admin API `NOT RE-TESTED`; approved synt
 synthetic mailbox `NO`. This does not change the `NO-GO` cutover recommendation — apex cutover
 depends on gates unrelated to SSH/Docker access (Keycloak config verification, synthetic auth
 flows, `www` provisioning, final MKT-03K approval), none of which this re-verification touched.
+
+## Release candidate deployment and exact image digests — 2026-09-06
+
+Preview redeployed with the Institutional Pilot release candidate (`main`
+`a0a0b0c90d7010392aa2c366a3e9d0475f98f51b`, PR #216 + #217). Built for `linux/amd64` locally,
+transferred via `docker save | gzip` + `scp`, sha256-verified identical before and after transfer
+(`151a1e26892e...`), loaded on the host, old container renamed
+`witness-marketing-preview-retired-1788687442` (not removed — that rename is the rollback), new
+container started on the existing `witness-pilot` network. All 13 content routes plus
+`/health`/`/robots.txt`/`/sitemap.xml` return `200`; `robots.txt` still disallows all. Six-width
+browser QA (320/375/430/768/1024/1440) passed 3 consecutive runs against the live preview after
+fixing a genuine test-timing race in `brand-review.mjs` (PR #218) — the check read the logo
+image's `complete` flag before the image had necessarily finished loading, failing at a different,
+unpredictable page/width each run with no actual rendering defect.
+
+Exact running production image digests, filling the gap this document previously left as
+`HUMAN ACTION REQUIRED` (only image names had been recorded, not `docker image inspect` output):
+
+| Container | Repo:Tag | Image digest | Arch | Image created |
+| --- | --- | --- | --- | --- |
+| `witness-pilot-web-1` | `witness-pilot-web:latest` | `sha256:3d0eacfc58a7c8baf360d19ef4bb10fe9a74012b721ccd8220c91e6477fe20a9` | amd64/linux | 2026-09-04T17:13:30Z |
+| `witness-pilot-api-1` | `witness-pilot-api:latest` | `sha256:917cd4edb65c39643959111edfa00aa3f7a09bc7aac0e92a47374d3148b39dc9` | amd64/linux | 2026-09-05T00:18:17Z |
+| `witness-pilot-keycloak-1` | `quay.io/keycloak/keycloak:26.0` | `sha256:09a381c715ab0b111835b70f2905955274843a219c6f27efb348e4d9f4086858` | amd64/linux | 2025-02-20T14:47:15Z |
+| `witness-marketing-preview` | `witness-marketing:rc-a0a0b0c` | `sha256:20db602e5e50137e719836410a68eceab589895fecb3c7dbc834c0fb5af208cb` | amd64/linux | 2026-09-06T09:31:19Z |
+
+Note: the container `Created` timestamps for `witness-pilot-web-1`/`witness-pilot-api-1` read
+2026-09-06T09:26 — later than their *image* `Created` timestamps above. That is a container
+recreation (e.g. a restart) against the same, unchanged image digest, not a redeploy; verified by
+comparing image digest, not container uptime.
+
+Also observed during transfer: `docker save`/`docker load` round-tripped the exact same archive
+(sha256-verified) but the destination host's `docker inspect` reported a different image ID than
+the source build (`20db602e5e50...` vs local `433dd78f...`) for the marketing RC image, despite
+identical layers, architecture, and config `Created` timestamp to the nanosecond. This is a
+Docker-version image-ID-recompute artifact of the load path, not a corrupted or different image —
+recorded here so it isn't mistaken for a supply-chain concern later.

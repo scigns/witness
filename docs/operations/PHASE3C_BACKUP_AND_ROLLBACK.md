@@ -1,7 +1,9 @@
 # Phase 3C backup and rollback controls
 
 **Owner:** Infrastructure Lead with Engineering
-**Status:** Planned; operator controls not yet exercised
+**Status:** Backup cron restored and isolated restore drill exercised 2026-09-06
+(see "Isolated restore validation" and the incident note below); Cloudflare
+control-plane rollback steps remain unexercised
 
 This runbook establishes recoverability before any independent-domain cutover.
 It does not change DNS, Cloudflare Tunnel routes, Keycloak clients, application
@@ -48,11 +50,51 @@ the snapshot or upload it to GitHub.
 
 ## Isolated restore validation
 
-Keycloak dump restorability is **documented but unproven** until an operator
-restores a newly-created dump into a disposable PostgreSQL instance. Use
-`pg_restore --list` (and, where approved, restore into an isolated database)
-to verify structural validity without querying customer or identity data.
-Never overwrite production for this test.
+Performed 2026-09-06 after finding and fixing a real backup-cron failure (see
+"Incident: backup cron silently failing" below). `pg_restore --list` confirmed
+structural validity of both dumps (431 TOC entries in the witness dump, 440 in
+the keycloak dump). A disposable `pgvector/pgvector:pg16` container on its own
+isolated Docker network (`witness-restore-drill`, no shared network, no
+published port) received a full `pg_restore` of both the fresh witness dump
+(`witness-20260906T095039Z.dump`) and keycloak dump
+(`keycloak-20260906T095039Z.dump`). Recovery was confirmed by querying actual
+row counts — not just schema presence: 4 organisations, 15 evidence records, 1
+decision, 195 audit events from the witness dump; 2 realms, 14 clients from the
+keycloak dump. The disposable container and network were destroyed immediately
+after (`docker rm -f restore-drill-pg && docker network rm
+witness-restore-drill`); production was never touched by this drill.
+
+## Incident: backup cron silently failing, 2026-08-31 through 2026-09-06
+
+`scripts/pilot/backup.sh` invokes `docker compose exec`, which interpolates
+the *entire* compose file before running, including `services.api.environment`
+entries for `WITNESS_BUILD_ID` and `WITNESS_VERSION`
+(`${WITNESS_BUILD_ID:?WITNESS_BUILD_ID must be set}` in
+`deployments/cloud-managed/docker-compose.pilot.yml`). Those two values are
+normally supplied only as transient environment variables at deploy time and
+were never persisted to the production `.env`. Every cron invocation of
+`backup.sh` since 2026-08-31 03:00 UTC failed at that interpolation step,
+before `pg_dump` ever ran — six days with zero new backups, and zero Keycloak
+backups had ever been produced (the keycloak-dump code path shares the same
+`docker compose exec` call and was never reached).
+
+Fixed 2026-09-06 by taking an environment snapshot
+(`scripts/pilot/snapshot-env.sh`, stored under
+`/home/witness/witness-backups/env-snapshots/`, mode 600) and appending the two
+values already active in the running `witness-pilot-api-1` container
+(`WITNESS_BUILD_ID=a0a0b0c90d7010392aa2c366a3e9d0475f98f51b`,
+`WITNESS_VERSION=0.4.0`) to `.env`. Confirmed no container restart was
+triggered and both were already-running values, not new configuration.
+Re-ran `backup.sh` manually: it produced both a fresh witness dump and, for
+the first time on record, a keycloak dump.
+`scripts/ops/backup-status.sh` now reports `STATUS: OK`.
+
+**Follow-up needed (not release-blocking, but should not recur silently):**
+`backup.log` had been accumulating these interpolation errors for six days
+with nothing alerting on it. Consider a `HUMAN ACTION REQUIRED` follow-up to
+add alerting on `backup-status.sh` exit code, or to have the deploy pipeline
+persist `WITNESS_BUILD_ID`/`WITNESS_VERSION` into `.env` automatically so this
+class of drift can't reoccur after the next deploy changes those values.
 
 ## Cloudflare pre-change evidence
 
@@ -82,9 +124,10 @@ in an approved non-destructive rehearsal.
 
 ## Current limitations
 
-The production application and Keycloak databases are known to persist in the
-shared PostgreSQL service, but a separate Keycloak backup has not yet been
-created in this repository context. Cloudflare API credentials were unavailable
-for a fresh Phase 3C snapshot, so tunnel-ID correlation and current DNS state
-require operator verification before Phase 3 resumes. Anonymous Docker volumes
-observed by diagnostics remain untouched and their ownership is unknown.
+Cloudflare API credentials were unavailable for a fresh Phase 3C snapshot, so
+tunnel-ID correlation and current DNS state require operator verification
+before Phase 3 resumes. Anonymous Docker volumes observed by diagnostics
+remain untouched and their ownership is unknown. The Cloudflare-specific steps
+in "Rollback order for a future domain cutover" (Tunnel routes, DNS records)
+remain documented but unexercised — the database/application restore path is
+now proven, the domain-cutover path is not.
