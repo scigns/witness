@@ -16,8 +16,10 @@ export default function Error({ error, reset }: { error: Error; reset: () => voi
 
   return (
     <div className="max-w-xl space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Something went wrong</h1>
-      <p className="text-[var(--color-ink-muted)]">{error.message}</p>
+      <h1 className="text-3xl">We couldn&apos;t load this page.</h1>
+      <p className="text-[var(--color-ink-muted)]">
+        {error.message || 'Try the page again. If it still does not load, contact Witness support.'}
+      </p>
       <button
         type="button"
         onClick={reset}

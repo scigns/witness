@@ -9,6 +9,7 @@
  * were institutional memory. The banner is persistent for that reason.
  */
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -45,7 +46,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <div
         role="status"
-        className="border-b border-[var(--color-line)] bg-[var(--color-accent-soft)] px-4 py-2 text-center text-sm"
+        className="border-b border-[var(--color-line)] bg-[var(--color-ink)] px-4 py-2 text-center text-sm text-[var(--color-paper)]"
       >
         {IS_DEVELOPMENT_BUILD ? (
           <>
@@ -61,23 +62,29 @@ export function Shell({ children }: { children: ReactNode }) {
       </div>
 
       <header className="border-b border-[var(--color-line)] bg-[var(--color-paper-raised)]">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center">
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-              <span
+            <a
+              href="https://buildwithwitness.com"
+              className="flex items-center gap-2"
+              aria-label="Witness commercial website"
+            >
+              <Image
+                src="/brand/witness-logo-transparent.png"
+                alt=""
                 aria-hidden="true"
-                className="grid h-8 w-8 place-items-center rounded bg-[var(--color-accent)] text-sm font-bold text-[var(--color-accent-contrast)]"
-              >
-                W
-              </span>
-              <span className="text-lg">Witness</span>
-            </Link>
-            <span className="hidden text-sm text-[var(--color-ink-muted)] sm:inline">
+                width={566}
+                height={553}
+                className="h-8 w-8 object-contain"
+              />
+              <span className="witness-editorial-heading text-2xl">Witness</span>
+            </a>
+            <span className="hidden border-l border-[var(--color-line)] pl-3 text-sm text-[var(--color-ink-muted)] sm:inline">
               Institutional memory
             </span>
           </div>
 
-          <nav aria-label="Primary" className="flex flex-wrap items-center gap-1">
+          <nav aria-label="Primary" className="flex flex-wrap items-center gap-1 lg:ml-auto">
             {NAV.map((item) => {
               const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
 
@@ -87,9 +94,9 @@ export function Shell({ children }: { children: ReactNode }) {
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
                   className={[
-                    'rounded px-3 py-1.5 text-sm transition-colors',
+                    'rounded px-3 py-2 text-sm transition-colors',
                     active
-                      ? 'bg-[var(--color-accent-soft)] font-medium text-[var(--color-accent)]'
+                      ? 'border-b border-[var(--color-ink)] bg-[var(--color-paper)] font-medium text-[var(--color-ink)]'
                       : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]',
                   ].join(' ')}
                 >
@@ -99,23 +106,23 @@ export function Shell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center gap-2 lg:border-l lg:border-[var(--color-line)] lg:pl-4">
             {currentUser !== null &&
               currentUser.organisations.some((organisation) => organisation.role === 'admin') && (
                 <details className="relative">
-                  <summary className="cursor-pointer list-none rounded px-3 py-1.5 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-ink)]">
+                  <summary className="cursor-pointer list-none rounded px-3 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-paper)] hover:text-[var(--color-ink)]">
                     Administration
                   </summary>
-                  <div className="absolute right-0 z-40 mt-2 min-w-44 rounded-lg border border-[var(--color-line)] bg-[var(--color-paper-raised)] p-2 shadow-lg">
+                  <div className="absolute right-0 z-40 mt-2 min-w-52 rounded border border-[var(--color-line)] bg-[var(--color-paper-raised)] p-2">
                     <Link
                       href="/organisations"
-                      className="block rounded px-3 py-2 text-sm hover:bg-[var(--color-accent-soft)]"
+                      className="block rounded px-3 py-2 text-sm hover:bg-[var(--color-paper)]"
                     >
                       Organisations
                     </Link>
                     <Link
                       href="/users"
-                      className="block rounded px-3 py-2 text-sm hover:bg-[var(--color-accent-soft)]"
+                      className="block rounded px-3 py-2 text-sm hover:bg-[var(--color-paper)]"
                     >
                       Users
                     </Link>
@@ -125,7 +132,7 @@ export function Shell({ children }: { children: ReactNode }) {
                         <Link
                           key={organisation.id}
                           href={`/organisations/${organisation.id}/billing`}
-                          className="block rounded px-3 py-2 text-sm hover:bg-[var(--color-accent-soft)]"
+                          className="block rounded px-3 py-2 text-sm hover:bg-[var(--color-paper)]"
                         >
                           {organisation.name} billing
                         </Link>
@@ -187,7 +194,31 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+      {currentUser !== null && (
+        <div className="border-b border-[var(--color-line)] bg-[var(--color-paper)]">
+          <div className="mx-auto flex max-w-6xl flex-wrap gap-x-6 gap-y-1 px-4 py-2 text-xs text-[var(--color-ink-muted)]">
+            <span>
+              Signed in as{' '}
+              <strong className="text-[var(--color-ink)]">{currentUser.displayName}</strong>
+            </span>
+            {currentUser.organisations.length === 1 && (
+              <span>
+                Organisation{' '}
+                <strong className="text-[var(--color-ink)]">
+                  {currentUser.organisations[0]?.name}
+                </strong>
+              </span>
+            )}
+            {currentUser.organisations.length > 1 && (
+              <Link href="/organisations" className="underline underline-offset-4">
+                {currentUser.organisations.length} organisations
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:py-12">
         {children}
       </main>
 
@@ -275,10 +306,20 @@ function AuthStatusBadge({
 
 function Footer() {
   return (
-    <footer className="border-t border-[var(--color-line)] px-4 py-6 text-sm text-[var(--color-ink-muted)]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-1 sm:flex-row sm:justify-between">
-        <span>Witness — open-source digital public infrastructure for institutional memory.</span>
-        <span>GPL-3.0-or-later · SDKs and contracts Apache-2.0</span>
+    <footer className="border-t border-[var(--color-line)] bg-[var(--color-ink)] px-4 py-8 text-sm text-[var(--color-paper)]">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <span className="witness-editorial-heading block text-xl">Witness</span>
+          <span className="text-[var(--color-line)]">
+            Institutional memory, built to be read later.
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-4 text-[var(--color-line)]">
+          <a href="https://buildwithwitness.com/platform" className="underline underline-offset-4">
+            Learn about Witness
+          </a>
+          <span className="witness-machine-fact text-xs">GPL-3.0-or-later</span>
+        </div>
       </div>
     </footer>
   );

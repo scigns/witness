@@ -10,6 +10,7 @@
     "start": "NODE_ENV=production next start -p ${WITNESS_WEB_PORT:-3000}",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
+    "test:e2e:brand": "node test/brand-review.mjs",
     "lint": "eslint src",
     "clean": "rm -rf .next dist *.tsbuildinfo"
   },
