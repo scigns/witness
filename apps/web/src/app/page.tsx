@@ -156,6 +156,7 @@ export default function DashboardPage() {
   if (authStatus === 'loading') {
     return (
       <div className="space-y-5" role="status" aria-live="polite">
+        <h1 className="sr-only">Witness home</h1>
         <p className="text-sm text-[var(--color-ink-muted)]">Checking your Witness session…</p>
       </div>
     );
@@ -164,6 +165,7 @@ export default function DashboardPage() {
   if (authStatus === 'error') {
     return (
       <div className="space-y-5" role="status" aria-live="polite">
+        <h1 className="sr-only">Witness home</h1>
         <p className="text-sm text-[var(--color-ink-muted)]">
           We could not verify your Witness session. Please wait a moment and try again.
         </p>
@@ -199,13 +201,13 @@ export default function DashboardPage() {
     <div className="space-y-10">
       <section className="flex flex-wrap items-start justify-between gap-5">
         <div className="max-w-2xl">
-          <p className="text-sm font-medium text-[var(--color-accent)]">Your programs</p>
+          <p className="text-sm font-medium text-[var(--color-ink-muted)]">Your record</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-            Welcome, {firstName(currentUser.displayName)}
+            Welcome back, {firstName(currentUser.displayName)}.
           </h1>
           <p className="mt-2 text-[var(--color-ink-muted)]">
-            Continue your programs, prepare for upcoming sessions and move reviewed evidence into
-            decisions and action.
+            Your record is where you left it. Continue a program, review recent evidence or move an
+            agreed decision into action.
           </p>
         </div>
 
