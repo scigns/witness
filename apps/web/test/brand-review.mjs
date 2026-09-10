@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright-core';
 
@@ -6,9 +7,25 @@ const baseURL = (process.env.WITNESS_WEB_E2E_BASE_URL ?? 'http://127.0.0.1:3020'
   '',
 );
 const artifacts = process.env.WITNESS_WEB_E2E_ARTIFACT_DIR ?? '/tmp/witness-web-brand-e2e';
-const executablePath =
-  process.env.WITNESS_WEB_CHROMIUM ??
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
+// No bundled browser: this script uses playwright-core against a system
+// Chrome/Chromium, so the executable has to be found rather than assumed.
+const CANDIDATE_CHROMIUM_PATHS = [
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+];
+
+function resolveExecutablePath() {
+  if (process.env.WITNESS_WEB_CHROMIUM) return process.env.WITNESS_WEB_CHROMIUM;
+  const found = CANDIDATE_CHROMIUM_PATHS.find((path) => existsSync(path));
+  if (found) return found;
+  throw new Error('No Chrome/Chromium executable found. Set WITNESS_WEB_CHROMIUM to its path.');
+}
+
+const executablePath = resolveExecutablePath();
 const widths = [320, 375, 430, 768, 1024, 1440];
 const routes = ['/', '/signin', '/pricing'];
 

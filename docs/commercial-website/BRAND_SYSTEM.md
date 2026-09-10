@@ -13,9 +13,9 @@
 | Public marketing | apps/marketing routes, navigation, demo and conversion path | Aligned; unchanged |
 | Product shell and major routes | apps/web, including home, organisations, people, programs, sessions, evidence, records, outcomes and profile | Canonical palette/type/logo/chrome applied |
 | Pricing and billing | Public catalogue at /pricing; organisation subscription, usage and invoices at /organisations/:id/billing | Same shell, palette, type and CTA hierarchy |
-| Identity browser | Keycloak login, recovery, verification, required-action and error screens | witness/login theme added; auth semantics unchanged |
+| Identity browser | Keycloak login, recovery, verification, required-action and error screens | witness/login theme implemented and validated in this working state; deferred to BRAND-UNIFY-01B (separate PR, own production-approval gate) |
 | Transactional email | Witness-owned invitation templates and Keycloak account theme | Already aligned; retained |
-| Invoice document | Self-contained privileged HTML render | Witness institutional-document treatment applied |
+| Invoice document | Self-contained privileged HTML render | Witness institutional-document treatment implemented and validated in this working state; deferred to BRAND-UNIFY-01C (separate PR) |
 | PDF invoices / receipts | No generator or customer receipt surface | Not implemented; no substitute invented |
 
 packages/ui was considered as the runtime owner of brand primitives. It is not
@@ -32,11 +32,11 @@ the same literal values.
 | Boundary | Previous gap | Resolution |
 | --- | --- | --- |
 | Marketing → pricing | Host changed and product opened with blue/system-font chrome | Product pricing now uses the Brand Book shell, typography and Ink action hierarchy |
-| Pricing → authentication | Sign-in was functionally correct but visually generic | Application sign-in and Keycloak theme use Witness language and surfaces |
-| Identity → product | Generic Keycloak browser appearance | Witness login theme covers inherited login/recovery/verification/error flows |
+| Pricing → authentication | Sign-in was functionally correct but visually generic | Application sign-in uses Witness language and surfaces; Keycloak theme implemented, ships in BRAND-UNIFY-01B |
+| Identity → product | Generic Keycloak browser appearance | Witness login theme covers inherited login/recovery/verification/error flows; ships in BRAND-UNIFY-01B |
 | Product → marketing | No deliberate return/learning route | Product mark links to the commercial site; footer links to the platform story |
 | Product → billing | Billing existed behind an administration menu but looked like a separate prototype | Billing inherits the reconciled shell and document styling |
-| Invoice → product | HTML invoice used an unrelated blue/system style | Self-contained invoice uses Bone, Gesso, Ink, Graphite and Mist |
+| Invoice → product | HTML invoice used an unrelated blue/system style | Self-contained invoice uses Bone, Gesso, Ink, Graphite and Mist; ships in BRAND-UNIFY-01C |
 | Email → product | Email theme was branded but browser identity was not | Browser and email identity now share one brand grammar |
 
 ### Vocabulary

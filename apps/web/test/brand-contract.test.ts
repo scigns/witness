@@ -43,4 +43,15 @@ describe('one Witness brand contract', () => {
     expect(webCss).toContain('--radius-witness: 4px');
     expect(webCss).toContain('box-shadow: none !important');
   });
+
+  it('keeps marketing on the same type roles, radius cap and controlled light surface', () => {
+    expect(marketingCss).toContain('--font-editorial: var(--font-newsreader)');
+    expect(marketingCss).toContain('--font-sans: var(--font-plex-sans)');
+    expect(marketingCss).toContain('--font-mono: var(--font-plex-mono)');
+    expect(marketingCss).toContain('--radius-small: 0.25rem');
+    expect(marketingCss).toContain('--radius-medium: 0.25rem');
+    expect(marketingCss).toContain('color-scheme: light');
+    expect(marketingCss).not.toContain('@media (prefers-color-scheme: dark)');
+    expect(marketingCss).not.toContain('box-shadow');
+  });
 });
