@@ -1,7 +1,10 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright-core';
 
-const baseURL = (process.env.WITNESS_WEB_E2E_BASE_URL ?? 'http://127.0.0.1:3020').replace(/\/$/, '');
+const baseURL = (process.env.WITNESS_WEB_E2E_BASE_URL ?? 'http://127.0.0.1:3020').replace(
+  /\/$/,
+  '',
+);
 const artifacts = process.env.WITNESS_WEB_E2E_ARTIFACT_DIR ?? '/tmp/witness-web-brand-e2e';
 const executablePath =
   process.env.WITNESS_WEB_CHROMIUM ??
