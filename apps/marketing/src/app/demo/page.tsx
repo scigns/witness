@@ -37,7 +37,7 @@ const evidenceItems = [
 ] as const;
 
 export default function DemoPage() {
-  const { demoUrl } = marketingSiteConfig();
+  const { demoUrl, pricingUrl } = marketingSiteConfig();
 
   return (
     <div className="foundation-page">
@@ -202,9 +202,9 @@ export default function DemoPage() {
       <Section id="contact" className="homepage-section homepage-final-cta">
         <SectionHeading title="See how Witness could work in your organisation." />
         <CTAGroup aria-label="Demo page actions">
-          <LinkButton href={demoUrl.href}>Book a demonstration</LinkButton>
-          <LinkButton href="/platform" variant="secondary">
-            Explore Witness
+          <LinkButton href={pricingUrl.href}>View plans</LinkButton>
+          <LinkButton href={demoUrl.href} variant="secondary">
+            Discuss a pilot
           </LinkButton>
           <LinkButton href="/how-it-works" variant="tertiary">
             How Witness works

@@ -43,7 +43,7 @@ export default function ConsultationSolutionPage() {
   const { demoUrl } = marketingSiteConfig();
 
   return (
-    <div className="foundation-page">
+    <div className="foundation-page sector-page consultation-page">
       <div className="foundation-heading">
         <Eyebrow>Consultation & co-design</Eyebrow>
         <h1>Show participants how their contribution influenced the outcome.</h1>

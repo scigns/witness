@@ -45,7 +45,7 @@ export default function ResearchSolutionPage() {
   const { demoUrl } = marketingSiteConfig();
 
   return (
-    <div className="foundation-page">
+    <div className="foundation-page sector-page research-page">
       <div className="foundation-heading">
         <Eyebrow>Research</Eyebrow>
         <h1>Maintain the connection between evidence, interpretation and impact.</h1>

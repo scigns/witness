@@ -40,7 +40,7 @@ export default function WhyWitnessPage() {
   const { demoUrl } = marketingSiteConfig();
 
   return (
-    <div className="foundation-page">
+    <div className="foundation-page editorial-page">
       <div className="foundation-heading">
         <Eyebrow>Why Witness</Eyebrow>
         <h1>Institutions remember what they decided. Fewer can show exactly why.</h1>

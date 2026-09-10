@@ -52,7 +52,7 @@ export default function InternationalDevelopmentSolutionPage() {
   const { demoUrl } = marketingSiteConfig();
 
   return (
-    <div className="foundation-page">
+    <div className="foundation-page sector-page development-page">
       <div className="foundation-heading">
         <Eyebrow>International development</Eyebrow>
         <h1>Preserve evidence from field engagement through implementation.</h1>

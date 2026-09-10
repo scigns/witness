@@ -60,7 +60,7 @@ export default function HowItWorksPage() {
   const { demoUrl } = marketingSiteConfig();
 
   return (
-    <div className="foundation-page">
+    <div className="foundation-page sequence-page">
       <div className="foundation-heading">
         <Eyebrow>How Witness works</Eyebrow>
         <h1>Connect the record from source to action.</h1>

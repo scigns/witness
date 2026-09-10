@@ -1,7 +1,7 @@
 # Witness Commercial Website Brand System
 
 **Owner:** Brand, Product and Design
-**Status:** MKT-03L Brand Book reconciliation — `VERIFIED COMPLETE`
+**Status:** MKT-LAUNCH-01A Brand Art Direction — implementation
 **Last reviewed:** 2026-09-05
 
 ## BRAND-UNIFY-01 — One Witness Experience (2026-09-09)
@@ -92,36 +92,33 @@ scale, spacing/layout system, image direction, provenance visual component or pu
 
 ## Official logo — human approved
 
-- Canonical repository file: `apps/marketing/public/brand/witness-logo.png`
-- Public URL: `/brand/witness-logo.png`
-- Format: PNG, RGB, no alpha channel
+- Canonical web file: `apps/marketing/public/brand/witness-logo-transparent.png`
+- Public URL: `/brand/witness-logo-transparent.png`
+- Format: PNG, RGBA
 - Dimensions: 566 × 553 pixels
-- File size: 6,230 bytes
+- Source: losslessly extracted RGB object and soft-mask alpha from the canonical Brand Book PDF
 - Artwork status: `HUMAN APPROVED`
 
-The supplied artwork is authoritative. Preserve its intrinsic proportions and do not recolour, crop,
-filter, or otherwise modify it without a separately approved variant. Clear-space, minimum display
-size, alternate light/dark artwork, trademark rules and official colour specifications are `TO BE
-DEFINED`.
+The embedded Brand Book artwork is authoritative. Its PDF soft mask was recombined with its RGB object
+without redrawing, recolouring, filtering or changing dimensions. Preserve its intrinsic proportions.
+An approved Bone/light reversed mark is still required before placing the logo directly on Ink.
 
 ## Asset architecture
 
 ```text
 apps/marketing/public/brand/
 ├── witness-logo.png
-├── witness-mark.svg             # future, if supplied
-├── witness-logo-light.svg       # future, if supplied
-├── witness-logo-dark.svg        # future, if supplied
+├── witness-logo-transparent.png
+├── imagery/
+│   ├── blush-canvas.png
+│   └── ember-ochre-source-canvas.png
 └── og/                          # future social artwork
 ```
 
-Only `witness-logo.png` currently exists. The marketing `WitnessLogo` component references the
-manifested canonical path and declares intrinsic dimensions to avoid layout shift. The PNG has an
-opaque white background baked into the raster; the shell presents it on the closest Brand Book
-token (Gesso `#FFFDF9`), which is a near-white the Brand Book permits, so the mismatch against the
-asset's true `#FFFFFF` is not visible. A transparent or Gesso-baked variant would remove this
-dependency; see MKT-03L's `BRAND ASSET REQUIRED` note below. A separate approved variant will be
-required before any future dark presentation is introduced.
+The marketing `WitnessLogo` component references the transparent canonical path and declares
+intrinsic dimensions to avoid layout shift. The older opaque PNG remains for provenance. The two
+painted assets were extracted losslessly from the PDF and retain their original pixels; their local
+README records page origin and guardrails.
 
 ## Colour system
 
@@ -288,11 +285,74 @@ milestone applied. `AFTER` reflects this milestone's implementation.
 
 ### Brand asset required
 
-**YES.** The Brand Book's three painted-evidence canvases (Ash/primary, Blush/secondary,
-Ember/punctuation — Brand Book §07) are not present anywhere in the repository, and the approved
-logo PNG has an opaque `#FFFFFF` background baked into the raster rather than a transparent or
-Gesso-matched one. Neither was fabricated to fill the gap; the homepage continues to use no imagery
-rather than substitute stock or generated art, consistent with the Brand Book's imagery guardrails.
+**YES, PARTIAL.** The canonical PDF contains a usable Blush canvas and a separate Ember/Ochre source
+canvas, now extracted losslessly. The named Ash and Ember frames on Brand Book page 12 contain no
+embedded raster artwork. Obtain the original approved Ash canvas for the default hero treatment and
+the named Ember canvas before any future campaign use. A transparent Ink mark now exists from the
+PDF's own alpha mask; a separately approved Bone/reversed mark is still required for direct Ink use.
+
+## MKT-LAUNCH-01A — Brand Art Direction (2026-09-05)
+
+### Creative premise
+
+The website applies **archival modernism**, **editorial institutional design**, and **human
+evidence**. It should read like a beautifully typeset evidence file: calm, rigorous, human and made
+to be understood years later. Precision and pacing create the premium quality; ornament does not.
+
+### Painted evidence usage
+
+- Homepage hero: the approved Blush canvas is used once as a deliberately cropped field beside the
+  editorial statement. The crop changes framing only; the artwork is not recoloured or filtered. A
+  bottom-weighted 68% Ink scrim protects only its small caption; type is not placed over active
+  brushwork.
+- Homepage transition: the Ember/Ochre source canvas appears once as a thin full-width band before
+  the institutional-audience section. It is punctuation, not a reusable pattern or card image.
+- Why Witness: the Blush canvas is ghosted at 18% behind the opening argument, within the Brand
+  Book's 15–25% range.
+- No paint is recoloured, filtered, tiled, placed in a rounded card, or used as a logo fill.
+
+### Hero composition and page rhythm
+
+The homepage opening pairs a large Newsreader statement and concise Plex Sans proposition with one
+vertical painted field. Desktop uses an asymmetrical editorial split; mobile stacks statement before
+art without overlaying copy. The rest of the page alternates long quiet narrative fields, a structured
+record preview, a painted band, a single Ink provenance field, trust material and a high-whitespace
+close. Repeated grids are retained only when comparison is the content.
+
+Platform pages use ruled record rows and stronger structural alignment. How It Works uses sequential
+typography and vertical progression. Why Witness uses a ghosted human field and an Ink editorial
+belief statement. Evidence and Decisions use a quiet ledger rule at the opening. Institutional Memory
+uses the widest negative space and an enlarged italic reflection. Solutions uses a two-column
+institutional index; sector pages share the system while varying opening alignment modestly.
+
+### Typography and spacing
+
+Newsreader carries hero, section and reflective statements with intentionally varied scale. IBM Plex
+Sans remains the functional and explanatory voice. IBM Plex Mono remains confined to actual record
+IDs, values, diagram kinds and the footer's document-like colophon. Major sections use responsive
+64–160px fields; fine structure uses the existing 8px rhythm and Mist hairlines.
+
+### Ink inversion and Ember semantics
+
+Ink inversion is limited to the homepage provenance statement and Why Witness belief section. Bone
+and Mist carry the reversed type/structure. Ember is not used for CTAs or ordinary text: the only
+visible Ember comes from the approved painted band and existing passive artwork. Any future semantic
+Ember UI must mean live, unresolved or requiring attention.
+
+### Provenance visual language
+
+The contributor → contribution → evidence → finding → recommendation → decision → action → outcome
+chain is the signature diagram. It remains ordered semantic HTML with one-weight hairlines, explicit
+labels and no filled network-node aesthetic. On Ink it reverses with Bone/Mist rules; on mobile it
+becomes a vertically traced record rather than a horizontally scrolling graph.
+
+### Navigation, footer and motion
+
+Primary navigation exposes only Platform, Solutions and Why Witness, followed by Sign in and the Ink
+commercial action. The footer is a three-column institutional colophon containing only live routes,
+contact/sign-in and restrained Mono publication metadata. Interaction transitions are 160ms
+ease-out and limited to colour, opacity and at most 1px vertical movement; reduced-motion handling
+remains global.
 
 ## MKT-02 requirements
 

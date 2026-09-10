@@ -12,10 +12,7 @@ export const marketingNavigation = {
   primary: [
     { label: 'Platform', href: '/platform' },
     { label: 'Solutions', href: '/solutions' },
-    { label: 'Demo', href: '/demo' },
-    { label: 'Resources', href: null },
-    { label: 'Pricing', href: null },
-    { label: 'Trust', href: null },
+    { label: 'Why Witness', href: '/why-witness' },
   ],
   footer: [
     {
@@ -23,7 +20,8 @@ export const marketingNavigation = {
       items: [
         { label: 'Overview', href: '/platform' },
         { label: 'How it works', href: '/how-it-works' },
-        { label: 'Pricing', href: null },
+        { label: 'Evidence', href: '/platform/evidence' },
+        { label: 'Institutional memory', href: '/platform/institutional-memory' },
       ],
     },
     {
@@ -36,34 +34,10 @@ export const marketingNavigation = {
       ],
     },
     {
-      label: 'Resources',
+      label: 'Witness',
       items: [
-        { label: 'Knowledge centre', href: null },
-        { label: 'Documentation', href: null },
+        { label: 'Why Witness', href: '/why-witness' },
         { label: 'Open source', href: 'https://github.com/scigns/witness' },
-      ],
-    },
-    {
-      label: 'Trust',
-      items: [
-        { label: 'Security', href: null },
-        { label: 'Privacy', href: null },
-        { label: 'Data sovereignty', href: null },
-        { label: 'Accessibility', href: null },
-      ],
-    },
-    {
-      label: 'Company',
-      items: [
-        { label: 'About', href: null },
-        { label: 'Contact', href: null },
-      ],
-    },
-    {
-      label: 'Legal',
-      items: [
-        { label: 'Privacy', href: null },
-        { label: 'Terms', href: null },
       ],
     },
   ],

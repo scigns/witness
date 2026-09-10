@@ -79,26 +79,41 @@ const trustPillars = [
 ] as const;
 
 export default function MarketingHomepage() {
-  const { appUrl, demoUrl } = marketingSiteConfig();
+  const { demoUrl, pricingUrl } = marketingSiteConfig();
 
   return (
     <div className="homepage">
       <Section id="hero" className="home-hero">
-        <Eyebrow>Evidence governance</Eyebrow>
-        <h1>Make important decisions traceable.</h1>
-        <p className="hero-lede">
-          Witness is the evidence layer for work that has to be provable. It connects evidence,
-          consultation, decisions and actions into an accountable institutional record.
-        </p>
-        <CTAGroup aria-label="Homepage actions">
-          <LinkButton href={demoUrl.href}>Book a demonstration</LinkButton>
-          <LinkButton href="#how-it-works" variant="secondary">
-            Explore Witness
-          </LinkButton>
-          <LinkButton href={appUrl.href} variant="tertiary">
-            Sign in
-          </LinkButton>
-        </CTAGroup>
+        <div className="hero-copy">
+          <Eyebrow>For institutions that must show how decisions were made</Eyebrow>
+          <h1>Make important decisions traceable.</h1>
+          <p className="hero-lede">
+            Witness is the evidence layer for work that has to be provable. Turn consultation,
+            research and organisational knowledge into a governed record that connects evidence,
+            decisions and action.
+          </p>
+          <CTAGroup aria-label="Homepage actions">
+            <LinkButton href={pricingUrl.href}>View plans</LinkButton>
+            <LinkButton href="/demo" variant="secondary">
+              See Witness in action
+            </LinkButton>
+            <LinkButton href={demoUrl.href} variant="tertiary">
+              Discuss a pilot
+            </LinkButton>
+          </CTAGroup>
+          <p className="hero-commercial-note">
+            Start free. Team and organisation plans are available in AUD. Institutional deployments
+            are quote-based.
+          </p>
+          <ul className="hero-assurance" aria-label="Why institutions choose Witness">
+            <li>Trace evidence to decisions</li>
+            <li>Govern roles and access</li>
+            <li>Keep a portable institutional record</li>
+          </ul>
+        </div>
+        <div className="hero-art" aria-hidden="true">
+          <span>Painted evidence / Blush canvas</span>
+        </div>
       </Section>
 
       <Section id="problem" className="homepage-section">
@@ -175,7 +190,7 @@ export default function MarketingHomepage() {
           ))}
         </div>
       </Section>
-      <Section id="provenance" className="homepage-section">
+      <Section id="provenance" className="homepage-section ink-section">
         <SectionHeading
           eyebrow="Provenance by design"
           title="Don't just store the decision. Preserve its story."
@@ -230,14 +245,19 @@ export default function MarketingHomepage() {
         </p>
       </Section>
       <Section id="contact" className="homepage-section homepage-final-cta">
-        <SectionHeading title="Ready to see how Witness could work in your organisation?" />
+        <SectionHeading title="Choose the right way to begin with Witness.">
+          <p>
+            Start with a small team, compare organisational plans, or discuss a controlled
+            institutional pilot.
+          </p>
+        </SectionHeading>
         <CTAGroup aria-label="Contact Witness">
-          <LinkButton href={demoUrl.href}>Book a demonstration</LinkButton>
-          <LinkButton href="#how-it-works" variant="secondary">
-            Explore Witness
+          <LinkButton href={pricingUrl.href}>View plans</LinkButton>
+          <LinkButton href="/demo" variant="secondary">
+            See Witness in action
           </LinkButton>
           <LinkButton href={demoUrl.href} variant="tertiary">
-            Talk to Witness
+            Discuss a pilot
           </LinkButton>
         </CTAGroup>
       </Section>
