@@ -13,7 +13,7 @@
 | Public marketing | apps/marketing routes, navigation, demo and conversion path | Aligned; unchanged |
 | Product shell and major routes | apps/web, including home, organisations, people, programs, sessions, evidence, records, outcomes and profile | Canonical palette/type/logo/chrome applied |
 | Pricing and billing | Public catalogue at /pricing; organisation subscription, usage and invoices at /organisations/:id/billing | Same shell, palette, type and CTA hierarchy |
-| Identity browser | Keycloak login, recovery, verification, required-action and error screens | witness/login theme implemented and validated in this working state; deferred to BRAND-UNIFY-01B (separate PR, own production-approval gate) |
+| Identity browser | Keycloak login, recovery, verification, required-action and error screens | witness/login theme applied (BRAND-UNIFY-01B); realm's loginTheme default set, not yet activated in production |
 | Transactional email | Witness-owned invitation templates and Keycloak account theme | Already aligned; retained |
 | Invoice document | Self-contained privileged HTML render | Witness institutional-document treatment implemented and validated in this working state; deferred to BRAND-UNIFY-01C (separate PR) |
 | PDF invoices / receipts | No generator or customer receipt surface | Not implemented; no substitute invented |
@@ -32,8 +32,8 @@ the same literal values.
 | Boundary | Previous gap | Resolution |
 | --- | --- | --- |
 | Marketing → pricing | Host changed and product opened with blue/system-font chrome | Product pricing now uses the Brand Book shell, typography and Ink action hierarchy |
-| Pricing → authentication | Sign-in was functionally correct but visually generic | Application sign-in uses Witness language and surfaces; Keycloak theme implemented, ships in BRAND-UNIFY-01B |
-| Identity → product | Generic Keycloak browser appearance | Witness login theme covers inherited login/recovery/verification/error flows; ships in BRAND-UNIFY-01B |
+| Pricing → authentication | Sign-in was functionally correct but visually generic | Application sign-in and the Keycloak browser theme both use Witness language and surfaces |
+| Identity → product | Generic Keycloak browser appearance | Witness login theme covers inherited login/recovery/verification/error flows |
 | Product → marketing | No deliberate return/learning route | Product mark links to the commercial site; footer links to the platform story |
 | Product → billing | Billing existed behind an administration menu but looked like a separate prototype | Billing inherits the reconciled shell and document styling |
 | Invoice → product | HTML invoice used an unrelated blue/system style | Self-contained invoice uses Bone, Gesso, Ink, Graphite and Mist; ships in BRAND-UNIFY-01C |
@@ -67,6 +67,60 @@ the same literal values.
   remains explicit, so colour is never the only signal.
 - No Stripe, checkout, invoice PDF, receipt, renewal workflow or billing email
   is implied where the implementation does not exist.
+
+### BRAND-UNIFY-01B — Identity Brand Reconciliation (2026-09-11)
+
+- **Theme:** `infrastructure/docker/keycloak-theme/witness/login`, a
+  CSS-only override on `parent=keycloak.v2` (Keycloak's PatternFly v5 login
+  theme). No FreeMarker templates are replaced — lower risk than a template
+  fork, at the cost of the canonical logo mark: the theme currently renders
+  a Newsreader "Witness" wordmark rather than the transparent mark used
+  elsewhere, because inserting an image into the v2 header without forking
+  `template.ftl` was judged riskier than it was worth for this milestone.
+- **Keycloak version:** 26.0 (`quay.io/keycloak/keycloak:26.0`, matching both
+  `infrastructure/docker/docker-compose.yml` and the pilot compose).
+- **Activation:** the realm import sets `"loginTheme": "witness"` as the
+  source-controlled default for new realms. On an already-bootstrapped
+  realm — production and the pilot — import does not overwrite it; the
+  same approved Keycloak admin action already documented for the email
+  theme (#212) is required. **Not executed against production.**
+- **Verified live** against an isolated Keycloak 26.0 container (local
+  Postgres, realm imported from source, theme volume-mounted): theme
+  discovered, `witness.css` and both self-hosted fonts served with no 404s,
+  computed styles confirm Newsreader/Plex Sans, Bone/Gesso/Ink, 4px radius,
+  no box-shadow, at 320–1440px.
+- **Real defect found and fixed in this verification pass:** the initial
+  theme only styled the page-level `.alert-error`/`.pf-*-c-alert.pf-m-danger`
+  component. Keycloak's actual inline field-validation error (e.g. "Invalid
+  username or password") and required-field asterisks use different
+  PatternFly classes (`.pf-*-c-form-control.pf-m-error`,
+  `.pf-*-c-helper-text__item.pf-m-error`, `.pf-*-c-form__label-required`)
+  and were rendering native PatternFly red until corrected to Ember.
+- **States checked:** login, forgot password (request), register, a failed
+  login (inline Ember error), and an inline Keycloak error page (invalid
+  redirect_uri — untouched, since customising it touches message keys
+  Keycloak also uses for other security-relevant errors, out of scope for a
+  CSS-only theme). Reset-password (post-email-link), verify-email and
+  session-expired need a real SMTP/token round trip and were **not
+  reproducible** in this isolated environment; they inherit the same
+  `parent=keycloak.v2` + `witness.css` styling, so the same palette/type
+  contract applies to them, but they have not been visually confirmed.
+- **Copy:** left at Keycloak's default English strings ("Forgot Your
+  Password?", etc.) rather than overridden, since that requires a
+  `messages_en.properties` addition beyond this CSS-only theme. Deferred to
+  a future pass if the plain default copy is judged insufficient.
+- **Local dev/production gap fixed alongside this:** `docker-compose.yml`
+  (the single-node dev/production target, ADR-0013) had no volume mount for
+  `keycloak-theme/witness` at all — only the pilot compose did (added
+  earlier for the email theme in #212) — so the login theme could never
+  have loaded outside the pilot deployment. Added the matching mount.
+- **Unrelated gap found, not fixed here:** nothing in this repository
+  provisions the `keycloak` Postgres database for local dev (
+  `infrastructure/docker/init/postgres` is empty), so `make dev-full`'s
+  Keycloak service cannot start against a fresh database without a manual
+  `CREATE DATABASE keycloak;`. Pre-existing, orthogonal to brand work.
+- Authentication semantics, OIDC clients, redirect URIs, PKCE, cookies,
+  CORS, CSRF, roles, users, SMTP: **unchanged**.
 
 **Canonical authority:** [`docs/brand/Witness Brand Book.pdf`](../brand/Witness%20Brand%20Book.pdf)
 (companion: [`docs/brand/BRAND_BOOK.md`](../brand/BRAND_BOOK.md)). This document records this

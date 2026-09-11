@@ -160,6 +160,8 @@ jobs:
         run: pnpm test:invariants
       - name: Adversarial suite
         run: pnpm test:adversarial
+      - name: Infrastructure contract tests
+        run: pnpm test:infrastructure
 
   build:
     name: Build

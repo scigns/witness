@@ -3,6 +3,7 @@
   "enabled": true,
   "displayName": "Witness",
   "emailTheme": "witness",
+  "loginTheme": "witness",
   "sslRequired": "external",
   "registrationAllowed": true,
   "resetPasswordAllowed": true,
