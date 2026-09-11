@@ -49,7 +49,8 @@
     "invite": "pnpm --filter @witness/api run invite",
     "cloudflare:email:inspect": "tsx scripts/cloudflare/inspect-email-routing.ts",
     "cloudflare:email:apply": "tsx scripts/cloudflare/configure-email-routing.ts --apply",
-    "test:cloudflare:email": "vitest run test/infrastructure/email-routing.test.ts"
+    "test:cloudflare:email": "vitest run test/infrastructure/email-routing.test.ts",
+    "test:infrastructure": "vitest run test/infrastructure"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.9",
