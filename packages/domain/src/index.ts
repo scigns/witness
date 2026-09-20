@@ -50,3 +50,17 @@ export * from './resource.js';
 export * from './commercial.js';
 export * from './invoice.js';
 export * from './billing-snapshot.js';
+
+// Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
+export * from './relationship-vocabulary.js';
+export * from './assertion-lifecycle.js';
+export * from './knowledge-domain.js';
+export * from './knowledge-entity.js';
+export * from './entity-alias.js';
+export * from './entity-merge-log.js';
+export * from './knowledge-provenance-chain.js';
+export * from './candidate-assertion.js';
+export * from './knowledge-review.js';
+export * from './knowledge-assertion.js';
+export * from './knowledge-entity-attribute.js';
+export * from './knowledge-relationship.js';

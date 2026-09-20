@@ -1,0 +1,27 @@
+{
+  "name": "@witness/graph-projector",
+  "version": "0.1.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "description": "Projects confirmed knowledge assertions from the transactional outbox into Neo4j (ADR-0011). The only process that writes to Neo4j. Idempotent (MERGE, never CREATE), checkpointed, resumable.",
+  "type": "module",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "lint": "eslint src",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "start": "node ./dist/main.js",
+    "rebuild": "node ./dist/rebuild.js"
+  },
+  "dependencies": {
+    "neo4j-driver": "^5.28.0",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "vitest": "^2.1.9"
+  }
+}

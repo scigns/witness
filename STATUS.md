@@ -71,7 +71,7 @@ does **not** mean that every capability described within it is absent.
 | Local transcription and local AI drafting | 🟢 Delivered with stated limitations       |
 | Client-ready web experience               | 🟢 Delivered                               |
 | Repeatable institutional pilot operations | 🟢 Delivered in 0.3.0                      |
-| Knowledge graph projection                | ⚪ Deferred                                |
+| Knowledge graph projection                | 🟡 Phase 1–2 delivered ahead of schedule (ADR-0026); manual curation UI, AI extraction, and community validation remain |
 | Hybrid/vector search                      | ⚪ Deferred                                |
 | Speaker diarisation                       | ⚪ Deferred                                |
 | Database-level RLS defence-in-depth       | ⚪ Deferred                                |
@@ -143,7 +143,7 @@ customer evidence.
 | Security        | Security Lead        | 🟡    | Keycloak, deny-by-default authorisation and adversarial checks active; further hardening remains            |
 | Infrastructure  | Infrastructure Lead  | 🟡    | Production deployment, backup and object storage operational; broader HA/DR remains future work             |
 | Backend         | Backend Lead         | 🟢    | Human-led MVP services and pilot metrics delivered                                                          |
-| Knowledge graph | Knowledge Graph Lead | ⚪    | Projection remains deferred                                                                                 |
+| Knowledge graph | Knowledge Graph Lead | 🟡    | Domain model, governance, permissions, Neo4j projection and rebuild delivered (ADR-0026); Phase 3–8 (manual curation UI, extraction, community validation, sensemaking) remain |
 | AI platform     | AI Lead              | 🟡    | Local transcription/AI drafting available; evaluation and diarisation remain incomplete                     |
 | Frontend        | Frontend Lead        | 🟢    | Client-ready program/session experience deployed                                                            |
 | Testing         | QA Lead              | 🟢    | Unit, contract, invariant, adversarial and CI gates active                                                  |

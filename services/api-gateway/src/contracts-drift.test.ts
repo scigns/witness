@@ -48,6 +48,14 @@ import {
   SESSION_STATUSES as CONTRACT_SESSION_STATUSES,
   SOURCE_KINDS as CONTRACT_SOURCE_KINDS,
   WITNESS_ROLES as CONTRACT_WITNESS_ROLES,
+  KNOWLEDGE_ENTITY_TYPES as CONTRACT_KNOWLEDGE_ENTITY_TYPES,
+  TOPIC_SCHEMES as CONTRACT_TOPIC_SCHEMES,
+  SENSITIVITY_CLASSES as CONTRACT_SENSITIVITY_CLASSES,
+  CANDIDATE_ASSERTION_TYPES as CONTRACT_CANDIDATE_ASSERTION_TYPES,
+  CANDIDATE_ASSERTION_STATUSES as CONTRACT_CANDIDATE_ASSERTION_STATUSES,
+  KNOWLEDGE_REVIEW_DECISIONS as CONTRACT_KNOWLEDGE_REVIEW_DECISIONS,
+  ASSERTION_LIFECYCLE_STATES as CONTRACT_ASSERTION_LIFECYCLE_STATES,
+  PERSPECTIVE_TAGS as CONTRACT_PERSPECTIVE_TAGS,
 } from '@witness/contracts';
 import {
   ACCOUNT_STATES as DOMAIN_ACCOUNT_STATES,
@@ -82,6 +90,14 @@ import {
   SESSION_STATUSES as DOMAIN_SESSION_STATUSES,
   SOURCE_KINDS as DOMAIN_SOURCE_KINDS,
   WITNESS_ROLES as DOMAIN_WITNESS_ROLES,
+  KNOWLEDGE_ENTITY_TYPES as DOMAIN_KNOWLEDGE_ENTITY_TYPES,
+  TOPIC_SCHEMES as DOMAIN_TOPIC_SCHEMES,
+  SENSITIVITY_CLASSES as DOMAIN_SENSITIVITY_CLASSES,
+  CANDIDATE_ASSERTION_TYPES as DOMAIN_CANDIDATE_ASSERTION_TYPES,
+  CANDIDATE_ASSERTION_STATUSES as DOMAIN_CANDIDATE_ASSERTION_STATUSES,
+  KNOWLEDGE_REVIEW_DECISIONS as DOMAIN_KNOWLEDGE_REVIEW_DECISIONS,
+  ASSERTION_LIFECYCLE_STATES as DOMAIN_ASSERTION_LIFECYCLE_STATES,
+  PERSPECTIVE_TAGS as DOMAIN_PERSPECTIVE_TAGS,
 } from '@witness/domain';
 
 describe('contracts and domain agree across the licence boundary', () => {
@@ -253,5 +269,49 @@ describe('contracts and domain agree across the licence boundary', () => {
     expect([...CONTRACT_REPORT_ATTRIBUTION_LABELS].sort()).toEqual(
       [...DOMAIN_REPORT_ATTRIBUTION_LABELS].sort(),
     );
+  });
+
+  it('knowledge entity types are identical', () => {
+    expect([...CONTRACT_KNOWLEDGE_ENTITY_TYPES].sort()).toEqual(
+      [...DOMAIN_KNOWLEDGE_ENTITY_TYPES].sort(),
+    );
+  });
+
+  it('topic schemes are identical', () => {
+    expect([...CONTRACT_TOPIC_SCHEMES].sort()).toEqual([...DOMAIN_TOPIC_SCHEMES].sort());
+  });
+
+  it('sensitivity classes are identical', () => {
+    expect([...CONTRACT_SENSITIVITY_CLASSES].sort()).toEqual(
+      [...DOMAIN_SENSITIVITY_CLASSES].sort(),
+    );
+  });
+
+  it('candidate assertion types are identical', () => {
+    expect([...CONTRACT_CANDIDATE_ASSERTION_TYPES].sort()).toEqual(
+      [...DOMAIN_CANDIDATE_ASSERTION_TYPES].sort(),
+    );
+  });
+
+  it('candidate assertion statuses are identical', () => {
+    expect([...CONTRACT_CANDIDATE_ASSERTION_STATUSES].sort()).toEqual(
+      [...DOMAIN_CANDIDATE_ASSERTION_STATUSES].sort(),
+    );
+  });
+
+  it('knowledge review decisions are identical', () => {
+    expect([...CONTRACT_KNOWLEDGE_REVIEW_DECISIONS].sort()).toEqual(
+      [...DOMAIN_KNOWLEDGE_REVIEW_DECISIONS].sort(),
+    );
+  });
+
+  it('assertion lifecycle states are identical', () => {
+    expect([...CONTRACT_ASSERTION_LIFECYCLE_STATES].sort()).toEqual(
+      [...DOMAIN_ASSERTION_LIFECYCLE_STATES].sort(),
+    );
+  });
+
+  it('perspective tags are identical', () => {
+    expect([...CONTRACT_PERSPECTIVE_TAGS].sort()).toEqual([...DOMAIN_PERSPECTIVE_TAGS].sort());
   });
 });

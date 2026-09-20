@@ -42,6 +42,10 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'report:export',
     'agenda_item:read',
     'resource:read',
+    // knowledge_*: aggregate view only — deliberately NOT
+    // knowledge_provenance:inspect. See policy.csv's matching comment.
+    'knowledge_domain:read',
+    'knowledge_entity:read',
   ],
   // `session:update`/`session:transition` are workspace-wide, not
   // per-session: any contributor in a workspace's scope may rename, close,
@@ -135,6 +139,16 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'agenda_item:manage',
     'resource:read',
     'resource:manage',
+    // knowledge_*: covers the WitnessRole `facilitator` too (collapses onto
+    // this tier, same as session:*/evidence:*). See policy.csv's matching
+    // comment for the full reasoning, including why community-validation
+    // capture is facilitator-mediated rather than participant self-service.
+    'knowledge_domain:read',
+    'knowledge_entity:read',
+    'knowledge_provenance:inspect',
+    'knowledge_concept:suggest',
+    'knowledge_relationship:suggest',
+    'knowledge_candidate:validate_community',
   ],
   // `evidence_review:*` (BUILD_ROADMAP.md Milestone 6, Evidence Review and
   // Validation) is where `reviewer` first gains write actions of its own —
@@ -228,6 +242,12 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'report:export',
     'agenda_item:read',
     'resource:read',
+    // knowledge_*: read/inspect plus the review decision itself — never
+    // knowledge_entity:steward/publish. See policy.csv's matching comment.
+    'knowledge_domain:read',
+    'knowledge_entity:read',
+    'knowledge_provenance:inspect',
+    'knowledge_candidate:review',
   ],
   // Least privilege (Constitution, Authority and Access): organisation and
   // workspace creation are the privileged actions in this slice, so they are the
@@ -331,6 +351,44 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'agenda_item:manage',
     'resource:read',
     'resource:manage',
+    // knowledge_*: admin (organisation/workspace-scoped) holds every
+    // knowledge action plus the two governance-only ones — see
+    // packages/policy/policy.csv's matching comment for the full reasoning,
+    // including why a *platform*-scope admin never reaches this tier for
+    // these actions.
+    'knowledge_domain:read',
+    'knowledge_domain:manage',
+    'knowledge_entity:read',
+    'knowledge_provenance:inspect',
+    'knowledge_concept:suggest',
+    'knowledge_relationship:suggest',
+    'knowledge_candidate:review',
+    'knowledge_candidate:validate_community',
+    'knowledge_entity:steward',
+    'knowledge_entity:publish',
+    'knowledge_governance:configure',
+  ],
+  // Knowledge Steward (ADR-0026 point 8) — see packages/policy/policy.csv's
+  // matching comment. This table and policy.csv must not disagree
+  // (role-grants-parity.test.ts).
+  steward: [
+    'record:read',
+    'organisation:read',
+    'workspace:read',
+    'role:read',
+    'session:read',
+    'participant:read',
+    'evidence:read',
+    'evidence_link:read',
+    'knowledge_domain:read',
+    'knowledge_entity:read',
+    'knowledge_provenance:inspect',
+    'knowledge_concept:suggest',
+    'knowledge_relationship:suggest',
+    'knowledge_candidate:review',
+    'knowledge_candidate:validate_community',
+    'knowledge_entity:steward',
+    'knowledge_entity:publish',
   ],
 });
 

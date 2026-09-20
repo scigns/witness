@@ -152,6 +152,17 @@ p, reader, report:read
 p, reader, report:export
 p, reader, agenda_item:read
 p, reader, resource:read
+# knowledge_*: (ADR-0011, ADR-0012, ADR-0026). knowledge_domain:read and
+# knowledge_entity:read stay broad like session:read/evidence:read — a
+# reader (which is what the `participant` WitnessRole collapses onto) may
+# see approved graph content for their scope. `knowledge_provenance:inspect`
+# is deliberately NOT granted to reader: separating "may see the aggregate"
+# from "may inspect the source evidence and who said it" is a named
+# requirement (originating request: "the graph must never expose evidence or
+# participant identity merely because an aggregate concept is visible"), and
+# reader is exactly the tier a reporting/external viewer holds.
+p, reader, knowledge_domain:read
+p, reader, knowledge_entity:read
 
 p, contributor, record:read
 p, contributor, record:create
@@ -205,6 +216,21 @@ p, contributor, agenda_item:read
 p, contributor, agenda_item:manage
 p, contributor, resource:read
 p, contributor, resource:manage
+# knowledge_*: contributor covers the WitnessRole `facilitator` too
+# (ROLE_TO_TIER collapses it here, same as session:*/evidence:*). This is
+# where Participant/Contributor's "suggest explanations, propose a
+# relationship, add context, flag a concept" and Facilitator's "curate
+# emerging concepts, propose themes/relationships, send for community
+# validation" responsibilities live — facilitator-mediated, matching this
+# milestone's existing evidence-capture precedent (participants themselves
+# do not yet hold a write grant of their own; a facilitator captures
+# community validation responses on their behalf, same as evidence).
+p, contributor, knowledge_domain:read
+p, contributor, knowledge_entity:read
+p, contributor, knowledge_provenance:inspect
+p, contributor, knowledge_concept:suggest
+p, contributor, knowledge_relationship:suggest
+p, contributor, knowledge_candidate:validate_community
 
 p, reviewer, record:read
 p, reviewer, record:create
@@ -243,6 +269,44 @@ p, reviewer, report:publish
 p, reviewer, report:export
 p, reviewer, agenda_item:read
 p, reviewer, resource:read
+# knowledge_*: "determine whether an assertion is supported by evidence;
+# approve, reject, qualify, or return for community review; never modify
+# primary evidence" — reviewer gets read/inspect (to actually check the
+# evidence) plus the review decision itself, nothing that creates or curates
+# graph structure (that is knowledge_entity:steward, a different tier).
+p, reviewer, knowledge_domain:read
+p, reviewer, knowledge_entity:read
+p, reviewer, knowledge_provenance:inspect
+p, reviewer, knowledge_candidate:review
+
+# Knowledge Steward (ADR-0026 point 8) — a project-level responsibility
+# assigned via the ordinary organisation/workspace-scoped RoleAssignment
+# mechanism, never a global platform role. Deliberately its own tier rather
+# than collapsed onto contributor/reviewer: manage aliases, merge/split
+# concepts, maintain vocabulary coherence, flag contradictions, route for
+# validation, manage publication readiness — capabilities neither
+# contributor nor reviewer holds. Steward does NOT get evidence_review:*,
+# session:*, or participant:* write actions: stewarding graph structure is
+# not evidence review or session facilitation, and holding this role must
+# not imply either (packages/domain/src/role.ts's ROLE_PERMISSIONS_BY_ROLE
+# makes the same restriction).
+p, steward, record:read
+p, steward, organisation:read
+p, steward, workspace:read
+p, steward, role:read
+p, steward, session:read
+p, steward, participant:read
+p, steward, evidence:read
+p, steward, evidence_link:read
+p, steward, knowledge_domain:read
+p, steward, knowledge_entity:read
+p, steward, knowledge_provenance:inspect
+p, steward, knowledge_concept:suggest
+p, steward, knowledge_relationship:suggest
+p, steward, knowledge_candidate:review
+p, steward, knowledge_candidate:validate_community
+p, steward, knowledge_entity:steward
+p, steward, knowledge_entity:publish
 
 p, admin, record:read
 p, admin, record:create
@@ -330,3 +394,30 @@ p, admin, agenda_item:read
 p, admin, agenda_item:manage
 p, admin, resource:read
 p, admin, resource:manage
+# knowledge_*: admin (an organisation- or workspace-scoped RoleAssignment —
+# see this file's own header on why that never includes the unscoped
+# platform tier) holds every knowledge action, same "superset" pattern as
+# every other resource in this file, PLUS the two governance-only actions
+# no other tier holds: knowledge_domain:manage (configuring a domain's
+# validation policy — a workspace-wide governance artifact, same
+# "administrative by definition" reasoning as consent_template:manage) and
+# knowledge_governance:configure (assigning Knowledge Steward responsibility
+# and configuring publication rules — Organisation Admin's own named
+# responsibility in the originating request). This is also the structural
+# proof of "platform authority does not equal knowledge authority": a
+# *platform*-scope admin RoleAssignment never resolves to this tier for a
+# workspace/organisation-scoped action (PolicyEnforcementService.decide only
+# calls scopedGrantTiers for these actions, which requires a real
+# organisation- or workspace-scoped RoleAssignment) — see
+# authz/knowledge-governance.adversarial.test.ts.
+p, admin, knowledge_domain:read
+p, admin, knowledge_domain:manage
+p, admin, knowledge_entity:read
+p, admin, knowledge_provenance:inspect
+p, admin, knowledge_concept:suggest
+p, admin, knowledge_relationship:suggest
+p, admin, knowledge_candidate:review
+p, admin, knowledge_candidate:validate_community
+p, admin, knowledge_entity:steward
+p, admin, knowledge_entity:publish
+p, admin, knowledge_governance:configure

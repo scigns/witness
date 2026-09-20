@@ -111,7 +111,21 @@ export type Action =
   | 'agenda_item:read'
   | 'agenda_item:manage'
   | 'resource:read'
-  | 'resource:manage';
+  | 'resource:manage'
+  // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026 point 7 — the
+  // originating request's dotted `knowledge.x.y` style translated to this
+  // file's established `resource:verb` convention, one-for-one).
+  | 'knowledge_domain:read'
+  | 'knowledge_domain:manage'
+  | 'knowledge_entity:read'
+  | 'knowledge_provenance:inspect'
+  | 'knowledge_concept:suggest'
+  | 'knowledge_relationship:suggest'
+  | 'knowledge_candidate:review'
+  | 'knowledge_candidate:validate_community'
+  | 'knowledge_entity:steward'
+  | 'knowledge_entity:publish'
+  | 'knowledge_governance:configure';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;

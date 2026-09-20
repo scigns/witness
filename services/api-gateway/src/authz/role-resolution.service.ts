@@ -60,6 +60,10 @@ const ROLE_TO_TIER: Readonly<Record<WitnessRole, string>> = Object.freeze({
   reviewer: 'reviewer',
   participant: 'reader',
   reader: 'reader',
+  // Knowledge Steward (ADR-0026 point 8) gets its own tier — deliberately
+  // not collapsed onto contributor/reviewer, since it grants
+  // knowledge-graph-specific capabilities neither of those tiers holds.
+  steward: 'steward',
 });
 
 @Injectable()

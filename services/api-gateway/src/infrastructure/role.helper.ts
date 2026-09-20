@@ -16,6 +16,7 @@ const ROLE_LABELS: Readonly<Record<WitnessRole, string>> = Object.freeze({
   reviewer: 'Reviewer',
   participant: 'Participant',
   reader: 'Read-only',
+  steward: 'Knowledge Steward',
 });
 
 const ROLE_DESCRIPTIONS: Readonly<Record<WitnessRole, string>> = Object.freeze({
@@ -25,6 +26,10 @@ const ROLE_DESCRIPTIONS: Readonly<Record<WitnessRole, string>> = Object.freeze({
   reviewer: 'Adds evidence and confirms it into the institutional record.',
   participant: 'Can see what has been recorded.',
   reader: 'Can see what has been recorded, and nothing more.',
+  // ADR-0026 point 8: a project-level responsibility, assigned the same way
+  // as every other role — never a global platform role.
+  steward:
+    'Curates the knowledge graph: manages aliases, merges or splits concepts, and routes assertions for review or community validation.',
 });
 
 export function roleLabel(role: WitnessRole): string {

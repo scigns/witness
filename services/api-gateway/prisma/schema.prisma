@@ -6,9 +6,13 @@
 // before its projector exists would be pretending.
 //
 // Scope discipline: only the entities the Developer Preview actually uses are
-// modelled. Assertion, Evidence, Commitment, Consent and Tenant are all real
-// parts of the architecture (architecture/DATA_MODEL.md) and are deliberately
-// absent — adding a table nothing writes to is how a schema becomes fiction.
+// modelled. `Tenant` is a real part of the architecture (architecture/DATA_MODEL.md)
+// and remains deliberately absent — this schema's `Organisation`/`Workspace`
+// hierarchy is the implemented tenant model (ADR-0026 point 1), not a second one.
+//
+// The evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026) is implemented
+// below as `Knowledge*` models: Neo4j remains a disposable, read-only
+// projection derived from these tables, never a second system of record.
 
 generator client {
   provider = "prisma-client-js"
@@ -45,6 +49,18 @@ model Actor {
   reportsApproved            Report[]                  @relation("ReportApprovedBy")
   reportSourcesIncluded      ReportSource[]            @relation("ReportSourceIncludedBy")
   commercialChangesRequested CommercialChangeRequest[]
+
+  // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
+  knowledgeDomainsCreated       KnowledgeDomain[]
+  knowledgeEntitiesCreated      KnowledgeEntity[]
+  entityAliasesContributed      EntityAlias[]
+  entityMergeLogsDecided        KnowledgeEntityMergeLog[]
+  candidatesProposed            KnowledgeCandidateAssertion[]
+  knowledgeReviewsDecided       KnowledgeReviewDecision[]
+  provenanceChainsConfirmed     KnowledgeProvenanceChain[]
+  knowledgeAssertionsCreated    KnowledgeAssertion[]
+  entityAttributesCreated       KnowledgeEntityAttribute[]
+  knowledgeRelationshipsCreated KnowledgeRelationship[]
 
   @@index([kind])
   @@map("actor")
@@ -146,7 +162,15 @@ model Organisation {
   purchaseOrders               PurchaseOrder[]
   paymentMethods               PaymentMethod[]
   payments                     Payment[]
-  invitationNotifications     InvitationNotification[]
+  invitationNotifications      InvitationNotification[]
+
+  // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
+  knowledgeDomains       KnowledgeDomain[]
+  knowledgeEntities      KnowledgeEntity[]
+  entityMergeLogs        KnowledgeEntityMergeLog[]
+  candidateAssertions    KnowledgeCandidateAssertion[]
+  knowledgeAssertions    KnowledgeAssertion[]
+  knowledgeRelationships KnowledgeRelationship[]
 
   @@map("organisation")
 }
@@ -501,6 +525,14 @@ model Workspace {
   agendaItems                  AgendaItem[]
   resources                    Resource[]
 
+  // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
+  knowledgeDomains       KnowledgeDomain[]
+  knowledgeEntities      KnowledgeEntity[]
+  entityMergeLogs        KnowledgeEntityMergeLog[]
+  candidateAssertions    KnowledgeCandidateAssertion[]
+  knowledgeAssertions    KnowledgeAssertion[]
+  knowledgeRelationships KnowledgeRelationship[]
+
   @@index([organisationId])
   @@map("workspace")
 }
@@ -537,7 +569,7 @@ model User {
   ownedActionItems          ActionItem[]             @relation("ActionItemOwner")
   facilitatedAgendaItems    AgendaItem[]
   uploadedResources         Resource[]
-  invitationNotifications  InvitationNotification[]
+  invitationNotifications   InvitationNotification[]
 
   @@index([accountState])
   @@map("witness_user")
@@ -557,10 +589,10 @@ model InvitationNotification {
   recipientEmail String       @map("recipient_email") @db.VarChar(320)
   status         String       @db.VarChar(16)
   attemptCount   Int          @default(0) @map("attempt_count")
-  lastError     String?      @map("last_error") @db.VarChar(500)
-  sentAt        DateTime?    @map("sent_at") @db.Timestamptz(6)
-  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastError      String?      @map("last_error") @db.VarChar(500)
+  sentAt         DateTime?    @map("sent_at") @db.Timestamptz(6)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@unique([organisationId, userId])
   @@index([status, updatedAt])
@@ -1154,13 +1186,16 @@ model Evidence {
   /// Optimistic-concurrency counter; bumped on every mutation.
   version Int @default(1)
 
-  linksFrom         EvidenceLink[]      @relation("EvidenceLinkFrom")
-  linksTo           EvidenceLink[]      @relation("EvidenceLinkTo")
-  attachment        EvidenceAttachment?
-  transcript        Transcript?
-  reviewAssignments ReviewAssignment[]
-  clarifications    Clarification[]
-  outcomeSupports   OutcomeSupport[]    @relation("OutcomeSupportEvidence")
+  linksFrom            EvidenceLink[]      @relation("EvidenceLinkFrom")
+  linksTo              EvidenceLink[]      @relation("EvidenceLinkTo")
+  attachment           EvidenceAttachment?
+  transcript           Transcript?
+  reviewAssignments    ReviewAssignment[]
+  clarifications       Clarification[]
+  outcomeSupports      OutcomeSupport[]    @relation("OutcomeSupportEvidence")
+  /// Community-language aliases that cite this exact piece of evidence as
+  /// the place the expression was used (ADR-0026 point 4, `EntityAlias`).
+  entityAliasesSourced EntityAlias[]
 
   @@unique([sessionId, clientRequestId])
   @@index([sessionId])
@@ -1971,4 +2006,557 @@ model Resource {
   @@index([sessionId])
   @@index([agendaItemId])
   @@map("resource")
+}
+
+// ---------------------------------------------------------------------------
+// Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
+//
+// PostgreSQL remains the sole system of record for this feature too: Neo4j is
+// a disposable, read-only projection built by `workers/graph-projector` from
+// `KnowledgeAssertion`/`KnowledgeEntityAttribute`/`KnowledgeRelationship`
+// rows, never written to directly by application code (ADR-0011 compliance
+// section). Every row below that represents interpreted knowledge carries a
+// non-nullable path back to a `KnowledgeProvenanceChain`, which itself is
+// non-nullable back to at least one `Evidence` row — "no graph assertion
+// without provenance" is a foreign-key constraint here, not a convention.
+// ---------------------------------------------------------------------------
+
+/// A workspace-scoped governance grouping (Community, Governance, Needs,
+/// Cultural Knowledge, ...) — NOT a graph node type (ADR-0026 point 3). Each
+/// domain carries its own `AssertionValidationPolicy`
+/// (`packages/domain/src/assertion-lifecycle.ts`), stored as JSON here and
+/// re-validated at the API boundary, following this schema's existing
+/// convention of controlled-vocabulary-as-data rather than a DB enum.
+model KnowledgeDomain {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  /// Lower-snake-case slug, e.g. 'cultural_knowledge'. Suggested vocabulary
+  /// only (`SUGGESTED_KNOWLEDGE_DOMAIN_KEYS`), not a closed gate — an
+  /// organisation may define additional domains.
+  key         String  @db.VarChar(64)
+  name        String  @db.VarChar(200)
+  description String? @db.Text
+
+  /// `AssertionValidationPolicy` — { requiresReviewerValidation,
+  /// requiresCommunityValidation, permitsExternalPublication }.
+  validationPolicy   Json   @map("validation_policy")
+  defaultSensitivity String @default("internal") @map("default_sensitivity") @db.VarChar(16)
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdById String   @map("created_by_id") @db.Uuid
+  createdBy   Actor    @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  version Int @default(1)
+
+  candidateAssertions KnowledgeCandidateAssertion[]
+  knowledgeAssertions KnowledgeAssertion[]
+
+  @@unique([workspaceId, key])
+  @@index([organisationId])
+  @@map("knowledge_domain")
+}
+
+/// The controlled relationship vocabulary as data (ADR-0026 point 5) —
+/// `KnowledgeRelationship.relationshipType` is a real foreign key against
+/// `code` here, so an unregistered type cannot be inserted. Rows are seeded
+/// by the `evidence_knowledge_graph` migration itself (generated verbatim
+/// from `packages/domain/src/relationship-vocabulary.ts`'s
+/// `RELATIONSHIP_TYPE_SEEDS`) — foundational reference data ships with the
+/// schema, not as an optional `prisma/seed.ts` step (that script is
+/// synthetic dev fixtures only, per its own header comment, and skipping it
+/// must never leave core vocabulary missing in any environment, including
+/// production). A future addition to `RELATIONSHIP_TYPE_SEEDS` needs its
+/// own migration inserting the new row(s); this model does not regenerate
+/// its seed automatically.
+model RelationshipTypeDefinition {
+  code            String  @id @db.VarChar(64)
+  category        String  @db.VarChar(32)
+  description     String  @db.Text
+  /// Core types come from the ratified ontology (`KNOWLEDGE_GRAPH.md` §4) and
+  /// require Knowledge Graph Lead + Principal Architect sign-off to remove
+  /// (§11). Non-core types are the feature request's additions or a
+  /// deployment's own namespaced extension — safely evolvable.
+  isCore          Boolean @default(false) @map("is_core")
+  inverseCode     String? @map("inverse_code") @db.VarChar(64)
+  /// Semantic version of the ontology revision this code was introduced in.
+  ontologyVersion String  @map("ontology_version") @db.VarChar(20)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  relationships KnowledgeRelationship[]
+
+  @@map("relationship_type_definition")
+}
+
+/// A node in the evidence knowledge graph's write model — one of the
+/// thirteen closed core types (`KNOWLEDGE_GRAPH.md` §3), never carrying
+/// content directly (see the model header note at the top of this section).
+model KnowledgeEntity {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  /// One of the thirteen core types (`packages/domain/src/knowledge-entity.ts`'s
+  /// `KNOWLEDGE_ENTITY_TYPES`) — VarChar, not a DB enum, matching this
+  /// schema's established convention; the closed set is enforced in the
+  /// domain layer, not here, exactly like `Evidence.evidenceType`.
+  entityType  String  @map("entity_type") @db.VarChar(32)
+  /// Only set when entityType = 'topic' — see `TopicScheme` (ADR-0026 point 2).
+  topicScheme String? @map("topic_scheme") @db.VarChar(32)
+
+  canonicalLabel String  @map("canonical_label") @db.VarChar(300)
+  definition     String? @db.Text
+
+  sensitivityClass       String  @default("internal") @map("sensitivity_class") @db.VarChar(16)
+  /// Set only when this entity is itself the community/custodian a
+  /// restriction defers to. Deliberately not a foreign key: enforcing it as
+  /// one would require a self-referential constraint checked before the
+  /// referenced row necessarily exists yet in every write order, for a field
+  /// that is read-mostly reference data — see `packages/domain`'s comment.
+  communityRestrictionId String? @map("community_restriction_id") @db.Uuid
+
+  status       String            @default("active") @db.VarChar(16)
+  mergedIntoId String?           @map("merged_into_id") @db.Uuid
+  mergedInto   KnowledgeEntity?  @relation("KnowledgeEntityMergedInto", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom   KnowledgeEntity[] @relation("KnowledgeEntityMergedInto")
+
+  ontologyVersion String @map("ontology_version") @db.VarChar(20)
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdById String   @map("created_by_id") @db.Uuid
+  createdBy   Actor    @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  version Int @default(1)
+
+  aliases                     EntityAlias[]
+  mergeLogsAsSurvivor         KnowledgeEntityMergeLog[]  @relation("KnowledgeEntityMergeSurviving")
+  mergeLogsAsMerged           KnowledgeEntityMergeLog[]  @relation("KnowledgeEntityMergeMerged")
+  attributes                  KnowledgeEntityAttribute[]
+  relationshipsFrom           KnowledgeRelationship[]    @relation("KnowledgeRelationshipFrom")
+  relationshipsTo             KnowledgeRelationship[]    @relation("KnowledgeRelationshipTo")
+  assertionsAttributedToGroup KnowledgeAssertion[]
+
+  @@index([workspaceId, entityType])
+  @@index([organisationId])
+  @@index([mergedIntoId])
+  @@map("knowledge_entity")
+}
+
+/// Community language, preserved forever (ADR-0026 point 4). Immutable and
+/// additive-only at the application layer — no update/delete endpoint exists
+/// for this row; see `packages/domain/src/entity-alias.ts`.
+model EntityAlias {
+  id String @id @db.Uuid
+
+  entityId String          @map("entity_id") @db.Uuid
+  entity   KnowledgeEntity @relation(fields: [entityId], references: [id], onDelete: Restrict)
+
+  aliasText String  @map("alias_text") @db.VarChar(300)
+  language  String? @db.VarChar(20)
+
+  /// The evidence in which this exact expression was used, when known.
+  sourceEvidenceId String?   @map("source_evidence_id") @db.Uuid
+  sourceEvidence   Evidence? @relation(fields: [sourceEvidenceId], references: [id], onDelete: SetNull)
+
+  contributedById String @map("contributed_by_id") @db.Uuid
+  contributedBy   Actor  @relation(fields: [contributedById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([entityId, aliasText, language])
+  @@index([sourceEvidenceId])
+  @@map("entity_alias")
+}
+
+/// The persisted record of a merge decision (`DATA_MODEL.md` §3), separate
+/// from the entity rows themselves. `KNOWLEDGE_GRAPH.md` §6: every merge is
+/// reversible for a defined window.
+model KnowledgeEntityMergeLog {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  survivingEntityId String          @map("surviving_entity_id") @db.Uuid
+  survivingEntity   KnowledgeEntity @relation("KnowledgeEntityMergeSurviving", fields: [survivingEntityId], references: [id], onDelete: Restrict)
+
+  mergedEntityId String          @map("merged_entity_id") @db.Uuid
+  mergedEntity   KnowledgeEntity @relation("KnowledgeEntityMergeMerged", fields: [mergedEntityId], references: [id], onDelete: Restrict)
+
+  decidedById String   @map("decided_by_id") @db.Uuid
+  decidedBy   Actor    @relation(fields: [decidedById], references: [id], onDelete: Restrict)
+  decidedAt   DateTime @map("decided_at") @db.Timestamptz(6)
+
+  rationale       String    @db.Text
+  reversibleUntil DateTime  @map("reversible_until") @db.Timestamptz(6)
+  reversedAt      DateTime? @map("reversed_at") @db.Timestamptz(6)
+
+  @@index([organisationId])
+  @@index([survivingEntityId])
+  @@index([mergedEntityId])
+  @@map("knowledge_entity_merge_log")
+}
+
+/// ADR-0012's `CandidateAssertion` — distinct from `KnowledgeAssertion` by
+/// construction (a separate table, not a status flag on the same one), so no
+/// query can accidentally treat an unconfirmed suggestion as institutional
+/// record. Always cites at least one `Evidence` id — enforced at the
+/// database level by the CHECK constraint added in this model's migration,
+/// not only in the domain layer, matching this repo's "defence in depth"
+/// convention for tenancy (ADR-0013).
+model KnowledgeCandidateAssertion {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  knowledgeDomainId String?          @map("knowledge_domain_id") @db.Uuid
+  knowledgeDomain   KnowledgeDomain? @relation(fields: [knowledgeDomainId], references: [id], onDelete: SetNull)
+
+  assertionType String @map("assertion_type") @db.VarChar(24)
+  /// Shape depends on assertionType — validated at the API boundary before
+  /// this row is ever written (schema-constrained AI output, per the
+  /// feature's governing requirement).
+  payload       Json
+
+  /// Non-empty, enforced by a CHECK constraint (see migration SQL) —
+  /// "AI never creates primary evidence" made structural: a candidate can
+  /// only ever point at existing `Evidence` rows, never substitute for one.
+  sourceEvidenceIds   String[] @map("source_evidence_ids") @db.Uuid
+  sourceUtteranceRefs Json?    @map("source_utterance_refs")
+
+  /// Machine metadata only — never a substitute for human/community
+  /// validation (ADR-0012).
+  confidence Float?
+
+  extractionMethod       String  @map("extraction_method") @db.VarChar(16)
+  extractionModel        String? @map("extraction_model") @db.VarChar(200)
+  extractionModelVersion String? @map("extraction_model_version") @db.VarChar(100)
+  promptVersion          String? @map("prompt_version") @db.VarChar(100)
+
+  proposedById String @map("proposed_by_id") @db.Uuid
+  proposedBy   Actor  @relation(fields: [proposedById], references: [id], onDelete: Restrict)
+
+  status                  String                        @default("pending") @db.VarChar(16)
+  supersededByCandidateId String?                       @map("superseded_by_candidate_id") @db.Uuid
+  supersededBy            KnowledgeCandidateAssertion?  @relation("CandidateSupersession", fields: [supersededByCandidateId], references: [id], onDelete: SetNull)
+  supersedes              KnowledgeCandidateAssertion[] @relation("CandidateSupersession")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  version   Int      @default(1)
+
+  reviewDecisions     KnowledgeReviewDecision[]
+  provenanceChains    KnowledgeProvenanceChain[]
+  resultingAssertions KnowledgeAssertion[]
+
+  @@index([organisationId])
+  @@index([workspaceId, status])
+  @@index([knowledgeDomainId])
+  @@map("knowledge_candidate_assertion")
+}
+
+/// A reviewer's decision on a `KnowledgeCandidateAssertion`
+/// (`packages/domain/src/knowledge-review.ts`). `reviewDurationMs` supports
+/// ADR-0012's rubber-stamping mitigation — anomalously fast decisions are
+/// flagged, never blocked.
+model KnowledgeReviewDecision {
+  id String @id @db.Uuid
+
+  candidateId String                      @map("candidate_id") @db.Uuid
+  candidate   KnowledgeCandidateAssertion @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+
+  reviewerActorId String @map("reviewer_actor_id") @db.Uuid
+  reviewer        Actor  @relation(fields: [reviewerActorId], references: [id], onDelete: Restrict)
+
+  decision         String  @db.VarChar(32)
+  correctedPayload Json?   @map("corrected_payload")
+  rationale        String? @db.Text
+
+  decidedAt        DateTime @map("decided_at") @db.Timestamptz(6)
+  reviewDurationMs Int      @map("review_duration_ms")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([candidateId])
+  @@map("knowledge_review_decision")
+}
+
+/// ADR-0012's non-nullable, non-optional structural provenance requirement.
+/// `KnowledgeAssertion.provenanceChainId` is `NOT NULL UNIQUE` against this
+/// table — the database, not only the domain layer, refuses to represent an
+/// assertion without one.
+model KnowledgeProvenanceChain {
+  id String @id @db.Uuid
+
+  candidateId String?                      @map("candidate_id") @db.Uuid
+  candidate   KnowledgeCandidateAssertion? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+
+  /// Non-empty, enforced by a CHECK constraint (see migration SQL).
+  sourceEvidenceIds   String[] @map("source_evidence_ids") @db.Uuid
+  sourceUtteranceRefs Json?    @map("source_utterance_refs")
+
+  extractionMethod       String  @map("extraction_method") @db.VarChar(16)
+  extractionModel        String? @map("extraction_model") @db.VarChar(200)
+  extractionModelVersion String? @map("extraction_model_version") @db.VarChar(100)
+  promptVersion          String? @map("prompt_version") @db.VarChar(100)
+
+  /// Consent categories checked and satisfied at confirmation time — a
+  /// frozen snapshot, like `Evidence.consentBasis`.
+  consentBasis String[] @map("consent_basis")
+
+  confirmedByActorId String   @map("confirmed_by_actor_id") @db.Uuid
+  confirmedBy        Actor    @relation(fields: [confirmedByActorId], references: [id], onDelete: Restrict)
+  confirmedAt        DateTime @map("confirmed_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  assertion KnowledgeAssertion?
+
+  @@index([candidateId])
+  @@map("knowledge_provenance_chain")
+}
+
+/// ADR-0012's confirmed `Assertion`, named `KnowledgeAssertion` to match the
+/// originating feature request (ADR-0026 point 4). The only way this table
+/// is written to is via `confirmCandidateAssertion` /
+/// `confirmCandidateAssertionAfterReview`
+/// (`packages/domain/src/knowledge-assertion.ts`), both of which require a
+/// human confirming actor and a `KnowledgeProvenanceChain`.
+model KnowledgeAssertion {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  knowledgeDomainId String?          @map("knowledge_domain_id") @db.Uuid
+  knowledgeDomain   KnowledgeDomain? @relation(fields: [knowledgeDomainId], references: [id], onDelete: SetNull)
+
+  candidateId String?                      @map("candidate_id") @db.Uuid
+  candidate   KnowledgeCandidateAssertion? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+
+  assertionType String @map("assertion_type") @db.VarChar(24)
+
+  /// NOT NULL + UNIQUE — the structural half of ADR-0012's provenance
+  /// requirement (see `KnowledgeProvenanceChain`'s doc comment).
+  provenanceChainId String                   @unique @map("provenance_chain_id") @db.Uuid
+  provenanceChain   KnowledgeProvenanceChain @relation(fields: [provenanceChainId], references: [id], onDelete: Restrict)
+
+  confidence       Float
+  sensitivityClass String @default("internal") @map("sensitivity_class") @db.VarChar(16)
+
+  /// One of `ASSERTION_LIFECYCLE_STATES` — deliberately excludes
+  /// `MACHINE_SUGGESTED` (ADR-0026 point 4; that state lives on
+  /// `KnowledgeCandidateAssertion.status` instead, since this row cannot
+  /// exist before human confirmation).
+  lifecycleState String @default("facilitator_curated") @map("lifecycle_state") @db.VarChar(24)
+
+  /// CONTESTED / MINORITY_PERSPECTIVE / CULTURALLY_SIGNIFICANT / UNRESOLVED /
+  /// COMMUNITY_RESTRICTED / MACHINE_INFERRED — multi-valued, so disagreement
+  /// is preserved rather than collapsed (ADR-0026 point 6).
+  perspectiveTags String[] @default([]) @map("perspective_tags")
+
+  /// Which community/group entity holds this perspective, for
+  /// "Group A supports / Group B opposes" — never collapsed into one row.
+  groupAttributionId String?          @map("group_attribution_id") @db.Uuid
+  groupAttribution   KnowledgeEntity? @relation(fields: [groupAttributionId], references: [id], onDelete: SetNull)
+
+  accessScope String @default("internal") @map("access_scope") @db.VarChar(16)
+
+  validFrom DateTime  @map("valid_from") @db.Timestamptz(6)
+  validTo   DateTime? @map("valid_to") @db.Timestamptz(6)
+
+  retractedAt     DateTime? @map("retracted_at") @db.Timestamptz(6)
+  retractedReason String?   @map("retracted_reason") @db.Text
+
+  recordedAt DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
+
+  createdById String @map("created_by_id") @db.Uuid
+  createdBy   Actor  @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  version Int @default(1)
+
+  entityAttributes KnowledgeEntityAttribute[]
+  relationships    KnowledgeRelationship[]
+
+  @@index([organisationId])
+  @@index([workspaceId, lifecycleState])
+  @@index([knowledgeDomainId])
+  @@index([candidateId])
+  @@index([groupAttributionId])
+  @@map("knowledge_assertion")
+}
+
+/// A single provenance-backed fact about an entity (`DATA_MODEL.md` §3).
+/// `assertionId` is `NOT NULL` — "an attribute with no assertion is
+/// impossible to insert" is a foreign-key constraint, not a convention.
+model KnowledgeEntityAttribute {
+  id String @id @db.Uuid
+
+  entityId String          @map("entity_id") @db.Uuid
+  entity   KnowledgeEntity @relation(fields: [entityId], references: [id], onDelete: Restrict)
+
+  attributeKey   String @map("attribute_key") @db.VarChar(100)
+  attributeValue String @map("attribute_value") @db.Text
+
+  assertionId String             @map("assertion_id") @db.Uuid
+  assertion   KnowledgeAssertion @relation(fields: [assertionId], references: [id], onDelete: Restrict)
+
+  validFrom DateTime  @map("valid_from") @db.Timestamptz(6)
+  validTo   DateTime? @map("valid_to") @db.Timestamptz(6)
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdById String   @map("created_by_id") @db.Uuid
+  createdBy   Actor    @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([entityId])
+  @@index([assertionId])
+  @@map("knowledge_entity_attribute")
+}
+
+/// A typed, provenance-carrying edge between two `KnowledgeEntity` rows —
+/// the write-model row Neo4j's projection is `MERGE`d from (ADR-0011), not
+/// the graph itself. `relationshipType` is a real foreign key against
+/// `RelationshipTypeDefinition.code`: an unregistered type cannot be
+/// inserted (ADR-0026 point 5).
+model KnowledgeRelationship {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  fromEntityId String          @map("from_entity_id") @db.Uuid
+  fromEntity   KnowledgeEntity @relation("KnowledgeRelationshipFrom", fields: [fromEntityId], references: [id], onDelete: Restrict)
+
+  toEntityId String          @map("to_entity_id") @db.Uuid
+  toEntity   KnowledgeEntity @relation("KnowledgeRelationshipTo", fields: [toEntityId], references: [id], onDelete: Restrict)
+
+  relationshipType           String                     @map("relationship_type") @db.VarChar(64)
+  relationshipTypeDefinition RelationshipTypeDefinition @relation(fields: [relationshipType], references: [code], onDelete: Restrict)
+
+  assertionId String             @map("assertion_id") @db.Uuid
+  assertion   KnowledgeAssertion @relation(fields: [assertionId], references: [id], onDelete: Restrict)
+
+  validFrom DateTime  @map("valid_from") @db.Timestamptz(6)
+  validTo   DateTime? @map("valid_to") @db.Timestamptz(6)
+  strength  Float?
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdById String   @map("created_by_id") @db.Uuid
+  createdBy   Actor    @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([organisationId])
+  @@index([fromEntityId])
+  @@index([toEntityId])
+  @@index([relationshipType])
+  @@index([assertionId])
+  @@map("knowledge_relationship")
+}
+
+/// Graph projection checkpoint (`DATA_MODEL.md` §3, "Event log") — lets
+/// `workers/graph-projector` resume after a crash and lets an operator see
+/// projection lag as a first-class signal (`KNOWLEDGE_GRAPH.md` §8) rather
+/// than silently serving a stale graph.
+model KnowledgeGraphProjectionCheckpoint {
+  projectionName String   @id @map("projection_name") @db.VarChar(100)
+  lastEventId    String?  @map("last_event_id") @db.Uuid
+  status         String   @default("idle") @db.VarChar(16)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("knowledge_graph_projection_checkpoint")
+}
+
+// ---------------------------------------------------------------------------
+// Minimal event backbone (ADR-0005 "minimal profile", ADR-0026 point 10).
+//
+// A real slice of ADR-0005's transactional outbox, not a knowledge-specific
+// mechanism — pulled forward from Phase 3 only far enough to unblock the
+// graph projector. `EventLogEntry` is the permanent record (`DATA_MODEL.md`
+// §3, "Event log"); `Outbox` is what a dispatcher polls. There is
+// deliberately no NATS/JetStream adapter here — the "minimal profile:
+// in-process polling dispatcher" branch ADR-0005 already specifies. A real
+// JetStream adapter is a future, additive change behind the same
+// `EventBusPort` (`services/api-gateway/src/events/event-bus.port.ts`),
+// requiring no consumer rewrite.
+// ---------------------------------------------------------------------------
+
+/// The permanent, append-only record of every domain event this service has
+/// published — CloudEvents-shaped (`EVENT_CATALOGUE.md` §1), so a future
+/// NATS adapter can republish these verbatim.
+model EventLogEntry {
+  /// The CloudEvents `id` — also the idempotency key every consumer keys on
+  /// (`EVENT_CATALOGUE.md` §3). Client-supplied at publish time (via
+  /// `randomUUID()` in the publishing service), never database-generated,
+  /// so the same logical event always carries the same id even if the
+  /// publishing transaction is retried.
+  id String @id @db.Uuid
+
+  organisationId String  @map("organisation_id") @db.Uuid
+  workspaceId    String? @map("workspace_id") @db.Uuid
+
+  aggregateType String @map("aggregate_type") @db.VarChar(64)
+  aggregateId   String @map("aggregate_id") @db.Uuid
+
+  /// `org.witness.<context>.<aggregate>.<past-tense-verb>.v<major>`
+  /// (`EVENT_CATALOGUE.md` §2).
+  eventType    String @map("event_type") @db.VarChar(150)
+  eventVersion Int    @default(1) @map("event_version")
+
+  payload  Json
+  metadata Json?
+
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
+  recordedAt DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  /// True insertion-order tiebreak, mirrors `AuditEvent.sequence`.
+  sequence   BigInt   @default(autoincrement())
+
+  outbox Outbox?
+
+  @@index([organisationId])
+  @@index([aggregateType, aggregateId])
+  @@index([eventType])
+  @@map("event_log_entry")
+}
+
+/// What a dispatcher polls. Written in the same transaction as the state
+/// change and the `EventLogEntry` row (the transactional outbox pattern,
+/// `EVENT_CATALOGUE.md` §3, "Durability") — publication and state change
+/// commit atomically, so a rolled-back transaction never leaves behind a
+/// dispatched event, and a committed change never loses its event.
+model Outbox {
+  id String @id @db.Uuid
+
+  eventId String        @unique @map("event_id") @db.Uuid
+  event   EventLogEntry @relation(fields: [eventId], references: [id], onDelete: Restrict)
+
+  destination String @default("graph-projector") @db.VarChar(64)
+  status      String @default("pending") @db.VarChar(16)
+  attempts    Int    @default(0)
+
+  lastAttemptAt DateTime? @map("last_attempt_at") @db.Timestamptz(6)
+  dispatchedAt  DateTime? @map("dispatched_at") @db.Timestamptz(6)
+
+  @@index([destination, status])
+  @@map("outbox")
 }

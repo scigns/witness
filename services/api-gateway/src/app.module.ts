@@ -95,6 +95,14 @@ import { WorkspaceRoleAssignmentsController } from './workspace-role-assignments
 import { WorkspaceRoleAssignmentsService } from './workspace-role-assignments/workspace-role-assignments.service.js';
 import { WorkspacesController } from './workspaces/workspaces.controller.js';
 import { WorkspacesService } from './workspaces/workspaces.service.js';
+import { KnowledgeDomainsController } from './knowledge/knowledge-domains.controller.js';
+import { KnowledgeDomainsService } from './knowledge/knowledge-domains.service.js';
+import { KnowledgeEntitiesController } from './knowledge/knowledge-entities.controller.js';
+import { KnowledgeEntitiesService } from './knowledge/knowledge-entities.service.js';
+import { KnowledgeCandidatesController } from './knowledge/knowledge-candidates.controller.js';
+import { KnowledgeCandidatesService } from './knowledge/knowledge-candidates.service.js';
+import { KnowledgeGraphQueryController } from './knowledge/knowledge-graph-query.controller.js';
+import { KnowledgeGraphQueryService } from './knowledge/knowledge-graph-query.service.js';
 import { InvoicesController } from './invoices/invoices.controller.js';
 import { InvoicesService } from './invoices/invoices.service.js';
 import { ManualSettlementService } from './invoices/manual-settlement.service.js';
@@ -135,6 +143,10 @@ import { MailerService } from './infrastructure/mailer.js';
     BillingController,
     InvoicesController,
     PlatformRolesController,
+    KnowledgeDomainsController,
+    KnowledgeEntitiesController,
+    KnowledgeCandidatesController,
+    KnowledgeGraphQueryController,
   ],
   providers: [
     PrismaService,
@@ -154,6 +166,10 @@ import { MailerService } from './infrastructure/mailer.js';
     InvoicesService,
     ManualSettlementService,
     PlatformRolesService,
+    KnowledgeDomainsService,
+    KnowledgeEntitiesService,
+    KnowledgeCandidatesService,
+    KnowledgeGraphQueryService,
     MailerService,
     WorkspacesService,
     UsersService,

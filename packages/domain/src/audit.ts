@@ -158,6 +158,31 @@ export const AUDIT_ACTIONS = [
   'agenda_item.reordered',
   'resource.uploaded',
   'resource.removed',
+  // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
+  'knowledge_domain.created',
+  'knowledge_domain.policy_updated',
+  'knowledge_entity.created',
+  'knowledge_entity.sensitivity_unchanged',
+  'knowledge_entity.sensitivity_changed',
+  'knowledge_entity.declassified',
+  'knowledge_entity.merged',
+  'knowledge_entity.merge_reversed',
+  'entity_alias.added',
+  'knowledge_candidate.proposed',
+  'knowledge_candidate.rejected',
+  'knowledge_candidate.expired',
+  'knowledge_candidate.confirmed',
+  'knowledge_candidate.corrected',
+  'knowledge_review.decided',
+  'knowledge_assertion.confirmed',
+  'knowledge_assertion.transitioned',
+  'knowledge_assertion.published',
+  'knowledge_assertion.retracted',
+  'knowledge_assertion.perspective_tag_unchanged',
+  'knowledge_assertion.perspective_tag_added',
+  'knowledge_relationship.created',
+  'knowledge_relationship.validity_ended',
+  'knowledge_entity_attribute.set',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -200,6 +225,16 @@ export const AUDIT_SUBJECT_TYPES = [
   'subscription',
   'invoice',
   'payment',
+  'knowledge_domain',
+  'knowledge_entity',
+  'entity_alias',
+  'entity_merge_log',
+  'candidate_assertion',
+  'knowledge_review_decision',
+  'knowledge_assertion',
+  'knowledge_relationship',
+  'knowledge_entity_attribute',
+  'knowledge_provenance_chain',
 ] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 

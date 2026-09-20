@@ -1,0 +1,33 @@
+{
+  "name": "@witness/knowledge-graph",
+  "version": "0.1.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "description": "Read-only Neo4j graph projection query layer (ADR-0011). Application services depend on this for traversal/provenance queries; only workers/graph-projector writes to Neo4j.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "lint": "eslint src",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "neo4j-driver": "^5.28.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.9"
+  }
+}

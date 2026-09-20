@@ -54,6 +54,19 @@ export type PaymentId = Branded<string, 'PaymentId'>;
 export type PaymentMethodId = Branded<string, 'PaymentMethodId'>;
 export type PurchaseOrderId = Branded<string, 'PurchaseOrderId'>;
 
+// Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
+export type KnowledgeDomainId = Branded<string, 'KnowledgeDomainId'>;
+export type KnowledgeEntityId = Branded<string, 'KnowledgeEntityId'>;
+export type EntityAliasId = Branded<string, 'EntityAliasId'>;
+export type EntityMergeLogId = Branded<string, 'EntityMergeLogId'>;
+export type RelationshipTypeCode = Branded<string, 'RelationshipTypeCode'>;
+export type KnowledgeRelationshipId = Branded<string, 'KnowledgeRelationshipId'>;
+export type KnowledgeEntityAttributeId = Branded<string, 'KnowledgeEntityAttributeId'>;
+export type CandidateAssertionId = Branded<string, 'CandidateAssertionId'>;
+export type KnowledgeReviewDecisionId = Branded<string, 'KnowledgeReviewDecisionId'>;
+export type KnowledgeProvenanceChainId = Branded<string, 'KnowledgeProvenanceChainId'>;
+export type KnowledgeAssertionId = Branded<string, 'KnowledgeAssertionId'>;
+
 /**
  * UUID v4/v7 shape. We accept both: v7 is time-ordered, which matters for the
  * append-only audit log, while existing v4 identifiers must keep validating.
@@ -244,4 +257,72 @@ export function toPaymentMethodId(value: string): PaymentMethodId {
 export function toPurchaseOrderId(value: string): PurchaseOrderId {
   assertUuid(value, 'PurchaseOrderId');
   return value as PurchaseOrderId;
+}
+
+export function toKnowledgeDomainId(value: string): KnowledgeDomainId {
+  assertUuid(value, 'KnowledgeDomainId');
+  return value as KnowledgeDomainId;
+}
+
+export function toKnowledgeEntityId(value: string): KnowledgeEntityId {
+  assertUuid(value, 'KnowledgeEntityId');
+  return value as KnowledgeEntityId;
+}
+
+export function toEntityAliasId(value: string): EntityAliasId {
+  assertUuid(value, 'EntityAliasId');
+  return value as EntityAliasId;
+}
+
+export function toEntityMergeLogId(value: string): EntityMergeLogId {
+  assertUuid(value, 'EntityMergeLogId');
+  return value as EntityMergeLogId;
+}
+
+const RELATIONSHIP_TYPE_CODE_PATTERN = /^[A-Z][A-Z0-9_]{1,63}$/;
+
+/**
+ * Not a UUID — a stable vocabulary code (`SUPPORTS`, `x_acme_CUSTOM_LINK`).
+ * Format only; whether the code is a *registered* type is a database lookup
+ * against `RelationshipTypeDefinition`, which the domain layer does not
+ * perform (ADR-0003) — see `relationship-vocabulary.ts`.
+ */
+export function toRelationshipTypeCode(value: string): RelationshipTypeCode {
+  if (!RELATIONSHIP_TYPE_CODE_PATTERN.test(value)) {
+    throw new InvariantViolation(
+      `'${value}' is not a well-formed relationship type code (expected upper-snake-case, optionally namespaced).`,
+      'INVALID_RELATIONSHIP_TYPE_CODE',
+    );
+  }
+  return value as RelationshipTypeCode;
+}
+
+export function toKnowledgeRelationshipId(value: string): KnowledgeRelationshipId {
+  assertUuid(value, 'KnowledgeRelationshipId');
+  return value as KnowledgeRelationshipId;
+}
+
+export function toKnowledgeEntityAttributeId(value: string): KnowledgeEntityAttributeId {
+  assertUuid(value, 'KnowledgeEntityAttributeId');
+  return value as KnowledgeEntityAttributeId;
+}
+
+export function toCandidateAssertionId(value: string): CandidateAssertionId {
+  assertUuid(value, 'CandidateAssertionId');
+  return value as CandidateAssertionId;
+}
+
+export function toKnowledgeReviewDecisionId(value: string): KnowledgeReviewDecisionId {
+  assertUuid(value, 'KnowledgeReviewDecisionId');
+  return value as KnowledgeReviewDecisionId;
+}
+
+export function toKnowledgeProvenanceChainId(value: string): KnowledgeProvenanceChainId {
+  assertUuid(value, 'KnowledgeProvenanceChainId');
+  return value as KnowledgeProvenanceChainId;
+}
+
+export function toKnowledgeAssertionId(value: string): KnowledgeAssertionId {
+  assertUuid(value, 'KnowledgeAssertionId');
+  return value as KnowledgeAssertionId;
 }

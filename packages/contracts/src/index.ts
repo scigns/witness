@@ -37,6 +37,10 @@ export const WITNESS_ROLES = [
   'reviewer',
   'participant',
   'reader',
+  // Knowledge Steward (ADR-0026 point 8) — mirrors @witness/domain's
+  // WITNESS_ROLES; kept as a separate literal here per this package's
+  // deliberate independence from the GPL domain package (see file header).
+  'steward',
 ] as const;
 export type WitnessRole = (typeof WITNESS_ROLES)[number];
 
@@ -2545,4 +2549,259 @@ export interface PlatformRoleAssignmentView {
   role: PlatformRole;
   createdAt: string;
   updatedAt: string;
+}
+
+// ─── Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026) ───────────────
+//
+// The closed thirteen-type ontology and lifecycle-state vocabularies are
+// declared here rather than imported from `@witness/domain` — same
+// licence-boundary reasoning as `REVIEW_STATES` above.
+// `contracts-drift.test.ts` in the API service asserts these have not
+// drifted from the domain package's own copies.
+
+export const KNOWLEDGE_ENTITY_TYPES = [
+  'person',
+  'community',
+  'organisation',
+  'project',
+  'meeting',
+  'policy',
+  'evidence',
+  'risk',
+  'decision',
+  'action',
+  'commitment',
+  'location',
+  'topic',
+] as const;
+export type KnowledgeEntityType = (typeof KNOWLEDGE_ENTITY_TYPES)[number];
+
+export const TOPIC_SCHEMES = ['general_concept', 'theme', 'issue', 'cultural_concept'] as const;
+export type TopicScheme = (typeof TOPIC_SCHEMES)[number];
+
+export const SENSITIVITY_CLASSES = ['public', 'internal', 'confidential', 'restricted'] as const;
+export type SensitivityClass = (typeof SENSITIVITY_CLASSES)[number];
+
+export const CANDIDATE_ASSERTION_TYPES = ['entity_attribute', 'relationship'] as const;
+export type CandidateAssertionType = (typeof CANDIDATE_ASSERTION_TYPES)[number];
+
+export const CANDIDATE_ASSERTION_STATUSES = [
+  'pending',
+  'confirmed',
+  'corrected',
+  'rejected',
+  'superseded',
+  'expired',
+] as const;
+export type CandidateAssertionStatus = (typeof CANDIDATE_ASSERTION_STATUSES)[number];
+
+export const KNOWLEDGE_REVIEW_DECISIONS = [
+  'approved',
+  'rejected',
+  'qualified',
+  'returned_for_community_review',
+] as const;
+export type KnowledgeReviewDecisionType = (typeof KNOWLEDGE_REVIEW_DECISIONS)[number];
+
+export const ASSERTION_LIFECYCLE_STATES = [
+  'facilitator_curated',
+  'evidence_reviewed',
+  'community_validated',
+  'approved',
+  'published',
+  'rejected',
+  'superseded',
+] as const;
+export type AssertionLifecycleState = (typeof ASSERTION_LIFECYCLE_STATES)[number];
+
+export const PERSPECTIVE_TAGS = [
+  'contested',
+  'minority_perspective',
+  'culturally_significant',
+  'unresolved',
+  'community_restricted',
+  'machine_inferred',
+] as const;
+export type PerspectiveTag = (typeof PERSPECTIVE_TAGS)[number];
+
+export const createKnowledgeDomainRequestSchema = z.object({
+  key: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z][a-z0-9_]{1,63}$/, "Key must be lower-snake-case, e.g. 'cultural_knowledge'"),
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(4000).optional(),
+  validationPolicy: z
+    .object({
+      requiresReviewerValidation: z.boolean().optional(),
+      requiresCommunityValidation: z.boolean().optional(),
+      permitsExternalPublication: z.boolean().optional(),
+    })
+    .optional(),
+  defaultSensitivity: z.enum(SENSITIVITY_CLASSES).optional(),
+});
+export type CreateKnowledgeDomainRequest = z.infer<typeof createKnowledgeDomainRequestSchema>;
+
+export interface KnowledgeDomainView {
+  id: string;
+  workspaceId: string;
+  key: string;
+  name: string;
+  description: string | null;
+  validationPolicy: {
+    requiresReviewerValidation: boolean;
+    requiresCommunityValidation: boolean;
+    permitsExternalPublication: boolean;
+  };
+  defaultSensitivity: SensitivityClass;
+  createdAt: string;
+}
+
+export const createKnowledgeEntityRequestSchema = z
+  .object({
+    entityType: z.enum(KNOWLEDGE_ENTITY_TYPES),
+    topicScheme: z.enum(TOPIC_SCHEMES).optional(),
+    canonicalLabel: z.string().trim().min(1).max(300),
+    definition: z.string().trim().max(5000).optional(),
+    sensitivityClass: z.enum(SENSITIVITY_CLASSES).optional(),
+  })
+  .refine((v) => (v.entityType === 'topic' ? v.topicScheme !== undefined : true), {
+    message: 'A topic entity must declare a topicScheme',
+    path: ['topicScheme'],
+  });
+export type CreateKnowledgeEntityRequest = z.infer<typeof createKnowledgeEntityRequestSchema>;
+
+export interface KnowledgeEntityView {
+  id: string;
+  workspaceId: string;
+  entityType: KnowledgeEntityType;
+  topicScheme: TopicScheme | null;
+  canonicalLabel: string;
+  definition: string | null;
+  sensitivityClass: SensitivityClass;
+  status: 'active' | 'merged' | 'superseded';
+  mergedIntoId: string | null;
+  ontologyVersion: string;
+  createdAt: string;
+  aliasCount: number;
+}
+
+export const addEntityAliasRequestSchema = z.object({
+  aliasText: z.string().trim().min(1).max(300),
+  language: z.string().trim().max(20).optional(),
+  sourceEvidenceId: z.string().uuid().optional(),
+});
+export type AddEntityAliasRequest = z.infer<typeof addEntityAliasRequestSchema>;
+
+export interface EntityAliasView {
+  id: string;
+  entityId: string;
+  aliasText: string;
+  language: string | null;
+  sourceEvidenceId: string | null;
+  contributedByName: string;
+  createdAt: string;
+}
+
+export const mergeKnowledgeEntitiesRequestSchema = z.object({
+  mergedEntityId: z.string().uuid(),
+  rationale: z.string().trim().min(1).max(2000),
+  elevatedAuthorityConfirmed: z.boolean().optional(),
+});
+export type MergeKnowledgeEntitiesRequest = z.infer<typeof mergeKnowledgeEntitiesRequestSchema>;
+
+/**
+ * Payload shape depends on `assertionType`; validated with a discriminated
+ * union so "propose a relationship citing two entities that don't exist
+ * yet" is a schema error, not a runtime surprise three services deep.
+ */
+export const candidateAssertionPayloadSchema = z.discriminatedUnion('assertionType', [
+  z.object({
+    assertionType: z.literal('entity_attribute'),
+    entityId: z.string().uuid(),
+    attributeKey: z.string().trim().min(1).max(100),
+    attributeValue: z.string().trim().min(1).max(4000),
+  }),
+  z.object({
+    assertionType: z.literal('relationship'),
+    fromEntityId: z.string().uuid(),
+    toEntityId: z.string().uuid(),
+    relationshipType: z.string().trim().min(1).max(64),
+    validFrom: z.string().datetime().optional(),
+    strength: z.number().min(0).max(1).optional(),
+  }),
+]);
+export type CandidateAssertionPayload = z.infer<typeof candidateAssertionPayloadSchema>;
+
+export const proposeCandidateAssertionRequestSchema = z.object({
+  knowledgeDomainId: z.string().uuid().optional(),
+  payload: candidateAssertionPayloadSchema,
+  sourceEvidenceIds: z
+    .array(z.string().uuid())
+    .min(1, 'At least one piece of source evidence is required'),
+  confidence: z.number().min(0).max(1).optional(),
+});
+export type ProposeCandidateAssertionRequest = z.infer<
+  typeof proposeCandidateAssertionRequestSchema
+>;
+
+export interface CandidateAssertionView {
+  id: string;
+  workspaceId: string;
+  knowledgeDomainId: string | null;
+  assertionType: CandidateAssertionType;
+  payload: Record<string, unknown>;
+  sourceEvidenceIds: string[];
+  confidence: number | null;
+  extractionMethod: 'human_manual' | 'ai_model' | 'rule_based';
+  proposedByName: string;
+  status: CandidateAssertionStatus;
+  createdAt: string;
+}
+
+export const reviewCandidateAssertionRequestSchema = z.object({
+  decision: z.enum(KNOWLEDGE_REVIEW_DECISIONS),
+  correctedPayload: candidateAssertionPayloadSchema.optional(),
+  rationale: z.string().trim().max(2000).optional(),
+  reviewStartedAt: z.string().datetime(),
+  sensitivityClass: z.enum(SENSITIVITY_CLASSES).optional(),
+  perspectiveTags: z.array(z.enum(PERSPECTIVE_TAGS)).optional(),
+  groupAttributionId: z.string().uuid().optional(),
+});
+export type ReviewCandidateAssertionRequest = z.infer<typeof reviewCandidateAssertionRequestSchema>;
+
+export interface KnowledgeReviewDecisionView {
+  id: string;
+  candidateId: string;
+  reviewerName: string;
+  decision: KnowledgeReviewDecisionType;
+  rationale: string | null;
+  decidedAt: string;
+  reviewDurationMs: number;
+}
+
+export interface KnowledgeAssertionView {
+  id: string;
+  workspaceId: string;
+  knowledgeDomainId: string | null;
+  candidateId: string | null;
+  assertionType: CandidateAssertionType;
+  confidence: number;
+  sensitivityClass: SensitivityClass;
+  lifecycleState: AssertionLifecycleState;
+  perspectiveTags: PerspectiveTag[];
+  groupAttributionId: string | null;
+  provenanceChainId: string;
+  createdAt: string;
+}
+
+export interface KnowledgeProvenanceChainView {
+  id: string;
+  sourceEvidenceIds: string[];
+  extractionMethod: 'human_manual' | 'ai_model' | 'rule_based';
+  extractionModel: string | null;
+  extractionModelVersion: string | null;
+  confirmedByName: string;
+  confirmedAt: string;
 }

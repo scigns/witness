@@ -187,16 +187,27 @@ not by developer discipline.
 
 ## Phase 4 — Knowledge graph
 
-| #   | Deliverable                                                | Definition of done                                             |
-| --- | ---------------------------------------------------------- | -------------------------------------------------------------- |
-| 4.1 | Ontology implementation & versioning                       | Schema migrations for the graph; versioned, forward-compatible |
-| 4.2 | Graph projector worker (event log → Neo4j)                 | Idempotent; full rebuild from zero verified                    |
-| 4.3 | Entity resolution & merge/split with human adjudication    | Precision/recall measured on a labelled fixture set            |
-| 4.4 | Temporal model (bitemporal: valid time + transaction time) | "What did we believe on date X?" answerable                    |
-| 4.5 | Graph query API + traversal safety limits                  | No unbounded traversal reachable from the API                  |
-| 4.6 | Provenance chain API                                       | Every node resolves to source utterance in ≤ 3 calls           |
+**Pulled forward, partially, ahead of this schedule (ADR-0026, 2026-09-19):** the Developer Preview
+now has the write-model schema, domain layer, permissions, minimal event backbone, Neo4j projector,
+rebuild command, and read-only traversal API described in 4.1, 4.2, 4.5 and 4.6 below. This was a
+deliberate product-directed decision, not scope drift — recorded so this table stays honest about
+what changed and why. 4.3 (entity resolution with human adjudication) and 4.4's *projection* of
+bitemporal data into the graph remain outstanding; the write model's bitemporal columns
+(`validFrom`/`validTo`) exist and are populated, but no UI or API answers "what did we believe on
+date X?" yet.
+
+| #   | Deliverable                                                | Definition of done                                             | Status |
+| --- | ---------------------------------------------------------- | ---------------------------------------------------------------- | --- |
+| 4.1 | Ontology implementation & versioning                       | Schema migrations for the graph; versioned, forward-compatible | 🟢 Delivered — `knowledge_*` Prisma migration, `RelationshipTypeDefinition` as data |
+| 4.2 | Graph projector worker (event log → Neo4j)                 | Idempotent; full rebuild from zero verified                    | 🟢 Delivered — `workers/graph-projector`, minimal-profile outbox dispatcher (ADR-0005), not yet NATS |
+| 4.3 | Entity resolution & merge/split with human adjudication    | Precision/recall measured on a labelled fixture set            | 🟡 Manual merge/split with elevated-authority gate delivered; no automated resolution/adjudication queue yet |
+| 4.4 | Temporal model (bitemporal: valid time + transaction time) | "What did we believe on date X?" answerable                    | 🟡 Columns exist and are populated; no query surface yet |
+| 4.5 | Graph query API + traversal safety limits                  | No unbounded traversal reachable from the API                  | 🟢 Delivered — `services/knowledge-graph`, depth/node/timeout caps enforced |
+| 4.6 | Provenance chain API                                       | Every node resolves to source utterance in ≤ 3 calls           | 🟡 Delivered to evidence-id granularity; utterance-level (word-timestamp) provenance awaits the transcription/extraction pipeline (Phase 5) |
 
 **Exit gate:** delete the graph entirely; rebuild it from the event log; byte-comparable result.
+`pnpm --filter @witness/graph-projector run rebuild` implements this against a running Neo4j; not
+yet wired into automated CI (requires `make dev-full`).
 
 ---
 

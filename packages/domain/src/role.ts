@@ -27,6 +27,14 @@ export const WITNESS_ROLES = [
   'reviewer',
   'participant',
   'reader',
+  // Knowledge Steward (ADR-0026 point 8): a project-level responsibility,
+  // assigned exactly like every other role via a `RoleAssignment` scoped to
+  // one organisation or workspace — never a global platform role. Deliberately
+  // its own tier (see `role-resolution.service.ts`'s `ROLE_TO_TIER`), not
+  // collapsed onto `contributor`/`reviewer`, because it grants capabilities
+  // (`knowledge_entity:steward`, `knowledge_entity:publish`) neither of those
+  // tiers should hold by default.
+  'steward',
 ] as const;
 
 export type WitnessRole = (typeof WITNESS_ROLES)[number];
@@ -56,6 +64,9 @@ export const ROLE_PERMISSIONS = [
   'session:manage',
   'participant:read',
   'participant:manage',
+  'knowledge:suggest',
+  'knowledge:review',
+  'knowledge:steward',
 ] as const;
 
 export type RolePermission = (typeof ROLE_PERMISSIONS)[number];
@@ -100,6 +111,7 @@ export const ROLE_PERMISSIONS_BY_ROLE: Readonly<Record<WitnessRole, readonly Rol
       'session:manage',
       'participant:read',
       'participant:manage',
+      'knowledge:suggest',
     ],
     facilitator: [
       'record:read',
@@ -109,8 +121,27 @@ export const ROLE_PERMISSIONS_BY_ROLE: Readonly<Record<WitnessRole, readonly Rol
       'session:manage',
       'participant:read',
       'participant:manage',
+      'knowledge:suggest',
     ],
-    reviewer: ['record:read', 'record:create', 'record:review', 'session:read', 'participant:read'],
+    reviewer: [
+      'record:read',
+      'record:create',
+      'record:review',
+      'session:read',
+      'participant:read',
+      'knowledge:review',
+    ],
+    // Knowledge Steward — see the `WITNESS_ROLES` comment above. Deliberately
+    // does not include `record:review`/`session:manage`: stewarding graph
+    // structure is not evidence review or session facilitation, and holding
+    // this role should not imply either.
+    steward: [
+      'record:read',
+      'session:read',
+      'participant:read',
+      'knowledge:suggest',
+      'knowledge:steward',
+    ],
     admin: [
       'record:read',
       'record:create',
@@ -122,6 +153,9 @@ export const ROLE_PERMISSIONS_BY_ROLE: Readonly<Record<WitnessRole, readonly Rol
       'session:manage',
       'participant:read',
       'participant:manage',
+      'knowledge:suggest',
+      'knowledge:review',
+      'knowledge:steward',
     ],
   });
 

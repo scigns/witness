@@ -22,7 +22,7 @@ import { ROLE_GRANTS } from './role-grants.js';
 import type { Action } from './authorization.port.js';
 import { PolicyEngineService } from './policy-engine.service.js';
 
-const TIERS = ['reader', 'contributor', 'reviewer', 'admin'] as const;
+const TIERS = ['reader', 'contributor', 'reviewer', 'admin', 'steward'] as const;
 
 const POLICY_CSV_PATH = fileURLToPath(
   new URL('../../../../packages/policy/policy.csv', import.meta.url),
