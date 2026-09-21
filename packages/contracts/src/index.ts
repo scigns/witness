@@ -2587,6 +2587,8 @@ export type CandidateAssertionType = (typeof CANDIDATE_ASSERTION_TYPES)[number];
 
 export const CANDIDATE_ASSERTION_STATUSES = [
   'pending',
+  'needs_clarification',
+  'pending_community_validation',
   'confirmed',
   'corrected',
   'rejected',
@@ -2600,6 +2602,7 @@ export const KNOWLEDGE_REVIEW_DECISIONS = [
   'rejected',
   'qualified',
   'returned_for_community_review',
+  'clarification_requested',
 ] as const;
 export type KnowledgeReviewDecisionType = (typeof KNOWLEDGE_REVIEW_DECISIONS)[number];
 
@@ -2658,6 +2661,16 @@ export interface KnowledgeDomainView {
   createdAt: string;
 }
 
+/** Governance-policy-only edit — `key`, once set, is not mutable (it's how existing candidates/assertions reference the domain by id, not by key, but the key is a stable public handle other tooling may already depend on). */
+export const updateKnowledgeDomainPolicyRequestSchema = z.object({
+  requiresReviewerValidation: z.boolean().optional(),
+  requiresCommunityValidation: z.boolean().optional(),
+  permitsExternalPublication: z.boolean().optional(),
+});
+export type UpdateKnowledgeDomainPolicyRequest = z.infer<
+  typeof updateKnowledgeDomainPolicyRequestSchema
+>;
+
 export const createKnowledgeEntityRequestSchema = z
   .object({
     entityType: z.enum(KNOWLEDGE_ENTITY_TYPES),
@@ -2710,6 +2723,68 @@ export const mergeKnowledgeEntitiesRequestSchema = z.object({
   elevatedAuthorityConfirmed: z.boolean().optional(),
 });
 export type MergeKnowledgeEntitiesRequest = z.infer<typeof mergeKnowledgeEntitiesRequestSchema>;
+
+/**
+ * Read-only preview of what a merge would do, computed against the same
+ * invariants `POST :entityId/merge` enforces (self-merge, cross-org, inactive
+ * entities, community/person re-identification) — without writing anything.
+ * `KNOWLEDGE_GRAPH.md` §6: "a graph that has fused two people is a trust
+ * catastrophe", so a steward must be able to see the blast radius (alias and
+ * relationship counts on the entity that will be tombstoned) before deciding.
+ */
+/**
+ * Mirrors `@witness/knowledge-graph`'s `GraphNode`/`GraphEdge`/`ProvenanceRecord`
+ * (GPL-3.0-or-later) across the same Apache/GPL licence boundary
+ * `contracts-drift.test.ts` guards for closed value sets — these three are
+ * plain read-model shapes with no enum fields to drift, so no drift test is
+ * needed, only field-for-field agreement kept by hand.
+ */
+export interface GraphNode {
+  id: string;
+  entityType: string;
+  topicScheme: string | null;
+  canonicalLabel: string;
+  sensitivityClass: string;
+  status: string;
+  ontologyVersion: string;
+}
+
+export interface GraphEdge {
+  id: string;
+  fromEntityId: string;
+  toEntityId: string;
+  relationshipType: string;
+  assertionId: string;
+  validFrom: string;
+  validTo: string | null;
+  strength: number | null;
+}
+
+export interface ProvenanceRecord {
+  assertionId: string;
+  provenanceChainId: string;
+  sourceEvidenceIds: readonly string[];
+  confirmedByDisplayName: string;
+  confirmedAt: string;
+  extractionMethod: string;
+  extractionModel: string | null;
+  extractionModelVersion: string | null;
+  confidence: number;
+  lifecycleState: string;
+  perspectiveTags: readonly string[];
+  sensitivityClass: string;
+}
+
+export interface MergeKnowledgeEntitiesPreview {
+  survivingEntity: KnowledgeEntityView;
+  mergedEntity: KnowledgeEntityView;
+  canMerge: boolean;
+  blockingReason: string | null;
+  requiresElevatedAuthority: boolean;
+  aliasesToCarryOver: number;
+  attributesOnMergedEntity: number;
+  relationshipsOnMergedEntity: number;
+}
 
 /**
  * Payload shape depends on `assertionType`; validated with a discriminated
@@ -2770,6 +2845,18 @@ export const reviewCandidateAssertionRequestSchema = z.object({
   groupAttributionId: z.string().uuid().optional(),
 });
 export type ReviewCandidateAssertionRequest = z.infer<typeof reviewCandidateAssertionRequestSchema>;
+
+export const respondToCandidateClarificationRequestSchema = z.object({
+  response: z.string().trim().min(1).max(2000),
+});
+export type RespondToCandidateClarificationRequest = z.infer<
+  typeof respondToCandidateClarificationRequestSchema
+>;
+
+export const addPerspectiveTagRequestSchema = z.object({
+  tag: z.enum(PERSPECTIVE_TAGS),
+});
+export type AddPerspectiveTagRequest = z.infer<typeof addPerspectiveTagRequestSchema>;
 
 export interface KnowledgeReviewDecisionView {
   id: string;

@@ -99,7 +99,10 @@ import { KnowledgeDomainsController } from './knowledge/knowledge-domains.contro
 import { KnowledgeDomainsService } from './knowledge/knowledge-domains.service.js';
 import { KnowledgeEntitiesController } from './knowledge/knowledge-entities.controller.js';
 import { KnowledgeEntitiesService } from './knowledge/knowledge-entities.service.js';
-import { KnowledgeCandidatesController } from './knowledge/knowledge-candidates.controller.js';
+import {
+  KnowledgeCandidatesController,
+  KnowledgeAssertionsController,
+} from './knowledge/knowledge-candidates.controller.js';
 import { KnowledgeCandidatesService } from './knowledge/knowledge-candidates.service.js';
 import { KnowledgeGraphQueryController } from './knowledge/knowledge-graph-query.controller.js';
 import { KnowledgeGraphQueryService } from './knowledge/knowledge-graph-query.service.js';
@@ -147,6 +150,7 @@ import { MailerService } from './infrastructure/mailer.js';
     KnowledgeEntitiesController,
     KnowledgeCandidatesController,
     KnowledgeGraphQueryController,
+    KnowledgeAssertionsController,
   ],
   providers: [
     PrismaService,

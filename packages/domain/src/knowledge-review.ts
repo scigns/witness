@@ -22,6 +22,7 @@ export const KNOWLEDGE_REVIEW_DECISIONS = [
   'rejected',
   'qualified',
   'returned_for_community_review',
+  'clarification_requested',
 ] as const;
 export type KnowledgeReviewDecisionType = (typeof KNOWLEDGE_REVIEW_DECISIONS)[number];
 

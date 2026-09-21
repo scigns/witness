@@ -16,6 +16,7 @@ import {
   createEntityMergeLog,
   createKnowledgeEntity,
   mergeKnowledgeEntities,
+  toActorId,
   toEntityAliasId,
   toEntityMergeLogId,
   toEvidenceId,
@@ -30,6 +31,7 @@ import type {
   CreateKnowledgeEntityRequest,
   EntityAliasView,
   KnowledgeEntityView,
+  MergeKnowledgeEntitiesPreview,
   MergeKnowledgeEntitiesRequest,
 } from '@witness/contracts';
 
@@ -222,6 +224,97 @@ export class KnowledgeEntitiesService {
       contributedByName: row.contributedBy.displayName,
       createdAt: row.createdAt.toISOString(),
     }));
+  }
+
+  /**
+   * Dry-run of `merge()` — same invariants (self-merge, cross-organisation,
+   * inactive entities, community/named-person re-identification), zero
+   * writes. Never resolves an `Actor` row for the caller (that would be a
+   * persistence side effect from what must behave like a `GET`); the
+   * synthetic actor below is discarded after the invariant check runs and is
+   * never returned to the caller or stored anywhere.
+   *
+   * Known gap (see `architecture/KNOWLEDGE_GRAPH.md` §6 and this feature's
+   * closing report): a completed merge does not currently repoint or
+   * reproject `KnowledgeRelationship`/`KnowledgeEntityAttribute` rows in
+   * Neo4j, so this preview's relationship/attribute counts describe rows
+   * that stay attached to the tombstoned entity's id in the graph
+   * projection until that gap is closed — surfaced here rather than hidden,
+   * per this feature's "never claim more than is true" requirement.
+   */
+  async previewMerge(
+    workspaceId: string,
+    survivingEntityId: string,
+    mergedEntityId: string,
+  ): Promise<MergeKnowledgeEntitiesPreview> {
+    const [survivingRow, mergedRow] = await Promise.all([
+      this.prisma.knowledgeEntity.findFirst({
+        where: { id: survivingEntityId, workspaceId },
+        include: { _count: { select: { aliases: true } } },
+      }),
+      this.prisma.knowledgeEntity.findFirst({
+        where: { id: mergedEntityId, workspaceId },
+        include: { _count: { select: { aliases: true } } },
+      }),
+    ]);
+    if (survivingRow === null || mergedRow === null) {
+      throw new NotFoundException({
+        error: { code: 'NOT_FOUND', message: 'Knowledge entity not found.' },
+      });
+    }
+
+    const previewActor = {
+      id: toActorId(randomUUID()),
+      kind: 'human' as const,
+      displayName: 'merge preview (not persisted)',
+    };
+    let canMerge = true;
+    let blockingReason: string | null = null;
+    try {
+      mergeKnowledgeEntities({
+        mergeLogId: toEntityMergeLogId(randomUUID()),
+        surviving: toDomainEntity(survivingRow),
+        merged: toDomainEntity(mergedRow),
+        rationale: 'merge preview',
+        reversibleUntil: new Date(),
+        decidedBy: previewActor,
+        at: new Date(),
+        elevatedAuthorityConfirmed: true,
+      });
+    } catch (error) {
+      if (error instanceof InvariantViolation) {
+        canMerge = false;
+        blockingReason = error.message;
+      } else {
+        throw error;
+      }
+    }
+
+    const bothCommunity =
+      survivingRow.entityType === 'community' && mergedRow.entityType === 'community';
+    const crossesIntoNamedPerson =
+      (survivingRow.entityType === 'person' && mergedRow.entityType === 'community') ||
+      (survivingRow.entityType === 'community' && mergedRow.entityType === 'person');
+
+    const [aliasesToCarryOver, attributesOnMergedEntity, relationshipsOnMergedEntity] =
+      await Promise.all([
+        this.prisma.entityAlias.count({ where: { entityId: mergedEntityId } }),
+        this.prisma.knowledgeEntityAttribute.count({ where: { entityId: mergedEntityId } }),
+        this.prisma.knowledgeRelationship.count({
+          where: { OR: [{ fromEntityId: mergedEntityId }, { toEntityId: mergedEntityId }] },
+        }),
+      ]);
+
+    return {
+      survivingEntity: toView(survivingRow),
+      mergedEntity: toView(mergedRow),
+      canMerge,
+      blockingReason,
+      requiresElevatedAuthority: bothCommunity || crossesIntoNamedPerson,
+      aliasesToCarryOver,
+      attributesOnMergedEntity,
+      relationshipsOnMergedEntity,
+    };
   }
 
   /** Steward-gated (`knowledge_entity:steward`) at the controller. */

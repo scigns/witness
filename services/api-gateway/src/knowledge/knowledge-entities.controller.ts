@@ -16,6 +16,7 @@ import {
   mergeKnowledgeEntitiesRequestSchema,
   type EntityAliasView,
   type KnowledgeEntityView,
+  type MergeKnowledgeEntitiesPreview,
 } from '@witness/contracts';
 import { DomainError } from '@witness/domain';
 
@@ -98,6 +99,30 @@ export class KnowledgeEntitiesController {
   ): Promise<EntityAliasView> {
     const parsed = parseOr400(addEntityAliasRequestSchema, body);
     return this.entities.addAlias(workspaceId, entityId, parsed, request.principal!);
+  }
+
+  /**
+   * Query param, not a path segment: this reads two entities but isn't
+   * "nested under" the candidate merged entity — it's a computation over a
+   * pair, matching how the request names it ("Provide preview before
+   * merge").
+   */
+  @Get(':entityId/merge-preview')
+  @Requires('knowledge_entity:steward')
+  async previewMerge(
+    @Param('workspaceId') workspaceId: string,
+    @Param('entityId') entityId: string,
+    @Query('mergedEntityId') mergedEntityId: string | undefined,
+  ): Promise<MergeKnowledgeEntitiesPreview> {
+    if (!mergedEntityId) {
+      throw new BadRequestException({
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: 'mergedEntityId query parameter is required.',
+        },
+      });
+    }
+    return this.entities.previewMerge(workspaceId, entityId, mergedEntityId);
   }
 
   @Post(':entityId/merge')

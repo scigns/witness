@@ -23,14 +23,17 @@ import {
 import { randomUUID } from 'node:crypto';
 
 import {
+  addPerspectiveTag,
   confirmCandidateAssertionAfterReview,
   setKnowledgeEntityAttribute,
   createKnowledgeProvenanceChain,
   createKnowledgeRelationship,
-  markCandidateDecided,
   proposeCandidateAssertion,
   recordKnowledgeReviewDecision,
   rejectCandidateAssertion,
+  requestCandidateClarification,
+  respondToCandidateClarification,
+  returnCandidateForCommunityValidation,
   toCandidateAssertionId,
   toEvidenceId,
   toKnowledgeAssertionId,
@@ -45,7 +48,9 @@ import {
   InvariantViolation,
   DEFAULT_VALIDATION_POLICY,
   type AssertionValidationPolicy,
+  type PerspectiveTag,
 } from '@witness/domain';
+import type { KnowledgeAssertionView } from '@witness/contracts';
 import type {
   CandidateAssertionView,
   ProposeCandidateAssertionRequest,
@@ -357,29 +362,37 @@ export class KnowledgeCandidatesService {
         now,
       );
 
-      if (request.decision !== 'approved') {
-        const { candidate: rejected, event } =
+      if (request.decision !== 'approved' && request.decision !== 'qualified') {
+        const domainCandidate = {
+          ...candidateRowToDomain(candidateRow),
+          payload: effectivePayload,
+        };
+        const { candidate: transitioned, event } =
           request.decision === 'rejected'
             ? rejectCandidateAssertion(
-                { ...candidateRowToDomain(candidateRow), payload: effectivePayload },
+                domainCandidate,
                 reviewer,
                 request.rationale ?? request.decision,
               )
-            : markCandidateDecided(
-                { ...candidateRowToDomain(candidateRow), payload: effectivePayload },
-                'corrected',
-                reviewer,
-              );
+            : request.decision === 'clarification_requested'
+              ? requestCandidateClarification(domainCandidate, reviewer, request.rationale ?? '')
+              : returnCandidateForCommunityValidation(domainCandidate, reviewer, request.rationale);
         const updated = await tx.knowledgeCandidateAssertion.update({
           where: { id: candidateId },
-          data: { status: rejected.status, version: rejected.version },
+          data: { status: transitioned.status, version: transitioned.version },
           include: { proposedBy: true },
         });
         await appendAuditEvent(tx, 'candidate_assertion', candidateId, event, now);
         return toView(updated);
       }
 
-      // Approved — confirm into a KnowledgeAssertion, one transaction.
+      // Approved or qualified — confirm into a KnowledgeAssertion, one
+      // transaction. "Qualified" still confirms (it is "yes, with a
+      // caveat" — the reviewer's rationale is the caveat, recorded on the
+      // KnowledgeReviewDecision row above) but the caller is expected to
+      // attach a perspective tag such as `unresolved` via
+      // `addPerspectiveTag` after confirmation if the caveat is significant
+      // enough to flag on the graph itself.
       const domain = candidateRow.knowledgeDomainId
         ? await tx.knowledgeDomain.findUnique({ where: { id: candidateRow.knowledgeDomainId } })
         : null;
@@ -560,6 +573,136 @@ export class KnowledgeCandidatesService {
 
       return toView(finalCandidate);
     });
+  }
+
+  /**
+   * A proposer (or any contributor who can speak to it) answers a
+   * reviewer's clarification question, returning the candidate to
+   * `pending` for re-review. Never touches `payload` — the answer is
+   * recorded as its own audit event, not folded into the candidate.
+   */
+  async respondToClarification(
+    workspaceId: string,
+    candidateId: string,
+    response: string,
+    principal: Principal,
+  ): Promise<CandidateAssertionView> {
+    const candidateRow = await this.prisma.knowledgeCandidateAssertion.findFirst({
+      where: { id: candidateId, workspaceId },
+      include: { proposedBy: true },
+    });
+    if (candidateRow === null) {
+      throw new NotFoundException({
+        error: { code: 'NOT_FOUND', message: 'Candidate assertion not found.' },
+      });
+    }
+
+    const actor = await resolveActor(this.prisma, principal);
+    let outcome: ReturnType<typeof respondToCandidateClarification>;
+    try {
+      outcome = respondToCandidateClarification(
+        candidateRowToDomain(candidateRow),
+        actor,
+        response,
+      );
+    } catch (error) {
+      if (error instanceof InvariantViolation) {
+        throw new BadRequestException({ error: { code: error.code, message: error.message } });
+      }
+      throw error;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.knowledgeCandidateAssertion.update({
+        where: { id: candidateId },
+        data: { status: outcome.candidate.status, version: outcome.candidate.version },
+        include: { proposedBy: true },
+      });
+      await appendAuditEvent(tx, 'candidate_assertion', candidateId, outcome.event, new Date());
+      return toView(updated);
+    });
+  }
+
+  /**
+   * Add a perspective tag (`contested`, `unresolved`, `culturally_significant`,
+   * ...) to an already-confirmed assertion — the "mark contested" / "mark
+   * unresolved" steward and reviewer actions from the originating request,
+   * which apply after confirmation, not only at approval time (approval
+   * already accepts `perspectiveTags` directly — see `review()`).
+   */
+  async addAssertionPerspectiveTag(
+    workspaceId: string,
+    assertionId: string,
+    tag: PerspectiveTag,
+    principal: Principal,
+  ): Promise<KnowledgeAssertionView> {
+    const row = await this.prisma.knowledgeAssertion.findFirst({
+      where: { id: assertionId, workspaceId },
+    });
+    if (row === null) {
+      throw new NotFoundException({
+        error: { code: 'NOT_FOUND', message: 'Knowledge assertion not found.' },
+      });
+    }
+
+    const actor = await resolveActor(this.prisma, principal);
+    const outcome = addPerspectiveTag(
+      {
+        id: toKnowledgeAssertionId(row.id),
+        organisationId: toOrganisationId(row.organisationId),
+        workspaceId: toWorkspaceId(row.workspaceId),
+        knowledgeDomainId: row.knowledgeDomainId
+          ? toKnowledgeDomainId(row.knowledgeDomainId)
+          : null,
+        candidateId: row.candidateId ? toCandidateAssertionId(row.candidateId) : null,
+        assertionType: row.assertionType as 'entity_attribute' | 'relationship',
+        provenanceChainId: toKnowledgeProvenanceChainId(row.provenanceChainId),
+        confidence: row.confidence,
+        sensitivityClass: row.sensitivityClass as never,
+        lifecycleState: row.lifecycleState as never,
+        perspectiveTags: row.perspectiveTags as PerspectiveTag[],
+        groupAttributionId: row.groupAttributionId
+          ? toKnowledgeEntityId(row.groupAttributionId)
+          : null,
+        accessScope: row.accessScope as never,
+        validFrom: row.validFrom,
+        validTo: row.validTo,
+        retractedAt: row.retractedAt,
+        retractedReason: row.retractedReason,
+        recordedAt: row.recordedAt,
+        createdBy: actor,
+        version: row.version,
+      },
+      tag,
+      actor,
+    );
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.knowledgeAssertion.update({
+        where: { id: assertionId },
+        data: {
+          perspectiveTags: [...outcome.assertion.perspectiveTags],
+          version: outcome.assertion.version,
+        },
+      });
+      await appendAuditEvent(tx, 'knowledge_assertion', assertionId, outcome.event, new Date());
+      return result;
+    });
+
+    return {
+      id: updated.id,
+      workspaceId: updated.workspaceId,
+      knowledgeDomainId: updated.knowledgeDomainId,
+      candidateId: updated.candidateId,
+      assertionType: updated.assertionType as KnowledgeAssertionView['assertionType'],
+      confidence: updated.confidence,
+      sensitivityClass: updated.sensitivityClass as KnowledgeAssertionView['sensitivityClass'],
+      lifecycleState: updated.lifecycleState as KnowledgeAssertionView['lifecycleState'],
+      perspectiveTags: updated.perspectiveTags as KnowledgeAssertionView['perspectiveTags'],
+      groupAttributionId: updated.groupAttributionId,
+      provenanceChainId: updated.provenanceChainId,
+      createdAt: updated.recordedAt.toISOString(),
+    };
   }
 }
 

@@ -2253,7 +2253,11 @@ model KnowledgeCandidateAssertion {
   proposedById String @map("proposed_by_id") @db.Uuid
   proposedBy   Actor  @relation(fields: [proposedById], references: [id], onDelete: Restrict)
 
-  status                  String                        @default("pending") @db.VarChar(16)
+  /// VarChar(32), not (16): Phase 3 added 'needs_clarification' (20 chars)
+  /// and 'pending_community_validation' (29 chars) to
+  /// `CandidateAssertionStatus` — see migration
+  /// `20260921003323_widen_candidate_status`.
+  status                  String                        @default("pending") @db.VarChar(32)
   supersededByCandidateId String?                       @map("superseded_by_candidate_id") @db.Uuid
   supersededBy            KnowledgeCandidateAssertion?  @relation("CandidateSupersession", fields: [supersededByCandidateId], references: [id], onDelete: SetNull)
   supersedes              KnowledgeCandidateAssertion[] @relation("CandidateSupersession")

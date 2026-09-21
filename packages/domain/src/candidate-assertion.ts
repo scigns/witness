@@ -35,6 +35,8 @@ export type CandidateAssertionType = (typeof CANDIDATE_ASSERTION_TYPES)[number];
 
 export const CANDIDATE_ASSERTION_STATUSES = [
   'pending',
+  'needs_clarification',
+  'pending_community_validation',
   'confirmed',
   'corrected',
   'rejected',
@@ -252,6 +254,90 @@ export function markCandidateDecided(
           : 'knowledge_candidate.corrected',
       actor: by,
       metadata: { candidateId: candidate.id },
+    },
+  };
+}
+
+/**
+ * A reviewer's question, distinct from rejection — the candidate is not
+ * decided, it is paused pending an answer from whoever can speak to it
+ * (mirrors `Clarification` on `Evidence`, at the lighter weight a candidate
+ * needs: no separate sub-aggregate, just a status and a recorded question).
+ */
+export function requestCandidateClarification(
+  candidate: CandidateAssertion,
+  by: Actor,
+  question: string,
+): CandidateAssertionOutcome {
+  assertPending(candidate);
+  const trimmed = question.trim();
+  if (trimmed.length === 0) {
+    throw new InvariantViolation(
+      'Requesting clarification requires a question.',
+      'CLARIFICATION_QUESTION_REQUIRED',
+    );
+  }
+  return {
+    candidate: { ...candidate, status: 'needs_clarification', version: candidate.version + 1 },
+    event: {
+      action: 'knowledge_candidate.clarification_requested',
+      actor: by,
+      metadata: { candidateId: candidate.id, question: trimmed },
+    },
+  };
+}
+
+/** Answering a clarification returns the candidate to `pending` for re-review — it does not decide it. */
+export function respondToCandidateClarification(
+  candidate: CandidateAssertion,
+  by: Actor,
+  response: string,
+): CandidateAssertionOutcome {
+  if (candidate.status !== 'needs_clarification') {
+    throw new InvariantViolation(
+      `Candidate assertion is '${candidate.status}', not 'needs_clarification'.`,
+      'CANDIDATE_NOT_AWAITING_CLARIFICATION',
+    );
+  }
+  const trimmed = response.trim();
+  if (trimmed.length === 0) {
+    throw new InvariantViolation(
+      'A clarification response cannot be empty.',
+      'CLARIFICATION_RESPONSE_REQUIRED',
+    );
+  }
+  return {
+    candidate: { ...candidate, status: 'pending', version: candidate.version + 1 },
+    event: {
+      action: 'knowledge_candidate.clarification_responded',
+      actor: by,
+      metadata: { candidateId: candidate.id, response: trimmed },
+    },
+  };
+}
+
+/**
+ * A reviewer's determination that this needs the community's voice before
+ * it can be confirmed or rejected — distinct from both outcomes, per the
+ * originating request's "send for review/community validation" (Reviewer)
+ * and "route assertions for validation" (Knowledge Steward).
+ */
+export function returnCandidateForCommunityValidation(
+  candidate: CandidateAssertion,
+  by: Actor,
+  rationale?: string,
+): CandidateAssertionOutcome {
+  assertPending(candidate);
+  return {
+    candidate: {
+      ...candidate,
+      status: 'pending_community_validation',
+      version: candidate.version + 1,
+    },
+    event: {
+      action: 'knowledge_candidate.returned_for_community_validation',
+      actor: by,
+      metadata: { candidateId: candidate.id, rationale: rationale?.trim() || '' },
     },
   };
 }

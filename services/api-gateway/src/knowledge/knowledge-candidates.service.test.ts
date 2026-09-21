@@ -114,6 +114,17 @@ function fakePrisma() {
         assertions.push({ ...data });
         return { ...data };
       },
+      findFirst: async ({ where }: { where: { id: string; workspaceId: string } }) => {
+        const row = assertions.find(
+          (a) => a['id'] === where.id && a['workspaceId'] === where.workspaceId,
+        );
+        return row === undefined ? null : { ...row };
+      },
+      update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        const idx = assertions.findIndex((a) => a['id'] === where.id);
+        assertions[idx] = { ...assertions[idx], ...data };
+        return { ...assertions[idx] };
+      },
     },
     knowledgeEntityAttribute: {
       create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -406,6 +417,215 @@ describe('KnowledgeCandidatesService', () => {
         WORKSPACE,
         '00000000-0000-4000-8000-000000000099',
         { decision: 'approved', reviewStartedAt: new Date().toISOString() },
+        REVIEWER,
+      ),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('a reviewer requesting clarification moves the candidate to needs_clarification, and the proposer answering it returns it to pending', async () => {
+    const { prisma, candidates } = fakePrisma();
+    const service = new KnowledgeCandidatesService(prisma as never, {} as never);
+
+    const candidate = await service.propose(
+      ORG,
+      WORKSPACE,
+      {
+        payload: {
+          assertionType: 'entity_attribute',
+          entityId: ENTITY_ID,
+          attributeKey: 'role',
+          attributeValue: 'x',
+        },
+        sourceEvidenceIds: [EVIDENCE_ID],
+      },
+      CONTRIBUTOR,
+    );
+
+    const clarified = await service.review(
+      ORG,
+      WORKSPACE,
+      candidate.id,
+      {
+        decision: 'clarification_requested',
+        rationale: 'Which time period does this refer to?',
+        reviewStartedAt: new Date(Date.now() - 1000).toISOString(),
+      },
+      REVIEWER,
+    );
+    expect(clarified.status).toBe('needs_clarification');
+    expect(candidates).toHaveLength(1);
+
+    const responded = await service.respondToClarification(
+      WORKSPACE,
+      candidate.id,
+      'It refers to the 2024 tenancy.',
+      CONTRIBUTOR,
+    );
+    expect(responded.status).toBe('pending');
+  });
+
+  it('refuses to accept a clarification response for a candidate that is not awaiting clarification', async () => {
+    const { prisma } = fakePrisma();
+    const service = new KnowledgeCandidatesService(prisma as never, {} as never);
+
+    const candidate = await service.propose(
+      ORG,
+      WORKSPACE,
+      {
+        payload: {
+          assertionType: 'entity_attribute',
+          entityId: ENTITY_ID,
+          attributeKey: 'role',
+          attributeValue: 'x',
+        },
+        sourceEvidenceIds: [EVIDENCE_ID],
+      },
+      CONTRIBUTOR,
+    );
+
+    await expect(
+      service.respondToClarification(WORKSPACE, candidate.id, 'an answer', CONTRIBUTOR),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('a reviewer can return a pending candidate for community validation', async () => {
+    const { prisma } = fakePrisma();
+    const service = new KnowledgeCandidatesService(prisma as never, {} as never);
+
+    const candidate = await service.propose(
+      ORG,
+      WORKSPACE,
+      {
+        payload: {
+          assertionType: 'entity_attribute',
+          entityId: ENTITY_ID,
+          attributeKey: 'role',
+          attributeValue: 'x',
+        },
+        sourceEvidenceIds: [EVIDENCE_ID],
+      },
+      CONTRIBUTOR,
+    );
+
+    const returned = await service.review(
+      ORG,
+      WORKSPACE,
+      candidate.id,
+      {
+        decision: 'returned_for_community_review',
+        rationale: 'This needs input from the tenants’ association.',
+        reviewStartedAt: new Date(Date.now() - 1000).toISOString(),
+      },
+      REVIEWER,
+    );
+    expect(returned.status).toBe('pending_community_validation');
+  });
+
+  it('a "qualified" decision confirms the candidate into an assertion exactly like "approved"', async () => {
+    const { prisma, assertions } = fakePrisma();
+    const service = new KnowledgeCandidatesService(prisma as never, {} as never);
+
+    const candidate = await service.propose(
+      ORG,
+      WORKSPACE,
+      {
+        payload: {
+          assertionType: 'entity_attribute',
+          entityId: ENTITY_ID,
+          attributeKey: 'role',
+          attributeValue: 'Director of Housing',
+        },
+        sourceEvidenceIds: [EVIDENCE_ID],
+      },
+      CONTRIBUTOR,
+    );
+
+    const reviewed = await service.review(
+      ORG,
+      WORKSPACE,
+      candidate.id,
+      {
+        decision: 'qualified',
+        rationale: 'Confirmed, but the date range is uncertain.',
+        reviewStartedAt: new Date(Date.now() - 1000).toISOString(),
+      },
+      REVIEWER,
+    );
+
+    expect(reviewed.status).toBe('confirmed');
+    expect(assertions).toHaveLength(1);
+  });
+
+  it('adds a perspective tag to a confirmed assertion', async () => {
+    const { prisma, assertions } = fakePrisma();
+    const service = new KnowledgeCandidatesService(prisma as never, {} as never);
+
+    const candidate = await service.propose(
+      ORG,
+      WORKSPACE,
+      {
+        payload: {
+          assertionType: 'entity_attribute',
+          entityId: ENTITY_ID,
+          attributeKey: 'role',
+          attributeValue: 'Director of Housing',
+        },
+        sourceEvidenceIds: [EVIDENCE_ID],
+      },
+      CONTRIBUTOR,
+    );
+    await service.review(
+      ORG,
+      WORKSPACE,
+      candidate.id,
+      { decision: 'approved', reviewStartedAt: new Date(Date.now() - 5000).toISOString() },
+      REVIEWER,
+    );
+    const assertionId = assertions[0]?.['id'] as string;
+
+    const tagged = await service.addAssertionPerspectiveTag(
+      WORKSPACE,
+      assertionId,
+      'contested',
+      REVIEWER,
+    );
+
+    expect(tagged.perspectiveTags).toContain('contested');
+    expect(assertions[0]?.['perspectiveTags']).toEqual(['contested']);
+  });
+
+  it('404s adding a perspective tag to an assertion outside the workspace', async () => {
+    const { prisma, assertions } = fakePrisma();
+    const service = new KnowledgeCandidatesService(prisma as never, {} as never);
+
+    const candidate = await service.propose(
+      ORG,
+      WORKSPACE,
+      {
+        payload: {
+          assertionType: 'entity_attribute',
+          entityId: ENTITY_ID,
+          attributeKey: 'role',
+          attributeValue: 'x',
+        },
+        sourceEvidenceIds: [EVIDENCE_ID],
+      },
+      CONTRIBUTOR,
+    );
+    await service.review(
+      ORG,
+      WORKSPACE,
+      candidate.id,
+      { decision: 'approved', reviewStartedAt: new Date(Date.now() - 5000).toISOString() },
+      REVIEWER,
+    );
+    const assertionId = assertions[0]?.['id'] as string;
+
+    await expect(
+      service.addAssertionPerspectiveTag(
+        'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        assertionId,
+        'contested',
         REVIEWER,
       ),
     ).rejects.toThrow(NotFoundException);
