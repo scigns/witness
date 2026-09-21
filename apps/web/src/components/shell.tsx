@@ -27,7 +27,13 @@ const NAV = [
   { href: '/pricing', label: 'Pricing' },
 ] as const;
 
-const ROLES: ReadonlyArray<ActingUser['role']> = ['reader', 'contributor', 'reviewer', 'admin'];
+const ROLES: ReadonlyArray<ActingUser['role']> = [
+  'reader',
+  'contributor',
+  'reviewer',
+  'steward',
+  'admin',
+];
 
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();

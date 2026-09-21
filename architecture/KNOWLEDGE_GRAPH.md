@@ -296,3 +296,76 @@ The ontology will be wrong at first and must change without breaking deployments
 | KG-4 | Cross-tenant shared entities — a national ministry appearing in many tenants' graphs | Principal Architect | Phase 4 |
 | KG-5 | Contradiction detection: automatic surfacing, or human-flagged only? | KG Lead + AI Lead | Phase 5 |
 | KG-6 | How much CIDOC-CRM alignment is worth the modelling cost? | Research Lead | Phase 4 |
+
+## 13. Manual curation UI (Phase 3)
+
+Delivered 2026-09-21, ahead of the Phase 5 AI extraction pipeline — deliberately: the product
+principle behind this ordering is that **a Knowledge Graph is not authoritative merely because
+Witness displays it**, and the system must be genuinely usable by facilitators, reviewers and
+Knowledge Stewards with AI-assisted extraction switched off entirely. No automatic concept
+generation, semantic summarisation, or GLiNER/Ollama extraction exists in this milestone; every
+concept, alias, attribute and relationship in the graph today was proposed and confirmed by a
+named human, citing evidence.
+
+**Surface** (`apps/web/src/app/workspaces/[id]/knowledge/**`), reached from a "Knowledge" tab
+alongside a program's existing Sessions/Agenda/Resources tabs, with its own sub-navigation:
+Overview (drill-down counts, no vanity metrics), Concepts (list + detail, aliases, "why is this
+here?" per relationship), Review Queue (approve/reject/request-clarification/route-for-community-
+validation), Stewardship (merge preview → confirm, steward-gated), Domains (per-area governance
+policy, admin-gated), and Graph (Cytoscape.js, with an accessible list view as a first-class
+alternative, not an afterthought — a canvas has no accessibility tree of its own). Graph is
+deliberately last in the tab order and never the default route: `/knowledge` itself renders
+Overview.
+
+**Roles**, mapped onto the existing five-tier model (`packages/policy/policy.csv`), not a new one:
+`contributor` proposes concepts/aliases/relationships from evidence (`knowledge_concept:suggest`,
+`knowledge_relationship:suggest`); `reviewer` confirms/rejects/requests clarification/routes for
+community validation (`knowledge_candidate:review`); `steward` additionally merges concepts and
+publishes (`knowledge_entity:steward`, `knowledge_entity:publish`); `admin` additionally configures
+domains and governance (`knowledge_domain:manage`, `knowledge_governance:configure`). A
+platform-scope administrator holds none of these — `knowledge_governance.adversarial.test.ts`
+proves this structurally, not by convention, because a `RoleAssignment` scoped to the platform
+(`organisationId`/`workspaceId` both null) never satisfies the organisation/workspace-scoped lookup
+every `knowledge_*` action requires.
+
+**Disagreement** is additive, never collapsing: `PerspectiveTag` values (`contested`,
+`minority_perspective`, `culturally_significant`, `unresolved`, `community_restricted`,
+`machine_inferred`) accumulate on a confirmed `KnowledgeAssertion` — adding one never removes
+another (`knowledge-candidates.governance.test.ts` proves `contested` and `minority_perspective`
+coexist), and a rejected or still-in-review candidate never reaches the confirmed graph at all
+(same test file, checking zero outbox events for `rejected`/`clarification_requested`/
+`returned_for_community_review`). A reviewer's `correctedPayload` is recorded on the
+`KnowledgeReviewDecision` row, never overwriting the proposer's original candidate payload.
+
+**Known gaps**, documented rather than silently worked around, per this milestone's own "reconcile,
+don't invent a parallel model" instruction:
+
+- **The Neo4j projection does not carry `PerspectiveTag`s.** `GraphNode`/`GraphEdge`
+  (`services/knowledge-graph/src/graph-repository.port.ts`) expose `entityType`, `status`,
+  `sensitivityClass` and validity — enough to distinguish merged/superseded/restricted concepts and
+  historical relationships visually (the Graph Explorer's shape/border/dashing rules, above) — but
+  not perspective tags, which live only on `KnowledgeAssertion` in PostgreSQL. The Graph Explorer
+  therefore cannot show "this relationship is contested" as a persistent graph decoration; a viewer
+  must open the same
+  "why is this here?" provenance panel the Concept detail page uses, which does carry perspective
+  tags. This is directly KG-2 above, now with a concrete UI depending on the answer — closing KG-2
+  (projecting a `perspectiveTags` array onto `GraphEdge`/relationship nodes, likely as a rebuild-only
+  additive projector change) would let the graph render contested/minority-perspective relationships
+  distinctly without a click. Not attempted here because it changes the projection contract §8
+  describes, which this milestone's brief was to build on top of, not revise.
+- **A concept merge does not repoint or reproject live `KnowledgeRelationship`/
+  `KnowledgeEntityAttribute` rows.** `mergeKnowledgeEntities` (`packages/domain/src/
+  knowledge-entity.ts`) tombstones the merged entity (`status: 'merged'`, `mergedIntoId` set) and
+  carries its aliases forward, by design (history is preserved by tombstoning, never rewritten —
+  §6's reversibility guarantee depends on this). Relationship and attribute rows keep citing the
+  tombstoned entity's id, and no merge event is projected to Neo4j (only confirmed assertions are).
+  A relationship the merged entity participated in therefore still shows in the graph attached to a
+  now-tombstoned node rather than the surviving one, until that relationship's own assertion is
+  superseded through the ordinary review flow. The Stewardship merge preview surfaces the count of
+  affected attributes/relationships so a steward sees this before merging, but does not resolve it.
+  Fixing this needs a decision on whether "repoint" is a Postgres-level rewrite (contradicts "never
+  rewrite history") or a read-time indirection through `mergedIntoId` in both the graph-projector and
+  `Neo4jGraphRepository` traversal queries — an ADR-worthy call, not made here.
+
+Both gaps are read-side limitations only; the underlying provenance and tombstoning guarantees hold
+in every case tested (`neo4j-projector.test.ts`, `knowledge-entities.service.test.ts`).

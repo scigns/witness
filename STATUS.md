@@ -71,7 +71,7 @@ does **not** mean that every capability described within it is absent.
 | Local transcription and local AI drafting | 🟢 Delivered with stated limitations       |
 | Client-ready web experience               | 🟢 Delivered                               |
 | Repeatable institutional pilot operations | 🟢 Delivered in 0.3.0                      |
-| Knowledge graph projection                | 🟡 Phase 1–2 delivered ahead of schedule (ADR-0026); manual curation UI, AI extraction, and community validation remain |
+| Knowledge graph projection                | 🟡 Phase 1–3 delivered ahead of schedule (ADR-0026): domain model, governance, Neo4j projection/rebuild, and manual curation UI (concepts, review queue, stewardship/merge, domains, graph explorer) all working end-to-end without AI; AI-assisted extraction and community-validation workflow UI remain |
 | Hybrid/vector search                      | ⚪ Deferred                                |
 | Speaker diarisation                       | ⚪ Deferred                                |
 | Database-level RLS defence-in-depth       | ⚪ Deferred                                |
@@ -143,7 +143,7 @@ customer evidence.
 | Security        | Security Lead        | 🟡    | Keycloak, deny-by-default authorisation and adversarial checks active; further hardening remains            |
 | Infrastructure  | Infrastructure Lead  | 🟡    | Production deployment, backup and object storage operational; broader HA/DR remains future work             |
 | Backend         | Backend Lead         | 🟢    | Human-led MVP services and pilot metrics delivered                                                          |
-| Knowledge graph | Knowledge Graph Lead | 🟡    | Domain model, governance, permissions, Neo4j projection and rebuild delivered (ADR-0026); Phase 3–8 (manual curation UI, extraction, community validation, sensemaking) remain |
+| Knowledge graph | Knowledge Graph Lead | 🟡    | Domain model, governance, permissions, Neo4j projection/rebuild, and manual curation UI delivered (ADR-0026, Phase 1–3); a facilitator can propose/review/steward/explore the graph with AI disabled. Phase 4–8 (AI-assisted extraction, community-validation workflow UI, sensemaking) remain |
 | AI platform     | AI Lead              | 🟡    | Local transcription/AI drafting available; evaluation and diarisation remain incomplete                     |
 | Frontend        | Frontend Lead        | 🟢    | Client-ready program/session experience deployed                                                            |
 | Testing         | QA Lead              | 🟢    | Unit, contract, invariant, adversarial and CI gates active                                                  |

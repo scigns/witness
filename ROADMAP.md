@@ -187,14 +187,17 @@ not by developer discipline.
 
 ## Phase 4 — Knowledge graph
 
-**Pulled forward, partially, ahead of this schedule (ADR-0026, 2026-09-19):** the Developer Preview
-now has the write-model schema, domain layer, permissions, minimal event backbone, Neo4j projector,
-rebuild command, and read-only traversal API described in 4.1, 4.2, 4.5 and 4.6 below. This was a
-deliberate product-directed decision, not scope drift — recorded so this table stays honest about
-what changed and why. 4.3 (entity resolution with human adjudication) and 4.4's *projection* of
-bitemporal data into the graph remain outstanding; the write model's bitemporal columns
-(`validFrom`/`validTo`) exist and are populated, but no UI or API answers "what did we believe on
-date X?" yet.
+**Pulled forward, ahead of this schedule (ADR-0026, 2026-09-19 through 2026-09-21):** the Developer
+Preview now has the write-model schema, domain layer, permissions, minimal event backbone, Neo4j
+projector, rebuild command, read-only traversal API, and a full manual-curation web UI described in
+4.1, 4.2, 4.5, 4.6 and 4.7 below. This was a deliberate product-directed decision, not scope drift —
+recorded so this table stays honest about what changed and why. A facilitator, reviewer and steward
+can today propose a concept from evidence, review/reject/request clarification/route it for
+community validation, merge duplicate concepts with a preview, configure per-domain governance
+policy, and explore the resulting graph — all with AI-assisted extraction (Phase 5) switched off
+entirely. 4.3 (entity resolution with human adjudication) and 4.4's *projection* of bitemporal data
+into the graph remain outstanding; the write model's bitemporal columns (`validFrom`/`validTo`)
+exist and are populated, but no UI or API answers "what did we believe on date X?" yet.
 
 | #   | Deliverable                                                | Definition of done                                             | Status |
 | --- | ---------------------------------------------------------- | ---------------------------------------------------------------- | --- |
@@ -204,6 +207,7 @@ date X?" yet.
 | 4.4 | Temporal model (bitemporal: valid time + transaction time) | "What did we believe on date X?" answerable                    | 🟡 Columns exist and are populated; no query surface yet |
 | 4.5 | Graph query API + traversal safety limits                  | No unbounded traversal reachable from the API                  | 🟢 Delivered — `services/knowledge-graph`, depth/node/timeout caps enforced |
 | 4.6 | Provenance chain API                                       | Every node resolves to source utterance in ≤ 3 calls           | 🟡 Delivered to evidence-id granularity; utterance-level (word-timestamp) provenance awaits the transcription/extraction pipeline (Phase 5) |
+| 4.7 | Manual knowledge curation UI (Concepts, Review Queue, Stewardship, Domains, Graph Explorer) | A facilitator/reviewer/steward can construct, review, correct, merge and explore the graph with AI disabled | 🟢 Delivered — `apps/web/src/app/workspaces/[id]/knowledge/**`; Cytoscape.js graph explorer with an accessible list alternative; disagreement (contested/minority-perspective) surfaced via perspective tags, never colour-only |
 
 **Exit gate:** delete the graph entirely; rebuild it from the event log; byte-comparable result.
 `pnpm --filter @witness/graph-projector run rebuild` implements this against a running Neo4j; not

@@ -126,6 +126,24 @@ import type {
   ManualSettlementContextView,
   ManualSettlementRequest,
   ManualSettlementResultView,
+  AddEntityAliasRequest,
+  AddPerspectiveTagRequest,
+  CandidateAssertionView,
+  CreateKnowledgeDomainRequest,
+  CreateKnowledgeEntityRequest,
+  EntityAliasView,
+  GraphEdge,
+  GraphNode,
+  KnowledgeAssertionView,
+  KnowledgeDomainView,
+  KnowledgeEntityView,
+  MergeKnowledgeEntitiesPreview,
+  MergeKnowledgeEntitiesRequest,
+  ProposeCandidateAssertionRequest,
+  ProvenanceRecord,
+  RespondToCandidateClarificationRequest,
+  ReviewCandidateAssertionRequest,
+  UpdateKnowledgeDomainPolicyRequest,
 } from '@witness/contracts';
 
 import { API_BASE_URL } from './runtime-config';
@@ -162,7 +180,7 @@ export class ApiError extends Error {
 
 export interface ActingUser {
   name: string;
-  role: 'reader' | 'contributor' | 'reviewer' | 'admin';
+  role: 'reader' | 'contributor' | 'reviewer' | 'steward' | 'admin';
 }
 
 /**
@@ -1870,6 +1888,267 @@ export const api = {
       `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/resources/${encodeURIComponent(resourceId)}`,
       user,
       { method: 'DELETE' },
+    ),
+
+  // --- Knowledge graph (Phase 3 manual curation) -----------------------
+  // Every route needs both ids: `.../organisations/:organisationId/workspaces/:workspaceId/knowledge/...`.
+
+  listKnowledgeCandidates: (
+    organisationId: string,
+    workspaceId: string,
+    user: ActingUser,
+    status?: string,
+  ): Promise<{ candidates: CandidateAssertionView[] }> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/candidates${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+      user,
+    ),
+
+  getKnowledgeCandidate: (
+    organisationId: string,
+    workspaceId: string,
+    candidateId: string,
+    user: ActingUser,
+  ): Promise<CandidateAssertionView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/candidates/${encodeURIComponent(candidateId)}`,
+      user,
+    ),
+
+  proposeKnowledgeCandidate: (
+    organisationId: string,
+    workspaceId: string,
+    body: ProposeCandidateAssertionRequest,
+    user: ActingUser,
+  ): Promise<CandidateAssertionView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/candidates`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  reviewKnowledgeCandidate: (
+    organisationId: string,
+    workspaceId: string,
+    candidateId: string,
+    body: ReviewCandidateAssertionRequest,
+    user: ActingUser,
+  ): Promise<CandidateAssertionView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/candidates/${encodeURIComponent(candidateId)}/review`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  respondToKnowledgeCandidateClarification: (
+    organisationId: string,
+    workspaceId: string,
+    candidateId: string,
+    body: RespondToCandidateClarificationRequest,
+    user: ActingUser,
+  ): Promise<CandidateAssertionView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/candidates/${encodeURIComponent(candidateId)}/respond-to-clarification`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  addKnowledgeAssertionPerspectiveTag: (
+    organisationId: string,
+    workspaceId: string,
+    assertionId: string,
+    body: AddPerspectiveTagRequest,
+    user: ActingUser,
+  ): Promise<KnowledgeAssertionView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/assertions/${encodeURIComponent(assertionId)}/perspective-tags`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  listKnowledgeEntities: (
+    organisationId: string,
+    workspaceId: string,
+    user: ActingUser,
+    entityType?: string,
+  ): Promise<{ entities: KnowledgeEntityView[] }> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/entities${entityType ? `?entityType=${encodeURIComponent(entityType)}` : ''}`,
+      user,
+    ),
+
+  getKnowledgeEntity: (
+    organisationId: string,
+    workspaceId: string,
+    entityId: string,
+    user: ActingUser,
+  ): Promise<KnowledgeEntityView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/entities/${encodeURIComponent(entityId)}`,
+      user,
+    ),
+
+  createKnowledgeEntity: (
+    organisationId: string,
+    workspaceId: string,
+    body: CreateKnowledgeEntityRequest,
+    user: ActingUser,
+  ): Promise<KnowledgeEntityView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/entities`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  listKnowledgeEntityAliases: (
+    organisationId: string,
+    workspaceId: string,
+    entityId: string,
+    user: ActingUser,
+  ): Promise<{ aliases: EntityAliasView[] }> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/entities/${encodeURIComponent(entityId)}/aliases`,
+      user,
+    ),
+
+  addKnowledgeEntityAlias: (
+    organisationId: string,
+    workspaceId: string,
+    entityId: string,
+    body: AddEntityAliasRequest,
+    user: ActingUser,
+  ): Promise<EntityAliasView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/entities/${encodeURIComponent(entityId)}/aliases`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  previewKnowledgeEntityMerge: (
+    organisationId: string,
+    workspaceId: string,
+    entityId: string,
+    mergedEntityId: string,
+    user: ActingUser,
+  ): Promise<MergeKnowledgeEntitiesPreview> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/entities/${encodeURIComponent(entityId)}/merge-preview?mergedEntityId=${encodeURIComponent(mergedEntityId)}`,
+      user,
+    ),
+
+  mergeKnowledgeEntities: (
+    organisationId: string,
+    workspaceId: string,
+    entityId: string,
+    body: MergeKnowledgeEntitiesRequest,
+    user: ActingUser,
+  ): Promise<KnowledgeEntityView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/entities/${encodeURIComponent(entityId)}/merge`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  listKnowledgeDomains: (
+    organisationId: string,
+    workspaceId: string,
+    user: ActingUser,
+  ): Promise<{ domains: KnowledgeDomainView[] }> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/domains`,
+      user,
+    ),
+
+  getKnowledgeDomain: (
+    organisationId: string,
+    workspaceId: string,
+    domainId: string,
+    user: ActingUser,
+  ): Promise<KnowledgeDomainView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/domains/${encodeURIComponent(domainId)}`,
+      user,
+    ),
+
+  createKnowledgeDomain: (
+    organisationId: string,
+    workspaceId: string,
+    body: CreateKnowledgeDomainRequest,
+    user: ActingUser,
+  ): Promise<KnowledgeDomainView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/domains`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateKnowledgeDomainPolicy: (
+    organisationId: string,
+    workspaceId: string,
+    domainId: string,
+    body: UpdateKnowledgeDomainPolicyRequest,
+    user: ActingUser,
+  ): Promise<KnowledgeDomainView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/domains/${encodeURIComponent(domainId)}/policy`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  getKnowledgeGraphNeighbourhood: (
+    organisationId: string,
+    workspaceId: string,
+    entityId: string,
+    user: ActingUser,
+    options?: { depth?: number; relationshipTypes?: string[] },
+  ): Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }> => {
+    const params = new URLSearchParams();
+    if (options?.depth !== undefined) params.set('depth', String(options.depth));
+    if (options?.relationshipTypes !== undefined) {
+      params.set('relationshipTypes', options.relationshipTypes.join(','));
+    }
+    const query = params.toString();
+    return request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/graph/entities/${encodeURIComponent(entityId)}/neighbourhood${query ? `?${query}` : ''}`,
+      user,
+    );
+  },
+
+  getKnowledgeNodeProvenance: (
+    organisationId: string,
+    // Required path segment on this controller, but not itself consulted by
+    // the query — provenance is keyed by organisationId, not workspace (see
+    // `KnowledgeGraphQueryService.provenanceForNode`). Callers pass their
+    // own current workspaceId.
+    workspaceId: string,
+    entityId: string,
+    user: ActingUser,
+  ): Promise<{ provenance: ProvenanceRecord[] }> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/graph/entities/${encodeURIComponent(entityId)}/provenance`,
+      user,
+    ),
+
+  getKnowledgeEdgeProvenance: (
+    organisationId: string,
+    workspaceId: string,
+    relationshipId: string,
+    user: ActingUser,
+  ): Promise<{ provenance: ProvenanceRecord[] }> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/graph/relationships/${encodeURIComponent(relationshipId)}/provenance`,
+      user,
+    ),
+
+  searchKnowledgeGraph: (
+    organisationId: string,
+    workspaceId: string,
+    query: string,
+    user: ActingUser,
+  ): Promise<{ results: GraphNode[] }> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/graph/search?q=${encodeURIComponent(query)}`,
+      user,
     ),
 };
 
