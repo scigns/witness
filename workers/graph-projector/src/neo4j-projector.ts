@@ -107,6 +107,27 @@ export function isProjectable(projection: AssertionProjection): boolean {
   );
 }
 
+/**
+ * Removes a merged entity's own node from the *current* graph. Called only
+ * after every assertion that referenced it has already been re-projected
+ * onto the canonical survivor (`main.ts`'s merge-event handler enforces
+ * this order) — by the time this runs, nothing should still need the
+ * merged node's edges, and `DETACH DELETE` removes any that linger anyway
+ * (defence in depth, not the primary mechanism). This never touches
+ * PostgreSQL — the merged `KnowledgeEntity` row stays tombstoned there
+ * forever, which is what `provenanceForNode`/`provenanceForEdge` and the
+ * Concept detail page's "merged into" link read from
+ * (`KNOWLEDGE_GRAPH.md` §13, Gap B: current graph vs. historical view).
+ */
+export async function removeMergedEntityNode(
+  session: Session,
+  mergedEntityId: string,
+): Promise<void> {
+  await session.executeWrite((tx) =>
+    tx.run(`MATCH (n:KnowledgeEntity {id: $id}) DETACH DELETE n`, { id: mergedEntityId }),
+  );
+}
+
 /** Remove everything this assertion is solely responsible for — the retraction/rejection path. */
 async function retractAssertion(session: Session, projection: AssertionProjection): Promise<void> {
   await session.executeWrite(async (tx) => {

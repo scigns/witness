@@ -35,6 +35,23 @@ export interface GraphNode {
   readonly ontologyVersion: string;
 }
 
+/**
+ * `lifecycleState` and `perspectiveTags` are the assertion's own governed
+ * state (`ASSERTION_LIFECYCLE_STATES` / `PERSPECTIVE_TAGS`,
+ * `@witness/domain`), projected onto the edge so a caller does not have to
+ * make a second `provenanceForEdge` call just to know whether a
+ * relationship is contested — every edge already carries an `Assertion`
+ * node with these properties (`neo4j-projector.ts`'s `MERGE_ASSERTION_CYPHER`
+ * has always written them); this type just started reading them back.
+ *
+ * Both fields are `null` when the caller lacks `knowledge_provenance:inspect`
+ * *and* the assertion carries the `community_restricted` perspective tag —
+ * the one tag whose entire point is that only the community and reviewers
+ * see it, not "confirmed knowledge is visible, but who contests it is not"
+ * for every other tag. `Neo4jGraphRepository.neighbourhood` performs this
+ * redaction; it is not the caller's responsibility to apply it, so there is
+ * exactly one place a mistake could leak it, not one per consumer.
+ */
 export interface GraphEdge {
   readonly id: string;
   readonly fromEntityId: string;
@@ -44,6 +61,8 @@ export interface GraphEdge {
   readonly validFrom: string;
   readonly validTo: string | null;
   readonly strength: number | null;
+  readonly lifecycleState: string | null;
+  readonly perspectiveTags: readonly string[] | null;
 }
 
 export interface ProvenanceRecord {
@@ -72,6 +91,16 @@ export interface NeighbourhoodOptions extends TenantScope {
   readonly depth?: number;
   readonly relationshipTypes?: readonly string[];
   readonly maxNodes?: number;
+  /**
+   * Whether the caller separately holds `knowledge_provenance:inspect` —
+   * decided once by the caller (the API layer, which has the `Principal`;
+   * this package does not) and passed down, never re-derived here.
+   * Governs only whether `community_restricted` edges' governance fields
+   * are redacted (see `GraphEdge`'s doc comment); every other perspective
+   * tag is visible to anyone who can see the edge at all. Defaults to
+   * `false` — the safer default when a caller forgets to pass it.
+   */
+  readonly canInspectGovernance?: boolean;
 }
 
 export abstract class GraphRepository {

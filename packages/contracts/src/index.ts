@@ -2749,6 +2749,13 @@ export interface GraphNode {
   ontologyVersion: string;
 }
 
+/**
+ * `lifecycleState`/`perspectiveTags` are `null` when the caller lacks
+ * `knowledge_provenance:inspect` and the edge's assertion carries the
+ * `community_restricted` perspective tag — see
+ * `@witness/knowledge-graph`'s `GraphEdge` doc comment (the mirror this
+ * type must not drift from, per this file's licence-boundary convention).
+ */
 export interface GraphEdge {
   id: string;
   fromEntityId: string;
@@ -2758,6 +2765,8 @@ export interface GraphEdge {
   validFrom: string;
   validTo: string | null;
   strength: number | null;
+  lifecycleState: string | null;
+  perspectiveTags: readonly string[] | null;
 }
 
 export interface ProvenanceRecord {

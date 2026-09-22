@@ -7,19 +7,25 @@
  * because a canvas has no accessibility tree of its own.
  *
  * State is distinguished by shape, border style and an explicit icon/label —
- * never colour alone (WCAG 1.4.1): `merged`/`superseded` concepts render
- * dashed and slightly translucent with a status label; `confidential`/
- * `restricted` concepts carry a 🔒 read as "restricted" by screen readers;
- * a relationship past its `validTo` renders as a dashed edge labelled
- * "(historical)".
+ * never colour alone (WCAG 1.4.1): `confidential`/`restricted` concepts
+ * carry a 🔒 read as "restricted" by screen readers; a relationship past
+ * its `validTo` renders as a dashed edge labelled "(historical)"; a
+ * relationship carrying a `PerspectiveTag` (contested/unresolved/minority
+ * perspective/culturally significant) renders with a distinct dash pattern
+ * *and* an explicit ⚑ label suffix naming the tag — never colour alone,
+ * and never only visible after a click.
  *
- * The projection itself (`GraphNode`/`GraphEdge`, `services/knowledge-graph`)
- * does not carry perspective tags (contested/minority-perspective/etc.) —
- * only the underlying `KnowledgeAssertion` does. Rather than fake a visual
- * that isn't backed by the data, disagreement is surfaced the same way the
- * concept detail page does it: click an edge to open its actual provenance,
- * which does carry perspective tags. Documented here rather than silently
- * worked around — see this feature's closing report.
+ * A merged/tombstoned concept never appears here at all — the API's
+ * `neighbourhood`/`search` queries filter `status = 'active'` server-side
+ * (`Neo4jGraphRepository`, ADR-0027's invariant 4), so the `node[status =
+ * "merged"]` style rule below is defence in depth against a future
+ * regression, not something a normal traversal can currently trigger.
+ *
+ * `perspectiveTags`/`lifecycleState` on an edge are `null` when the caller
+ * lacks `knowledge_provenance:inspect` and the edge is
+ * `community_restricted` — that one tag is redacted server-side
+ * (`GraphEdge`'s doc comment); every other tag is visible to anyone who can
+ * see the edge at all, exactly as it always was via "why is this here?".
  */
 
 import cytoscape, { type Core, type ElementDefinition } from 'cytoscape';
@@ -207,15 +213,25 @@ export default function GraphExplorerPage({ params }: { params: Promise<{ id: st
           sensitivityClass: node.sensitivityClass,
         },
       })),
-      ...edges.map((edge) => ({
-        data: {
-          id: edge.id,
-          source: edge.fromEntityId,
-          target: edge.toEntityId,
-          label: edge.relationshipType,
-          historical: edge.validTo !== null,
-        },
-      })),
+      ...edges.map((edge) => {
+        const tags = edge.perspectiveTags ?? [];
+        const contested = tags.some((t) =>
+          ['contested', 'unresolved', 'minority_perspective', 'culturally_significant'].includes(t),
+        );
+        const label = contested
+          ? `${edge.relationshipType} ⚑ ${tags.map((t) => PERSPECTIVE_TAG_LABELS[t] ?? t).join(', ')}`
+          : edge.relationshipType;
+        return {
+          data: {
+            id: edge.id,
+            source: edge.fromEntityId,
+            target: edge.toEntityId,
+            label,
+            historical: edge.validTo !== null,
+            contested,
+          },
+        };
+      }),
     ];
 
     const cy = cytoscape({
@@ -282,6 +298,16 @@ export default function GraphExplorerPage({ params }: { params: Promise<{ id: st
           style: {
             'line-style': 'dashed',
             label: 'data(label) + " (historical)"' as never,
+          },
+        },
+        {
+          selector: 'edge[?contested]',
+          style: {
+            'line-style': 'dotted',
+            width: 3,
+            'line-color': '#d97706',
+            'target-arrow-color': '#d97706',
+            color: '#d97706',
           },
         },
       ],
@@ -425,9 +451,10 @@ export default function GraphExplorerPage({ params }: { params: Promise<{ id: st
               className="h-96 w-full rounded-lg border border-[var(--color-line)] bg-[var(--color-paper)]"
             />
             <p className="text-xs text-[var(--color-ink-muted)]">
-              Legend: dashed border = merged/superseded · red border = confidential/restricted ·
-              green border = the concept you're centred on · dashed edge = no longer current. Click
-              a concept to re-centre; click a relationship for its evidence.
+              Legend: red border = confidential/restricted concept · green border = the concept
+              you're centred on · dashed edge = no longer current · dotted amber edge with a ⚑ label
+              = contested, unresolved, minority perspective, or culturally significant. Click a
+              concept to re-centre; click a relationship for its evidence.
             </p>
           </div>
 
@@ -472,6 +499,14 @@ export default function GraphExplorerPage({ params }: { params: Promise<{ id: st
                       </button>
                       {edge.validTo !== null && (
                         <span className="text-[var(--color-ink-muted)]"> (historical)</span>
+                      )}
+                      {edge.perspectiveTags !== null && edge.perspectiveTags.length > 0 && (
+                        <span className="ml-1 text-amber-700 dark:text-amber-400">
+                          ⚑{' '}
+                          {edge.perspectiveTags
+                            .map((tag) => PERSPECTIVE_TAG_LABELS[tag] ?? tag)
+                            .join(', ')}
+                        </span>
                       )}
                     </li>
                   );

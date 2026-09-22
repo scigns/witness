@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist *.tsbuildinfo",
     "start": "node ./dist/main.js",

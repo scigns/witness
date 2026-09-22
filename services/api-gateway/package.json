@@ -13,6 +13,7 @@
     "typecheck": "prisma generate && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.ts",
     "lint": "eslint src",
     "seed": "prisma generate && tsx prisma/seed.ts",
     "clean": "rm -rf dist *.tsbuildinfo",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isProjectable } from './neo4j-projector.js';
+import { isProjectable, removeMergedEntityNode } from './neo4j-projector.js';
 import type { AssertionProjection } from './postgres-source.js';
 
 const ENTITY = {
@@ -13,6 +13,7 @@ const ENTITY = {
   sensitivityClass: 'internal',
   status: 'active',
   ontologyVersion: '0.1.0',
+  mergedIntoId: null,
 };
 
 function assertionProjection(overrides: {
@@ -68,5 +69,26 @@ describe('isProjectable', () => {
         assertionProjection({ lifecycleState: 'published', retractedAt: '2026-09-19T00:00:00Z' }),
       ),
     ).toBe(false);
+  });
+});
+
+describe('removeMergedEntityNode', () => {
+  it('runs a DETACH DELETE keyed on the merged entity id, inside a write transaction', async () => {
+    const calls: { cypher: string; params: Record<string, unknown> }[] = [];
+    const session = {
+      executeWrite: async (work: (tx: unknown) => Promise<unknown>) =>
+        work({
+          run: async (cypher: string, params: Record<string, unknown>) => {
+            calls.push({ cypher, params });
+            return { records: [] };
+          },
+        }),
+    };
+
+    await removeMergedEntityNode(session as never, 'merged-entity-id');
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.cypher).toContain('DETACH DELETE');
+    expect(calls[0]?.params['id']).toBe('merged-entity-id');
   });
 });

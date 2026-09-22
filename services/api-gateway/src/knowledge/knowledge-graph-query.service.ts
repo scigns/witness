@@ -47,6 +47,7 @@ export class KnowledgeGraphQueryService implements OnModuleDestroy {
     organisationId: string,
     workspaceId: string,
     entityId: string,
+    canInspectGovernance: boolean,
     depth?: number,
     relationshipTypes?: string[],
   ): Promise<{ nodes: readonly GraphNode[]; edges: readonly GraphEdge[] }> {
@@ -54,6 +55,7 @@ export class KnowledgeGraphQueryService implements OnModuleDestroy {
       organisationId,
       workspaceId,
       entityId,
+      canInspectGovernance,
       ...(depth !== undefined ? { depth } : {}),
       ...(relationshipTypes !== undefined ? { relationshipTypes } : {}),
     });

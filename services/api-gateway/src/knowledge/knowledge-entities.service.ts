@@ -38,6 +38,7 @@ import type {
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
+import { appendOutboxEvent } from '../infrastructure/outbox.helper.js';
 import type { Principal } from '../authz/authorization.port.js';
 
 const ONTOLOGY_VERSION = '0.1.0';
@@ -406,6 +407,25 @@ export class KnowledgeEntitiesService {
       for (const evt of outcome.events) {
         await appendAuditEvent(tx, 'knowledge_entity', outcome.survivingEntity.id, evt, now);
       }
+      // Tells the graph-projector to re-resolve every relationship/attribute
+      // that referenced the merged entity onto the survivor, then remove the
+      // merged entity's own node — the *current* graph must never show a
+      // tombstoned concept as an active peer (`KNOWLEDGE_GRAPH.md` §13, Gap B).
+      // PostgreSQL rows above are never rewritten; this only tells the
+      // read-side projection to catch up.
+      await appendOutboxEvent(tx, {
+        id: randomUUID(),
+        organisationId: survivingRow.organisationId,
+        workspaceId,
+        aggregateType: 'knowledge_entity',
+        aggregateId: outcome.survivingEntity.id,
+        eventType: 'org.witness.knowledge.entity.merged.v1',
+        payload: {
+          survivingEntityId: outcome.survivingEntity.id,
+          mergedEntityId: outcome.mergedEntity.id,
+        },
+        occurredAt: now,
+      });
       return survived;
     });
 

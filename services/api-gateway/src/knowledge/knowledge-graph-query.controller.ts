@@ -10,17 +10,25 @@
  * aggregate concept is visible."
  */
 
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
 
 import type { GraphEdge, GraphNode, ProvenanceRecord } from '@witness/knowledge-graph';
 
-import { AuthorizationGuard, Requires } from '../authz/authorization.guard.js';
+import {
+  AuthorizationGuard,
+  Requires,
+  type RequestWithPrincipal,
+} from '../authz/authorization.guard.js';
+import { PolicyEnforcementService } from '../authz/policy-enforcement.service.js';
 import { KnowledgeGraphQueryService } from './knowledge-graph-query.service.js';
 
 @Controller('api/v1/organisations/:organisationId/workspaces/:workspaceId/knowledge/graph')
 @UseGuards(AuthorizationGuard)
 export class KnowledgeGraphQueryController {
-  constructor(private readonly graph: KnowledgeGraphQueryService) {}
+  constructor(
+    private readonly graph: KnowledgeGraphQueryService,
+    private readonly authorization: PolicyEnforcementService,
+  ) {}
 
   @Get('entities/:entityId/neighbourhood')
   @Requires('knowledge_entity:read')
@@ -30,11 +38,25 @@ export class KnowledgeGraphQueryController {
     @Param('entityId') entityId: string,
     @Query('depth') depth: string | undefined,
     @Query('relationshipTypes') relationshipTypes: string | undefined,
+    @Req() request: RequestWithPrincipal,
   ): Promise<{ nodes: readonly GraphNode[]; edges: readonly GraphEdge[] }> {
+    // A second, in-process gate on top of the route's own
+    // `knowledge_entity:read` — deciding only whether `perspectiveTags` on
+    // returned edges get redacted (`GraphEdge`'s doc comment), never
+    // whether the request as a whole is allowed; that is still solely
+    // `@Requires` above. Mirrors the same two-gate design this controller's
+    // own file header already documents for the provenance endpoints.
+    const canInspectGovernance = (
+      await this.authorization.decide(request.principal!, 'knowledge_provenance:inspect', {
+        type: 'workspace',
+        workspaceId,
+      })
+    ).allowed;
     return this.graph.neighbourhood(
       organisationId,
       workspaceId,
       entityId,
+      canInspectGovernance,
       depth ? Number(depth) : undefined,
       relationshipTypes ? relationshipTypes.split(',') : undefined,
     );

@@ -36,6 +36,8 @@ function fakePrisma() {
   const attributes: Record<string, unknown>[] = [];
   const relationships: Record<string, unknown>[] = [];
   const auditEvents: Record<string, unknown>[] = [];
+  const eventLog: Record<string, unknown>[] = [];
+  const outbox: Record<string, unknown>[] = [];
 
   function actorFor(kind: string, displayName: string) {
     let actor = actors.find((a) => a['kind'] === kind && a['displayName'] === displayName);
@@ -135,6 +137,18 @@ function fakePrisma() {
         return { ...data };
       },
     },
+    eventLogEntry: {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        eventLog.push({ ...data });
+        return { ...data };
+      },
+    },
+    outbox: {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        outbox.push({ ...data });
+        return { ...data };
+      },
+    },
   };
 
   const prisma = {
@@ -142,7 +156,17 @@ function fakePrisma() {
     $transaction: async (fn: (tx: typeof txApi) => Promise<unknown>) => fn(txApi),
   };
 
-  return { prisma, entities, aliases, mergeLogs, attributes, relationships, auditEvents };
+  return {
+    prisma,
+    entities,
+    aliases,
+    mergeLogs,
+    attributes,
+    relationships,
+    auditEvents,
+    eventLog,
+    outbox,
+  };
 }
 
 describe('KnowledgeEntitiesService', () => {
@@ -212,6 +236,40 @@ describe('KnowledgeEntitiesService', () => {
     expect(mergedRow?.['mergedIntoId']).toBe(surviving.id);
     expect(aliases[0]?.['entityId']).toBe(surviving.id);
     expect(mergeLogs).toHaveLength(1);
+  });
+
+  it("merge appends a knowledge_entity.merged.v1 outbox event naming both entities — the graph-projector's only signal to re-resolve current-graph edges onto the survivor", async () => {
+    const { prisma, outbox, eventLog } = fakePrisma();
+    const service = new KnowledgeEntitiesService(prisma as never);
+    const surviving = await service.create(
+      ORG,
+      WORKSPACE,
+      { entityType: 'person', canonicalLabel: 'L. Chen' },
+      CONTRIBUTOR,
+    );
+    const merged = await service.create(
+      ORG,
+      WORKSPACE,
+      { entityType: 'person', canonicalLabel: 'Minister Chen' },
+      CONTRIBUTOR,
+    );
+
+    await service.merge(
+      WORKSPACE,
+      surviving.id,
+      { mergedEntityId: merged.id, rationale: 'Same person.' },
+      STEWARD,
+    );
+
+    expect(outbox).toHaveLength(1);
+    const mergeEvent = eventLog.find(
+      (e) => e['eventType'] === 'org.witness.knowledge.entity.merged.v1',
+    );
+    expect(mergeEvent).toBeDefined();
+    expect((mergeEvent?.['payload'] as Record<string, unknown>)['survivingEntityId']).toBe(
+      surviving.id,
+    );
+    expect((mergeEvent?.['payload'] as Record<string, unknown>)['mergedEntityId']).toBe(merged.id);
   });
 
   it('refuses to merge an entity into itself', async () => {

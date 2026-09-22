@@ -42,6 +42,7 @@ record of having been wrong is part of the value.
 | [0024](ADR-0024-server-managed-browser-sessions.md) | Server-managed browser sessions | Proposed | P1, P6, P7 |
 | [0025](ADR-0025-controlled-invitation-notifications.md) | Controlled invitation notifications | Proposed | P1, P6, P7 |
 | [0026](ADR-0026-evidence-knowledge-graph-implementation.md) | Evidence knowledge graph — implementation reconciliation (Phases 1–2) | Accepted | **P3, P4**, P5, P6 |
+| [0027](ADR-0027-canonical-merge-and-governance-projection.md) | Canonical merge resolution and governance-state projection | Accepted | **P3**, P5, P6 |
 
 Bold principles indicate an ADR that is a primary expression of that principle. Changing one of
 those requires Steering Committee approval, and where consent, provenance or Indigenous data

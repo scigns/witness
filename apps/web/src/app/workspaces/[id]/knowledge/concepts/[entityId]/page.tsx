@@ -372,6 +372,13 @@ export default function ConceptDetailPage({
                       Why is this here?
                     </Button>
                   </div>
+                  {row.edge.perspectiveTags !== null && row.edge.perspectiveTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {row.edge.perspectiveTags.map((tag) => (
+                        <PerspectiveTagBadge key={tag} tag={tag} />
+                      ))}
+                    </div>
+                  )}
                   {inspecting === row.edge.id && (
                     <div className="rounded border border-[var(--color-line)] bg-[var(--color-paper)] p-3 text-sm">
                       {inspectionError !== null ? (

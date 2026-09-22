@@ -176,3 +176,183 @@ describe('Neo4jGraphRepository — tenant isolation', () => {
     );
   });
 });
+
+/**
+ * `neighbourhood`'s governance-metadata surfacing and redaction
+ * (`KNOWLEDGE_GRAPH.md` §13, Gap A; ADR-0027) — a fake driver that answers
+ * the *shape* `neighbourhood`'s query returns (`nodes`, `relPairs`, each
+ * pair pre-associated with its assertion) rather than modelling real
+ * Cypher traversal, since the logic under test is this file's TypeScript
+ * mapping and redaction, not the Cypher engine (that round-trip, and the
+ * exact Cypher shape, is exercised live in
+ * `graph-integrity.live.test.ts`/`neo4j-graph-repository.live.test.ts` —
+ * a nested pattern comprehension was tried here first and rejected by a
+ * real Neo4j 5.26 server, which this fake driver would never have caught).
+ */
+function fakeNeighbourhoodDriver(scenario: {
+  rel: Record<string, unknown>;
+  relType: string;
+  assertion: Record<string, unknown> | null;
+}) {
+  const session = {
+    executeRead: async (
+      work: (tx: {
+        run: (cypher: string, params: Record<string, unknown>) => Promise<{ records: unknown[] }>;
+      }) => Promise<unknown>,
+    ) => {
+      const tx = {
+        run: async () => ({
+          records: [
+            {
+              get: (key: string) => {
+                if (key === 'nodes') return [];
+                if (key === 'relPairs') {
+                  return [
+                    {
+                      rel: { type: scenario.relType, properties: scenario.rel },
+                      assertion:
+                        scenario.assertion === null ? null : { properties: scenario.assertion },
+                    },
+                  ];
+                }
+                throw new Error(`unexpected key '${key}'`);
+              },
+            },
+          ],
+        }),
+      };
+      return work(tx as never);
+    },
+    close: async () => {},
+  };
+  return { session: () => session, close: async () => {} };
+}
+
+const BASE_REL = {
+  id: 'rel-1',
+  fromEntityId: 'e1',
+  toEntityId: 'e2',
+  assertionId: 'a1',
+  validFrom: '2026-01-01T00:00:00Z',
+  validTo: null,
+  strength: null,
+};
+
+describe('Neo4jGraphRepository — governance metadata on edges', () => {
+  it('surfaces lifecycleState and perspectiveTags from the edge’s Assertion node', async () => {
+    const driver = fakeNeighbourhoodDriver({
+      rel: BASE_REL,
+      relType: 'SUPPORTS',
+      assertion: { lifecycleState: 'approved', perspectiveTags: ['contested'] },
+    });
+    const repo = new Neo4jGraphRepository(driver as never);
+
+    const { edges } = await repo.neighbourhood({
+      organisationId: 'org-a',
+      entityId: 'e1',
+      canInspectGovernance: false,
+    });
+
+    expect(edges).toHaveLength(1);
+    expect(edges[0]?.lifecycleState).toBe('approved');
+    expect(edges[0]?.perspectiveTags).toEqual(['contested']);
+  });
+
+  it('redacts governance fields for community_restricted when the caller cannot inspect provenance', async () => {
+    const driver = fakeNeighbourhoodDriver({
+      rel: BASE_REL,
+      relType: 'SUPPORTS',
+      assertion: { lifecycleState: 'approved', perspectiveTags: ['community_restricted'] },
+    });
+    const repo = new Neo4jGraphRepository(driver as never);
+
+    const { edges } = await repo.neighbourhood({
+      organisationId: 'org-a',
+      entityId: 'e1',
+      canInspectGovernance: false,
+    });
+
+    expect(edges[0]?.lifecycleState).toBeNull();
+    expect(edges[0]?.perspectiveTags).toBeNull();
+  });
+
+  it('does not redact community_restricted for a caller who can inspect provenance', async () => {
+    const driver = fakeNeighbourhoodDriver({
+      rel: BASE_REL,
+      relType: 'SUPPORTS',
+      assertion: { lifecycleState: 'approved', perspectiveTags: ['community_restricted'] },
+    });
+    const repo = new Neo4jGraphRepository(driver as never);
+
+    const { edges } = await repo.neighbourhood({
+      organisationId: 'org-a',
+      entityId: 'e1',
+      canInspectGovernance: true,
+    });
+
+    expect(edges[0]?.lifecycleState).toBe('approved');
+    expect(edges[0]?.perspectiveTags).toEqual(['community_restricted']);
+  });
+
+  it('does not redact non-community_restricted tags regardless of the caller’s governance permission', async () => {
+    const driver = fakeNeighbourhoodDriver({
+      rel: BASE_REL,
+      relType: 'SUPPORTS',
+      assertion: { lifecycleState: 'approved', perspectiveTags: ['unresolved'] },
+    });
+    const repo = new Neo4jGraphRepository(driver as never);
+
+    const { edges } = await repo.neighbourhood({
+      organisationId: 'org-a',
+      entityId: 'e1',
+      canInspectGovernance: false,
+    });
+
+    expect(edges[0]?.perspectiveTags).toEqual(['unresolved']);
+  });
+
+  it('defaults canInspectGovernance to false (redacted) when the caller omits it', async () => {
+    const driver = fakeNeighbourhoodDriver({
+      rel: BASE_REL,
+      relType: 'SUPPORTS',
+      assertion: { lifecycleState: 'approved', perspectiveTags: ['community_restricted'] },
+    });
+    const repo = new Neo4jGraphRepository(driver as never);
+
+    const { edges } = await repo.neighbourhood({ organisationId: 'org-a', entityId: 'e1' });
+
+    expect(edges[0]?.perspectiveTags).toBeNull();
+  });
+
+  it('handles a relationship with no matching Assertion node gracefully (null governance, no crash)', async () => {
+    const driver = fakeNeighbourhoodDriver({ rel: BASE_REL, relType: 'SUPPORTS', assertion: null });
+    const repo = new Neo4jGraphRepository(driver as never);
+
+    const { edges } = await repo.neighbourhood({
+      organisationId: 'org-a',
+      entityId: 'e1',
+      canInspectGovernance: true,
+    });
+
+    expect(edges[0]?.lifecycleState).toBeNull();
+    expect(edges[0]?.perspectiveTags).toBeNull();
+  });
+});
+
+describe('Neo4jGraphRepository — invariant 4 (no tombstoned entity as an active peer)', () => {
+  it('getNode only matches status = active in its Cypher pattern', async () => {
+    const { driver, runCalls } = fakeDriver();
+    const repo = new Neo4jGraphRepository(driver as never);
+    await repo.getNode({ organisationId: ORG_A }, NODE_IN_ORG_A);
+
+    expect(runCalls[0]?.cypher).toContain("status: 'active'");
+  });
+
+  it('neighbourhood filters both traversal endpoints to status = active in its Cypher', async () => {
+    const { driver, runCalls } = fakeDriver();
+    const repo = new Neo4jGraphRepository(driver as never);
+    await repo.neighbourhood({ organisationId: ORG_A, entityId: NODE_IN_ORG_A });
+
+    expect(runCalls[0]?.cypher).toContain("n.status = 'active' AND m.status = 'active'");
+  });
+});

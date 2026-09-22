@@ -13,6 +13,8 @@
  * loses data — rerunning is always safe, being itself `MERGE`-based.
  */
 
+import { fileURLToPath } from 'node:url';
+
 import neo4j from 'neo4j-driver';
 import pg from 'pg';
 
@@ -79,7 +81,9 @@ async function main(): Promise<void> {
   await pool.end();
 }
 
-main().catch((error: unknown) => {
-  console.error('[graph-projector:rebuild] fatal error', error);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((error: unknown) => {
+    console.error('[graph-projector:rebuild] fatal error', error);
+    process.exit(1);
+  });
+}
