@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Accepted (divergence noted below) |
 | **Date** | 2026-09-01 |
 | **Deciders** | CTO, Principal Architect, Product Lead |
 | **Consulted** | Security Lead, Governance Lead, Operations Lead, Finance/Legal advisers |
@@ -87,6 +87,23 @@ Rejected.
 
 **Cons:** trials, pilots, implementation agreements, deployment, support and procurement can exist
 outside recurring subscriptions; identity and retention survive cancellation. Rejected.
+
+## Implementation status (added 2026-09-22)
+
+The core decision — Organisation as the sole commercial aggregate, capability access evaluated
+through fail-closed entitlement resolution, commercial state unable to broaden RBAC/governance
+authority — is implemented and validated: catalogue, entitlements, subscriptions, invoicing, and
+manual/bank-transfer settlement with exactly-once entitlement activation all exist and are tested.
+
+**Documented divergence:** this ADR's Decision section names a `CommercialAgreement` aggregate
+("Paid access is traceable to a `CommercialAgreement` or explicitly recorded transitional
+authority"). No such aggregate exists in code. Today, "what arrangement is this customer under" is
+answerable only indirectly, via `Subscription`/`Plan`/`BillingInterval` state — there is no single
+record of trial/pilot/enterprise-agreement type, start/end dates, or an explicit renewal owner.
+This is a real, tracked gap (Gate F of the 2026-09-22 productisation roadmap), not an oversight,
+and is explicitly out of scope for the phase that added this note — see `STATUS.md`. Marking this
+ADR Accepted rather than leaving it Proposed reflects that the aggregate boundary and authority
+principle it establishes hold today; the one named object it anticipated does not yet exist.
 
 ## Consequences
 

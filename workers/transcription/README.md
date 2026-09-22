@@ -1,7 +1,13 @@
 # Transcription Worker
 
 **Owner:** AI Lead
-**Status:** Phase 5
+**Status:** Reserved — Phase 5 as a standalone worker. Not built as a separate deployable; this
+directory contains only this planning document. **Transcription itself is real and running
+today** — a local Whisper CLI adapter
+(`services/api-gateway/src/transcription/local-whisper.adapter.ts`) runs inside `services/
+api-gateway`, not as a queued worker subscribing to an event topology. Diarisation and forced
+alignment, which this document also plans, are not implemented anywhere (STATUS.md: "Speaker
+diarisation — Deferred").
 
 Whisper transcription, diarisation and forced alignment.
 

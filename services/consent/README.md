@@ -1,7 +1,13 @@
 # Consent Service
 
 **Owner:** Governance Lead · Security Lead
-**Status:** Phase 3
+**Status:** Reserved — Phase 3 as a standalone service. Not built as a separate deployable; this
+directory contains only this planning document. **Consent enforcement itself is real and running
+today** — `ConsentPolicyService` and the consent domain model
+(`packages/domain/src/consent-decision.ts`, `consent-template.ts`,
+`participant-consent-record.ts`) live inside `services/api-gateway`, gate every evidence
+attachment, and are covered by tests. Extracting that logic into a standalone service, as this
+document plans, has not happened and is not scheduled.
 
 **The most consequential service in Witness.** Grants, scopes, delegations, revocations, erasure.
 

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Accepted |
 | **Date** | 2026-09-02 |
 | **Deciders** | Identity, Security, Product Operations |
 | **Consulted** | Repository governance and pilot operators |

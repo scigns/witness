@@ -4,8 +4,9 @@
 > anything else in this repository. If this document contradicts something you were told
 > elsewhere, this document wins, and the contradiction is a bug worth reporting.
 
-**Status:** Foundation (pre-implementation)
-**Last reviewed:** 2026-07-31
+**Status:** Controlled institutional pilot — the human-led workflow is implemented, deployed and in
+front of real pilot users; AI-assisted extraction and general-availability hardening remain ahead.
+**Last reviewed:** 2026-09-22
 **Owner:** Chief Technology Officer
 **Review cadence:** Every release, and on any accepted ADR that changes scope
 
@@ -141,35 +142,37 @@ under-resourced public-sector IT team is not public infrastructure.
 ```mermaid
 flowchart LR
   subgraph Capture
-    A[Recording / Upload / Live capture]
+    A[Recording / Upload<br/>audio, document, image]
   end
   subgraph Pipeline
-    B[Transcription<br/>Whisper] --> C[Extraction<br/>LLM + rules]
-    C --> D[Human review<br/>candidate queue]
+    B[Transcription<br/>Whisper, local CLI] --> C[Human review<br/>evidence queue]
   end
   subgraph Record
     E[(PostgreSQL<br/>system of record<br/>event log)]
   end
-  subgraph Projections
+  subgraph Projection
     F[(Neo4j<br/>knowledge graph)]
-    G[(OpenSearch<br/>lexical)]
-    H[(pgvector<br/>semantic)]
   end
   A --> B
-  D --> E
-  E -->|events| F
-  E -->|events| G
-  E -->|events| H
-  F & G & H --> I[GraphQL BFF / REST API]
+  C --> E
+  E -->|outbox events| F
+  E --> I[REST API — NestJS]
+  F --> I
   I --> J[Next.js web app]
 ```
 
-**The load-bearing decision:** PostgreSQL is the **system of record**. Neo4j, OpenSearch and
-pgvector are **disposable projections**, rebuildable from the event log at any time. This is what
-makes consent revocation, model re-runs, schema evolution and disaster recovery tractable.
-See [ADR-0011](architecture/decisions/ADR-0011-knowledge-graph-as-projection.md).
+**The load-bearing decision:** PostgreSQL is the **system of record**. Neo4j is a **disposable
+projection**, rebuilt from the event log by `workers/graph-projector` and never written to
+directly. This is what makes consent revocation, governance changes, schema evolution and disaster
+recovery tractable. See [ADR-0011](architecture/decisions/ADR-0011-knowledge-graph-as-projection.md).
 
-Full detail: [`architecture/ARCHITECTURE.md`](architecture/ARCHITECTURE.md).
+**Not yet built, by sequencing choice, not blocker:** AI-assisted extraction (an LLM proposing
+*candidate* assertions a human confirms — the architecture and P4 already require this shape when
+it lands), OpenSearch lexical search, pgvector semantic search, and speaker diarisation. See
+[`STATUS.md`](STATUS.md) for the live picture of what depends on what.
+
+Full detail: [`architecture/ARCHITECTURE.md`](architecture/ARCHITECTURE.md) ·
+[`architecture/DATA_MODEL.md`](architecture/DATA_MODEL.md) describes the real, as-built write model.
 
 ---
 
@@ -224,13 +227,44 @@ Binding on every contributor, including AI agents.
 
 ## 8. Current state — honest version
 
-Witness is at **Phase 0 → Phase 1**: the engineering organisation and architecture exist; the
-product does not. There is no running code yet, and that is deliberate. See
-[`STATUS.md`](STATUS.md) for the live picture and [`ROADMAP.md`](ROADMAP.md) for sequencing.
+Witness is a **running product in a controlled institutional pilot**, not a foundation-only
+research prototype. What genuinely works today, verified against the actual code rather than
+assumed from this document (see the 2026-09-22 productisation audit referenced in
+[`STATUS.md`](STATUS.md)):
 
-Do not let anyone — including an enthusiastic AI agent — skip ahead to writing application code
-before the foundations in [`ROADMAP.md`](ROADMAP.md) Phase 1–3 are complete. The whole point of
-this project is that we are building infrastructure meant to outlive us.
+- **Identity and access.** Keycloak-backed sign-in, organisation and workspace membership,
+  scoped role assignment (reader/contributor/facilitator/reviewer/steward/admin), and — new this
+  phase — a workspace invitation path for an external collaborator (facilitator, reviewer, or
+  Knowledge Steward from another organisation) that grants authority scoped to exactly one
+  workspace without making them a member of the commissioning organisation. See
+  [ADR-0028](architecture/decisions/ADR-0028-organisation-workspace-session-participant-model.md).
+- **Co-design programmes.** An organisation creates a workspace (the product calls this a
+  "programme" or "co-design" in the UI — see ADR-0028 for why the underlying domain name stays
+  `Workspace`), runs multiple sessions/workshops inside it, and manages participants — including
+  anonymous and pseudonymous participation, which never requires a Witness account.
+- **Evidence.** Audio, document and image capture, each consent-gated by its own policy category,
+  human review, correction and provenance.
+- **Decisions, commitments, reports.** Recorded, tracked, and exportable.
+- **The Evidence Knowledge Graph.** Domain model, governance/perspective metadata projection,
+  canonical concept merging, and manual curation (concepts, review queue, stewardship, graph
+  explorer) all work end to end against a real Neo4j — entirely without AI, by design (P4).
+- **Commercial operations.** Catalogue, entitlements, subscriptions, invoicing, and manual/bank-
+  transfer settlement with exactly-once entitlement activation. No payment-processor dependency.
+
+**Deliberately not yet built**, in the order the roadmap sequences them, not by accident:
+
+1. Cross-organisation collaborator invitation UX polish and a coherent organisation/programme
+   dashboard (this phase's work).
+2. Production hardening: observability deployed to the pilot, expanded adversarial security
+   coverage, a consolidated customer data export, a real contract/renewal lifecycle model.
+3. AI-assisted knowledge extraction, embeddings, hybrid/vector search, and speaker diarisation —
+   explicitly sequenced *after* the governance and collaboration model above, per the standing
+   instruction that a human-governed graph must remain correct under merge, disagreement, and
+   multi-organisation collaboration before a machine is allowed to propose anything into it.
+
+See [`STATUS.md`](STATUS.md) for the live, per-workstream picture and [`ROADMAP.md`](ROADMAP.md)
+for sequencing. Do not let anyone — including an enthusiastic AI agent — start work on item 3
+before items 1 and 2 are further along; that ordering is deliberate, not a leftover placeholder.
 
 ---
 

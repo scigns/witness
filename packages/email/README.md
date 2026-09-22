@@ -4,14 +4,17 @@
 
 ## Why this exists
 
-`docs/brand/EMAIL_SYSTEM.md` audits what actually sends email today: Keycloak's own password-reset
-and email-verification flows (rebranded in `infrastructure/docker/keycloak-theme/witness/`), sent
-through the Brevo SMTP relay as pure transport. No Witness application code currently sends email —
-there is no notification service, no Brevo API integration, and organisation invitations create a
-database record only (see the audit for the exact evidence). These five templates are the
-source-controlled, Brand Book-aligned starting point for when that capability exists. Wiring them to
-a real send path (Brevo's transactional API, or an application-level notification service) is a
-separate, future piece of work — building that service is out of scope here.
+`docs/brand/EMAIL_SYSTEM.md` audits what sends email today: Keycloak's own password-reset and
+email-verification flows (rebranded in `infrastructure/docker/keycloak-theme/witness/`), sent
+through the Brevo SMTP relay as pure transport — plus, since this was originally written,
+`services/api-gateway/src/infrastructure/mailer.ts`, which sends organisation- and workspace-
+invitation email directly over SMTP as a plain-text message built inline in code, not from these
+templates and not through Brevo's API. There is still no notification service and no Brevo API
+integration. These five templates remain the source-controlled, Brand Book-aligned starting point
+for when a real templated send path exists. Wiring them up — either via Brevo's transactional API
+or an application-level notification service — is a separate, future piece of work, explicitly out
+of scope for the invitation email `mailer.ts` sends today (see PART 18 of the 2026-09-22
+multi-organisation onboarding phase: "do not create another notification infrastructure").
 
 ## Templates
 

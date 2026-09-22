@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Accepted |
 | **Date** | 2026-09-02 |
 | **Deciders** | Identity, Security, Frontend Architecture |
 | **Consulted** | Repository governance and automated security review |

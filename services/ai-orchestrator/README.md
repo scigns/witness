@@ -1,7 +1,10 @@
 # AI Orchestrator
 
 **Owner:** AI Lead · Security Lead
-**Status:** Phase 5
+**Status:** Reserved — Phase 5. Not built, not deployed, no active development. This directory
+contains only this planning document; there is no `src/`. No AI-assisted extraction runs anywhere
+in Witness today (STATUS.md); when it is built, this is where it is planned to live. Do not treat
+this file as evidence any of the below exists yet.
 
 LiteLLM gateway, model registry, extraction pipeline, and **egress policy enforcement**.
 

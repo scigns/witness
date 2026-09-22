@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Accepted |
 | **Date** | 2026-08-25 |
 | **Deciders** | CTO, Principal Architect, Product Lead |
 | **Consulted** | Security Lead, Operations Lead, Finance/Legal advisers |

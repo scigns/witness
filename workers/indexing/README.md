@@ -1,7 +1,9 @@
 # Indexing Worker
 
 **Owner:** Backend Lead
-**Status:** Phase 6
+**Status:** Reserved — Phase 6. Not built, not deployed, no active development. This directory
+contains only this planning document; there is no `src/`. Depends on `services/search`
+(also reserved) — neither OpenSearch nor pgvector is wired into the running application today.
 
 Maintains the OpenSearch lexical index and pgvector embeddings.
 

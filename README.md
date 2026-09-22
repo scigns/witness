@@ -8,7 +8,7 @@
 provenance-backed institutional knowledge that survives staff turnover, elections and decades.*
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Status: Foundation](https://img.shields.io/badge/status-foundation-orange.svg)](STATUS.md)
+[![Status: Controlled pilot](https://img.shields.io/badge/status-controlled%20pilot-green.svg)](STATUS.md)
 [![ADRs](https://img.shields.io/badge/decisions-ADR--documented-informational.svg)](architecture/decisions/)
 [![Sovereignty](https://img.shields.io/badge/deployment-self--hosted%20by%20default-success.svg)](docs/governance/DIGITAL_SOVEREIGNTY.md)
 
@@ -54,29 +54,57 @@ Read the full set in [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md).
 
 ```mermaid
 flowchart LR
-  A[Recording / Upload<br/>Live capture] --> B[Transcription<br/>Whisper, local]
-  B --> C[Extraction<br/>LLM + rules]
-  C --> D[Human review<br/>candidate queue]
-  D --> E[(PostgreSQL<br/><b>system of record</b><br/>event log)]
-  E -->|events| F[(Neo4j<br/>knowledge graph)]
-  E -->|events| G[(OpenSearch<br/>lexical)]
-  E -->|events| H[(pgvector<br/>semantic)]
-  F & G & H --> I[GraphQL BFF / REST]
-  I --> J[Next.js web app]
+  A[Recording / Upload<br/>audio, document, image] --> B[Transcription<br/>Whisper, local CLI]
+  B --> C[Human review<br/>evidence queue]
+  C --> D[(PostgreSQL<br/><b>system of record</b><br/>event log)]
+  D -->|outbox events| E[(Neo4j<br/>knowledge graph projection)]
+  D --> F[REST API — NestJS]
+  E --> F
+  F --> G[Next.js web app]
 ```
 
-PostgreSQL is the system of record. Neo4j, OpenSearch and pgvector are **disposable projections**,
-rebuildable from the event log at any time — which is what makes consent revocation, model re-runs
-and schema evolution tractable. See [ADR-0011](architecture/decisions/ADR-0011-knowledge-graph-as-projection.md).
+PostgreSQL is the system of record for every write. Neo4j is a **disposable projection**,
+rebuilt from the event log by `workers/graph-projector` — never written to directly — which is
+what makes consent revocation, governance changes and schema evolution tractable. See
+[ADR-0011](architecture/decisions/ADR-0011-knowledge-graph-as-projection.md). AI-assisted
+extraction (an LLM producing *candidate* assertions a human confirms), hybrid/vector search and
+diarisation are designed for in the architecture but not yet built — see
+[`STATUS.md`](STATUS.md) for exactly what is deferred and why.
 
 ## Project status
 
-**Phase 1 — Architecture & research.** The engineering organisation, architecture and decision
-record exist. Application implementation has not started, deliberately: consent and provenance
-are cross-cutting invariants that must exist before the first assertion is written.
+**Controlled institutional pilot.** Witness is a running product, not a research prototype: the
+human-led workflow (organisation → programme → session → participants → consent → evidence →
+review → decisions/commitments → reports) is implemented end to end, deployed, and in front of
+real institutional pilot users. It is authenticated through Keycloak, organisation/workspace
+scoped, and backed by PostgreSQL as the system of record.
 
-There is **nothing to install yet.** Live state: [`STATUS.md`](STATUS.md) ·
-Sequencing: [`ROADMAP.md`](ROADMAP.md)
+**Implemented and in use today:**
+
+- Institutional onboarding, authentication and scoped role-based access (organisation, workspace,
+  and — new this phase — invited external programme collaborators; see
+  [ADR-0028](architecture/decisions/ADR-0028-organisation-workspace-session-participant-model.md)).
+- Co-design programme and session (workshop) management, with consent-gated audio, document and
+  image evidence capture.
+- Human evidence review, decisions, commitments, session summaries and exportable reports.
+- The Evidence Knowledge Graph: domain model, governance/perspective metadata, manual curation
+  (concepts, review queue, stewardship, merge, graph explorer) — all working end to end, by
+  design, without AI (see [`architecture/KNOWLEDGE_GRAPH.md`](architecture/KNOWLEDGE_GRAPH.md)).
+- Provider-independent commercial state (catalogue, subscriptions, invoices, manual/bank-transfer
+  settlement with exactly-once entitlement activation) — no payment-processor dependency required.
+
+**Deliberately not yet built** — not oversights, tracked directly in [`STATUS.md`](STATUS.md) and
+[`ROADMAP.md`](ROADMAP.md):
+
+- AI-assisted knowledge extraction, embeddings, hybrid/vector search, and speaker diarisation.
+  These are sequenced *after* the governance and multi-organisation collaboration model they
+  depend on, not blocked by anything technical.
+- A public self-service marketing/documentation surface covering every product area.
+- A general-availability hardening pass (production observability, consolidated customer data
+  export, a full contract/renewal lifecycle).
+
+Live state: [`STATUS.md`](STATUS.md) · Sequencing: [`ROADMAP.md`](ROADMAP.md) ·
+Start here: [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md)
 
 ## Repository map
 
@@ -84,27 +112,33 @@ Sequencing: [`ROADMAP.md`](ROADMAP.md)
 |---|---|
 | [`.ai/`](.ai/) | Machine-readable context and guardrails for AI contributors |
 | [`agents/`](agents/) | Role charters — the engineering organisation as executable specification |
-| [`architecture/`](architecture/) | Architecture documents, C4 views, domain models, [ADRs](architecture/decisions/) |
+| [`architecture/`](architecture/) | Architecture documents, C4 views, domain model, [ADRs](architecture/decisions/) |
 | [`docs/`](docs/) | [Engineering](docs/engineering/), [product](docs/product/), [governance](docs/governance/), [operations](docs/operations/), [research](docs/research/) |
-| [`apps/`](apps/) | Deployable applications — web, admin console, docs site |
-| [`packages/`](packages/) | Shared libraries — domain, contracts, UI, policy, observability |
-| [`services/`](services/) | Bounded-context backend services (NestJS) |
-| [`workers/`](workers/) | Async processors — transcription, extraction, indexing, projection |
-| [`infrastructure/`](infrastructure/) | Docker, Kubernetes, Helm, Terraform, observability |
-| [`deployments/`](deployments/) | Opinionated deployment topologies (local, sovereign on-prem, cloud) |
+| [`apps/`](apps/) | Deployable applications — `web` (the product), `marketing`, `admin-console`, `docs-site` |
+| [`packages/`](packages/) | Shared libraries — `domain`, `contracts`, `ui`, `policy`, `config`, `config-eslint`, `config-typescript` |
+| [`services/`](services/) | Backend services — `api-gateway` (the real backend, NestJS) and `knowledge-graph` (Neo4j read layer) are live; the rest (`ai-orchestrator`, `consent`, `identity`, `ingestion`, `search`) are reserved future extractions of capability that runs inside `api-gateway` today — each README says so explicitly |
+| [`workers/`](workers/) | `graph-projector` is live; `extraction`, `indexing`, `notification`, `transcription` are reserved scaffolds — transcription itself is real, but lives in `services/api-gateway/src/transcription` today, not here |
+| [`infrastructure/`](infrastructure/) | Docker, Kubernetes, Helm, Terraform, observability stack (observability is wired for local dev; not yet deployed to the production pilot) |
+| [`deployments/`](deployments/) | Real deployment topologies — `cloud-managed` runs the live pilot |
 | [`sdk/`](sdk/) | Client SDKs — TypeScript, Python |
 | [`examples/`](examples/) | Worked end-to-end examples with synthetic data |
 | [`templates/`](templates/) | Scaffolding — ADR, RFC, service, package, runbook, postmortem |
 
 ## Technology
 
-**Frontend** Next.js 15 · React · TypeScript · Tailwind · shadcn/ui
-**Backend** NestJS · GraphQL · REST · Prisma
-**Data** PostgreSQL + pgvector · Neo4j · OpenSearch · Redis · MinIO
-**AI** Whisper · LiteLLM · LangGraph · LlamaIndex · Ollama · OpenAI-compatible APIs
-**Infrastructure** Docker · Kubernetes · Helm · Terraform · GitHub Actions · OpenTelemetry ·
-Prometheus · Grafana
-**Identity** Keycloak · OIDC · OAuth2 · JWT · Casbin
+**Frontend** Next.js 15 · React · TypeScript · Tailwind
+**Backend** NestJS · REST · Prisma
+**Data** PostgreSQL (system of record) · Neo4j (knowledge graph projection) · S3-compatible object
+storage (optional; Postgres-inline by default)
+**AI** Whisper (local CLI, transcription only — extraction/embeddings not yet built)
+**Infrastructure** Docker Compose (production pilot topology) · Kubernetes/Helm/Terraform
+(designed for, not yet the deployed profile) · GitHub Actions
+**Identity** Keycloak · OIDC · Casbin-pattern scoped RBAC
+
+OpenSearch, pgvector, NATS JetStream, LiteLLM/Ollama-based extraction and a Kubernetes production
+deployment are architected for (see [`architecture/TECH_STACK.md`](architecture/TECH_STACK.md))
+but not yet wired into the running application — do not configure them expecting a live effect
+today; [`.env.example`](.env.example) marks each variable as consumed or reserved.
 
 Every choice justified in [`architecture/TECH_STACK.md`](architecture/TECH_STACK.md); every
 dependency evaluated with an exit strategy in [`docs/research/OSS_EVALUATION.md`](docs/research/OSS_EVALUATION.md).

@@ -1,7 +1,12 @@
 # Extraction Worker
 
 **Owner:** AI Lead
-**Status:** Phase 5
+**Status:** Reserved — Phase 5. Not built, not deployed, no active development. This directory
+contains only this planning document; there is no `src/`. No AI-assisted extraction pipeline runs
+anywhere in Witness today — `KnowledgeCandidateAssertion.extractionMethod` is modelled in the
+schema but only ever populated as `'human_manual'`. Building this is explicitly sequenced *after*
+the multi-organisation collaboration and governance model (`architecture/decisions/ADR-0028`,
+ADR-0027) — do not start it because this document exists.
 
 LangGraph pipeline producing **candidate** assertions from transcripts and documents.
 
