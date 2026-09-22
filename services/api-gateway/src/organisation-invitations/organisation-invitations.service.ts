@@ -297,6 +297,54 @@ export class OrganisationInvitationsService {
     };
   }
 
+  /**
+   * Every account in this organisation still `invited` (not yet activated
+   * by a real, verified first sign-in) — the data source for the
+   * organisation dashboard's Overview and Invitations tabs. Queries the
+   * existing `OrganisationMembership`/`User`/`RoleAssignment`/
+   * `InvitationNotification` tables directly; no new invitation aggregate,
+   * since organisation invitations already provision membership and role
+   * at send time (ADR-0025) and have nothing further to track beyond
+   * delivery status.
+   */
+  async listPending(organisationId: string): Promise<OrganisationInvitationView[]> {
+    await this.requireOrganisation(organisationId);
+    const memberships = await this.prisma.organisationMembership.findMany({
+      where: { organisationId, user: { accountState: 'invited' } },
+      include: { user: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (memberships.length === 0) return [];
+
+    const userIds = memberships.map((m) => m.userId);
+    const [roleAssignments, notifications] = await Promise.all([
+      this.prisma.roleAssignment.findMany({
+        where: { organisationId, userId: { in: userIds } },
+        select: { userId: true, role: true },
+      }),
+      this.prisma.invitationNotification.findMany({
+        where: { organisationId, userId: { in: userIds } },
+        select: { userId: true, status: true },
+      }),
+    ]);
+    const roleByUser = new Map(roleAssignments.map((r) => [r.userId, r.role]));
+    const notificationByUser = new Map(notifications.map((n) => [n.userId, n.status]));
+
+    return memberships.map((membership) => ({
+      userId: membership.userId,
+      email: membership.user.email,
+      displayName: membership.user.displayName,
+      accountState: membership.user.accountState as OrganisationInvitationView['accountState'],
+      organisationId,
+      membershipId: membership.id,
+      role: (roleByUser.get(membership.userId) ?? 'reader') as OrganisationInvitationView['role'],
+      createdAt: membership.createdAt.toISOString(),
+      notificationStatus:
+        (notificationByUser.get(membership.userId) as
+          OrganisationInvitationView['notificationStatus'] | undefined) ?? 'pending',
+    }));
+  }
+
   async resend(
     organisationId: string,
     userId: string,

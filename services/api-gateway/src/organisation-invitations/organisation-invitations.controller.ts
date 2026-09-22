@@ -4,7 +4,16 @@
  * authorise, delegate, serialise (ADR-0003).
  */
 
-import { BadRequestException, Body, Controller, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 
 import {
   inviteOrganisationUserRequestSchema,
@@ -53,6 +62,15 @@ export class OrganisationInvitationsController {
       }
       throw error;
     }
+  }
+
+  /** Every account in this organisation still in `invited` state — the org Overview/Invitations tabs' data source. */
+  @Get('pending')
+  @Requires('organisation_membership:read')
+  async listPending(
+    @Param('organisationId') organisationId: string,
+  ): Promise<OrganisationInvitationView[]> {
+    return this.invitations.listPending(organisationId);
   }
 
   @Post(':userId/invitation/resend')

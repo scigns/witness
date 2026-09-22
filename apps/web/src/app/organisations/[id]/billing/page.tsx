@@ -9,6 +9,7 @@ import type {
 import { PricingCards } from '@/components/pricing-cards';
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { OrganisationNav } from '@/components/organisation-nav';
 
 export default function BillingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -89,10 +90,25 @@ export default function BillingPage({ params }: { params: Promise<{ id: string }
       setBusy(false);
     }
   };
-  if (error && !overview) return <p role="alert">{error}</p>;
-  if (!overview) return <p role="status">Loading billing…</p>;
+  if (error && !overview) {
+    return (
+      <div className="space-y-6">
+        <OrganisationNav organisationId={id} />
+        <p role="alert">{error}</p>
+      </div>
+    );
+  }
+  if (!overview) {
+    return (
+      <div className="space-y-6">
+        <OrganisationNav organisationId={id} />
+        <p role="status">Loading billing…</p>
+      </div>
+    );
+  }
   return (
-    <div>
+    <div className="space-y-6">
+      <OrganisationNav organisationId={id} />
       <header className="mb-6">
         <p className="text-sm text-[var(--color-ink-muted)]">Organisation billing</p>
         <h1 className="text-3xl font-bold">{overview.currentPlan.name} plan</h1>

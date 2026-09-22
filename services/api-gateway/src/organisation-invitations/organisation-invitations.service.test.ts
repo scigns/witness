@@ -69,12 +69,39 @@ function fakePrisma() {
         );
         return row === undefined ? null : { ...row };
       },
+      findMany: async ({
+        where,
+      }: {
+        where: { organisationId: string; user: { accountState: string } };
+      }) => {
+        return memberships
+          .filter((m) => m['organisationId'] === where.organisationId)
+          .map((m) => {
+            const user = users.find((u) => u['id'] === m['userId']);
+            return { ...m, user: user === undefined ? undefined : { ...user } };
+          })
+          .filter(
+            (m) => m.user !== undefined && m.user['accountState'] === where.user.accountState,
+          );
+      },
       create: async ({ data }: { data: Record<string, unknown> }) => {
         memberships.push({ ...data });
         return { ...data };
       },
     },
     roleAssignment: {
+      findMany: async ({
+        where,
+      }: {
+        where: { organisationId: string; userId: { in: string[] } };
+      }) =>
+        roleAssignments
+          .filter(
+            (r) =>
+              r['organisationId'] === where.organisationId &&
+              where.userId.in.includes(r['userId'] as string),
+          )
+          .map((r) => ({ userId: r['userId'], role: r['role'] })),
       create: async ({ data }: { data: Record<string, unknown> }) => {
         roleAssignments.push({ ...data });
         return { ...data };
@@ -109,6 +136,18 @@ function fakePrisma() {
         invitationNotifications.push({ ...data });
         return { ...data };
       },
+      findMany: async ({
+        where,
+      }: {
+        where: { organisationId: string; userId: { in: string[] } };
+      }) =>
+        invitationNotifications
+          .filter(
+            (n) =>
+              n['organisationId'] === where.organisationId &&
+              where.userId.in.includes(n['userId'] as string),
+          )
+          .map((n) => ({ userId: n['userId'], status: n['status'] })),
     },
     $transaction: async <T>(fn: (tx: typeof prisma) => Promise<T>) => fn(prisma),
   };
@@ -208,5 +247,55 @@ describe('OrganisationInvitationsService', () => {
     expect(users).toHaveLength(0);
     expect(memberships).toHaveLength(0);
     expect(roleAssignments).toHaveLength(0);
+  });
+
+  describe('listPending', () => {
+    it('lists only accounts still in the invited state, with role and notification status', async () => {
+      const { prisma } = fakePrisma();
+      const service = new OrganisationInvitationsService(prisma);
+
+      const invited = await service.invite(
+        ORGANISATION_ID,
+        { email: 'mele@example.com', displayName: 'Mele Tupou', role: 'facilitator' },
+        ADMIN,
+      );
+
+      const pending = await service.listPending(ORGANISATION_ID);
+
+      expect(pending).toHaveLength(1);
+      expect(pending[0]).toMatchObject({
+        userId: invited.userId,
+        email: 'mele@example.com',
+        displayName: 'Mele Tupou',
+        accountState: 'invited',
+        organisationId: ORGANISATION_ID,
+        role: 'facilitator',
+        notificationStatus: 'pending',
+      });
+    });
+
+    it('excludes activated accounts', async () => {
+      const { prisma, users } = fakePrisma();
+      const service = new OrganisationInvitationsService(prisma);
+
+      await service.invite(
+        ORGANISATION_ID,
+        { email: 'mele@example.com', displayName: 'Mele Tupou', role: 'facilitator' },
+        ADMIN,
+      );
+      // Simulate activation the way a real first sign-in would.
+      users[0]!['accountState'] = 'active';
+
+      const pending = await service.listPending(ORGANISATION_ID);
+
+      expect(pending).toHaveLength(0);
+    });
+
+    it('404s for a missing organisation', async () => {
+      const { prisma } = fakePrisma();
+      const service = new OrganisationInvitationsService(prisma);
+
+      await expect(service.listPending('does-not-exist')).rejects.toThrow(NotFoundException);
+    });
   });
 });

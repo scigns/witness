@@ -475,6 +475,15 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  listPendingOrganisationInvitations: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<OrganisationInvitationView[]> =>
+    request<OrganisationInvitationView[]>(
+      `/api/v1/organisations/${organisationId}/users/pending`,
+      user,
+    ),
+
   resendOrganisationInvitation: (
     organisationId: string,
     userId: string,
