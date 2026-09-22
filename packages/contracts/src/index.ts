@@ -44,6 +44,29 @@ export const WITNESS_ROLES = [
 ] as const;
 export type WitnessRole = (typeof WITNESS_ROLES)[number];
 
+/**
+ * External-collaborator workspace invitation (ADR-0028) — mirrors
+ * @witness/domain's `WorkspaceInvitationStatus`/`AffiliationType`, kept as
+ * separate literals here per this package's deliberate independence from
+ * the GPL domain package (see file header).
+ */
+export const WORKSPACE_INVITATION_STATUSES = [
+  'pending',
+  'accepted',
+  'declined',
+  'expired',
+  'revoked',
+] as const;
+export type WorkspaceInvitationStatus = (typeof WORKSPACE_INVITATION_STATUSES)[number];
+
+export const AFFILIATION_TYPES = [
+  'organisation',
+  'independent',
+  'community',
+  'undisclosed',
+] as const;
+export type AffiliationType = (typeof AFFILIATION_TYPES)[number];
+
 // ─── Requests ────────────────────────────────────────────────────────────────
 
 export const createRecordRequestSchema = z.object({
@@ -157,6 +180,28 @@ export const assignRoleRequestSchema = z.object({
   role: z.enum(WITNESS_ROLES, { message: 'A recognised Witness role is required' }),
 });
 export type AssignRoleRequest = z.infer<typeof assignRoleRequestSchema>;
+
+/**
+ * Invite an external collaborator (facilitator, reviewer or Knowledge
+ * Steward from another organisation, or with no organisation at all) into
+ * one workspace (ADR-0028). Deliberately distinct from
+ * `inviteOrganisationUserRequestSchema`: no organisation-membership side
+ * effect exists here at all, ever — see the workspace-invitation domain
+ * module's file header for why this is a separate, more conservative flow.
+ */
+export const createWorkspaceInvitationRequestSchema = z.object({
+  invitedEmail: z.string().trim().min(1, 'An email address is required').max(320).email(),
+  invitedName: z.string().trim().max(200).optional(),
+  role: z.enum(WITNESS_ROLES, { message: 'A recognised Witness role is required' }),
+  affiliationType: z.enum(AFFILIATION_TYPES, {
+    message: 'A recognised affiliation type is required',
+  }),
+  affiliationLabel: z.string().trim().max(300).optional(),
+  message: z.string().trim().max(2000).optional(),
+});
+export type CreateWorkspaceInvitationRequest = z.infer<
+  typeof createWorkspaceInvitationRequestSchema
+>;
 
 // ─── Commercial catalogue and billing (Commercial Foundation C2) ──────────
 
@@ -1592,6 +1637,54 @@ export interface RoleAssignmentView {
   roleLabel: string | null;
   permittedActions: string[];
   updatedAt: string | null;
+}
+
+/**
+ * Administrator-facing view of a workspace invitation (ADR-0028) — the
+ * roster row PART 10 of the originating request asks for. Never carries the
+ * raw token; only `tokenHash`-derived state (status, timestamps) is exposed.
+ */
+export interface WorkspaceInvitationView {
+  id: string;
+  workspaceId: string;
+  invitedEmail: string;
+  invitedName: string | null;
+  inviterDisplayName: string;
+  role: WitnessRole;
+  affiliationType: AffiliationType;
+  affiliationLabel: string | null;
+  status: WorkspaceInvitationStatus;
+  createdAt: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  declinedAt: string | null;
+  revokedAt: string | null;
+  resendCount: number;
+  deliveryStatus: 'pending' | 'sent' | 'failed';
+}
+
+/**
+ * What an invitee sees at the invitation link, before signing in or
+ * accepting (PART 7 of the originating request: full context up front,
+ * never "authenticate first, discover later what you accepted"). Reachable
+ * without authentication — token possession alone is enough to view this,
+ * though never enough to accept (see `acceptWorkspaceInvitationRequestSchema`
+ * usage in the API, which additionally requires a signed-in, email-matched
+ * session).
+ */
+export interface WorkspaceInvitationContextView {
+  organisationName: string;
+  workspaceName: string;
+  workspaceDescription: string | null;
+  inviterDisplayName: string;
+  invitedEmail: string;
+  role: WitnessRole;
+  roleLabel: string;
+  affiliationType: AffiliationType;
+  affiliationLabel: string | null;
+  message: string | null;
+  status: WorkspaceInvitationStatus;
+  expiresAt: string;
 }
 
 /**

@@ -9,9 +9,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   activateAccount,
+  addExternalWorkspaceCollaborator,
   addOrganisationMember,
   addWorkspaceMember,
   assertAccountAccessible,
+  assignExternalWorkspaceRole,
   assignRole,
   captureRecord,
   changeRoleAssignment,
@@ -42,6 +44,7 @@ import {
   toSourceId,
   toUserId,
   toWorkspaceId,
+  toWorkspaceInvitationId,
   toWorkspaceMembershipId,
   transitionOrganisationMembership,
   transitionWorkspaceMembership,
@@ -601,6 +604,125 @@ describe('role assignment', () => {
 
     expect(event.action).toBe('role_assignment.removed');
     expect(event.metadata['role']).toBe('reviewer');
+  });
+});
+
+describe('external workspace collaboration (ADR-0028)', () => {
+  const WORKSPACE_ID = toWorkspaceId('33333333-3333-4333-8333-333333333333');
+  const USER_ID = toUserId('55555555-5555-4555-8555-555555555555');
+  const INVITATION_ID = toWorkspaceInvitationId('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+  const AT = new Date('2026-03-14T11:00:00Z');
+
+  it('addExternalWorkspaceCollaborator grants active membership with no organisation membership check at all', () => {
+    const outcome = addExternalWorkspaceCollaborator({
+      id: toWorkspaceMembershipId('77777777-7777-4777-8777-777777777777'),
+      workspaceId: WORKSPACE_ID,
+      userId: USER_ID,
+      affiliationType: 'organisation',
+      affiliationLabel: 'Fiji Teachers Association',
+      viaInvitationId: INVITATION_ID,
+      addedBy: HUMAN,
+      at: AT,
+    });
+
+    expect(outcome.membership.state).toBe('active');
+    expect(outcome.membership.affiliationType).toBe('organisation');
+    expect(outcome.membership.affiliationLabel).toBe('Fiji Teachers Association');
+    expect(outcome.membership.viaInvitationId).toBe(INVITATION_ID);
+    expect(outcome.event.action).toBe('workspace_membership.created');
+  });
+
+  it('addExternalWorkspaceCollaborator refuses an unrecognised affiliation type', () => {
+    expect(() =>
+      addExternalWorkspaceCollaborator({
+        id: toWorkspaceMembershipId('77777777-7777-4777-8777-777777777777'),
+        workspaceId: WORKSPACE_ID,
+        userId: USER_ID,
+        affiliationType: 'employee',
+        viaInvitationId: INVITATION_ID,
+        addedBy: HUMAN,
+        at: AT,
+      }),
+    ).toThrow(/not a recognised affiliation type/i);
+  });
+
+  it('the internal addWorkspaceMember path is unaffected: still requires organisation standing, and its output carries null affiliation fields', () => {
+    const outcome = addWorkspaceMember({
+      id: toWorkspaceMembershipId('77777777-7777-4777-8777-777777777777'),
+      workspaceId: WORKSPACE_ID,
+      userId: USER_ID,
+      organisationMembershipState: 'active',
+      addedBy: HUMAN,
+      at: AT,
+    });
+
+    expect(outcome.membership.affiliationType).toBeNull();
+    expect(outcome.membership.affiliationLabel).toBeNull();
+    expect(outcome.membership.viaInvitationId).toBeNull();
+  });
+
+  it('assignExternalWorkspaceRole grants a workspace-scoped role with no membership or parent-organisation check', () => {
+    const outcome = assignExternalWorkspaceRole({
+      id: toRoleAssignmentId('88888888-8888-4888-8888-888888888888'),
+      userId: USER_ID,
+      role: 'reviewer',
+      workspaceId: WORKSPACE_ID,
+      viaInvitationId: INVITATION_ID,
+      assignedBy: HUMAN,
+      at: AT,
+    });
+
+    expect(outcome.assignment.role).toBe('reviewer');
+    expect(outcome.assignment.scope).toEqual({ type: 'workspace', workspaceId: WORKSPACE_ID });
+    expect(outcome.assignment.viaInvitationId).toBe(INVITATION_ID);
+    expect(outcome.event.action).toBe('role_assignment.created');
+    expect(outcome.event.metadata['viaInvitationId']).toBe(INVITATION_ID);
+  });
+
+  it('assignExternalWorkspaceRole refuses an invalid role, same as the internal path', () => {
+    expect(() =>
+      assignExternalWorkspaceRole({
+        id: toRoleAssignmentId('88888888-8888-4888-8888-888888888888'),
+        userId: USER_ID,
+        role: 'superuser',
+        workspaceId: WORKSPACE_ID,
+        viaInvitationId: INVITATION_ID,
+        assignedBy: HUMAN,
+        at: AT,
+      }),
+    ).toThrow(/not a recognised Witness role/i);
+  });
+
+  it('the internal assignRole path is unaffected: its output carries a null viaInvitationId', () => {
+    const outcome = assignRole({
+      id: toRoleAssignmentId('88888888-8888-4888-8888-888888888888'),
+      userId: USER_ID,
+      role: 'contributor',
+      scope: {
+        type: 'organisation',
+        organisationId: toOrganisationId('22222222-2222-4222-8222-222222222222'),
+      },
+      membershipState: 'active',
+      assignedBy: HUMAN,
+      at: AT,
+    });
+
+    expect(outcome.assignment.viaInvitationId).toBeNull();
+  });
+
+  it('an externally-granted role never resolves an organisation scope — it is structurally workspace-only', () => {
+    const outcome = assignExternalWorkspaceRole({
+      id: toRoleAssignmentId('88888888-8888-4888-8888-888888888888'),
+      userId: USER_ID,
+      role: 'admin',
+      workspaceId: WORKSPACE_ID,
+      viaInvitationId: INVITATION_ID,
+      assignedBy: HUMAN,
+      at: AT,
+    });
+
+    expect(outcome.assignment.scope.type).toBe('workspace');
+    expect('organisationId' in outcome.assignment.scope).toBe(false);
   });
 });
 

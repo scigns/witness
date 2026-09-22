@@ -172,6 +172,9 @@ model Organisation {
   knowledgeAssertions    KnowledgeAssertion[]
   knowledgeRelationships KnowledgeRelationship[]
 
+  // External-collaborator workspace invitations (ADR-0028).
+  workspaceInvitations WorkspaceInvitation[]
+
   @@map("organisation")
 }
 
@@ -533,6 +536,9 @@ model Workspace {
   knowledgeAssertions    KnowledgeAssertion[]
   knowledgeRelationships KnowledgeRelationship[]
 
+  // External-collaborator workspace invitations (ADR-0028).
+  workspaceInvitations WorkspaceInvitation[]
+
   @@index([organisationId])
   @@map("workspace")
 }
@@ -569,6 +575,8 @@ model User {
   ownedActionItems          ActionItem[]             @relation("ActionItemOwner")
   facilitatedAgendaItems    AgendaItem[]
   uploadedResources         Resource[]
+  workspaceInvitationsSent     WorkspaceInvitation[] @relation("WorkspaceInvitationInviter")
+  workspaceInvitationsAccepted WorkspaceInvitation[] @relation("WorkspaceInvitationAcceptedBy")
   invitationNotifications   InvitationNotification[]
 
   @@index([accountState])
@@ -710,12 +718,26 @@ model WorkspaceMembership {
 
   state String @db.VarChar(24)
 
+  /// Set only for a member added through `addExternalWorkspaceCollaborator`
+  /// (ADR-0028) — an external collaborator with no standing in this
+  /// workspace's organisation. `null` for a member added through the
+  /// internal, organisation-membership-gated path. Contextual metadata only
+  /// (packages/domain/src/workspace-invitation.ts's `AFFILIATION_TYPES`
+  /// doc comment) — never a foreign key to a real `Organisation`, exactly
+  /// the same discipline as `SessionParticipant.affiliation`.
+  affiliationType  String? @map("affiliation_type") @db.VarChar(16)
+  affiliationLabel String? @map("affiliation_label") @db.VarChar(300)
+
+  viaInvitationId String?              @map("via_invitation_id") @db.Uuid
+  viaInvitation   WorkspaceInvitation? @relation(fields: [viaInvitationId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@unique([workspaceId, userId])
   @@index([workspaceId, state])
   @@index([userId])
+  @@index([viaInvitationId])
   @@map("workspace_membership")
 }
 
@@ -763,13 +785,100 @@ model RoleAssignment {
 
   role String @db.VarChar(24)
 
+  /// Set only for a grant made through `assignExternalWorkspaceRole`
+  /// (ADR-0028). `RoleResolutionService` needs no change to read a grant
+  /// created this way — this column exists for traceability/audit, not for
+  /// the authorization read path.
+  viaInvitationId String?              @map("via_invitation_id") @db.Uuid
+  viaInvitation   WorkspaceInvitation? @relation(fields: [viaInvitationId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@unique([organisationId, userId])
   @@unique([workspaceId, userId])
   @@index([userId])
+  @@index([viaInvitationId])
   @@map("role_assignment")
+}
+
+/// External-collaborator workspace invitation (ADR-0028) — how a
+/// facilitator, reviewer or Knowledge Steward from another organisation (or
+/// with no organisation at all) is granted workspace-scoped authority
+/// without ever becoming a member of the commissioning organisation.
+/// Deliberately separate from `InvitationNotification` (the organisation-
+/// invitation delivery tracker, ADR-0025): this has its own business
+/// lifecycle (`status`), not only a delivery-tracking role, and a genuinely
+/// new token mechanism that model does not use — see
+/// `packages/domain/src/workspace-invitation.ts`'s file header for why the
+/// two differ.
+model WorkspaceInvitation {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  invitedEmail String  @map("invited_email") @db.VarChar(320)
+  invitedName  String? @map("invited_name") @db.VarChar(200)
+
+  inviterId String @map("inviter_id") @db.Uuid
+  inviter   User   @relation("WorkspaceInvitationInviter", fields: [inviterId], references: [id], onDelete: Restrict)
+
+  /// One of `packages/domain/src/role.ts`'s `WitnessRole` values.
+  role String @db.VarChar(24)
+
+  /// One of `packages/domain/src/workspace-invitation.ts`'s `AFFILIATION_TYPES`.
+  affiliationType  String  @map("affiliation_type") @db.VarChar(16)
+  affiliationLabel String? @map("affiliation_label") @db.VarChar(300)
+
+  message String? @db.VarChar(2000)
+
+  /// One of `WORKSPACE_INVITATION_STATUSES`: pending | accepted | declined | expired | revoked.
+  status String @default("pending") @db.VarChar(16)
+
+  /// SHA-256 hash of a random token generated by the application layer
+  /// (ADR-0003 — the domain layer never touches `node:crypto`). The raw
+  /// token is never persisted; only its hash, so a database read alone
+  /// cannot reconstruct a usable invitation link.
+  tokenHash String @map("token_hash") @db.VarChar(64)
+
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+
+  acceptedAt       DateTime? @map("accepted_at") @db.Timestamptz(6)
+  acceptedByUserId String?   @map("accepted_by_user_id") @db.Uuid
+  acceptedBy       User?     @relation("WorkspaceInvitationAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+
+  declinedAt DateTime? @map("declined_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  resendCount Int @default(0) @map("resend_count")
+
+  /// Delivery state — independent of `status` (ADR-0025's discipline,
+  /// reapplied here): SMTP acceptance is never conflated with acceptance of
+  /// the invitation itself.
+  deliveryStatus   String  @default("pending") @map("delivery_status") @db.VarChar(16)
+  deliveryAttempts Int     @default(0) @map("delivery_attempts")
+  lastDeliveryError String? @map("last_delivery_error") @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspaceMemberships WorkspaceMembership[]
+  roleAssignments      RoleAssignment[]
+
+  // Looked up by tokenHash at accept time — must be fast and, since a token
+  // is a high-entropy random value, effectively unique in practice; not a
+  // database-enforced unique constraint because a resend legitimately
+  // reuses the same row with a new hash, and two different invitations
+  // colliding on a 256-bit hash is not a case worth modelling.
+  @@index([tokenHash])
+  @@index([workspaceId, status])
+  @@index([organisationId])
+  @@index([invitedEmail])
+  @@map("workspace_invitation")
 }
 
 /// A co-design workshop, consultation, or similar structured conversation

@@ -21,7 +21,13 @@ import type { Actor } from './actor.js';
 import type { PendingAuditEvent } from './audit.js';
 import { isInGoodStanding, type MembershipState } from './membership.js';
 import { isWitnessRole, type WitnessRole } from './role.js';
-import type { OrganisationId, RoleAssignmentId, UserId, WorkspaceId } from './ids.js';
+import type {
+  OrganisationId,
+  RoleAssignmentId,
+  UserId,
+  WorkspaceId,
+  WorkspaceInvitationId,
+} from './ids.js';
 
 export type RoleAssignmentScope =
   | { readonly type: 'organisation'; readonly organisationId: OrganisationId }
@@ -32,6 +38,8 @@ export interface RoleAssignment {
   readonly userId: UserId;
   readonly role: WitnessRole;
   readonly scope: RoleAssignmentScope;
+  /** Set only for a grant made through `assignExternalWorkspaceRole` (ADR-0028). */
+  readonly viaInvitationId: WorkspaceInvitationId | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -111,6 +119,7 @@ export function assignRole(input: {
     userId: input.userId,
     role: input.role,
     scope: input.scope,
+    viaInvitationId: null,
     createdAt: input.at,
     updatedAt: input.at,
   };
@@ -124,6 +133,60 @@ export function assignRole(input: {
         userId: assignment.userId,
         role: assignment.role,
         ...scopeMetadata(assignment.scope),
+      },
+    },
+  };
+}
+
+/**
+ * Assign a workspace role to an external collaborator — someone with no
+ * `RoleAssignment`-eligible standing in this workspace's parent
+ * organisation. Skips both eligibility checks `assignRole` enforces
+ * (`membershipState`, `parentOrganisationMembershipState`); in their place,
+ * `viaInvitationId` must name the accepted `WorkspaceInvitation` that
+ * authorised this grant (ADR-0028). Always workspace-scoped — there is no
+ * external variant of an organisation-scoped assignment, because an
+ * external collaborator by definition holds no standing in the organisation
+ * to administer.
+ *
+ * `RoleResolutionService.tiersForWorkspace` (`services/api-gateway`) needs
+ * no change to read a grant created this way: it already only checks that a
+ * `WorkspaceMembership` in good standing and a matching `RoleAssignment`
+ * exist for the workspace, never how either came to exist.
+ */
+export function assignExternalWorkspaceRole(input: {
+  id: RoleAssignmentId;
+  userId: UserId;
+  role: string;
+  workspaceId: WorkspaceId;
+  viaInvitationId: WorkspaceInvitationId;
+  assignedBy: Actor;
+  at: Date;
+}): RoleAssignmentOutcome {
+  assertValidRole(input.role);
+
+  const scope: RoleAssignmentScope = { type: 'workspace', workspaceId: input.workspaceId };
+
+  const assignment: RoleAssignment = {
+    id: input.id,
+    userId: input.userId,
+    role: input.role,
+    scope,
+    viaInvitationId: input.viaInvitationId,
+    createdAt: input.at,
+    updatedAt: input.at,
+  };
+
+  return {
+    assignment,
+    event: {
+      action: 'role_assignment.created',
+      actor: input.assignedBy,
+      metadata: {
+        userId: assignment.userId,
+        role: assignment.role,
+        viaInvitationId: input.viaInvitationId,
+        ...scopeMetadata(scope),
       },
     },
   };
