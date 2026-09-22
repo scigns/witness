@@ -36,10 +36,22 @@ const ROLES: ReadonlyArray<ActingUser['role']> = [
   'admin',
 ];
 
+const REVIEW_ROLES = new Set(['admin', 'reviewer']);
+
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, setUser } = useSession();
   const { status, currentUser, errorMessage, signOut } = useAuth();
+
+  // "My review work" (Phase 4G) only earns a place in primary nav for
+  // someone it actually applies to — reviewer/admin in at least one
+  // programme. Everyone else keeps the static list unchanged.
+  const isReviewerSomewhere =
+    currentUser !== null &&
+    currentUser.workspaces.some((w) => w.role !== null && REVIEW_ROLES.has(w.role));
+  const navItems = isReviewerSomewhere
+    ? [...NAV, { href: '/review', label: 'Review' } as const]
+    : NAV;
 
   return (
     <div className="min-h-dvh flex flex-col">
@@ -91,7 +103,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
 
           <nav aria-label="Primary" className="flex flex-wrap items-center gap-1 lg:ml-auto">
-            {NAV.map((item) => {
+            {navItems.map((item) => {
               const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
 
               return (
