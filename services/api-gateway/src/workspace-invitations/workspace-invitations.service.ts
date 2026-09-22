@@ -51,6 +51,7 @@ import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { sha256 } from '../infrastructure/hashing.js';
 import { MailerService } from '../infrastructure/mailer.js';
+import { roleLabel } from '../infrastructure/role.helper.js';
 import type { Principal } from '../authz/authorization.port.js';
 import { WITNESS_CONFIG } from '../tokens.js';
 import type { WitnessConfig } from '@witness/config';
@@ -81,16 +82,6 @@ function requirePrincipalUserId(principal: Principal): string {
   }
   return principal.subject.slice('user:'.length);
 }
-
-const ROLE_LABELS: Readonly<Record<WitnessRole, string>> = Object.freeze({
-  admin: 'Administrator',
-  facilitator: 'Facilitator',
-  contributor: 'Contributor',
-  reviewer: 'Reviewer',
-  participant: 'Participant',
-  reader: 'Reader',
-  steward: 'Knowledge Steward',
-});
 
 @Injectable()
 export class WorkspaceInvitationsService {
@@ -242,7 +233,7 @@ export class WorkspaceInvitationsService {
       inviterDisplayName: inviter.displayName,
       invitedEmail: invitation.invitedEmail,
       role: invitation.role as WitnessRole,
-      roleLabel: ROLE_LABELS[invitation.role as WitnessRole],
+      roleLabel: roleLabel(invitation.role as WitnessRole),
       affiliationType:
         invitation.affiliationType as WorkspaceInvitationContextView['affiliationType'],
       affiliationLabel: invitation.affiliationLabel,
@@ -448,7 +439,7 @@ export class WorkspaceInvitationsService {
         organisationName: invitation.organisation.name,
         workspaceName: invitation.workspace.name,
         inviterDisplayName: invitation.inviter.displayName,
-        role: ROLE_LABELS[invitation.role as WitnessRole],
+        role: roleLabel(invitation.role as WitnessRole),
         invitationUrl,
         expiresAt: invitation.expiresAt,
         message: invitation.message,
