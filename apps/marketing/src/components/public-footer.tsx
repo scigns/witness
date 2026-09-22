@@ -1,17 +1,27 @@
 import { marketingNavigation } from '../lib/navigation';
+import { marketingSiteConfig } from '../lib/site-config';
 import { NavigationItems } from './navigation-items';
 import { PageContainer } from './page-container';
 import { WitnessLogo } from './witness-logo';
 
 export function PublicFooter() {
+  const { appUrl, demoUrl, pricingUrl } = marketingSiteConfig();
+
   return (
     <footer className="site-footer">
       <PageContainer>
         <div className="footer-introduction">
-          <a className="logo-link" href="/" aria-label="Witness home">
-            <WitnessLogo />
-          </a>
-          <p>Institutional memory with provenance by design.</p>
+          <div className="footer-signature">
+            <a className="logo-link" href="/" aria-label="Witness home">
+              <WitnessLogo />
+            </a>
+            <p>Institutional memory with provenance by design.</p>
+          </div>
+          <div className="footer-actions">
+            <a href={pricingUrl.href}>View plans</a>
+            <a href={demoUrl.href}>Discuss a pilot</a>
+            <a href={appUrl.href}>Sign in</a>
+          </div>
         </div>
         <nav className="footer-navigation" aria-label="Footer navigation">
           {marketingNavigation.footer.map((group) => (
@@ -25,7 +35,10 @@ export function PublicFooter() {
             </section>
           ))}
         </nav>
-        <p className="copyright">© 2026 Witness. Built in the open. Designed for institutions.</p>
+        <div className="footer-colophon">
+          <p className="copyright">© 2026 Witness. Built in the open. Designed for institutions.</p>
+          <p className="footer-record">WITNESS / PUBLIC RECORD / 2026</p>
+        </div>
       </PageContainer>
     </footer>
   );

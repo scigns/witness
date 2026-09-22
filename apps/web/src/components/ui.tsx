@@ -43,10 +43,10 @@ const STATE_LABELS: Record<ReviewState, string> = {
  */
 const STATE_CLASSES: Record<ReviewState, string> = {
   draft: 'border-current text-[var(--color-ink-muted)]',
-  in_review: 'border-amber-600 text-amber-700 dark:text-amber-400',
-  confirmed: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
-  corrected: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
-  rejected: 'border-red-700 text-red-700 dark:text-red-400',
+  in_review: 'border-[var(--color-attention)] text-[var(--color-ink)]',
+  confirmed: 'border-[var(--color-ink)] text-[var(--color-ink)]',
+  corrected: 'border-[var(--color-ink)] text-[var(--color-ink)]',
+  rejected: 'border-[var(--color-attention)] text-[var(--color-ink)]',
 };
 
 export function StateBadge({ state }: { state: ReviewState }) {
@@ -73,9 +73,9 @@ const MEMBERSHIP_STATE_LABELS: Record<MembershipState, string> = {
 
 const MEMBERSHIP_STATE_CLASSES: Record<MembershipState, string> = {
   invited: 'border-current text-[var(--color-ink-muted)]',
-  active: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
-  suspended: 'border-amber-600 text-amber-700 dark:text-amber-400',
-  revoked: 'border-red-700 text-red-700 dark:text-red-400',
+  active: 'border-[var(--color-ink)] text-[var(--color-ink)]',
+  suspended: 'border-[var(--color-attention)] text-[var(--color-ink)]',
+  revoked: 'border-[var(--color-attention)] text-[var(--color-ink-muted)]',
 };
 
 export function MembershipStateBadge({ state }: { state: MembershipState }) {
@@ -135,8 +135,8 @@ const SESSION_STATUS_LABELS: Record<SessionStatus, string> = {
 
 const SESSION_STATUS_CLASSES: Record<SessionStatus, string> = {
   draft: 'border-current text-[var(--color-ink-muted)]',
-  scheduled: 'border-amber-600 text-amber-700 dark:text-amber-400',
-  open: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  scheduled: 'border-[var(--color-line)] text-[var(--color-ink)]',
+  open: 'border-[var(--color-attention)] text-[var(--color-ink)]',
   closed: 'border-current text-[var(--color-ink-muted)]',
   archived: 'border-current text-[var(--color-ink-muted)]',
 };
@@ -161,9 +161,9 @@ const INVITATION_STATUS_LABELS: Record<ParticipantInvitationStatus, string> = {
 
 const INVITATION_STATUS_CLASSES: Record<ParticipantInvitationStatus, string> = {
   not_invited: 'border-current text-[var(--color-ink-muted)]',
-  invited: 'border-amber-600 text-amber-700 dark:text-amber-400',
-  accepted: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
-  declined: 'border-red-700 text-red-700 dark:text-red-400',
+  invited: 'border-[var(--color-line)] text-[var(--color-ink)]',
+  accepted: 'border-[var(--color-ink)] text-[var(--color-ink)]',
+  declined: 'border-[var(--color-attention)] text-[var(--color-ink)]',
   cancelled: 'border-current text-[var(--color-ink-muted)]',
 };
 
@@ -187,9 +187,9 @@ const ATTENDANCE_STATUS_LABELS: Record<ParticipantAttendanceStatus, string> = {
 
 const ATTENDANCE_STATUS_CLASSES: Record<ParticipantAttendanceStatus, string> = {
   expected: 'border-current text-[var(--color-ink-muted)]',
-  present: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
-  absent: 'border-red-700 text-red-700 dark:text-red-400',
-  partially_attended: 'border-amber-600 text-amber-700 dark:text-amber-400',
+  present: 'border-[var(--color-ink)] text-[var(--color-ink)]',
+  absent: 'border-[var(--color-attention)] text-[var(--color-ink)]',
+  partially_attended: 'border-[var(--color-line)] text-[var(--color-ink)]',
   left_early: 'border-current text-[var(--color-ink-muted)]',
 };
 
@@ -221,11 +221,11 @@ const EVIDENCE_REVIEW_STATUS_LABELS: Record<EvidenceReviewStatus, string> = {
 
 const EVIDENCE_REVIEW_STATUS_CLASSES: Record<EvidenceReviewStatus, string> = {
   draft: 'border-current text-[var(--color-ink-muted)]',
-  submitted: 'border-amber-600 text-amber-700 dark:text-amber-400',
-  under_review: 'border-amber-600 text-amber-700 dark:text-amber-400',
-  needs_clarification: 'border-amber-600 text-amber-700 dark:text-amber-400',
-  validated: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
-  rejected: 'border-red-700 text-red-700 dark:text-red-400',
+  submitted: 'border-[var(--color-line)] text-[var(--color-ink)]',
+  under_review: 'border-[var(--color-attention)] text-[var(--color-ink)]',
+  needs_clarification: 'border-[var(--color-attention)] text-[var(--color-ink)]',
+  validated: 'border-[var(--color-ink)] text-[var(--color-ink)]',
+  rejected: 'border-[var(--color-attention)] text-[var(--color-ink)]',
   withdrawn: 'border-current text-[var(--color-ink-muted)] line-through',
 };
 
@@ -253,10 +253,10 @@ const DECISION_STATUS_LABELS: Record<DecisionStatus, string> = {
  * `packages/domain/src/decision.ts`.
  */
 const DECISION_STATUS_CLASSES: Record<DecisionStatus, string> = {
-  proposed: 'border-amber-600 text-amber-700 dark:text-amber-400',
-  confirmed: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  proposed: 'border-[var(--color-attention)] text-[var(--color-ink)]',
+  confirmed: 'border-[var(--color-ink)] text-[var(--color-ink)]',
   superseded: 'border-current text-[var(--color-ink-muted)]',
-  reversed: 'border-red-700 text-red-700 dark:text-red-400',
+  reversed: 'border-[var(--color-attention)] text-[var(--color-ink)]',
 };
 
 export function DecisionStatusBadge({ status }: { status: DecisionStatus }) {
@@ -278,9 +278,9 @@ const COMMITMENT_STATUS_LABELS: Record<CommitmentStatus, string> = {
 };
 
 const COMMITMENT_STATUS_CLASSES: Record<CommitmentStatus, string> = {
-  proposed: 'border-amber-600 text-amber-700 dark:text-amber-400',
-  active: 'border-sky-700 text-sky-700 dark:text-sky-400',
-  fulfilled: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  proposed: 'border-[var(--color-line)] text-[var(--color-ink)]',
+  active: 'border-[var(--color-attention)] text-[var(--color-ink)]',
+  fulfilled: 'border-[var(--color-ink)] text-[var(--color-ink)]',
   withdrawn: 'border-current text-[var(--color-ink-muted)] line-through',
   superseded: 'border-current text-[var(--color-ink-muted)]',
 };
@@ -305,9 +305,9 @@ const ACTION_ITEM_STATUS_LABELS: Record<ActionItemStatus, string> = {
 
 const ACTION_ITEM_STATUS_CLASSES: Record<ActionItemStatus, string> = {
   open: 'border-current text-[var(--color-ink-muted)]',
-  in_progress: 'border-sky-700 text-sky-700 dark:text-sky-400',
-  blocked: 'border-red-700 text-red-700 dark:text-red-400',
-  completed: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
+  in_progress: 'border-[var(--color-attention)] text-[var(--color-ink)]',
+  blocked: 'border-[var(--color-attention)] text-[var(--color-ink)]',
+  completed: 'border-[var(--color-ink)] text-[var(--color-ink)]',
   cancelled: 'border-current text-[var(--color-ink-muted)] line-through',
 };
 
@@ -324,7 +324,7 @@ export function ActionItemStatusBadge({ status }: { status: ActionItemStatus }) 
 /** Shown next to an overdue commitment or action, never on a closed one. */
 export function OverdueBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-red-700 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+    <span className="inline-flex items-center gap-1 rounded border border-[var(--color-attention)] px-2 py-0.5 text-xs font-medium text-[var(--color-ink)]">
       Overdue
     </span>
   );
@@ -340,7 +340,7 @@ export function SupportCountBadge({ count }: { count: number }) {
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
         count === 0
-          ? 'border-amber-600 text-amber-700 dark:text-amber-400'
+          ? 'border-[var(--color-attention)] text-[var(--color-ink)]'
           : 'border-current text-[var(--color-ink-muted)]'
       }`}
     >
@@ -359,10 +359,10 @@ const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
 
 const REPORT_STATUS_CLASSES: Record<ReportStatus, string> = {
   draft: 'border-current text-[var(--color-ink-muted)]',
-  under_review: 'border-amber-600 text-amber-700 dark:text-amber-400',
-  approved: 'border-emerald-700 text-emerald-700 dark:text-emerald-400',
-  published_internally: 'border-sky-700 text-sky-700 dark:text-sky-400',
-  exported: 'border-sky-700 text-sky-700 dark:text-sky-400',
+  under_review: 'border-[var(--color-attention)] text-[var(--color-ink)]',
+  approved: 'border-[var(--color-ink)] text-[var(--color-ink)]',
+  published_internally: 'border-[var(--color-ink)] text-[var(--color-ink)]',
+  exported: 'border-[var(--color-ink)] text-[var(--color-ink)]',
 };
 
 export function ReportStatusBadge({ status }: { status: ReportStatus }) {
@@ -438,7 +438,7 @@ export function categoryHelp(category: string): string | undefined {
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`rounded-lg border border-[var(--color-line)] bg-[var(--color-paper-raised)] p-5 ${className}`}
+      className={`rounded border border-[var(--color-line)] bg-[var(--color-paper-raised)] p-5 ${className}`}
     >
       {children}
     </div>
@@ -451,7 +451,8 @@ const BUTTON_VARIANT_STYLES: Record<ButtonVariant, string> = {
   primary: 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)] hover:opacity-90',
   secondary:
     'border border-[var(--color-line)] bg-[var(--color-paper)] hover:bg-[var(--color-accent-soft)]',
-  danger: 'border border-red-700 text-red-700 hover:bg-red-50 dark:hover:bg-red-950',
+  danger:
+    'border border-[var(--color-attention)] text-[var(--color-ink)] hover:bg-[var(--color-paper)]',
 };
 
 const BUTTON_BASE_CLASSES =
@@ -515,7 +516,7 @@ export function ErrorNotice({ message }: { message: string }) {
   return (
     <div
       role="alert"
-      className="rounded border border-red-700 bg-red-50 p-4 text-sm text-red-900 dark:bg-red-950 dark:text-red-200"
+      className="rounded border-l-4 border-[var(--color-attention)] bg-[var(--color-paper-raised)] p-4 text-sm text-[var(--color-ink)]"
     >
       {message}
     </div>

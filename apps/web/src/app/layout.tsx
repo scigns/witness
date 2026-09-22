@@ -6,6 +6,7 @@ import { ServiceWorkerRegistration } from '@/components/service-worker';
 import { IS_DEVELOPMENT_BUILD } from '@/lib/api';
 import { AuthProvider } from '@/lib/auth';
 import { SessionProvider } from '@/lib/session';
+import { brandFontVariables } from '@/lib/fonts';
 
 import './globals.css';
 
@@ -41,7 +42,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={brandFontVariables}>
       <body>
         <ServiceWorkerRegistration />
         <AuthProvider>

@@ -53,6 +53,15 @@ async function assertPage(page, width, path) {
   if (!response || !response.ok())
     throw new Error(`${path} returned HTTP ${response?.status() ?? 'unknown'}`);
 
+  await page.locator('header .brand-logo').evaluate(
+    (logo) =>
+      logo.complete ||
+      new Promise((resolve, reject) => {
+        logo.addEventListener('load', resolve, { once: true });
+        logo.addEventListener('error', reject, { once: true });
+      }),
+  );
+
   const state = await page.evaluate(() => {
     const logo = document.querySelector('.brand-logo');
     return {
@@ -97,11 +106,13 @@ async function assertPage(page, width, path) {
 
   if (isMobile) await page.locator('.mobile-navigation summary').click();
 
-  for (const label of ['Book a demo', 'Sign in']) {
+  for (const label of ['View plans', 'Sign in']) {
     const scope = isMobile ? page.locator('.mobile-navigation') : page.locator('.header-actions');
     const locator = scope.getByText(label, { exact: true });
     if (!(await locator.isVisible())) throw new Error(`${label} is not visible at ${width}px`);
   }
+
+  if (isMobile) await page.locator('.mobile-navigation summary').click();
 }
 
 async function assertKeyboard(page) {
@@ -137,7 +148,7 @@ async function assertKeyboard(page) {
   if (!(await page.locator('.mobile-navigation').evaluate((node) => node.hasAttribute('open')))) {
     throw new Error('Mobile menu is not keyboard operable');
   }
-  for (const label of ['Sign in', 'Book a demo']) {
+  for (const label of ['Sign in', 'View plans']) {
     if (!(await page.locator('.mobile-navigation').getByText(label, { exact: true }).isVisible())) {
       throw new Error(`${label} is not reachable in the mobile menu`);
     }

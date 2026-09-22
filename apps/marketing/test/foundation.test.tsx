@@ -92,7 +92,7 @@ describe('independent marketing foundation', () => {
     expect(html).toContain('Institutional Transformation Programme');
     expect(html).toContain('Adopt revised complaints process');
     expect(html).toContain('Action #21');
-    expect(html).toContain('Talk to Witness');
+    expect(html).toContain('Discuss a pilot');
     for (const title of [
       'Government',
       'International Development',
@@ -134,12 +134,12 @@ describe('independent marketing foundation', () => {
     expect(html).toContain('aria-label="Mobile navigation"');
     expect(html).toContain('aria-label="Footer navigation"');
     expect(html).toContain('aria-label="Witness home"');
-    expect(html).toContain('src="/brand/witness-logo.png"');
+    expect(html).toContain('src="/brand/witness-logo-transparent.png"');
     expect(html).toContain('<summary>Menu</summary>');
     expect(html).toContain('href="#main-content"');
     expect(html).toContain('Skip to main content');
     expect(html).toContain('Sign in');
-    expect(html).toContain('Book a demo');
+    expect(html).toContain('View plans');
   });
 
   it('exposes links only for destinations that work today', () => {
@@ -155,10 +155,7 @@ describe('independent marketing foundation', () => {
     expect(marketingNavigation.primary.map((item) => item.label)).toEqual([
       'Platform',
       'Solutions',
-      'Demo',
-      'Resources',
-      'Pricing',
-      'Trust',
+      'Why Witness',
     ]);
     expect(hrefs).toEqual(
       expect.arrayContaining([
@@ -171,14 +168,13 @@ describe('independent marketing foundation', () => {
         '/solutions/international-development',
         '/solutions/research',
         '/solutions/consultation',
-        '/demo',
         'https://app.buildwithwitness.com/signin',
-        'mailto:hello@buildwithwitness.com?subject=Witness%20demonstration%20request',
+        'https://app.buildwithwitness.com/pricing',
+        'mailto:hello@buildwithwitness.com?subject=Witness%20institutional%20pilot%20enquiry',
         'https://github.com/scigns/witness',
       ]),
     );
-    // MKT-04/05 built /platform, /how-it-works and /solutions/*, so those are wired now —
-    // Resources, Pricing and Trust on the primary nav still have no route.
+    // The launch navigation exposes only implemented routes.
     expect(hrefs.some((href) => href.startsWith('/pricing'))).toBe(false);
     expect(hrefs.some((href) => href.startsWith('/trust'))).toBe(false);
     expect(hrefs.some((href) => href.startsWith('/resources'))).toBe(false);
@@ -194,6 +190,7 @@ describe('independent marketing foundation', () => {
     expect(preview.deploymentUrl.href).toBe('https://preview.example/');
     expect(preview.canonicalOrigin.href).toBe('https://buildwithwitness.com/');
     expect(preview.appUrl.href).toBe('https://app.buildwithwitness.com/signin');
+    expect(preview.pricingUrl.href).toBe('https://app.buildwithwitness.com/pricing');
     expect(robots()).toEqual({ rules: { userAgent: '*', disallow: '/' } });
     expect(sitemap()[0]?.url).toBe('https://buildwithwitness.com/');
 
@@ -265,8 +262,9 @@ describe('independent marketing foundation', () => {
   });
 
   it('uses the approved canonical brand asset with explicit intrinsic dimensions', () => {
-    expect(brandAssets.logo).toBe('/brand/witness-logo.png');
-    expect(existsSync(join(process.cwd(), 'public/brand/witness-logo.png'))).toBe(true);
+    expect(brandAssets.logo).toBe('/brand/witness-logo-transparent.png');
+    expect(existsSync(join(process.cwd(), 'public/brand/witness-logo-transparent.png'))).toBe(true);
+    expect(existsSync(join(process.cwd(), 'public/brand/imagery/blush-canvas.png'))).toBe(true);
     const html = renderToStaticMarkup(
       <MarketingShell>
         <MarketingHomepage />
@@ -434,8 +432,8 @@ describe('independent marketing foundation', () => {
         '/solutions/international-development',
         '/solutions/research',
         '/solutions/consultation',
-        '/demo', // MarketingShell's primary nav links this on every page, MKT-06 on
-        '/brand/witness-logo.png', // next/image priority preload on the header logo, every page
+        '/demo',
+        '/brand/witness-logo-transparent.png', // next/image priority preload on every page
       ]);
       for (const { Page } of pages) {
         const html = renderToStaticMarkup(
@@ -514,7 +512,7 @@ describe('independent marketing foundation', () => {
         '/solutions/research',
         '/solutions/consultation',
         '/demo',
-        '/brand/witness-logo.png',
+        '/brand/witness-logo-transparent.png',
       ]);
       for (const { Page } of pages) {
         const html = renderToStaticMarkup(
@@ -609,7 +607,7 @@ describe('independent marketing foundation', () => {
         '/solutions/research',
         '/solutions/consultation',
         '/demo',
-        '/brand/witness-logo.png',
+        '/brand/witness-logo-transparent.png',
       ]);
       const html = renderToStaticMarkup(
         <MarketingShell>

@@ -1,8 +1,126 @@
 # Witness Commercial Website Brand System
 
 **Owner:** Brand, Product and Design
-**Status:** MKT-03L Brand Book reconciliation — `VERIFIED COMPLETE`
+**Status:** MKT-LAUNCH-01A Brand Art Direction — implementation
 **Last reviewed:** 2026-09-05
+
+## BRAND-UNIFY-01 — One Witness Experience (2026-09-09)
+
+### Surface inventory and alignment
+
+| Surface | Current implementation | Reconciliation |
+| --- | --- | --- |
+| Public marketing | apps/marketing routes, navigation, demo and conversion path | Aligned; unchanged |
+| Product shell and major routes | apps/web, including home, organisations, people, programs, sessions, evidence, records, outcomes and profile | Canonical palette/type/logo/chrome applied |
+| Pricing and billing | Public catalogue at /pricing; organisation subscription, usage and invoices at /organisations/:id/billing | Same shell, palette, type and CTA hierarchy |
+| Identity browser | Keycloak login, recovery, verification, required-action and error screens | witness/login theme applied (BRAND-UNIFY-01B); realm's loginTheme default set, not yet activated in production |
+| Transactional email | Witness-owned invitation templates and Keycloak account theme | Already aligned; retained |
+| Invoice document | Self-contained privileged HTML render | Witness institutional-document treatment implemented and validated in this working state; deferred to BRAND-UNIFY-01C (separate PR) |
+| PDF invoices / receipts | No generator or customer receipt surface | Not implemented; no substitute invented |
+
+packages/ui was considered as the runtime owner of brand primitives. It is not
+introduced in this milestone: marketing deliberately verifies its local CSS
+source, the product compiles Tailwind, and Keycloak consumes static theme
+resources. Coupling those three build systems through a package would add a
+deployment dependency without removing the required Keycloak copies. Instead,
+the canonical --witness-* contract is identical in both Next applications and
+enforced by apps/web/test/brand-contract.test.ts; Keycloak's static theme uses
+the same literal values.
+
+### Customer journey gap map
+
+| Boundary | Previous gap | Resolution |
+| --- | --- | --- |
+| Marketing → pricing | Host changed and product opened with blue/system-font chrome | Product pricing now uses the Brand Book shell, typography and Ink action hierarchy |
+| Pricing → authentication | Sign-in was functionally correct but visually generic | Application sign-in and the Keycloak browser theme both use Witness language and surfaces |
+| Identity → product | Generic Keycloak browser appearance | Witness login theme covers inherited login/recovery/verification/error flows |
+| Product → marketing | No deliberate return/learning route | Product mark links to the commercial site; footer links to the platform story |
+| Product → billing | Billing existed behind an administration menu but looked like a separate prototype | Billing inherits the reconciled shell and document styling |
+| Invoice → product | HTML invoice used an unrelated blue/system style | Self-contained invoice uses Bone, Gesso, Ink, Graphite and Mist; ships in BRAND-UNIFY-01C |
+| Email → product | Email theme was branded but browser identity was not | Browser and email identity now share one brand grammar |
+
+### Vocabulary
+
+| Term | Use |
+| --- | --- |
+| Organisation | The tenant and commercial/account boundary |
+| Program | Customer-facing name for the persisted Workspace domain object |
+| Session | A bounded period of consultation or evidence capture |
+| Evidence | Source material captured with context and consent |
+| Record | Reviewed institutional memory surfaced across programs |
+| Decision | A confirmed outcome supported by evidence |
+| Action | Work arising from a decision or commitment |
+| Member | A person with organisation or program membership |
+| Participant | A person contributing to a session; also the least-privileged participation role |
+| Administrator | A scoped organisation or program role, never implied by identity alone |
+| Plan | Catalogue definition |
+| Subscription | An organisation's persisted plan state |
+| Pilot | A governed deployment/engagement, not a plan or evidence state |
+
+### Guardrails
+
+- Hostnames, OIDC, PKCE, state, nonce, callback URLs, cookie scope, CORS,
+  CSRF, tenant isolation and API boundaries are unchanged.
+- Product density remains operational. Newsreader is limited to page-level
+  narrative hierarchy; machine IDs, times and amounts use Plex Mono.
+- Ember identifies live, unresolved or attention-required states. Status text
+  remains explicit, so colour is never the only signal.
+- No Stripe, checkout, invoice PDF, receipt, renewal workflow or billing email
+  is implied where the implementation does not exist.
+
+### BRAND-UNIFY-01B — Identity Brand Reconciliation (2026-09-11)
+
+- **Theme:** `infrastructure/docker/keycloak-theme/witness/login`, a
+  CSS-only override on `parent=keycloak.v2` (Keycloak's PatternFly v5 login
+  theme). No FreeMarker templates are replaced — lower risk than a template
+  fork, at the cost of the canonical logo mark: the theme currently renders
+  a Newsreader "Witness" wordmark rather than the transparent mark used
+  elsewhere, because inserting an image into the v2 header without forking
+  `template.ftl` was judged riskier than it was worth for this milestone.
+- **Keycloak version:** 26.0 (`quay.io/keycloak/keycloak:26.0`, matching both
+  `infrastructure/docker/docker-compose.yml` and the pilot compose).
+- **Activation:** the realm import sets `"loginTheme": "witness"` as the
+  source-controlled default for new realms. On an already-bootstrapped
+  realm — production and the pilot — import does not overwrite it; the
+  same approved Keycloak admin action already documented for the email
+  theme (#212) is required. **Not executed against production.**
+- **Verified live** against an isolated Keycloak 26.0 container (local
+  Postgres, realm imported from source, theme volume-mounted): theme
+  discovered, `witness.css` and both self-hosted fonts served with no 404s,
+  computed styles confirm Newsreader/Plex Sans, Bone/Gesso/Ink, 4px radius,
+  no box-shadow, at 320–1440px.
+- **Real defect found and fixed in this verification pass:** the initial
+  theme only styled the page-level `.alert-error`/`.pf-*-c-alert.pf-m-danger`
+  component. Keycloak's actual inline field-validation error (e.g. "Invalid
+  username or password") and required-field asterisks use different
+  PatternFly classes (`.pf-*-c-form-control.pf-m-error`,
+  `.pf-*-c-helper-text__item.pf-m-error`, `.pf-*-c-form__label-required`)
+  and were rendering native PatternFly red until corrected to Ember.
+- **States checked:** login, forgot password (request), register, a failed
+  login (inline Ember error), and an inline Keycloak error page (invalid
+  redirect_uri — untouched, since customising it touches message keys
+  Keycloak also uses for other security-relevant errors, out of scope for a
+  CSS-only theme). Reset-password (post-email-link), verify-email and
+  session-expired need a real SMTP/token round trip and were **not
+  reproducible** in this isolated environment; they inherit the same
+  `parent=keycloak.v2` + `witness.css` styling, so the same palette/type
+  contract applies to them, but they have not been visually confirmed.
+- **Copy:** left at Keycloak's default English strings ("Forgot Your
+  Password?", etc.) rather than overridden, since that requires a
+  `messages_en.properties` addition beyond this CSS-only theme. Deferred to
+  a future pass if the plain default copy is judged insufficient.
+- **Local dev/production gap fixed alongside this:** `docker-compose.yml`
+  (the single-node dev/production target, ADR-0013) had no volume mount for
+  `keycloak-theme/witness` at all — only the pilot compose did (added
+  earlier for the email theme in #212) — so the login theme could never
+  have loaded outside the pilot deployment. Added the matching mount.
+- **Unrelated gap found, not fixed here:** nothing in this repository
+  provisions the `keycloak` Postgres database for local dev (
+  `infrastructure/docker/init/postgres` is empty), so `make dev-full`'s
+  Keycloak service cannot start against a fresh database without a manual
+  `CREATE DATABASE keycloak;`. Pre-existing, orthogonal to brand work.
+- Authentication semantics, OIDC clients, redirect URIs, PKCE, cookies,
+  CORS, CSRF, roles, users, SMTP: **unchanged**.
 
 **Canonical authority:** [`docs/brand/Witness Brand Book.pdf`](../brand/Witness%20Brand%20Book.pdf)
 (companion: [`docs/brand/BRAND_BOOK.md`](../brand/BRAND_BOOK.md)). This document records this
@@ -28,36 +146,33 @@ scale, spacing/layout system, image direction, provenance visual component or pu
 
 ## Official logo — human approved
 
-- Canonical repository file: `apps/marketing/public/brand/witness-logo.png`
-- Public URL: `/brand/witness-logo.png`
-- Format: PNG, RGB, no alpha channel
+- Canonical web file: `apps/marketing/public/brand/witness-logo-transparent.png`
+- Public URL: `/brand/witness-logo-transparent.png`
+- Format: PNG, RGBA
 - Dimensions: 566 × 553 pixels
-- File size: 6,230 bytes
+- Source: losslessly extracted RGB object and soft-mask alpha from the canonical Brand Book PDF
 - Artwork status: `HUMAN APPROVED`
 
-The supplied artwork is authoritative. Preserve its intrinsic proportions and do not recolour, crop,
-filter, or otherwise modify it without a separately approved variant. Clear-space, minimum display
-size, alternate light/dark artwork, trademark rules and official colour specifications are `TO BE
-DEFINED`.
+The embedded Brand Book artwork is authoritative. Its PDF soft mask was recombined with its RGB object
+without redrawing, recolouring, filtering or changing dimensions. Preserve its intrinsic proportions.
+An approved Bone/light reversed mark is still required before placing the logo directly on Ink.
 
 ## Asset architecture
 
 ```text
 apps/marketing/public/brand/
 ├── witness-logo.png
-├── witness-mark.svg             # future, if supplied
-├── witness-logo-light.svg       # future, if supplied
-├── witness-logo-dark.svg        # future, if supplied
+├── witness-logo-transparent.png
+├── imagery/
+│   ├── blush-canvas.png
+│   └── ember-ochre-source-canvas.png
 └── og/                          # future social artwork
 ```
 
-Only `witness-logo.png` currently exists. The marketing `WitnessLogo` component references the
-manifested canonical path and declares intrinsic dimensions to avoid layout shift. The PNG has an
-opaque white background baked into the raster; the shell presents it on the closest Brand Book
-token (Gesso `#FFFDF9`), which is a near-white the Brand Book permits, so the mismatch against the
-asset's true `#FFFFFF` is not visible. A transparent or Gesso-baked variant would remove this
-dependency; see MKT-03L's `BRAND ASSET REQUIRED` note below. A separate approved variant will be
-required before any future dark presentation is introduced.
+The marketing `WitnessLogo` component references the transparent canonical path and declares
+intrinsic dimensions to avoid layout shift. The older opaque PNG remains for provenance. The two
+painted assets were extracted losslessly from the PDF and retain their original pixels; their local
+README records page origin and guardrails.
 
 ## Colour system
 
@@ -224,11 +339,74 @@ milestone applied. `AFTER` reflects this milestone's implementation.
 
 ### Brand asset required
 
-**YES.** The Brand Book's three painted-evidence canvases (Ash/primary, Blush/secondary,
-Ember/punctuation — Brand Book §07) are not present anywhere in the repository, and the approved
-logo PNG has an opaque `#FFFFFF` background baked into the raster rather than a transparent or
-Gesso-matched one. Neither was fabricated to fill the gap; the homepage continues to use no imagery
-rather than substitute stock or generated art, consistent with the Brand Book's imagery guardrails.
+**YES, PARTIAL.** The canonical PDF contains a usable Blush canvas and a separate Ember/Ochre source
+canvas, now extracted losslessly. The named Ash and Ember frames on Brand Book page 12 contain no
+embedded raster artwork. Obtain the original approved Ash canvas for the default hero treatment and
+the named Ember canvas before any future campaign use. A transparent Ink mark now exists from the
+PDF's own alpha mask; a separately approved Bone/reversed mark is still required for direct Ink use.
+
+## MKT-LAUNCH-01A — Brand Art Direction (2026-09-05)
+
+### Creative premise
+
+The website applies **archival modernism**, **editorial institutional design**, and **human
+evidence**. It should read like a beautifully typeset evidence file: calm, rigorous, human and made
+to be understood years later. Precision and pacing create the premium quality; ornament does not.
+
+### Painted evidence usage
+
+- Homepage hero: the approved Blush canvas is used once as a deliberately cropped field beside the
+  editorial statement. The crop changes framing only; the artwork is not recoloured or filtered. A
+  bottom-weighted 68% Ink scrim protects only its small caption; type is not placed over active
+  brushwork.
+- Homepage transition: the Ember/Ochre source canvas appears once as a thin full-width band before
+  the institutional-audience section. It is punctuation, not a reusable pattern or card image.
+- Why Witness: the Blush canvas is ghosted at 18% behind the opening argument, within the Brand
+  Book's 15–25% range.
+- No paint is recoloured, filtered, tiled, placed in a rounded card, or used as a logo fill.
+
+### Hero composition and page rhythm
+
+The homepage opening pairs a large Newsreader statement and concise Plex Sans proposition with one
+vertical painted field. Desktop uses an asymmetrical editorial split; mobile stacks statement before
+art without overlaying copy. The rest of the page alternates long quiet narrative fields, a structured
+record preview, a painted band, a single Ink provenance field, trust material and a high-whitespace
+close. Repeated grids are retained only when comparison is the content.
+
+Platform pages use ruled record rows and stronger structural alignment. How It Works uses sequential
+typography and vertical progression. Why Witness uses a ghosted human field and an Ink editorial
+belief statement. Evidence and Decisions use a quiet ledger rule at the opening. Institutional Memory
+uses the widest negative space and an enlarged italic reflection. Solutions uses a two-column
+institutional index; sector pages share the system while varying opening alignment modestly.
+
+### Typography and spacing
+
+Newsreader carries hero, section and reflective statements with intentionally varied scale. IBM Plex
+Sans remains the functional and explanatory voice. IBM Plex Mono remains confined to actual record
+IDs, values, diagram kinds and the footer's document-like colophon. Major sections use responsive
+64–160px fields; fine structure uses the existing 8px rhythm and Mist hairlines.
+
+### Ink inversion and Ember semantics
+
+Ink inversion is limited to the homepage provenance statement and Why Witness belief section. Bone
+and Mist carry the reversed type/structure. Ember is not used for CTAs or ordinary text: the only
+visible Ember comes from the approved painted band and existing passive artwork. Any future semantic
+Ember UI must mean live, unresolved or requiring attention.
+
+### Provenance visual language
+
+The contributor → contribution → evidence → finding → recommendation → decision → action → outcome
+chain is the signature diagram. It remains ordered semantic HTML with one-weight hairlines, explicit
+labels and no filled network-node aesthetic. On Ink it reverses with Bone/Mist rules; on mobile it
+becomes a vertically traced record rather than a horizontally scrolling graph.
+
+### Navigation, footer and motion
+
+Primary navigation exposes only Platform, Solutions and Why Witness, followed by Sign in and the Ink
+commercial action. The footer is a three-column institutional colophon containing only live routes,
+contact/sign-in and restrained Mono publication metadata. Interaction transitions are 160ms
+ease-out and limited to colour, opacity and at most 1px vertical movement; reduced-motion handling
+remains global.
 
 ## MKT-02 requirements
 

@@ -24,11 +24,14 @@ export function PricingCards({
       {plans.map((plan) => (
         <article
           key={plan.code}
-          className="flex flex-col rounded-xl border border-[var(--color-line)] bg-[var(--color-paper-raised)] p-5"
+          className="flex flex-col rounded border border-[var(--color-line)] bg-[var(--color-paper-raised)] p-5"
         >
-          <h2 className="text-xl font-semibold">{plan.name}</h2>
+          <h2 className="text-xl font-medium">{plan.name}</h2>
           <p className="mt-2 min-h-16 text-sm text-[var(--color-ink-muted)]">{plan.description}</p>
-          <p className="my-5 text-2xl font-semibold" aria-label={`${plan.name} price`}>
+          <p
+            className="witness-machine-fact my-5 text-2xl font-medium"
+            aria-label={`${plan.name} price`}
+          >
             {price(plan, interval)}
           </p>
           <ul className="mb-6 flex-1 space-y-2 text-sm">

@@ -49,7 +49,7 @@ export default function DecisionsPage() {
   const { demoUrl } = marketingSiteConfig();
 
   return (
-    <div className="foundation-page">
+    <div className="foundation-page decisions-page">
       <div className="foundation-heading">
         <Eyebrow>Platform</Eyebrow>
         <h1>Don't just store the decision. Preserve its story.</h1>

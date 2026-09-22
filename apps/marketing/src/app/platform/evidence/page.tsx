@@ -46,7 +46,7 @@ export default function EvidencePage() {
   const { demoUrl } = marketingSiteConfig();
 
   return (
-    <div className="foundation-page">
+    <div className="foundation-page evidence-page">
       <div className="foundation-heading">
         <Eyebrow>Platform</Eyebrow>
         <h1>Provenance or it did not happen.</h1>

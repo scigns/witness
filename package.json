@@ -49,7 +49,8 @@
     "invite": "pnpm --filter @witness/api run invite",
     "cloudflare:email:inspect": "tsx scripts/cloudflare/inspect-email-routing.ts",
     "cloudflare:email:apply": "tsx scripts/cloudflare/configure-email-routing.ts --apply",
-    "test:cloudflare:email": "vitest run test/infrastructure/email-routing.test.ts"
+    "test:cloudflare:email": "vitest run test/infrastructure/email-routing.test.ts",
+    "test:infrastructure": "vitest run test/infrastructure"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.9",
@@ -68,10 +69,10 @@
     "markdownlint-cli2": "^0.23.2",
     "playwright-core": "^1.62.1",
     "prettier": "^3.3.3",
-    "tsx": "^4.23.12",
+    "tsx": "^4.23.13",
     "turbo": "^2.10.12",
     "typescript": "^5.6.3",
-    "typescript-eslint": "^8.68.0",
+    "typescript-eslint": "^8.69.0",
     "vitest": "^2.1.8"
   },
   "lint-staged": {

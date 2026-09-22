@@ -40,8 +40,11 @@ export default function SignInPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-md space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+    <div className="mx-auto max-w-lg space-y-6">
+      <div>
+        <p className="text-sm font-medium text-[var(--color-ink-muted)]">Welcome back</p>
+        <h1 className="mt-2 text-4xl">Your record is where you left it.</h1>
+      </div>
       {developmentProfile && (
         <div
           role="status"
@@ -54,8 +57,8 @@ export default function SignInPage() {
       )}
       <Card className="space-y-4">
         <p className="text-sm text-[var(--color-ink-muted)]">
-          Sign in with your organisation&apos;s identity provider. Witness never sees or stores your
-          password.
+          Continue with your organisation&apos;s identity provider. Witness never sees or stores
+          your password.
         </p>
         <a
           href={authApi.loginUrl()}

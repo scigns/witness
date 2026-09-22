@@ -16,16 +16,16 @@ export default function PricingPage() {
   }, []);
   return (
     <div>
-      <header className="mb-8 text-center">
-        <p className="text-sm font-semibold uppercase tracking-wider text-[var(--color-accent)]">
+      <header className="mb-10 max-w-3xl">
+        <p className="text-sm font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
           Simple AUD pricing
         </p>
-        <h1 className="mt-2 text-4xl font-bold">Keep institutional memory accountable</h1>
-        <p className="mx-auto mt-3 max-w-2xl text-[var(--color-ink-muted)]">
+        <h1 className="mt-2 text-5xl">Keep institutional memory accountable</h1>
+        <p className="mt-4 max-w-2xl text-[var(--color-ink-muted)]">
           Start free. Upgrade when your team needs more capacity, governance or deployment control.
         </p>
       </header>
-      <fieldset className="mb-8 flex justify-center gap-4">
+      <fieldset className="mb-8 flex gap-4 border-y border-[var(--color-line)] py-4">
         <legend className="sr-only">Billing frequency</legend>
         {(['MONTHLY', 'YEARLY'] as const).map((value) => (
           <label key={value} className="cursor-pointer">

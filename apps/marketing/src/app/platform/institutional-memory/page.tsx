@@ -47,7 +47,7 @@ export default function InstitutionalMemoryPage() {
   const { demoUrl } = marketingSiteConfig();
 
   return (
-    <div className="foundation-page">
+    <div className="foundation-page memory-page">
       <div className="foundation-heading">
         <Eyebrow>Platform</Eyebrow>
         <h1>Built to be read later.</h1>

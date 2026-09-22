@@ -44,7 +44,7 @@ export default function GovernmentSolutionPage() {
   const { demoUrl } = marketingSiteConfig();
 
   return (
-    <div className="foundation-page">
+    <div className="foundation-page sector-page government-page">
       <div className="foundation-heading">
         <Eyebrow>Government</Eyebrow>
         <h1>Make consultation and public decisions accountable.</h1>

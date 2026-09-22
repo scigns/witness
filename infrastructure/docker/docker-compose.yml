@@ -155,6 +155,12 @@ services:
     volumes:
       # Realm-as-code: configuration is reproducible and reviewable, not clicked.
       - ./init/keycloak:/opt/keycloak/data/import:ro
+      # Witness login/email theme (docs/commercial-website/BRAND_SYSTEM.md).
+      # On an already-bootstrapped realm this mount alone has no effect —
+      # importing does not overwrite an initialised realm — so an existing
+      # deployment also needs the realm's Login Theme set to "witness" via an
+      # approved Keycloak admin action, same as the email theme in #212.
+      - ./keycloak-theme/witness:/opt/keycloak/themes/witness:ro
     ports: ["${KEYCLOAK_PORT:-8080}:8080"]
     depends_on:
       postgres: { condition: service_healthy }

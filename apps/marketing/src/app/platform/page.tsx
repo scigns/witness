@@ -75,7 +75,7 @@ export default function PlatformPage() {
   const { demoUrl } = marketingSiteConfig();
 
   return (
-    <div className="foundation-page">
+    <div className="foundation-page platform-page">
       <div className="foundation-heading">
         <Eyebrow>The platform</Eyebrow>
         <h1>One system for evidence, decisions and institutional memory.</h1>

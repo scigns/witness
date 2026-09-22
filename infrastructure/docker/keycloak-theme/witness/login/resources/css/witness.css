@@ -1,0 +1,157 @@
+@font-face {
+  font-family: 'Newsreader';
+  src: url('../fonts/Newsreader-Variable.woff2') format('woff2');
+  font-weight: 300 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('../fonts/IBMPlexSans-Variable.woff2') format('woff2');
+  font-weight: 300 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --pf-v5-global--BackgroundColor--100: #f5f2ed;
+  --pf-v5-global--BackgroundColor--200: #fffdf9;
+  --pf-v5-global--Color--100: #1b1917;
+  --pf-v5-global--Color--200: #46423d;
+  --pf-v5-global--primary-color--100: #1b1917;
+  --pf-v5-global--primary-color--200: #46423d;
+  --pf-v5-global--BorderColor--100: #dcd6cc;
+  --pf-v5-global--BorderRadius--sm: 4px;
+}
+
+html, body, .login-pf body {
+  min-height: 100%;
+  background: #f5f2ed;
+  color: #1b1917;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+.login-pf-page {
+  padding: clamp(2rem, 7vw, 5rem) 1rem;
+}
+
+#kc-header-wrapper {
+  color: #1b1917;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: clamp(2.25rem, 7vw, 4rem);
+  font-weight: 300;
+  letter-spacing: -0.035em;
+  text-transform: none;
+}
+
+.card-pf,
+.pf-v5-c-login__main,
+.pf-c-login__main {
+  max-width: 32rem;
+  border: 1px solid #dcd6cc;
+  border-radius: 4px;
+  background: #fffdf9;
+  box-shadow: none;
+}
+
+h1, h2, #kc-page-title {
+  color: #1b1917;
+  font-family: 'Newsreader', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+
+label,
+.pf-v5-c-form__label,
+.pf-c-form__label {
+  color: #46423d;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+input,
+.pf-v5-c-form-control,
+.pf-c-form-control {
+  min-height: 44px;
+  border-color: #dcd6cc;
+  border-radius: 4px;
+  background: #fffdf9;
+  color: #1b1917;
+}
+
+input:focus,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #1b1917;
+  outline-offset: 3px;
+}
+
+#kc-login,
+.pf-v5-c-button.pf-m-primary,
+.pf-c-button.pf-m-primary {
+  min-height: 44px;
+  border: 1px solid #1b1917;
+  border-radius: 4px;
+  background: #1b1917;
+  color: #f5f2ed;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+#kc-login:hover,
+.pf-v5-c-button.pf-m-primary:hover,
+.pf-c-button.pf-m-primary:hover {
+  background: #46423d;
+}
+
+a {
+  color: #1b1917;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.alert-error,
+.pf-v5-c-alert.pf-m-danger,
+.pf-c-alert.pf-m-danger {
+  border-color: #c1481d;
+  background: #fffdf9;
+  color: #1b1917;
+}
+
+/* Inline field validation (e.g. "Invalid username or password") uses its own
+   PatternFly error classes, separate from the page-level alert above. */
+.pf-v5-c-form-control.pf-m-error,
+.pf-c-form-control.pf-m-error,
+input[aria-invalid='true'] {
+  border-color: #c1481d;
+}
+
+.pf-v5-c-form-control__icon.pf-m-status,
+.pf-c-form-control__icon.pf-m-status {
+  color: #c1481d;
+}
+
+.pf-v5-c-helper-text__item.pf-m-error .pf-v5-c-helper-text__item-text,
+.pf-c-helper-text__item.pf-m-error .pf-c-helper-text__item-text,
+.kc-feedback-text {
+  color: #c1481d;
+}
+
+.pf-v5-c-form__label-required,
+.pf-c-form__label-required {
+  color: #c1481d;
+}
+
+* {
+  animation-duration: 180ms;
+  transition-duration: 160ms;
+  transition-timing-function: ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
