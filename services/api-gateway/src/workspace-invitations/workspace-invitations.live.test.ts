@@ -20,6 +20,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Principal } from '../authz/authorization.port.js';
+import { RoleResolutionService } from '../authz/role-resolution.service.js';
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { WorkspaceInvitationsService } from './workspace-invitations.service.js';
 
@@ -629,6 +630,181 @@ describe.skipIf(prisma === null)('workspace invitations (live PostgreSQL) — AD
       expect(noRealOrgB).not.toBeNull();
       const orgNamedOrgB = await db.organisation.findFirst({ where: { name: 'Organisation B' } });
       expect(orgNamedOrgB).toBeNull();
+    });
+
+    // Phase 5, Workstream 0.3 — the three checklist items the Phase 4 final
+    // report flagged as "likely covered implicitly" rather than proven by a
+    // named test. Proven here explicitly, against real Postgres.
+
+    it('THREAT: concurrent resend cannot leave more than one token able to grant authority', async () => {
+      const email = `concurrent-resend-${randomUUID()}@partner.example`;
+      const { svc, tokens: capturedTokens } = spyingService();
+
+      const invitation = await svc.create(
+        workspaceAId,
+        { invitedEmail: email, role: 'contributor', affiliationType: 'independent' },
+        ADMIN_PRINCIPAL,
+      );
+      capturedTokens.length = 0;
+
+      // Five concurrent resends race to overwrite the same row's token hash.
+      await Promise.allSettled(
+        Array.from({ length: 5 }, () => svc.resend(workspaceAId, invitation.id, ADMIN_PRINCIPAL)),
+      );
+
+      // Still exactly one invitation row — resend never forks the invitation.
+      const rowCount = await db.workspaceInvitation.count({ where: { id: invitation.id } });
+      expect(rowCount).toBe(1);
+      expect(capturedTokens).toHaveLength(5);
+
+      const userId = await createUser(email);
+      const userPrincipal: Principal = {
+        subject: `user:${userId}`,
+        displayName: 'X',
+        kind: 'human',
+        roles: [],
+      };
+
+      // Every captured token attempts to accept. Last-write-wins on the
+      // single tokenHash column means at most one can ever match.
+      const results = await Promise.allSettled(
+        capturedTokens.map((token) => svc.accept(token, userId, email, userPrincipal)),
+      );
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      expect(fulfilled.length).toBeLessThanOrEqual(1);
+
+      // Whether zero or one succeeded, authority was never duplicated.
+      const memberships = await db.workspaceMembership.count({
+        where: { userId, workspaceId: workspaceAId },
+      });
+      expect(memberships).toBeLessThanOrEqual(1);
+      const roles = await db.roleAssignment.count({ where: { userId, workspaceId: workspaceAId } });
+      expect(roles).toBeLessThanOrEqual(1);
+      expect(memberships).toBe(roles);
+    });
+
+    it('THREAT: a workspace-scoped external role — even "admin" — resolves to zero organisation-scope tiers, and therefore zero billing authority', async () => {
+      const email = `no-billing-${randomUUID()}@partner.example`;
+      const { svc, tokens: capturedTokens } = spyingService();
+
+      // The strongest case: the invited role is 'admin' — the same role
+      // name an organisation's own administrator holds. If any workspace
+      // grant could leak into organisation-scope authority, this is where
+      // it would show up.
+      await svc.create(
+        workspaceAId,
+        { invitedEmail: email, role: 'admin', affiliationType: 'independent' },
+        ADMIN_PRINCIPAL,
+      );
+      const rawToken = capturedTokens[0] as string;
+      const userId = await createUser(email);
+      const userPrincipal: Principal = {
+        subject: `user:${userId}`,
+        displayName: 'X',
+        kind: 'human',
+        roles: [],
+      };
+      await svc.accept(rawToken, userId, email, userPrincipal);
+
+      const resolution = new RoleResolutionService(db);
+      const organisationTiers = await resolution.scopedGrantTiers(userId, {
+        type: 'organisation',
+        organisationId: organisationAId,
+      });
+      expect(organisationTiers).toEqual([]);
+
+      // Billing routes (BillingController, InvoicesController) resolve to
+      // an *organisation* scope — never workspace — so an empty
+      // organisation-tier set here is the actual authorization-layer proof,
+      // not an inference from row shape.
+      const workspaceTiers = await resolution.scopedGrantTiers(userId, {
+        type: 'workspace',
+        workspaceId: workspaceAId,
+      });
+      expect(workspaceTiers).toContain('admin');
+    });
+
+    it('THREAT: session-level participation cannot escalate into a workspace or organisation role', async () => {
+      const facilitatorId = await createUser(`session-facilitator-${randomUUID()}@org-a.example`);
+      const sessionId = randomUUID();
+      const participantId = randomUUID();
+      let participantUserId = '';
+      try {
+        await db.coDesignSession.create({
+          data: {
+            id: sessionId,
+            organisationId: organisationAId,
+            workspaceId: workspaceAId,
+            title: 'Adversarial fixture session',
+            purpose: 'Prove session participation grants no RBAC authority.',
+            sessionType: 'co_design_workshop',
+            deliveryMode: 'in_person',
+            primaryFacilitatorId: facilitatorId,
+            status: 'draft',
+            participantVisibility: 'facilitators_only',
+          },
+        });
+
+        participantUserId = await createUser(`session-only-${randomUUID()}@partner.example`);
+        await db.sessionParticipant.create({
+          data: {
+            id: participantId,
+            organisationId: organisationAId,
+            workspaceId: workspaceAId,
+            sessionId,
+            linkedUserId: participantUserId,
+            displayName: 'Session-Only Participant',
+            participantType: 'community_member',
+            participationMode: 'in_person',
+            identityMode: 'named',
+            identityVisibility: 'visible_to_all_participants',
+            invitationStatus: 'not_invited',
+            attendanceStatus: 'expected',
+          },
+        });
+
+        // 1. There is no `role_assignment` row for this user anywhere —
+        // being linked to a session, alone, creates no authority row at all.
+        const anyRole = await db.roleAssignment.findFirst({ where: { userId: participantUserId } });
+        expect(anyRole).toBeNull();
+
+        // 2. The real authorization service resolves zero tiers at both
+        // scopes a session's workspace touches.
+        const resolution = new RoleResolutionService(db);
+        expect(
+          await resolution.scopedGrantTiers(participantUserId, {
+            type: 'workspace',
+            workspaceId: workspaceAId,
+          }),
+        ).toEqual([]);
+        expect(
+          await resolution.scopedGrantTiers(participantUserId, {
+            type: 'organisation',
+            organisationId: organisationAId,
+          }),
+        ).toEqual([]);
+
+        // 3. There is no such thing as a session-scoped role assignment to
+        // escalate into in the first place — `role_assignment` has no
+        // `session_id` column at all (scope is organisation/workspace/
+        // platform only — role_assignment_scope_check), so the closest an
+        // attacker could get is smuggling a session's id into one of the two
+        // columns that DO exist. The database's own CHECK constraint
+        // rejects 'session' as a scope_type outright — structurally
+        // impossible, not merely unused by convention.
+        await expect(
+          db.$executeRawUnsafe(
+            `INSERT INTO role_assignment (id, scope_type, workspace_id, user_id, role, created_at, updated_at)
+             VALUES ($1, 'session', $2, $3, 'admin', now(), now())`,
+            randomUUID(),
+            sessionId,
+            participantUserId,
+          ),
+        ).rejects.toThrow();
+      } finally {
+        await db.sessionParticipant.deleteMany({ where: { id: participantId } });
+        await db.coDesignSession.deleteMany({ where: { id: sessionId } });
+      }
     });
   });
 });
