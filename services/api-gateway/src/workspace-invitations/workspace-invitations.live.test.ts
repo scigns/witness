@@ -56,9 +56,11 @@ describe.skipIf(prisma === null)('workspace invitations (live PostgreSQL) — AD
   const organisationAId = randomUUID();
   const organisationBId = randomUUID();
   const workspaceAId = randomUUID();
+  const workspaceA2Id = randomUUID();
   const workspaceBId = randomUUID();
   const adminUserId = randomUUID();
   const adminActorId = randomUUID();
+  const orgBMemberUserId = randomUUID();
 
   const ADMIN_PRINCIPAL: Principal = {
     subject: `user:${adminUserId}`,
@@ -95,12 +97,45 @@ describe.skipIf(prisma === null)('workspace invitations (live PostgreSQL) — AD
       data: { id: workspaceAId, name: 'Teacher Voice Co-design', organisationId: organisationAId },
     });
     await db.workspace.create({
-      data: { id: workspaceBId, name: 'Unrelated Workspace B', organisationId: organisationBId },
+      data: {
+        id: workspaceA2Id,
+        name: "Organisation A's Second Programme",
+        organisationId: organisationAId,
+      },
+    });
+    await db.workspace.create({
+      data: {
+        id: workspaceBId,
+        name: "Organisation B's Own Programme",
+        organisationId: organisationBId,
+      },
     });
     await db.actor.create({
       data: { id: adminActorId, kind: 'human', displayName: 'Live Test Admin' },
     });
     await createUserWithId(adminUserId, 'admin@org-a.example');
+
+    // A real, ordinary internal member of Organisation B's own programme —
+    // PART 23's isolation check needs something real on the other side of
+    // the boundary to prove stays untouched, not just an empty workspace.
+    await createUserWithId(orgBMemberUserId, 'member@org-b.example');
+    await db.organisationMembership.create({
+      data: {
+        id: randomUUID(),
+        organisationId: organisationBId,
+        userId: orgBMemberUserId,
+        state: 'active',
+      },
+    });
+    await db.roleAssignment.create({
+      data: {
+        id: randomUUID(),
+        scopeType: 'workspace',
+        workspaceId: workspaceBId,
+        userId: orgBMemberUserId,
+        role: 'facilitator',
+      },
+    });
   });
 
   async function createUserWithId(id: string, email: string): Promise<void> {
@@ -112,22 +147,30 @@ describe.skipIf(prisma === null)('workspace invitations (live PostgreSQL) — AD
   afterAll(async () => {
     if (prisma === null) return;
     await db.auditEvent.deleteMany({
-      where: { OR: [{ subjectId: workspaceAId }, { subjectId: workspaceBId }] },
+      where: {
+        OR: [
+          { subjectId: workspaceAId },
+          { subjectId: workspaceA2Id },
+          { subjectId: workspaceBId },
+        ],
+      },
     });
     await db.roleAssignment.deleteMany({
-      where: { workspaceId: { in: [workspaceAId, workspaceBId] } },
+      where: { workspaceId: { in: [workspaceAId, workspaceA2Id, workspaceBId] } },
     });
     await db.workspaceMembership.deleteMany({
-      where: { workspaceId: { in: [workspaceAId, workspaceBId] } },
+      where: { workspaceId: { in: [workspaceAId, workspaceA2Id, workspaceBId] } },
     });
     await db.workspaceInvitation.deleteMany({
-      where: { workspaceId: { in: [workspaceAId, workspaceBId] } },
+      where: { workspaceId: { in: [workspaceAId, workspaceA2Id, workspaceBId] } },
     });
     await db.authSession.deleteMany({ where: { user: { email: { endsWith: '.example' } } } });
     await db.organisationMembership.deleteMany({
       where: { organisationId: { in: [organisationAId, organisationBId] } },
     });
-    await db.workspace.deleteMany({ where: { id: { in: [workspaceAId, workspaceBId] } } });
+    await db.workspace.deleteMany({
+      where: { id: { in: [workspaceAId, workspaceA2Id, workspaceBId] } },
+    });
     await db.organisation.deleteMany({ where: { id: { in: [organisationAId, organisationBId] } } });
     await db.user.deleteMany({ where: { email: { endsWith: '.example' } } });
     // Actor rows are never deleted by design in this system (they are
@@ -462,6 +505,130 @@ describe.skipIf(prisma === null)('workspace invitations (live PostgreSQL) — AD
         where: { userId, organisationId: { not: null } },
       });
       expect(orgScopedRole).toBeNull();
+    });
+
+    it('PART 23 acceptance scenario: four external collaborators from four different affiliations, none of whom carry any authority Organisation A never granted', async () => {
+      const { svc, tokens } = spyingService();
+
+      // Organisation A convenes "Teacher Voice Co-design" and invites:
+      //   B — a Facilitator affiliated with a different organisation
+      //   C — a Reviewer affiliated with yet another organisation
+      //   D — a Knowledge Steward affiliated with a third organisation
+      //   E — a Participant with no organisational affiliation (community)
+      const invitees = [
+        {
+          key: 'B' as const,
+          email: `userB-${randomUUID()}@partner.example`,
+          role: 'facilitator' as const,
+          affiliationType: 'organisation' as const,
+          affiliationLabel: 'Organisation B',
+        },
+        {
+          key: 'C' as const,
+          email: `userC-${randomUUID()}@partner.example`,
+          role: 'reviewer' as const,
+          affiliationType: 'organisation' as const,
+          affiliationLabel: 'Organisation C',
+        },
+        {
+          key: 'D' as const,
+          email: `userD-${randomUUID()}@partner.example`,
+          role: 'steward' as const,
+          affiliationType: 'organisation' as const,
+          affiliationLabel: 'Organisation D',
+        },
+        {
+          key: 'E' as const,
+          email: `userE-${randomUUID()}@partner.example`,
+          role: 'participant' as const,
+          affiliationType: 'community' as const,
+          affiliationLabel: 'Neighbourhood Council',
+        },
+      ];
+
+      const accepted: { key: string; userId: string }[] = [];
+
+      for (const invitee of invitees) {
+        tokens.length = 0;
+        await svc.create(
+          workspaceAId,
+          {
+            invitedEmail: invitee.email,
+            role: invitee.role,
+            affiliationType: invitee.affiliationType,
+            affiliationLabel: invitee.affiliationLabel,
+          },
+          ADMIN_PRINCIPAL,
+        );
+        const rawToken = tokens[0] as string;
+        const userId = await createUser(invitee.email);
+        const userPrincipal: Principal = {
+          subject: `user:${userId}`,
+          displayName: invitee.key,
+          kind: 'human',
+          roles: [],
+        };
+        const result = await svc.accept(rawToken, userId, invitee.email, userPrincipal);
+        expect(result.role).toBe(invitee.role);
+        accepted.push({ key: invitee.key, userId });
+      }
+
+      const allUserIds = accepted.map((a) => a.userId);
+
+      // 1. None of B, C, D, E became a member of Organisation A.
+      const orgAMemberships = await db.organisationMembership.findMany({
+        where: { organisationId: organisationAId, userId: { in: allUserIds } },
+      });
+      expect(orgAMemberships).toEqual([]);
+
+      // 2. Each holds exactly the workspace-scoped role they were invited
+      // to in workspaceA — nothing broader.
+      for (const invitee of invitees) {
+        const { userId } = accepted.find((a) => a.key === invitee.key)!;
+        const role = await db.roleAssignment.findFirstOrThrow({
+          where: { userId, workspaceId: workspaceAId },
+        });
+        expect(role.role).toBe(invitee.role);
+        expect(role.scopeType).toBe('workspace');
+        expect(role.organisationId).toBeNull();
+
+        const allRolesForUser = await db.roleAssignment.findMany({ where: { userId } });
+        expect(allRolesForUser).toHaveLength(1);
+      }
+
+      // 3. A second programme under the SAME Organisation A shows no
+      // implicit carryover — none of the four hold any role there.
+      const carryoverRoles = await db.roleAssignment.findMany({
+        where: { workspaceId: workspaceA2Id, userId: { in: allUserIds } },
+      });
+      expect(carryoverRoles).toEqual([]);
+      const carryoverMemberships = await db.workspaceMembership.findMany({
+        where: { workspaceId: workspaceA2Id, userId: { in: allUserIds } },
+      });
+      expect(carryoverMemberships).toEqual([]);
+
+      // 4. Organisation B's own, real, unrelated programme stays fully
+      // isolated: its own internal member's role is untouched, and none
+      // of the four external invitees have any presence there at all —
+      // despite B's affiliation *label* literally reading "Organisation B".
+      const orgBWorkspaceRoles = await db.roleAssignment.findMany({
+        where: { workspaceId: workspaceBId },
+      });
+      expect(orgBWorkspaceRoles.map((r) => r.userId)).toEqual([orgBMemberUserId]);
+      expect(orgBWorkspaceRoles[0]?.role).toBe('facilitator');
+      const leakedIntoOrgB = await db.roleAssignment.findMany({
+        where: { workspaceId: workspaceBId, userId: { in: allUserIds } },
+      });
+      expect(leakedIntoOrgB).toEqual([]);
+
+      // 5. The affiliation label naming a real organisation's name never
+      // resolves to that (or any) real Organisation row.
+      const noRealOrgB = await db.workspaceMembership.findFirst({
+        where: { workspaceId: workspaceAId, affiliationLabel: 'Organisation B' },
+      });
+      expect(noRealOrgB).not.toBeNull();
+      const orgNamedOrgB = await db.organisation.findFirst({ where: { name: 'Organisation B' } });
+      expect(orgNamedOrgB).toBeNull();
     });
   });
 });
