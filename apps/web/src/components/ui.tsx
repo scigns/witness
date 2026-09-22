@@ -14,6 +14,7 @@ import { useState, type ReactNode } from 'react';
 
 import type {
   ActionItemStatus,
+  AffiliationType,
   ReportStatus,
   CommitmentStatus,
   DecisionStatus,
@@ -26,6 +27,7 @@ import type {
   RoleDefinition,
   SessionStatus,
   WitnessRole,
+  WorkspaceInvitationStatus,
 } from '@witness/contracts';
 
 const STATE_LABELS: Record<ReviewState, string> = {
@@ -86,6 +88,54 @@ export function MembershipStateBadge({ state }: { state: MembershipState }) {
       {MEMBERSHIP_STATE_LABELS[state]}
     </span>
   );
+}
+
+const WORKSPACE_INVITATION_STATUS_LABELS: Record<WorkspaceInvitationStatus, string> = {
+  pending: 'Pending',
+  accepted: 'Accepted',
+  declined: 'Declined',
+  expired: 'Expired',
+  revoked: 'Revoked',
+};
+
+const WORKSPACE_INVITATION_STATUS_CLASSES: Record<WorkspaceInvitationStatus, string> = {
+  pending: 'border-[var(--color-attention)] text-[var(--color-ink)]',
+  accepted: 'border-[var(--color-ink)] text-[var(--color-ink)]',
+  declined: 'border-current text-[var(--color-ink-muted)]',
+  expired: 'border-current text-[var(--color-ink-muted)]',
+  revoked: 'border-[var(--color-attention)] text-[var(--color-ink-muted)]',
+};
+
+export function WorkspaceInvitationStatusBadge({ status }: { status: WorkspaceInvitationStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${WORKSPACE_INVITATION_STATUS_CLASSES[status]}`}
+    >
+      {WORKSPACE_INVITATION_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+const AFFILIATION_TYPE_LABELS: Record<AffiliationType, string> = {
+  organisation: 'Organisation',
+  independent: 'Independent',
+  community: 'Community',
+  undisclosed: 'Undisclosed',
+};
+
+/**
+ * "I am participating from X" — contextual metadata, never authority
+ * (ADR-0028). Deliberately plain, no colour semantics: an affiliation is not
+ * a state that needs attention drawn to it.
+ */
+export function AffiliationTag({ type, label }: { type: AffiliationType; label: string | null }) {
+  const text =
+    type === 'organisation' && label !== null
+      ? label
+      : type === 'community' && label !== null
+        ? label
+        : AFFILIATION_TYPE_LABELS[type];
+  return <span className="text-[var(--color-ink-muted)]">{text}</span>;
 }
 
 // Mirrors `services/api-gateway/src/infrastructure/role.helper.ts`'s `ROLE_LABELS` — the

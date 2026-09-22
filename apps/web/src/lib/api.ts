@@ -93,6 +93,9 @@ import type {
   WithdrawParticipantConsentRequest,
   WorkspaceMembershipView,
   WorkspaceSummary,
+  CreateWorkspaceInvitationRequest,
+  WorkspaceInvitationContextView,
+  WorkspaceInvitationView,
   ActionItemDetail,
   ActionItemSummary,
   ActionItemTransitionRequest,
@@ -617,6 +620,72 @@ export const api = {
     request<void>(`/api/v1/workspaces/${workspaceId}/memberships/${membershipId}/role`, user, {
       method: 'DELETE',
     }),
+
+  // ─── Workspace invitations (external collaborators, ADR-0028) ───────────
+
+  listWorkspaceInvitations: (
+    workspaceId: string,
+    user: ActingUser,
+  ): Promise<WorkspaceInvitationView[]> =>
+    request<WorkspaceInvitationView[]>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/invitations`,
+      user,
+    ),
+
+  createWorkspaceInvitation: (
+    workspaceId: string,
+    body: CreateWorkspaceInvitationRequest,
+    user: ActingUser,
+  ): Promise<WorkspaceInvitationView> =>
+    request<WorkspaceInvitationView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/invitations`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  resendWorkspaceInvitation: (
+    workspaceId: string,
+    invitationId: string,
+    user: ActingUser,
+  ): Promise<WorkspaceInvitationView> =>
+    request<WorkspaceInvitationView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/invitations/${encodeURIComponent(invitationId)}/resend`,
+      user,
+      { method: 'POST' },
+    ),
+
+  revokeWorkspaceInvitation: (
+    workspaceId: string,
+    invitationId: string,
+    user: ActingUser,
+  ): Promise<WorkspaceInvitationView> =>
+    request<WorkspaceInvitationView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/invitations/${encodeURIComponent(invitationId)}/revoke`,
+      user,
+      { method: 'POST' },
+    ),
+
+  /** Public — no ActingUser needed, matches the unguarded backend route. */
+  getWorkspaceInvitationContext: (token: string): Promise<WorkspaceInvitationContextView> =>
+    request<WorkspaceInvitationContextView>(
+      `/api/v1/workspace-invitations/${encodeURIComponent(token)}`,
+      null,
+    ),
+
+  /** Requires a real signed-in session cookie — see WorkspaceInvitationTokenController. */
+  acceptWorkspaceInvitation: (token: string): Promise<{ workspaceId: string; role: string }> =>
+    request<{ workspaceId: string; role: string }>(
+      `/api/v1/workspace-invitations/${encodeURIComponent(token)}/accept`,
+      null,
+      { method: 'POST' },
+    ),
+
+  declineWorkspaceInvitation: (token: string): Promise<{ status: 'declined' }> =>
+    request<{ status: 'declined' }>(
+      `/api/v1/workspace-invitations/${encodeURIComponent(token)}/decline`,
+      null,
+      { method: 'POST' },
+    ),
 
   listSessions: (
     workspaceId: string,
