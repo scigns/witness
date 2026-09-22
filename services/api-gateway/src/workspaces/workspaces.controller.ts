@@ -20,6 +20,7 @@ import {
 import {
   createWorkspaceRequestSchema,
   updateWorkspaceRequestSchema,
+  workspaceTransitionRequestSchema,
   type WorkspaceSummary,
 } from '@witness/contracts';
 import { DomainError } from '@witness/domain';
@@ -114,6 +115,38 @@ export class WorkspacesController {
 
     try {
       return await this.workspaces.updateDetails(id, parsed.data, request.principal!);
+    } catch (error) {
+      if (error instanceof DomainError) {
+        throw new BadRequestException({
+          error: { code: error.code, message: error.message },
+        });
+      }
+      throw error;
+    }
+  }
+
+  /** Lifecycle transitions (recruit/activate/review/close/archive/reopen), one endpoint — see `sessions.controller.ts`'s identical shape. */
+  @Post(':workspaceId/transition')
+  @Requires('workspace:transition')
+  async transition(
+    @Param('workspaceId') id: string,
+    @Body() body: unknown,
+    @Req() request: RequestWithPrincipal,
+  ): Promise<WorkspaceSummary> {
+    const parsed = workspaceTransitionRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      throw new BadRequestException({
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: 'The transition is not valid.',
+          fields: parsed.error.flatten().fieldErrors,
+        },
+      });
+    }
+
+    try {
+      return await this.workspaces.transition(id, parsed.data, request.principal!);
     } catch (error) {
       if (error instanceof DomainError) {
         throw new BadRequestException({

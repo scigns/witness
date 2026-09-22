@@ -1550,13 +1550,47 @@ export const updateStorageQuotaRequestSchema = z.object({
 });
 export type UpdateStorageQuotaRequest = z.infer<typeof updateStorageQuotaRequestSchema>;
 
+export const WORKSPACE_STATUSES = [
+  'draft',
+  'recruiting',
+  'active',
+  'review',
+  'closed',
+  'archived',
+] as const;
+export type WorkspaceStatus = (typeof WORKSPACE_STATUSES)[number];
+
 export interface WorkspaceSummary {
   id: string;
   name: string;
   organisationId: string;
   description: string | null;
+  status: WorkspaceStatus;
   createdAt: string;
+  updatedAt: string;
+  /** Optimistic-concurrency counter; required by workspaceTransitionRequestSchema's expectedVersion. */
+  version: number;
 }
+
+/**
+ * Mirrors `sessionTransitionRequestSchema`: every workspace lifecycle move
+ * is a named action here, one endpoint, one place the rules live.
+ * `reopen` (closed -> active) is the only edge that requires a reason — see
+ * packages/domain/src/workspace.ts's `reopenWorkspace`.
+ */
+export const workspaceTransitionRequestSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('recruit'), expectedVersion: z.number().int().positive() }),
+  z.object({ action: z.literal('activate'), expectedVersion: z.number().int().positive() }),
+  z.object({ action: z.literal('review'), expectedVersion: z.number().int().positive() }),
+  z.object({ action: z.literal('close'), expectedVersion: z.number().int().positive() }),
+  z.object({ action: z.literal('archive'), expectedVersion: z.number().int().positive() }),
+  z.object({
+    action: z.literal('reopen'),
+    reason: z.string().trim().min(1, 'A reason is required').max(2000),
+    expectedVersion: z.number().int().positive(),
+  }),
+]);
+export type WorkspaceTransitionRequest = z.infer<typeof workspaceTransitionRequestSchema>;
 
 export interface UserSummary {
   id: string;

@@ -502,11 +502,17 @@ model Workspace {
   id          String  @id @db.Uuid
   name        String  @db.VarChar(200)
   description String? @db.VarChar(4000)
+  // Programme lifecycle (Phase 4F, ADR-0028) — draft/recruiting/active/
+  // review/closed/archived. See packages/domain/src/workspace.ts for the
+  // transition table.
+  status  String @default("draft") @db.VarChar(16)
+  version Int    @default(1)
 
   organisationId String       @map("organisation_id") @db.Uuid
   organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   memberships                  WorkspaceMembership[]
   roleAssignments              RoleAssignment[]

@@ -37,6 +37,7 @@ import {
   PersonCard,
   RoleBadge,
   SessionStatusBadge,
+  WorkspaceStatusBadge,
 } from '@/components/ui';
 
 const CAN_MANAGE_ROLES = new Set(['admin', 'facilitator']);
@@ -204,7 +205,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           <p className="text-sm text-[var(--color-ink-muted)]">
             {organisation === null ? 'A co-design program' : `Hosted by ${organisation.name}`}
           </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">{workspace.name}</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h1 className="text-3xl font-semibold tracking-tight">{workspace.name}</h1>
+            <WorkspaceStatusBadge status={workspace.status} />
+          </div>
         </div>
         {role !== null && (
           <div className="text-sm text-[var(--color-ink-muted)]">

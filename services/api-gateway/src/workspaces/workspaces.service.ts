@@ -7,22 +7,26 @@
  * happens here, before `createWorkspace` is ever called.
  */
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import {
   createActor,
   createAuditEvent,
   createWorkspace,
+  reopenWorkspace,
   toActorId,
   toAuditEventId,
   toOrganisationId,
   toWorkspaceId,
+  transitionWorkspace,
   updateWorkspaceDetails,
   type Actor,
   type Workspace,
+  type WorkspaceOutcome,
+  type WorkspaceStatus as DomainWorkspaceStatus,
 } from '@witness/domain';
-import type { WorkspaceSummary } from '@witness/contracts';
+import type { WorkspaceSummary, WorkspaceTransitionRequest } from '@witness/contracts';
 
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { sha256 } from '../infrastructure/hashing.js';
@@ -58,13 +62,7 @@ export class WorkspacesService {
       take: 200,
     });
 
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      organisationId: row.organisationId,
-      description: row.description,
-      createdAt: row.createdAt.toISOString(),
-    }));
+    return rows.map((row) => toSummary(toDomain(row)));
   }
 
   /** `null` means "unscoped — return everything" (the dev-header path). */
@@ -128,6 +126,8 @@ export class WorkspacesService {
           id: outcome.workspace.id,
           name: outcome.workspace.name,
           description: outcome.workspace.description,
+          status: outcome.workspace.status,
+          version: outcome.workspace.version,
           organisationId: outcome.workspace.organisationId,
           createdAt: outcome.workspace.createdAt,
         },
@@ -164,13 +164,7 @@ export class WorkspacesService {
       });
     });
 
-    return {
-      id: outcome.workspace.id,
-      name: outcome.workspace.name,
-      organisationId: outcome.workspace.organisationId,
-      description: outcome.workspace.description,
-      createdAt: outcome.workspace.createdAt.toISOString(),
-    };
+    return toSummary(outcome.workspace);
   }
 
   async updateDetails(
@@ -185,33 +179,90 @@ export class WorkspacesService {
       });
     }
 
-    const current: Workspace = {
-      id: toWorkspaceId(row.id),
-      organisationId: toOrganisationId(row.organisationId),
-      name: row.name,
-      description: row.description,
-      createdAt: row.createdAt,
-    };
-
+    const current = toDomain(row);
     const actor = await this.resolveActor(principal);
     const now = new Date();
-    const outcome = updateWorkspaceDetails(current, input, actor);
+    const outcome = updateWorkspaceDetails(current, input, actor, now);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.workspace.update({
-        where: { id: workspaceId },
-        data: { description: outcome.workspace.description },
+    await this.applyOutcome(workspaceId, row.version, outcome, now);
+
+    return toSummary(outcome.workspace);
+  }
+
+  /**
+   * Programme lifecycle transitions (Phase 4F, ADR-0028) — one endpoint,
+   * one place the rules live, mirroring `SessionsService.transition`'s
+   * shape. `reopen` requires a stated reason; every other action maps
+   * directly to `transitionWorkspace`'s target status.
+   */
+  async transition(
+    workspaceId: string,
+    action: WorkspaceTransitionRequest,
+    principal: Principal,
+  ): Promise<WorkspaceSummary> {
+    const row = await this.prisma.workspace.findUnique({ where: { id: workspaceId } });
+    if (row === null) {
+      throw new NotFoundException({
+        error: { code: 'WORKSPACE_NOT_FOUND', message: `No workspace with id '${workspaceId}'.` },
       });
-      await appendAuditEvent(tx, 'workspace', outcome.workspace.id, outcome.event, now);
-    });
+    }
 
-    return {
-      id: outcome.workspace.id,
-      name: outcome.workspace.name,
-      organisationId: outcome.workspace.organisationId,
-      description: outcome.workspace.description,
-      createdAt: outcome.workspace.createdAt.toISOString(),
+    const current = toDomain(row);
+    const actor = await this.resolveActor(principal);
+    const now = new Date();
+
+    const targetByAction: Record<Exclude<typeof action.action, 'reopen'>, DomainWorkspaceStatus> = {
+      recruit: 'recruiting',
+      activate: 'active',
+      review: 'review',
+      close: 'closed',
+      archive: 'archived',
     };
+
+    const outcome =
+      action.action === 'reopen'
+        ? reopenWorkspace(current, actor, action.reason, now)
+        : transitionWorkspace(current, actor, targetByAction[action.action], now);
+
+    await this.applyOutcome(workspaceId, action.expectedVersion, outcome, now);
+
+    return toSummary(outcome.workspace);
+  }
+
+  /**
+   * Write a domain outcome back conditioned on the version the caller last
+   * saw. `updateMany`'s `WHERE version = expected` inside the transaction
+   * makes a concurrent writer's change reject the whole request rather than
+   * silently overwrite it — same pattern as `SessionsService.applyOutcomes`.
+   */
+  private async applyOutcome(
+    workspaceId: string,
+    expectedVersion: number,
+    outcome: WorkspaceOutcome,
+    at: Date,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const result = await tx.workspace.updateMany({
+        where: { id: workspaceId, version: expectedVersion },
+        data: {
+          description: outcome.workspace.description,
+          status: outcome.workspace.status,
+          version: outcome.workspace.version,
+        },
+      });
+
+      if (result.count === 0) {
+        throw new ConflictException({
+          error: {
+            code: 'STALE_VERSION',
+            message:
+              'This programme was changed by someone else since you last loaded it. Reload and try again.',
+          },
+        });
+      }
+
+      await appendAuditEvent(tx, 'workspace', workspaceId, outcome.event, at);
+    });
   }
 
   /** Find or create the Actor row for a principal. */
@@ -242,4 +293,42 @@ export class WorkspacesService {
       displayName: created.displayName,
     });
   }
+}
+
+/** Raw `workspace` row shape needed by `toDomain` — a subset every query above selects. */
+interface WorkspaceRow {
+  id: string;
+  organisationId: string;
+  name: string;
+  description: string | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  version: number;
+}
+
+function toDomain(row: WorkspaceRow): Workspace {
+  return {
+    id: toWorkspaceId(row.id),
+    organisationId: toOrganisationId(row.organisationId),
+    name: row.name,
+    description: row.description,
+    status: row.status as DomainWorkspaceStatus,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    version: row.version,
+  };
+}
+
+function toSummary(workspace: Workspace): WorkspaceSummary {
+  return {
+    id: workspace.id,
+    name: workspace.name,
+    organisationId: workspace.organisationId,
+    description: workspace.description,
+    status: workspace.status,
+    createdAt: workspace.createdAt.toISOString(),
+    updatedAt: workspace.updatedAt.toISOString(),
+    version: workspace.version,
+  };
 }

@@ -29,7 +29,11 @@ import {
   type User,
   type WitnessRole,
 } from '@witness/domain';
-import type { CurrentUserView, UpdateOwnProfileRequest } from '@witness/contracts';
+import type {
+  CurrentUserView,
+  CurrentUserWorkspaceView,
+  UpdateOwnProfileRequest,
+} from '@witness/contracts';
 
 import type { Principal } from '../authz/authorization.port.js';
 import { PrismaService } from '../infrastructure/prisma.service.js';
@@ -439,7 +443,10 @@ export class AuthenticationService {
         name: m.workspace.name,
         organisationId: m.workspace.organisationId,
         description: m.workspace.description,
+        status: m.workspace.status as CurrentUserWorkspaceView['status'],
         createdAt: m.workspace.createdAt.toISOString(),
+        updatedAt: m.workspace.updatedAt.toISOString(),
+        version: m.workspace.version,
         // An organisation-scoped `RoleAssignment` grants its holder every
         // action the same tier would grant in any workspace under that
         // organisation (`RoleResolutionService.tiersForWorkspace` — an
@@ -477,7 +484,10 @@ export class AuthenticationService {
         name: w.name,
         organisationId: w.organisationId,
         description: w.description,
+        status: w.status as CurrentUserWorkspaceView['status'],
         createdAt: w.createdAt.toISOString(),
+        updatedAt: w.updatedAt.toISOString(),
+        version: w.version,
         role: cascadedRoleFor(w.organisationId),
       }));
 

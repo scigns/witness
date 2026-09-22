@@ -42,6 +42,7 @@ export type Action =
   | 'workspace:read'
   | 'workspace:create'
   | 'workspace:update'
+  | 'workspace:transition'
   | 'user:read'
   | 'user:create'
   | 'organisation_membership:read'

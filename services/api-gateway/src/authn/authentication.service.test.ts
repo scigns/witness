@@ -433,7 +433,10 @@ describe('AuthenticationService — sign-in and user mapping', () => {
         id: 'workspace-1',
         name: 'Workspace One',
         organisationId: 'org-1',
+        status: 'draft',
         createdAt: new Date(),
+        updatedAt: new Date(),
+        version: 1,
       },
     });
     // A role assignment for the organisation only — the workspace membership
@@ -491,7 +494,10 @@ describe('AuthenticationService — sign-in and user mapping', () => {
       name: 'Workspace One',
       organisationId: 'org-1',
       description: null,
+      status: 'draft',
       createdAt: new Date(),
+      updatedAt: new Date(),
+      version: 1,
     });
 
     const current = await service.getCurrentUser(INVITED_USER);
@@ -519,7 +525,10 @@ describe('AuthenticationService — sign-in and user mapping', () => {
         id: 'workspace-1',
         name: 'Workspace One',
         organisationId: 'org-1',
+        status: 'draft',
         createdAt: new Date(),
+        updatedAt: new Date(),
+        version: 1,
       },
     });
     roleAssignments.push(
@@ -561,7 +570,10 @@ describe('AuthenticationService — sign-in and user mapping', () => {
       name: 'Workspace One',
       organisationId: 'org-1',
       description: null,
+      status: 'draft',
       createdAt: new Date(),
+      updatedAt: new Date(),
+      version: 1,
     });
 
     const current = await service.getCurrentUser(INVITED_USER);
@@ -594,7 +606,10 @@ describe('AuthenticationService — sign-in and user mapping', () => {
         id: 'workspace-1',
         name: 'Workspace One',
         organisationId: 'org-1',
+        status: 'draft',
         createdAt: new Date(),
+        updatedAt: new Date(),
+        version: 1,
       },
     });
     roleAssignments.push({
@@ -634,7 +649,10 @@ describe('AuthenticationService — sign-in and user mapping', () => {
       name: 'Someone Else’s Workspace',
       organisationId: 'org-2',
       description: null,
+      status: 'draft',
       createdAt: new Date(),
+      updatedAt: new Date(),
+      version: 1,
     });
 
     const current = await service.getCurrentUser(INVITED_USER);

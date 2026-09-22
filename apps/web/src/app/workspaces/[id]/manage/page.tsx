@@ -21,11 +21,13 @@
  */
 
 import Link from 'next/link';
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useState, type FormEvent } from 'react';
 
 import type {
+  AffiliationType,
   AgendaItemView,
   CoDesignSessionSummary,
+  CreateWorkspaceInvitationRequest,
   MembershipAction,
   MembershipState,
   OrganisationMembershipView,
@@ -34,21 +36,55 @@ import type {
   RoleAssignmentView,
   RoleDefinition,
   WitnessRole,
+  WorkspaceInvitationView,
   WorkspaceMembershipView,
+  WorkspaceStatus,
   WorkspaceSummary,
+  WorkspaceTransitionRequest,
 } from '@witness/contracts';
+import { AFFILIATION_TYPES } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
 import { ProgramNav } from '@/components/program-nav';
 import {
+  AffiliationTag,
   Button,
   Card,
   ErrorNotice,
   MembershipStateBadge,
   RoleAssignmentControl,
+  WorkspaceInvitationStatusBadge,
+  WorkspaceStatusBadge,
 } from '@/components/ui';
+
+/**
+ * Mirrors `packages/domain/src/workspace.ts`'s `TRANSITIONS` table — for
+ * deciding which buttons to show only. The server re-validates every
+ * transition independently; a stale or hand-crafted client request gains
+ * nothing from this table being wrong.
+ */
+const WORKSPACE_TRANSITION_ACTIONS: Record<
+  WorkspaceStatus,
+  { action: Exclude<WorkspaceTransitionRequest['action'], 'reopen'>; label: string }[]
+> = {
+  draft: [
+    { action: 'recruit', label: 'Open for recruiting' },
+    { action: 'activate', label: 'Activate' },
+  ],
+  recruiting: [{ action: 'activate', label: 'Activate' }],
+  active: [
+    { action: 'review', label: 'Move to review' },
+    { action: 'close', label: 'Close' },
+  ],
+  review: [
+    { action: 'activate', label: 'Send back to active' },
+    { action: 'close', label: 'Close' },
+  ],
+  closed: [],
+  archived: [],
+};
 
 interface ReadinessRow {
   label: string;
@@ -92,6 +128,23 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
   const [agendaItems, setAgendaItems] = useState<AgendaItemView[]>([]);
   const [resources, setResources] = useState<ResourceView[]>([]);
   const [consentConfigured, setConsentConfigured] = useState(false);
+
+  const [invitations, setInvitations] = useState<WorkspaceInvitationView[]>([]);
+  const [invitationsUnavailable, setInvitationsUnavailable] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [inviteRole, setInviteRole] = useState('');
+  const [inviteAffiliationType, setInviteAffiliationType] =
+    useState<AffiliationType>('independent');
+  const [inviteAffiliationLabel, setInviteAffiliationLabel] = useState('');
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [inviteStatusMessage, setInviteStatusMessage] = useState<string | null>(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [invitationActionId, setInvitationActionId] = useState<string | null>(null);
+
+  const [transitionBusy, setTransitionBusy] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
+  const [showReopenForm, setShowReopenForm] = useState(false);
 
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
@@ -172,6 +225,29 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
             );
           }
         }
+
+        try {
+          const invitationsResult = await api.listWorkspaceInvitations(id, user);
+          if (cancelledRef.current) return;
+          setInvitations(invitationsResult);
+          setInvitationsUnavailable(false);
+        } catch (invitationsCaught) {
+          if (cancelledRef.current) return;
+          setInvitations([]);
+          // Same permission boundary as membership — `role_assignment:read`
+          // is admin-only, so a 403 here means "not your role", not "there
+          // are no invitations".
+          if (invitationsCaught instanceof ApiError && invitationsCaught.status === 403) {
+            setInvitationsUnavailable(true);
+          } else {
+            setInvitationsUnavailable(false);
+            setError(
+              invitationsCaught instanceof ApiError
+                ? invitationsCaught.message
+                : "Couldn't load this program's external collaborators.",
+            );
+          }
+        }
       } catch (caught) {
         if (cancelledRef.current) return;
         setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
@@ -243,6 +319,110 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const inviteExternalCollaborator = async (event: FormEvent) => {
+    event.preventDefault();
+    if (inviteRole === '') return;
+    setInviteBusy(true);
+    setError(null);
+    setInviteStatusMessage(null);
+    try {
+      const body: CreateWorkspaceInvitationRequest = {
+        invitedEmail: inviteEmail,
+        invitedName: inviteName.trim() === '' ? undefined : inviteName.trim(),
+        role: inviteRole as WitnessRole,
+        affiliationType: inviteAffiliationType,
+        affiliationLabel:
+          inviteAffiliationLabel.trim() === '' ? undefined : inviteAffiliationLabel.trim(),
+        message: inviteMessage.trim() === '' ? undefined : inviteMessage.trim(),
+      };
+      const invited = await api.createWorkspaceInvitation(id, body, user);
+      setInviteEmail('');
+      setInviteName('');
+      setInviteRole('');
+      setInviteAffiliationType('independent');
+      setInviteAffiliationLabel('');
+      setInviteMessage('');
+      setInviteStatusMessage(
+        `Invitation sent to ${invited.invitedEmail} as ${invited.role}. Delivery: ${invited.deliveryStatus}.`,
+      );
+      await load({ current: false });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
+  const resendInvitation = async (invitationId: string) => {
+    setInvitationActionId(invitationId);
+    setError(null);
+    try {
+      const result = await api.resendWorkspaceInvitation(id, invitationId, user);
+      setInviteStatusMessage(
+        `Invitation notification for ${result.invitedEmail}: ${result.deliveryStatus}.`,
+      );
+      await load({ current: false });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setInvitationActionId(null);
+    }
+  };
+
+  const revokeInvitation = async (invitationId: string) => {
+    setInvitationActionId(invitationId);
+    setError(null);
+    try {
+      await api.revokeWorkspaceInvitation(id, invitationId, user);
+      await load({ current: false });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setInvitationActionId(null);
+    }
+  };
+
+  const applyTransition = async (
+    action: Exclude<WorkspaceTransitionRequest['action'], 'reopen'>,
+  ) => {
+    if (workspace === null) return;
+    setTransitionBusy(true);
+    setError(null);
+    try {
+      const updated = await api.transitionWorkspace(
+        id,
+        { action, expectedVersion: workspace.version },
+        user,
+      );
+      setWorkspace(updated);
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setTransitionBusy(false);
+    }
+  };
+
+  const reopenProgramme = async (event: FormEvent) => {
+    event.preventDefault();
+    if (workspace === null || reopenReason.trim() === '') return;
+    setTransitionBusy(true);
+    setError(null);
+    try {
+      const updated = await api.transitionWorkspace(
+        id,
+        { action: 'reopen', reason: reopenReason.trim(), expectedVersion: workspace.version },
+        user,
+      );
+      setWorkspace(updated);
+      setReopenReason('');
+      setShowReopenForm(false);
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setTransitionBusy(false);
     }
   };
 
@@ -346,6 +526,76 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
       </div>
 
       <ProgramNav workspaceId={id} role={role} />
+
+      <section aria-labelledby="status-heading" className="space-y-3">
+        <h2 id="status-heading" className="text-lg font-semibold">
+          Programme status
+        </h2>
+        <Card className="space-y-3">
+          <p className="flex items-center gap-2 text-sm">
+            Currently <WorkspaceStatusBadge status={workspace.status} />
+          </p>
+          {workspace.status === 'closed' ? (
+            showReopenForm ? (
+              <form onSubmit={(event) => void reopenProgramme(event)} className="space-y-2">
+                <label htmlFor="reopenReason" className="block text-sm font-medium">
+                  Reason for reopening <span aria-hidden="true">*</span>
+                  <span className="sr-only">(required)</span>
+                </label>
+                <textarea
+                  id="reopenReason"
+                  required
+                  rows={2}
+                  maxLength={2000}
+                  value={reopenReason}
+                  onChange={(event) => setReopenReason(event.target.value)}
+                  placeholder="Why is this closed programme reopening?"
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2 text-sm"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={transitionBusy || reopenReason.trim() === ''}
+                  >
+                    {transitionBusy ? 'Reopening…' : 'Reopen programme'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={transitionBusy}
+                    onClick={() => setShowReopenForm(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <Button variant="secondary" onClick={() => setShowReopenForm(true)}>
+                Reopen programme
+              </Button>
+            )
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {WORKSPACE_TRANSITION_ACTIONS[workspace.status].map(({ action, label }) => (
+                <Button
+                  key={action}
+                  variant="secondary"
+                  disabled={transitionBusy}
+                  onClick={() => void applyTransition(action)}
+                >
+                  {transitionBusy ? 'Working…' : label}
+                </Button>
+              ))}
+              {workspace.status === 'archived' && (
+                <p className="text-sm text-[var(--color-ink-muted)]">
+                  Archived programmes are read-only and cannot transition further.
+                </p>
+              )}
+            </div>
+          )}
+        </Card>
+      </section>
 
       <section aria-labelledby="readiness-heading" className="space-y-3">
         <h2 id="readiness-heading" className="text-lg font-semibold">
@@ -500,6 +750,235 @@ export default function ManageWorkspacePage({ params }: { params: Promise<{ id: 
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="invite-external-heading">
+        <h2 id="invite-external-heading" className="mb-3 text-lg font-semibold">
+          Invite an external collaborator
+        </h2>
+        <Card className="space-y-4">
+          <p className="text-xs text-[var(--color-ink-muted)]">
+            For a facilitator, reviewer, or Knowledge Steward from outside{' '}
+            {organisation?.name ?? 'your organisation'} — an invitation scoped to this one
+            programme. It never adds them to {organisation?.name ?? 'your organisation'}.
+          </p>
+          {inviteStatusMessage !== null && (
+            <p className="text-sm text-[var(--color-ink)]" role="status">
+              {inviteStatusMessage}
+            </p>
+          )}
+          <form onSubmit={(event) => void inviteExternalCollaborator(event)} className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="inviteExternalEmail" className="mb-1 block text-sm font-medium">
+                  Email <span aria-hidden="true">*</span>
+                  <span className="sr-only">(required)</span>
+                </label>
+                <input
+                  id="inviteExternalEmail"
+                  type="email"
+                  required
+                  maxLength={320}
+                  value={inviteEmail}
+                  onChange={(event) => setInviteEmail(event.target.value)}
+                  placeholder="mele@example.org"
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                />
+              </div>
+              <div>
+                <label htmlFor="inviteExternalName" className="mb-1 block text-sm font-medium">
+                  Name
+                </label>
+                <input
+                  id="inviteExternalName"
+                  maxLength={200}
+                  value={inviteName}
+                  onChange={(event) => setInviteName(event.target.value)}
+                  placeholder="Mele Tupou"
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                />
+              </div>
+              <div>
+                <label htmlFor="inviteExternalRole" className="mb-1 block text-sm font-medium">
+                  Role <span aria-hidden="true">*</span>
+                  <span className="sr-only">(required)</span>
+                </label>
+                <select
+                  id="inviteExternalRole"
+                  required
+                  value={inviteRole}
+                  onChange={(event) => setInviteRole(event.target.value)}
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                >
+                  <option value="">Choose a role…</option>
+                  {roles.map((definition) => (
+                    <option
+                      key={definition.role}
+                      value={definition.role}
+                      title={definition.description}
+                    >
+                      {definition.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="inviteExternalAffiliationType"
+                  className="mb-1 block text-sm font-medium"
+                >
+                  Participating as
+                </label>
+                <select
+                  id="inviteExternalAffiliationType"
+                  value={inviteAffiliationType}
+                  onChange={(event) =>
+                    setInviteAffiliationType(event.target.value as AffiliationType)
+                  }
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                >
+                  {AFFILIATION_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {(inviteAffiliationType === 'organisation' ||
+                inviteAffiliationType === 'community') && (
+                <div className="sm:col-span-2">
+                  <label
+                    htmlFor="inviteExternalAffiliationLabel"
+                    className="mb-1 block text-sm font-medium"
+                  >
+                    {inviteAffiliationType === 'organisation'
+                      ? 'Organisation name'
+                      : 'Community name'}
+                  </label>
+                  <input
+                    id="inviteExternalAffiliationLabel"
+                    maxLength={300}
+                    value={inviteAffiliationLabel}
+                    onChange={(event) => setInviteAffiliationLabel(event.target.value)}
+                    placeholder={
+                      inviteAffiliationType === 'organisation'
+                        ? 'Pacific Water Trust'
+                        : 'Nukuʻalofa Youth Council'
+                    }
+                    className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                  />
+                </div>
+              )}
+              <div className="sm:col-span-2">
+                <label htmlFor="inviteExternalMessage" className="mb-1 block text-sm font-medium">
+                  Personal message
+                </label>
+                <textarea
+                  id="inviteExternalMessage"
+                  rows={2}
+                  maxLength={2000}
+                  value={inviteMessage}
+                  onChange={(event) => setInviteMessage(event.target.value)}
+                  placeholder="Optional — shown to the invitee before they accept."
+                  className="w-full rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
+                />
+              </div>
+            </div>
+            <Button type="submit" variant="primary" disabled={inviteBusy || inviteRole === ''}>
+              {inviteBusy ? 'Inviting…' : 'Send invitation'}
+            </Button>
+          </form>
+        </Card>
+      </section>
+
+      <section aria-labelledby="external-collaborators-heading">
+        <h2 id="external-collaborators-heading" className="mb-3 text-lg font-semibold">
+          External collaborators
+        </h2>
+        {invitationsUnavailable ? (
+          <Card>
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              External collaborator invitations aren&apos;t available to your role.
+            </p>
+          </Card>
+        ) : invitations.length === 0 ? (
+          <Card>
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              No external collaborators invited yet.
+            </p>
+          </Card>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left text-sm">
+              <caption className="sr-only">
+                External collaborator invitations and their status
+              </caption>
+              <thead>
+                <tr className="border-b border-[var(--color-line)]">
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Person
+                  </th>
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Role
+                  </th>
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Affiliation
+                  </th>
+                  <th scope="col" className="py-2 pr-4 font-medium">
+                    Status
+                  </th>
+                  <th scope="col" className="py-2 font-medium">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {invitations.map((invitation) => (
+                  <tr key={invitation.id} className="border-b border-[var(--color-line)]">
+                    <td className="py-3 pr-4">
+                      <div className="font-medium">
+                        {invitation.invitedName ?? invitation.invitedEmail}
+                      </div>
+                      <div className="text-xs text-[var(--color-ink-muted)]">
+                        {invitation.invitedEmail}
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4">{invitation.role}</td>
+                    <td className="py-3 pr-4">
+                      <AffiliationTag
+                        type={invitation.affiliationType}
+                        label={invitation.affiliationLabel}
+                      />
+                    </td>
+                    <td className="py-3 pr-4">
+                      <WorkspaceInvitationStatusBadge status={invitation.status} />
+                    </td>
+                    <td className="py-3">
+                      {invitation.status === 'pending' && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="secondary"
+                            disabled={invitationActionId === invitation.id}
+                            onClick={() => void resendInvitation(invitation.id)}
+                          >
+                            {invitationActionId === invitation.id ? 'Working…' : 'Resend'}
+                          </Button>
+                          <Button
+                            variant="danger"
+                            disabled={invitationActionId === invitation.id}
+                            onClick={() => void revokeInvitation(invitation.id)}
+                          >
+                            Revoke
+                          </Button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

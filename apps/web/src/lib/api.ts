@@ -93,6 +93,7 @@ import type {
   WithdrawParticipantConsentRequest,
   WorkspaceMembershipView,
   WorkspaceSummary,
+  WorkspaceTransitionRequest,
   CreateWorkspaceInvitationRequest,
   WorkspaceInvitationContextView,
   WorkspaceInvitationView,
@@ -455,6 +456,17 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
+
+  transitionWorkspace: (
+    workspaceId: string,
+    body: WorkspaceTransitionRequest,
+    user: ActingUser,
+  ): Promise<WorkspaceSummary> =>
+    request<WorkspaceSummary>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/transition`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
 
   listUsers: (user: ActingUser): Promise<{ users: UserSummary[] }> =>
     request<{ users: UserSummary[] }>('/api/v1/users', user),

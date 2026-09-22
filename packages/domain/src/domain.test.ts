@@ -47,8 +47,11 @@ import {
   toWorkspaceInvitationId,
   toWorkspaceMembershipId,
   transitionOrganisationMembership,
+  transitionWorkspace,
   transitionWorkspaceMembership,
+  reopenWorkspace,
   verifyChain,
+  HumanConfirmationRequired,
   type AuditEvent,
 } from './index.js';
 
@@ -170,6 +173,100 @@ describe('workspace', () => {
         createdAt: new Date('2026-03-14T11:00:00Z'),
       }),
     ).toThrow(/200/);
+  });
+
+  it('starts life in draft, at version 1', () => {
+    const outcome = createWorkspace({
+      id: toWorkspaceId('33333333-3333-4333-8333-333333333333'),
+      organisationId: ORGANISATION_ID,
+      name: 'Water Committee Programme',
+      createdBy: HUMAN,
+      createdAt: new Date('2026-03-14T11:00:00Z'),
+    });
+
+    expect(outcome.workspace.status).toBe('draft');
+    expect(outcome.workspace.version).toBe(1);
+  });
+
+  describe('lifecycle (Phase 4F, ADR-0028)', () => {
+    const draft = () =>
+      createWorkspace({
+        id: toWorkspaceId('33333333-3333-4333-8333-333333333333'),
+        organisationId: ORGANISATION_ID,
+        name: 'Water Committee Programme',
+        createdBy: HUMAN,
+        createdAt: new Date('2026-03-14T11:00:00Z'),
+      }).workspace;
+
+    it('permits draft -> recruiting -> active -> review -> closed -> archived', () => {
+      let current = draft();
+
+      current = transitionWorkspace(current, HUMAN, 'recruiting', new Date()).workspace;
+      expect(current.status).toBe('recruiting');
+      expect(current.version).toBe(2);
+
+      current = transitionWorkspace(current, HUMAN, 'active', new Date()).workspace;
+      expect(current.status).toBe('active');
+
+      current = transitionWorkspace(current, HUMAN, 'review', new Date()).workspace;
+      expect(current.status).toBe('review');
+
+      current = transitionWorkspace(current, HUMAN, 'closed', new Date()).workspace;
+      expect(current.status).toBe('closed');
+
+      current = transitionWorkspace(current, HUMAN, 'archived', new Date()).workspace;
+      expect(current.status).toBe('archived');
+      expect(current.version).toBe(6);
+    });
+
+    it('permits draft -> active directly, skipping recruiting', () => {
+      const outcome = transitionWorkspace(draft(), HUMAN, 'active', new Date());
+      expect(outcome.workspace.status).toBe('active');
+    });
+
+    it('permits review -> active (send back for more work)', () => {
+      let current = transitionWorkspace(draft(), HUMAN, 'active', new Date()).workspace;
+      current = transitionWorkspace(current, HUMAN, 'review', new Date()).workspace;
+      current = transitionWorkspace(current, HUMAN, 'active', new Date()).workspace;
+      expect(current.status).toBe('active');
+    });
+
+    it('rejects an archived -> anything transition', () => {
+      let current = transitionWorkspace(draft(), HUMAN, 'active', new Date()).workspace;
+      current = transitionWorkspace(current, HUMAN, 'closed', new Date()).workspace;
+      current = transitionWorkspace(current, HUMAN, 'archived', new Date()).workspace;
+
+      expect(() => transitionWorkspace(current, HUMAN, 'active', new Date())).toThrow(
+        /cannot move/i,
+      );
+    });
+
+    it('rejects closed -> active via transitionWorkspace — reopenWorkspace only', () => {
+      let current = transitionWorkspace(draft(), HUMAN, 'active', new Date()).workspace;
+      current = transitionWorkspace(current, HUMAN, 'closed', new Date()).workspace;
+
+      expect(() => transitionWorkspace(current, HUMAN, 'active', new Date())).toThrow(
+        /reopenWorkspace/,
+      );
+    });
+
+    it('reopenWorkspace requires a human actor and a stated reason', () => {
+      let current = transitionWorkspace(draft(), HUMAN, 'active', new Date()).workspace;
+      current = transitionWorkspace(current, HUMAN, 'closed', new Date()).workspace;
+
+      expect(() => reopenWorkspace(current, MODEL, 'because', new Date())).toThrow(
+        HumanConfirmationRequired,
+      );
+      expect(() => reopenWorkspace(current, HUMAN, '   ', new Date())).toThrow(/reason/i);
+
+      const outcome = reopenWorkspace(current, HUMAN, 'Community asked to continue', new Date());
+      expect(outcome.workspace.status).toBe('active');
+      expect(outcome.event.metadata['reason']).toBe('Community asked to continue');
+    });
+
+    it('rejects reopening a programme that is not closed', () => {
+      expect(() => reopenWorkspace(draft(), HUMAN, 'reason', new Date())).toThrow(/cannot reopen/i);
+    });
   });
 });
 

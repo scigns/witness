@@ -170,6 +170,7 @@ p, contributor, organisation:read
 p, contributor, invoice:read
 p, contributor, workspace:read
 p, contributor, workspace:update
+p, contributor, workspace:transition
 p, contributor, role:read
 p, contributor, session:read
 p, contributor, session:create
@@ -324,6 +325,7 @@ p, admin, platform_role:delete
 p, admin, workspace:read
 p, admin, workspace:create
 p, admin, workspace:update
+p, admin, workspace:transition
 p, admin, user:read
 p, admin, user:create
 p, admin, organisation_membership:read

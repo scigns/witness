@@ -28,6 +28,7 @@ import type {
   SessionStatus,
   WitnessRole,
   WorkspaceInvitationStatus,
+  WorkspaceStatus,
 } from '@witness/contracts';
 
 const STATE_LABELS: Record<ReviewState, string> = {
@@ -197,6 +198,35 @@ export function SessionStatusBadge({ status }: { status: SessionStatus }) {
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${SESSION_STATUS_CLASSES[status]}`}
     >
       {SESSION_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+const WORKSPACE_STATUS_LABELS: Record<WorkspaceStatus, string> = {
+  draft: 'Draft',
+  recruiting: 'Recruiting',
+  active: 'Active',
+  review: 'In review',
+  closed: 'Closed',
+  archived: 'Archived',
+};
+
+const WORKSPACE_STATUS_CLASSES: Record<WorkspaceStatus, string> = {
+  draft: 'border-current text-[var(--color-ink-muted)]',
+  recruiting: 'border-[var(--color-line)] text-[var(--color-ink)]',
+  active: 'border-[var(--color-attention)] text-[var(--color-ink)]',
+  review: 'border-[var(--color-line)] text-[var(--color-ink)]',
+  closed: 'border-current text-[var(--color-ink-muted)]',
+  archived: 'border-current text-[var(--color-ink-muted)]',
+};
+
+/** Programme lifecycle (Phase 4F, ADR-0028) — mirrors `SessionStatusBadge`'s styling exactly. */
+export function WorkspaceStatusBadge({ status }: { status: WorkspaceStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${WORKSPACE_STATUS_CLASSES[status]}`}
+    >
+      {WORKSPACE_STATUS_LABELS[status]}
     </span>
   );
 }

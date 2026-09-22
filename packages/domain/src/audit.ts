@@ -39,6 +39,7 @@ export const AUDIT_ACTIONS = [
   'entitlement.overridden',
   'workspace.created',
   'workspace.details_updated',
+  'workspace.status_changed',
   'user.created',
   'user.invited',
   'user.invitation_notification_sent',

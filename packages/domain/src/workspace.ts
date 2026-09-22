@@ -14,10 +14,21 @@
  * record cannot exist without provenance (P3). The domain trusts the caller that
  * the organisation exists; verifying that is an application-layer concern
  * (ADR-0003) because it requires a database read.
+ *
+ * `status` (Phase 4F, ADR-0028) names the programme's own lifecycle — draft
+ * (being set up), recruiting (open for participants/collaborators before
+ * work starts), active (running), review (wrapping up, evaluating
+ * outcomes), closed (finished), archived (closed and read-only long-term).
+ * This is deliberately a *separate* lifecycle from `CoDesignSession.status`
+ * (`co-design-session.ts`): a programme can be `active` across many
+ * sessions that individually cycle through draft/open/closed, and closing
+ * one session says nothing about whether the programme itself is done.
+ * Conflating the two would force every session to share the programme's
+ * pace, which co-design programmes with irregular workshop cadences do not.
  */
 
-import { InvariantViolation } from './errors.js';
-import type { Actor } from './actor.js';
+import { HumanConfirmationRequired, InvariantViolation } from './errors.js';
+import { isHuman, type Actor } from './actor.js';
 import type { PendingAuditEvent } from './audit.js';
 import type { OrganisationId, WorkspaceId } from './ids.js';
 
@@ -26,6 +37,41 @@ const NAME_MAX = 200;
 
 /** The maximum length of a workspace's descriptive "about" text. */
 const DESCRIPTION_MAX = 4000;
+
+export const WORKSPACE_STATUSES = [
+  'draft',
+  'recruiting',
+  'active',
+  'review',
+  'closed',
+  'archived',
+] as const;
+export type WorkspaceStatus = (typeof WORKSPACE_STATUSES)[number];
+
+/**
+ * Permitted lifecycle transitions. `closed -> active` (reopen) requires a
+ * human actor and a stated reason via `reopenWorkspace` below — the same
+ * "institutional decision reversal" guardrail as
+ * `co-design-session.ts`'s `reopenSession` and `record.ts`'s
+ * `reopenRecord` — so it is deliberately absent from this table and
+ * `transitionWorkspace` rejects it. `archived` is terminal.
+ */
+const TRANSITIONS: Readonly<Record<WorkspaceStatus, readonly WorkspaceStatus[]>> = Object.freeze({
+  draft: ['recruiting', 'active'],
+  recruiting: ['active'],
+  active: ['review', 'closed'],
+  review: ['active', 'closed'],
+  closed: ['archived'],
+  archived: [],
+});
+
+export function canTransitionWorkspace(from: WorkspaceStatus, to: WorkspaceStatus): boolean {
+  return TRANSITIONS[from].includes(to);
+}
+
+export function permittedWorkspaceTransitions(from: WorkspaceStatus): readonly WorkspaceStatus[] {
+  return TRANSITIONS[from];
+}
 
 export interface Workspace {
   readonly id: WorkspaceId;
@@ -39,7 +85,11 @@ export interface Workspace {
    * nothing.
    */
   readonly description: string | null;
+  readonly status: WorkspaceStatus;
   readonly createdAt: Date;
+  readonly updatedAt: Date;
+  /** Optimistic-concurrency counter; bumped on every mutation. */
+  readonly version: number;
 }
 
 export interface WorkspaceOutcome {
@@ -102,7 +152,10 @@ export function createWorkspace(input: {
     organisationId: input.organisationId,
     name: assertName(input.name),
     description: assertDescription(input.description ?? null),
+    status: 'draft',
     createdAt: input.createdAt,
+    updatedAt: input.createdAt,
+    version: 1,
   };
 
   return {
@@ -126,11 +179,17 @@ export function updateWorkspaceDetails(
   workspace: Workspace,
   input: { description?: string | null },
   updatedBy: Actor,
+  at: Date,
 ): WorkspaceOutcome {
   const description =
     input.description === undefined ? workspace.description : assertDescription(input.description);
 
-  const updated: Workspace = { ...workspace, description };
+  const updated: Workspace = {
+    ...workspace,
+    description,
+    updatedAt: at,
+    version: workspace.version + 1,
+  };
 
   return {
     workspace: updated,
@@ -138,6 +197,95 @@ export function updateWorkspaceDetails(
       action: 'workspace.details_updated',
       actor: updatedBy,
       metadata: { description: updated.description ?? '' },
+    },
+  };
+}
+
+/**
+ * Move a programme forward (or one step back) through its lifecycle —
+ * every edge in `TRANSITIONS` except `closed -> active`, which
+ * `reopenWorkspace` below handles under a stricter guard.
+ */
+export function transitionWorkspace(
+  workspace: Workspace,
+  actor: Actor,
+  to: WorkspaceStatus,
+  at: Date,
+): WorkspaceOutcome {
+  if (workspace.status === 'closed' && to === 'active') {
+    throw new InvariantViolation(
+      'Reopening a closed programme requires a stated reason — use reopenWorkspace.',
+      'INVALID_WORKSPACE_TRANSITION',
+    );
+  }
+
+  if (!canTransitionWorkspace(workspace.status, to)) {
+    throw new InvariantViolation(
+      `Cannot move a programme from '${workspace.status}' to '${to}'.`,
+      'INVALID_WORKSPACE_TRANSITION',
+    );
+  }
+
+  const next: Workspace = {
+    ...workspace,
+    status: to,
+    updatedAt: at,
+    version: workspace.version + 1,
+  };
+
+  return {
+    workspace: next,
+    event: {
+      action: 'workspace.status_changed',
+      actor,
+      metadata: { from: workspace.status, to },
+    },
+  };
+}
+
+/**
+ * Reopen a closed programme. Requires a human actor and a stated reason —
+ * this reverses "the programme is finished," an institutional decision
+ * exactly like `co-design-session.ts`'s `reopenSession`.
+ */
+export function reopenWorkspace(
+  workspace: Workspace,
+  actor: Actor,
+  reason: string,
+  at: Date,
+): WorkspaceOutcome {
+  if (!isHuman(actor)) {
+    throw new HumanConfirmationRequired(actor.kind);
+  }
+
+  if (workspace.status !== 'closed') {
+    throw new InvariantViolation(
+      `Cannot reopen a programme from '${workspace.status}'.`,
+      'INVALID_WORKSPACE_TRANSITION',
+    );
+  }
+
+  const trimmedReason = reason.trim();
+  if (trimmedReason.length === 0) {
+    throw new InvariantViolation(
+      'Reopening a closed programme must state a reason — this reverses that the programme had ended.',
+      'REOPEN_REASON_REQUIRED',
+    );
+  }
+
+  const next: Workspace = {
+    ...workspace,
+    status: 'active',
+    updatedAt: at,
+    version: workspace.version + 1,
+  };
+
+  return {
+    workspace: next,
+    event: {
+      action: 'workspace.status_changed',
+      actor,
+      metadata: { from: 'closed', to: 'active', reason: trimmedReason },
     },
   };
 }
