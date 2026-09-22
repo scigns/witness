@@ -15,6 +15,7 @@ import {
   addWorkspaceMember,
   toUserId,
   toWorkspaceId,
+  toWorkspaceInvitationId,
   toWorkspaceMembershipId,
   transitionWorkspaceMembership,
   type MembershipState,
@@ -145,6 +146,14 @@ export class WorkspaceMembershipsService {
       workspaceId: toWorkspaceId(row.workspaceId),
       userId: toUserId(row.userId),
       state: row.state as MembershipState,
+      // An external collaborator's membership (ADR-0028) goes through this
+      // same transition path (e.g. an admin revoking their access) — read
+      // the real row rather than assuming null, unlike the assignment
+      // converters, which only ever handle internally-created rows.
+      affiliationType: row.affiliationType as WorkspaceMembership['affiliationType'],
+      affiliationLabel: row.affiliationLabel,
+      viaInvitationId:
+        row.viaInvitationId === null ? null : toWorkspaceInvitationId(row.viaInvitationId),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };

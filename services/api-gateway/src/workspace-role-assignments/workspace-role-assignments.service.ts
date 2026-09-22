@@ -208,6 +208,10 @@ function toDomainAssignment(
     userId: toUserId(userId),
     role: row.role as WitnessRole,
     scope,
+    // This service is the internal, organisation-membership-gated path
+    // only — external grants are created exclusively through
+    // WorkspaceInvitationsService (ADR-0028), never through here.
+    viaInvitationId: null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

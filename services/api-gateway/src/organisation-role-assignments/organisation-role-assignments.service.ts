@@ -179,6 +179,10 @@ function toDomainAssignment(
     userId: toUserId(userId),
     role: row.role as WitnessRole,
     scope,
+    // Organisation-scoped assignments are never granted through an external
+    // workspace invitation (ADR-0028 — that path only ever produces
+    // workspace-scoped assignments), so this is always null here.
+    viaInvitationId: null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

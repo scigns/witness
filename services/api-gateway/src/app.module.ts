@@ -93,6 +93,11 @@ import { WorkspaceMembershipsController } from './workspace-memberships/workspac
 import { WorkspaceMembershipsService } from './workspace-memberships/workspace-memberships.service.js';
 import { WorkspaceRoleAssignmentsController } from './workspace-role-assignments/workspace-role-assignments.controller.js';
 import { WorkspaceRoleAssignmentsService } from './workspace-role-assignments/workspace-role-assignments.service.js';
+import {
+  WorkspaceInvitationsController,
+  WorkspaceInvitationTokenController,
+} from './workspace-invitations/workspace-invitations.controller.js';
+import { WorkspaceInvitationsService } from './workspace-invitations/workspace-invitations.service.js';
 import { WorkspacesController } from './workspaces/workspaces.controller.js';
 import { WorkspacesService } from './workspaces/workspaces.service.js';
 import { KnowledgeDomainsController } from './knowledge/knowledge-domains.controller.js';
@@ -126,6 +131,8 @@ import { MailerService } from './infrastructure/mailer.js';
     RolesController,
     OrganisationRoleAssignmentsController,
     WorkspaceRoleAssignmentsController,
+    WorkspaceInvitationsController,
+    WorkspaceInvitationTokenController,
     SessionsController,
     ParticipantsController,
     ConsentTemplatesController,
@@ -182,6 +189,7 @@ import { MailerService } from './infrastructure/mailer.js';
     WorkspaceMembershipsService,
     OrganisationRoleAssignmentsService,
     WorkspaceRoleAssignmentsService,
+    WorkspaceInvitationsService,
     SessionsService,
     ParticipantsService,
     ConsentTemplatesService,
