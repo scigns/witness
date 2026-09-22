@@ -19,10 +19,12 @@ import { loadConfigOrExit } from '@witness/config';
 
 import { AppModule } from './app.module.js';
 import { BUILD_INFO } from './build-info.js';
+import { loadRootEnv } from './infrastructure/load-root-env.js';
 import { StructuredLogger } from './observability/structured-logger.js';
 import { csrfOriginProtection } from './authn/csrf-origin.js';
 
 async function bootstrap(): Promise<void> {
+  loadRootEnv();
   const config = loadConfigOrExit();
 
   const levels =

@@ -118,6 +118,21 @@ Runs the API and the web application together.
 Open <http://localhost:3000>. You should see the dashboard with system status, three seeded records,
 and a list of what this build does not implement.
 
+> **API config layering.** `services/api-gateway` reads `DATABASE_URL` and everything else it needs
+> straight from this repo's root `.env` — nothing needs manual exporting first
+> (`src/infrastructure/load-root-env.ts`, gap-filling only; a real deployment's own platform-set
+> environment variables always win).
+>
+> **Web config layering.** The web app is different on purpose: `NEXT_PUBLIC_*` values get baked into
+> the browser bundle, so pointing it at the root `.env` risks a real footgun on a machine where that
+> file legitimately targets a real deployment for other reasons (ops work on the same checkout, say).
+> `pnpm --filter @witness/web dev` never needs the root `.env` — its defaults are already
+> `http://localhost:3001`. If you ever need to change that, put the override in
+> `apps/web/.env.local` (copy from `apps/web/.env.local.example`; git-ignored), never in the root
+> `.env`. A development build refuses to start against a non-local API URL unless
+> `NEXT_PUBLIC_WITNESS_ALLOW_REMOTE_DEV_API` is explicitly set in that same local file — see
+> `apps/web/src/lib/runtime-config.ts`.
+
 ### Try the workflow
 
 1. **Capture** → fill the form. The source description and date are required — a record without
