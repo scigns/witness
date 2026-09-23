@@ -25,6 +25,7 @@ export * from './workspace-membership.js';
 export * from './role.js';
 export * from './role-assignment.js';
 export * from './workspace-invitation.js';
+export * from './session-join-link.js';
 export * from './identity-link.js';
 export * from './co-design-session.js';
 export * from './session-participant.js';

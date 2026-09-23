@@ -86,6 +86,11 @@ import { SessionConsentConfigurationController } from './session-consent-configu
 import { SessionConsentConfigurationService } from './session-consent-configuration/session-consent-configuration.service.js';
 import { SessionsController } from './sessions/sessions.controller.js';
 import { SessionsService } from './sessions/sessions.service.js';
+import {
+  SessionJoinController,
+  SessionJoinLinksController,
+} from './session-join/session-join.controller.js';
+import { SessionJoinService } from './session-join/session-join.service.js';
 import { WITNESS_CONFIG } from './tokens.js';
 import { UsersController } from './users/users.controller.js';
 import { UsersService } from './users/users.service.js';
@@ -135,6 +140,8 @@ import { MailerService } from './infrastructure/mailer.js';
     WorkspaceInvitationTokenController,
     SessionsController,
     ParticipantsController,
+    SessionJoinLinksController,
+    SessionJoinController,
     ConsentTemplatesController,
     SessionConsentConfigurationController,
     ParticipantConsentRecordsController,
@@ -192,6 +199,7 @@ import { MailerService } from './infrastructure/mailer.js';
     WorkspaceInvitationsService,
     SessionsService,
     ParticipantsService,
+    SessionJoinService,
     ConsentTemplatesService,
     ConsentPolicyService,
     SessionConsentConfigurationService,

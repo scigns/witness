@@ -175,6 +175,9 @@ model Organisation {
   // External-collaborator workspace invitations (ADR-0028).
   workspaceInvitations WorkspaceInvitation[]
 
+  // Governed QR/link session joining (Phase 5, Workstream 1.6).
+  sessionJoinLinks SessionJoinLink[]
+
   @@map("organisation")
 }
 
@@ -545,6 +548,9 @@ model Workspace {
   // External-collaborator workspace invitations (ADR-0028).
   workspaceInvitations WorkspaceInvitation[]
 
+  // Governed QR/link session joining (Phase 5, Workstream 1.6).
+  sessionJoinLinks SessionJoinLink[]
+
   @@index([organisationId])
   @@map("workspace")
 }
@@ -584,6 +590,7 @@ model User {
   workspaceInvitationsSent     WorkspaceInvitation[] @relation("WorkspaceInvitationInviter")
   workspaceInvitationsAccepted WorkspaceInvitation[] @relation("WorkspaceInvitationAcceptedBy")
   invitationNotifications   InvitationNotification[]
+  sessionJoinLinksCreated   SessionJoinLink[]
 
   @@index([accountState])
   @@map("witness_user")
@@ -959,6 +966,7 @@ model CoDesignSession {
   summary                   SessionSummary?
   agendaItems               AgendaItem[]
   resources                 Resource[]
+  joinLinks                 SessionJoinLink[]
 
   @@index([organisationId])
   @@index([workspaceId, status])
@@ -1022,11 +1030,104 @@ model SessionParticipant {
 
   consentRecords ParticipantConsentRecord[]
   evidence       Evidence[]
+  joinAttempts   SessionJoinAttempt[]
 
   @@index([sessionId])
   @@index([workspaceId])
   @@index([linkedUserId])
   @@map("session_participant")
+}
+
+/// A governed, session-scoped join credential (Phase 5, Workstream 1.6) — how
+/// a participant with no prior standing in the workspace gets a
+/// `SessionParticipant` row without a facilitator adding them by hand.
+/// Deliberately session-scoped, never workspace- or programme-wide: a QR
+/// code printed for one session must not double as a standing credential
+/// for every other session the workspace ever runs.
+///
+/// Mirrors `WorkspaceInvitation`'s token discipline (only `tokenHash` is ever
+/// persisted; the raw token lives in the URL/QR image only) but differs in
+/// shape: a `WorkspaceInvitation` is single-use and single-target, while a
+/// `SessionJoinLink` is a standing, multi-use credential — the same QR poster
+/// is scanned by every participant in the room over the life of the session.
+/// `governanceMode` is read from this row at join time, never from anything
+/// the joining client supplies, so a governance mode cannot be tampered with
+/// by crafting a request — see `packages/domain/src/session-join-link.ts`.
+model SessionJoinLink {
+  id             String       @id @db.Uuid
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  /// One of `SESSION_JOIN_GOVERNANCE_MODES`: invited_only | verified_guest |
+  /// pseudonymous | anonymous.
+  governanceMode String @map("governance_mode") @db.VarChar(16)
+
+  /// SHA-256 hash of a random token, same discipline as
+  /// `WorkspaceInvitation.tokenHash` — a database read alone cannot
+  /// reconstruct a usable join link.
+  tokenHash String @map("token_hash") @db.VarChar(64)
+
+  /// One of `SESSION_JOIN_LINK_STATUSES`: active | revoked | expired.
+  status String @default("active") @db.VarChar(16)
+
+  createdByUserId String @map("created_by_user_id") @db.Uuid
+  createdBy       User   @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  /// Optional volume cap (e.g. "this room seats 60") — separate from the
+  /// per-window rate limit enforced in `SessionJoinAttempt`, which guards
+  /// against a burst, not a total.
+  maxUses  Int? @map("max_uses")
+  useCount Int  @default(0) @map("use_count")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  attempts SessionJoinAttempt[]
+
+  @@index([sessionId])
+  @@index([workspaceId])
+  @@map("session_join_link")
+}
+
+/// One join transaction against a `SessionJoinLink` — exists purely so a
+/// join can be idempotent (retrying a flaky mobile network must not create a
+/// second `SessionParticipant`) and rate-limitable (count recent rows in a
+/// trailing window) without adding join-mechanism fields to
+/// `SessionParticipant` itself, which has no other reason to know how a
+/// participant arrived.
+model SessionJoinAttempt {
+  id String @id @db.Uuid
+
+  joinLinkId String          @map("join_link_id") @db.Uuid
+  joinLink   SessionJoinLink @relation(fields: [joinLinkId], references: [id], onDelete: Cascade)
+
+  /// Client-generated UUID, same idempotency-key convention as
+  /// `apps/web/src/lib/offline-queue.ts`'s `clientRequestId` — a retry of the
+  /// exact same join resolves to the same participant rather than creating a
+  /// duplicate.
+  clientRequestId String @map("client_request_id") @db.Uuid
+
+  participantId String?             @map("participant_id") @db.Uuid
+  participant   SessionParticipant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
+
+  /// SHA-256 of the requesting IP, never the IP itself — enough to notice
+  /// abuse from one source without persisting a raw client IP indefinitely.
+  ipHash String? @map("ip_hash") @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([joinLinkId, clientRequestId])
+  @@index([joinLinkId, createdAt])
+  @@map("session_join_attempt")
 }
 
 /// A versioned, organisation-defined consent statement (BUILD_ROADMAP.md

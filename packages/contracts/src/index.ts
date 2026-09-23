@@ -732,6 +732,89 @@ export type SessionParticipantTransitionRequest = z.infer<
   typeof sessionParticipantTransitionRequestSchema
 >;
 
+// ─── Governed QR/link session joining (Phase 5, Workstream 1.6) ───────────────
+// Mirrors @witness/domain's `SessionJoinGovernanceMode`/`SessionJoinLinkStatus`,
+// kept as separate literals here per this package's deliberate independence
+// from the GPL domain package (see file header).
+
+export const SESSION_JOIN_GOVERNANCE_MODES = [
+  'invited_only',
+  'verified_guest',
+  'pseudonymous',
+  'anonymous',
+] as const;
+export type SessionJoinGovernanceMode = (typeof SESSION_JOIN_GOVERNANCE_MODES)[number];
+
+export const SESSION_JOIN_LINK_STATUSES = ['active', 'revoked', 'expired'] as const;
+export type SessionJoinLinkStatus = (typeof SESSION_JOIN_LINK_STATUSES)[number];
+
+export const createSessionJoinLinkRequestSchema = z.object({
+  governanceMode: z.enum(SESSION_JOIN_GOVERNANCE_MODES, {
+    message: 'A recognised governance mode is required',
+  }),
+  expiresInMinutes: z
+    .number()
+    .int()
+    .min(5)
+    .max(60 * 24 * 14),
+  maxUses: z.number().int().positive().optional(),
+});
+export type CreateSessionJoinLinkRequest = z.infer<typeof createSessionJoinLinkRequestSchema>;
+
+/** Administrator-facing roster row. Never carries the raw token; only `token` at creation time (see `SessionJoinLinkCreatedView`). */
+export interface SessionJoinLinkView {
+  id: string;
+  sessionId: string;
+  governanceMode: SessionJoinGovernanceMode;
+  status: SessionJoinLinkStatus;
+  createdByDisplayName: string;
+  createdAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  maxUses: number | null;
+  useCount: number;
+}
+
+/** Returned once, at creation — the only moment the raw token/join URL is ever available. */
+export interface SessionJoinLinkCreatedView extends SessionJoinLinkView {
+  token: string;
+  joinPath: string;
+}
+
+/**
+ * What a scanning client sees before joining (PART 1.5/1.6: full context up
+ * front). Reachable without authentication — token possession alone is
+ * enough to view this, though never enough to join in `invited_only` or
+ * `verified_guest` mode without a matching signed-in session.
+ */
+export interface SessionJoinContextView {
+  organisationName: string;
+  workspaceName: string;
+  sessionId: string;
+  sessionTitle: string;
+  facilitatorDisplayName: string;
+  governanceMode: SessionJoinGovernanceMode;
+  status: SessionJoinLinkStatus;
+  sessionStatus: string;
+  expiresAt: string;
+  requiresSignIn: boolean;
+  requiresDisplayName: boolean;
+}
+
+export const joinSessionRequestSchema = z.object({
+  clientRequestId: z.string().uuid('A valid client request id is required'),
+  displayName: z.string().trim().min(1).max(200).optional(),
+});
+export type JoinSessionRequest = z.infer<typeof joinSessionRequestSchema>;
+
+export interface JoinSessionResult {
+  participantId: string;
+  sessionId: string;
+  workspaceId: string;
+  identityMode: ParticipantIdentityMode;
+  displayName: string;
+}
+
 // ─── Consent management (BUILD_ROADMAP.md Milestone 4) ────────────────────────
 
 /**

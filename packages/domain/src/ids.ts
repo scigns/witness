@@ -32,6 +32,9 @@ export type WorkspaceInvitationId = Branded<string, 'WorkspaceInvitationId'>;
 export type IdentityLinkId = Branded<string, 'IdentityLinkId'>;
 export type CoDesignSessionId = Branded<string, 'CoDesignSessionId'>;
 export type SessionParticipantId = Branded<string, 'SessionParticipantId'>;
+/** Phase 5, Workstream 1.6 — governed QR/link session joining. */
+export type SessionJoinLinkId = Branded<string, 'SessionJoinLinkId'>;
+export type SessionJoinAttemptId = Branded<string, 'SessionJoinAttemptId'>;
 export type ConsentTemplateId = Branded<string, 'ConsentTemplateId'>;
 export type SessionConsentConfigurationId = Branded<string, 'SessionConsentConfigurationId'>;
 export type ParticipantConsentRecordId = Branded<string, 'ParticipantConsentRecordId'>;
@@ -139,6 +142,16 @@ export function toWorkspaceInvitationId(value: string): WorkspaceInvitationId {
 export function toIdentityLinkId(value: string): IdentityLinkId {
   assertUuid(value, 'IdentityLinkId');
   return value as IdentityLinkId;
+}
+
+export function toSessionJoinLinkId(value: string): SessionJoinLinkId {
+  assertUuid(value, 'SessionJoinLinkId');
+  return value as SessionJoinLinkId;
+}
+
+export function toSessionJoinAttemptId(value: string): SessionJoinAttemptId {
+  assertUuid(value, 'SessionJoinAttemptId');
+  return value as SessionJoinAttemptId;
 }
 
 export function toCoDesignSessionId(value: string): CoDesignSessionId {
