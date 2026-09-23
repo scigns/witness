@@ -343,4 +343,19 @@ export class Neo4jGraphRepository extends GraphRepository {
   async close(): Promise<void> {
     await this.driver.close();
   }
+
+  /**
+   * Liveness probe for the health endpoint — mirrors
+   * `PrismaService.ping()`'s exact shape (round-trip milliseconds, throws
+   * on failure rather than returning a boolean) so the two read identically
+   * in `HealthController`. Uses the driver's own connectivity check rather
+   * than a Cypher query: it needs no open session, no read/write access
+   * mode, and no tenant scope, which a real query would otherwise require
+   * one of.
+   */
+  async ping(): Promise<number> {
+    const started = Date.now();
+    await this.driver.verifyConnectivity();
+    return Date.now() - started;
+  }
 }

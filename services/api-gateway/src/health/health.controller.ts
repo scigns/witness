@@ -23,6 +23,7 @@ import type { WitnessConfig } from '@witness/config';
 
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { BUILD_INFO } from '../build-info.js';
+import { KnowledgeGraphQueryService } from '../knowledge/knowledge-graph-query.service.js';
 import { WITNESS_CONFIG } from '../tokens.js';
 
 /**
@@ -37,8 +38,6 @@ import { WITNESS_CONFIG } from '../tokens.js';
 const NOT_IMPLEMENTED: readonly string[] = [
   'Speaker diarisation — transcription itself is local and working; ' +
     'per-speaker attribution within one recording is deferred (Phase 3)',
-  'Knowledge graph projection (Phase 4)',
-  'Event-driven projection rebuild (Phase 4)',
   'Hybrid/vector search — plain scoped text search across sessions, evidence, ' +
     'transcripts, summaries and outcomes is implemented (Phase 6)',
   'PDF export — HTML, Markdown, JSON and CSV are implemented (Milestone 8)',
@@ -52,6 +51,7 @@ export class HealthController {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly knowledgeGraph: KnowledgeGraphQueryService,
     @Inject(WITNESS_CONFIG) private readonly config: WitnessConfig,
   ) {}
 
@@ -93,7 +93,7 @@ export class HealthController {
     // Reported as not_configured rather than omitted. An operator reading this
     // should see that these are known parts of the architecture that this build
     // does not use yet, not wonder whether the check is missing.
-    components['neo4j'] = { status: 'not_configured', detail: 'Graph projection — Phase 4' };
+    components['neo4j'] = await this.checkNeo4j();
     components['opensearch'] = { status: 'not_configured', detail: 'Lexical index — Phase 6' };
     components['keycloak'] = await this.checkIdentityProvider();
     components['ollama'] = await this.checkLocalLlm();
@@ -174,6 +174,34 @@ export class HealthController {
             latencyMs: Date.now() - started,
           }
         : { status: 'down', detail: `Ollama returned HTTP ${response.status}` };
+    } catch (error) {
+      return {
+        status: 'down',
+        detail: `Unreachable: ${error instanceof Error ? error.message.slice(0, 120) : 'unknown'}`,
+      };
+    }
+  }
+
+  /**
+   * Real reachability, same reasoning as `checkLocalLlm` — a deployment
+   * that has opted into the Evidence Knowledge Graph (Phase 5F) depends on
+   * this being up, and a readiness probe that says "ok" while the graph is
+   * actually unreachable is worse than no check. `not_configured` (never
+   * attempts a connection) is the honest answer for every deployment that
+   * has not opted in yet — most of them, today.
+   */
+  private async checkNeo4j(): Promise<HealthComponent> {
+    if (!this.knowledgeGraph.isConfigured()) {
+      return { status: 'not_configured', detail: 'Evidence Knowledge Graph (ADR-0011, ADR-0026)' };
+    }
+
+    try {
+      const latencyMs = await this.knowledgeGraph.ping();
+      return {
+        status: latencyMs < 1000 ? 'ok' : 'degraded',
+        detail: 'Evidence Knowledge Graph (ADR-0011, ADR-0026)',
+        latencyMs,
+      };
     } catch (error) {
       return {
         status: 'down',

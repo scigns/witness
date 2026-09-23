@@ -43,6 +43,22 @@ export class KnowledgeGraphQueryService implements OnModuleDestroy {
     return this.repository;
   }
 
+  /**
+   * Whether this deployment has Neo4j settings at all — most, today, do
+   * not (Phase 5F is the first one that does). `HealthController` uses
+   * this to tell "the graph is genuinely unreachable" (`ping()` throws)
+   * apart from "this deployment doesn't use the graph" (`not_configured`,
+   * never attempts a connection).
+   */
+  isConfigured(): boolean {
+    return (process.env['NEO4J_URI'] ?? '').trim() !== '';
+  }
+
+  /** Liveness probe for the health endpoint — see `Neo4jGraphRepository.ping()`. */
+  async ping(): Promise<number> {
+    return this.getRepository().ping();
+  }
+
   async neighbourhood(
     organisationId: string,
     workspaceId: string,

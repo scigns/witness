@@ -129,6 +129,57 @@ services:
       retries: 20
       start_period: 60s
 
+  # ── Evidence Knowledge Graph (ADR-0011, ADR-0026, Phase 5F) ────────────────
+  # Off by default: this service, `graph-projector` below, and the api
+  # container's NEO4J_* vars are all additive — a pilot that never sets
+  # NEO4J_PASSWORD runs exactly as it did before this section existed
+  # (api-gateway's KnowledgeGraphQueryService connects lazily and only on
+  # first actual graph query; HealthController reports `not_configured`
+  # rather than attempting one — see services/api-gateway/src/health/
+  # health.controller.ts). Bringing the graph online for an already-running
+  # pilot is a deliberate, one-time operator action — see
+  # docs/operations/KNOWLEDGE_GRAPH_PRODUCTION_RUNBOOK.md — never something
+  # this file or scripts/pilot/deploy.sh starts on its own; deploy.sh only
+  # ever recreates `api`/`web` (see that script's own `up -d` line).
+  neo4j:
+    <<: *common
+    image: neo4j:5-community
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?NEO4J_PASSWORD must be set}
+      NEO4J_server_memory_heap_max__size: ${NEO4J_HEAP:-2G}
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4j-data:/data
+    # No `ports:` — same reasoning as `postgres` above: reachable only from
+    # this compose network. `api` (read-only traversal) and `graph-projector`
+    # (the only writer, ADR-0011) are the only two services with any reason
+    # to reach it, and both already share this network by being in this file.
+    mem_limit: ${NEO4J_MEM_LIMIT:-3g}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  graph-projector:
+    <<: *common
+    build:
+      context: ../..
+      dockerfile: workers/graph-projector/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      NEO4J_URI: bolt://neo4j:7687
+      # Deliberately distinct write credentials from the api container's
+      # read-only ones below — see workers/graph-projector/src/config.ts's
+      # doc comment on why, even though Neo4j Community cannot yet enforce
+      # the difference at the database level.
+      NEO4J_PROJECTOR_USER: ${NEO4J_PROJECTOR_USER:-${NEO4J_USER:-neo4j}}
+      NEO4J_PROJECTOR_PASSWORD: ${NEO4J_PROJECTOR_PASSWORD:-${NEO4J_PASSWORD:?NEO4J_PASSWORD must be set}}
+    depends_on:
+      postgres: { condition: service_healthy }
+      neo4j: { condition: service_healthy }
+
   # ── Application ────────────────────────────────────────────────────────────
   api:
     <<: *common
@@ -183,6 +234,14 @@ services:
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       S3_SERVER_SIDE_ENCRYPTION: ${S3_SERVER_SIDE_ENCRYPTION:-}
       ALLOW_OBJECT_STORAGE_EGRESS: ${ALLOW_OBJECT_STORAGE_EGRESS:-false}
+      # Evidence Knowledge Graph, read-only side (KnowledgeGraphQueryService).
+      # Empty is the default — nothing above reaches Neo4j (connects lazily,
+      # on first actual traversal query) or fails startup because of it.
+      # Read-only credentials, deliberately distinct from graph-projector's
+      # write ones above.
+      NEO4J_URI: ${NEO4J_URI:-}
+      NEO4J_READONLY_USER: ${NEO4J_READONLY_USER:-}
+      NEO4J_READONLY_PASSWORD: ${NEO4J_READONLY_PASSWORD:-}
     depends_on:
       postgres: { condition: service_healthy }
       keycloak: { condition: service_healthy }
@@ -268,6 +327,9 @@ volumes:
   caddy-data: # certificates and their private keys
   caddy-config:
   ollama-data: # re-downloadable model weights — not backed up, same reasoning as caddy-config
+  neo4j-data: # NOT independently backed up — rebuildable from postgres-data by design, see
+    # docs/operations/KNOWLEDGE_GRAPH_PRODUCTION_RUNBOOK.md. Postgres remains the only
+    # system of record this deployment backs up (ADR-0011: Neo4j is a projection).
 
 networks:
   default:
