@@ -39,7 +39,7 @@ import {
   listForSession,
   remove as removeQueued,
   updateStatus as updateQueuedStatus,
-  type QueuedContribution,
+  type QueuedFacilitatorContribution,
 } from '@/lib/offline-queue';
 
 // Only `contributor`-tier and `admin` roles actually hold `evidence:create`
@@ -120,7 +120,7 @@ export default function SessionEvidencePage({
   const [sourceParticipantId, setSourceParticipantId] = useState('');
   const [captureBusy, setCaptureBusy] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
-  const [queued, setQueued] = useState<QueuedContribution[]>([]);
+  const [queued, setQueued] = useState<QueuedFacilitatorContribution[]>([]);
 
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
@@ -283,6 +283,7 @@ export default function SessionEvidencePage({
         // what was typed. `flushQueue` retries automatically once the
         // browser's `online` event fires.
         await enqueue({
+          kind: 'facilitator',
           id: clientRequestId,
           workspaceId,
           sessionId,

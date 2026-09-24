@@ -25,7 +25,7 @@
 
 'use client';
 
-import type { CaptureEvidenceRequest } from '@witness/contracts';
+import type { CaptureEvidenceRequest, ParticipantCaptureEvidenceRequest } from '@witness/contracts';
 
 const DB_NAME = 'witness-offline-queue';
 const DB_VERSION = 1;
@@ -33,7 +33,9 @@ const STORE_NAME = 'queued-contributions';
 
 export type QueueItemStatus = 'pending' | 'syncing' | 'synced' | 'failed';
 
-export interface QueuedContribution {
+/** A facilitator/contributor capture, sent with their signed-in session. */
+export interface QueuedFacilitatorContribution {
+  kind: 'facilitator';
   /** The clientRequestId — doubles as the IndexedDB key and the API idempotency key. */
   id: string;
   workspaceId: string;
@@ -43,6 +45,27 @@ export interface QueuedContribution {
   createdAt: number;
   lastError: string | null;
 }
+
+/**
+ * A participant self-capture (Phase 5, Workstream 1.8) — same idempotency
+ * discipline, but authorised by a capture token rather than a signed-in
+ * session, and carrying the recorded audio inline: IndexedDB stores Blobs
+ * natively, so the attachment survives a closed tab exactly like the text
+ * fields do, and is uploaded once the evidence row itself confirms.
+ */
+export interface QueuedParticipantContribution {
+  kind: 'participant';
+  id: string;
+  sessionId: string;
+  captureToken: string;
+  body: ParticipantCaptureEvidenceRequest;
+  attachment: { blob: Blob; filename: string } | null;
+  status: QueueItemStatus;
+  createdAt: number;
+  lastError: string | null;
+}
+
+export type QueuedContribution = QueuedFacilitatorContribution | QueuedParticipantContribution;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -93,9 +116,24 @@ export async function listAll(): Promise<QueuedContribution[]> {
 export async function listForSession(
   workspaceId: string,
   sessionId: string,
-): Promise<QueuedContribution[]> {
+): Promise<QueuedFacilitatorContribution[]> {
   const all = await listAll();
-  return all.filter((item) => item.workspaceId === workspaceId && item.sessionId === sessionId);
+  return all.filter(
+    (item): item is QueuedFacilitatorContribution =>
+      item.kind === 'facilitator' &&
+      item.workspaceId === workspaceId &&
+      item.sessionId === sessionId,
+  );
+}
+
+export async function listForParticipantSession(
+  sessionId: string,
+): Promise<QueuedParticipantContribution[]> {
+  const all = await listAll();
+  return all.filter(
+    (item): item is QueuedParticipantContribution =>
+      item.kind === 'participant' && item.sessionId === sessionId,
+  );
 }
 
 export async function updateStatus(

@@ -38,10 +38,24 @@ const ROLES: ReadonlyArray<ActingUser['role']> = [
 
 const REVIEW_ROLES = new Set(['admin', 'reviewer']);
 
+/**
+ * Routes a participant reaches directly from a QR code or join link, with no
+ * standing in the workspace at all — Phase 5, Workstream 1.5's explicit
+ * "no admin nav" requirement. These render with none of the chrome below:
+ * no preview banner, no header, no primary navigation, not even a sign-in
+ * prompt — the simplest possible screen for someone who just scanned a code
+ * on a workshop floor.
+ */
+const BARE_ROUTE_PREFIXES = ['/join/', '/capture/'];
+
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, setUser } = useSession();
   const { status, currentUser, errorMessage, signOut } = useAuth();
+
+  if (BARE_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+    return <>{children}</>;
+  }
 
   // "My review work" (Phase 4G) only earns a place in primary nav for
   // someone it actually applies to — reviewer/admin in at least one

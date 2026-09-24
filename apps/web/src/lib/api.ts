@@ -148,6 +148,16 @@ import type {
   RespondToCandidateClarificationRequest,
   ReviewCandidateAssertionRequest,
   UpdateKnowledgeDomainPolicyRequest,
+  CreateSessionJoinLinkRequest,
+  JoinSessionRequest,
+  JoinSessionResult,
+  ParticipantCaptureConsentRequest,
+  ParticipantCaptureContextView,
+  ParticipantCaptureEvidenceRequest,
+  ParticipantCaptureEvidenceResult,
+  SessionJoinContextView,
+  SessionJoinLinkCreatedView,
+  SessionJoinLinkView,
 } from '@witness/contracts';
 
 import { API_BASE_URL } from './runtime-config';
@@ -279,13 +289,14 @@ async function requestMultipart<T>(
   path: string,
   user: ActingUser | null,
   formData: FormData,
+  init?: { headers?: Record<string, string> },
 ): Promise<T> {
   let response: Response;
 
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       method: 'POST',
-      headers: authHeaders(user),
+      headers: { ...authHeaders(user), ...init?.headers },
       body: formData,
       cache: 'no-store',
       credentials: 'include',
@@ -707,6 +718,100 @@ export const api = {
       null,
       { method: 'POST' },
     ),
+
+  // ─── Governed QR/link session joining (Phase 5, Workstream 1.6) ───────────
+
+  createSessionJoinLink: (
+    workspaceId: string,
+    sessionId: string,
+    body: CreateSessionJoinLinkRequest,
+    user: ActingUser,
+  ): Promise<SessionJoinLinkCreatedView> =>
+    request<SessionJoinLinkCreatedView>(
+      `/api/v1/workspaces/${workspaceId}/sessions/${sessionId}/join-links`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  listSessionJoinLinks: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<SessionJoinLinkView[]> =>
+    request<SessionJoinLinkView[]>(
+      `/api/v1/workspaces/${workspaceId}/sessions/${sessionId}/join-links`,
+      user,
+    ),
+
+  revokeSessionJoinLink: (
+    workspaceId: string,
+    sessionId: string,
+    linkId: string,
+    user: ActingUser,
+  ): Promise<SessionJoinLinkView> =>
+    request<SessionJoinLinkView>(
+      `/api/v1/workspaces/${workspaceId}/sessions/${sessionId}/join-links/${linkId}/revoke`,
+      user,
+      { method: 'POST' },
+    ),
+
+  /** Public — token possession alone is enough to view context, never to join. */
+  getSessionJoinContext: (token: string): Promise<SessionJoinContextView> =>
+    request<SessionJoinContextView>(`/api/v1/session-join/${encodeURIComponent(token)}`, null),
+
+  /** Public — governance-mode-specific identity checks happen server-side. */
+  joinSession: (token: string, body: JoinSessionRequest): Promise<JoinSessionResult> =>
+    request<JoinSessionResult>(`/api/v1/session-join/${encodeURIComponent(token)}/join`, null, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // ─── Participant self-capture (Phase 5, Workstream 1.1-1.4) ───────────────
+  // Every call here carries a capture token, never an ActingUser — a
+  // pseudonymous/anonymous participant has no Witness account at all. See
+  // ParticipantCaptureController's own header comment for why this is a
+  // distinct header, not Authorization: Bearer.
+
+  getParticipantCaptureContext: (captureToken: string): Promise<ParticipantCaptureContextView> =>
+    request<ParticipantCaptureContextView>('/api/v1/participant-capture/me', null, {
+      headers: { 'X-Witness-Capture-Token': captureToken },
+    }),
+
+  captureParticipantEvidence: (
+    captureToken: string,
+    body: ParticipantCaptureEvidenceRequest,
+  ): Promise<ParticipantCaptureEvidenceResult> =>
+    request<ParticipantCaptureEvidenceResult>('/api/v1/participant-capture/evidence', null, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { 'X-Witness-Capture-Token': captureToken },
+    }),
+
+  captureParticipantSelfConsent: (
+    captureToken: string,
+    body: ParticipantCaptureConsentRequest,
+  ): Promise<{ status: 'captured' }> =>
+    request<{ status: 'captured' }>('/api/v1/participant-capture/consent', null, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { 'X-Witness-Capture-Token': captureToken },
+    }),
+
+  uploadParticipantCaptureAttachment: (
+    captureToken: string,
+    evidenceId: string,
+    file: Blob,
+    filename: string,
+  ): Promise<EvidenceAttachmentView> => {
+    const form = new FormData();
+    form.append('file', file, filename);
+    return requestMultipart<EvidenceAttachmentView>(
+      `/api/v1/participant-capture/evidence/${evidenceId}/attachment`,
+      null,
+      form,
+      { headers: { 'X-Witness-Capture-Token': captureToken } },
+    );
+  },
 
   listSessions: (
     workspaceId: string,

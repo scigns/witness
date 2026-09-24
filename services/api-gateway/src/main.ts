@@ -72,8 +72,8 @@ async function bootstrap(): Promise<void> {
     // spend an afternoon establishing that.
     allowedHeaders:
       config.profile === 'development'
-        ? ['Content-Type', 'X-Witness-Dev-User', 'Authorization']
-        : ['Content-Type', 'Authorization'],
+        ? ['Content-Type', 'X-Witness-Dev-User', 'Authorization', 'X-Witness-Capture-Token']
+        : ['Content-Type', 'Authorization', 'X-Witness-Capture-Token'],
   });
 
   // Cookie authentication needs an explicit CSRF boundary. SameSite=Lax is
