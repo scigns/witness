@@ -8,6 +8,7 @@ import {
   toPaymentId,
   toPaymentMethodId,
   toPurchaseOrderId,
+  toReceiptId,
 } from './ids.js';
 import {
   assessPayment,
@@ -16,6 +17,7 @@ import {
   createManualBankTransferEvidence,
   createManualBankTransferMethod,
   createPurchaseOrder,
+  createReceipt,
   issueInvoice,
   markInvoiceOverdue,
   markInvoicePaid,
@@ -537,5 +539,71 @@ describe('manual bank-transfer settlement evidence', () => {
         expect.objectContaining({ code: 'PAYMENT_NOT_RECONCILABLE' }),
       );
     }
+  });
+});
+
+describe('createReceipt', () => {
+  const receiptId = toReceiptId('99999999-9999-4999-8999-999999999999');
+  const issuedAt = new Date('2026-09-03T02:00:00.000Z');
+
+  it('issues a receipt matching the verified payment it evidences', () => {
+    const verified = payment();
+    const receipt = createReceipt({
+      id: receiptId,
+      organisationId: organisationA,
+      billingAccountId: 'billing-account-a',
+      invoiceId,
+      payment: verified,
+      receiptNumber: 'RCP-00000001',
+      issuedAt,
+    });
+    expect(receipt.paymentId).toBe(verified.id);
+    expect(receipt.amount).toEqual(verified.amount);
+    expect(receipt.receiptNumber).toBe('RCP-00000001');
+  });
+
+  it('THREAT: refuses to issue a receipt for unverified settlement evidence', () => {
+    const unverified = payment({ verified: false });
+    expect(() =>
+      createReceipt({
+        id: receiptId,
+        organisationId: organisationA,
+        billingAccountId: 'billing-account-a',
+        invoiceId,
+        payment: unverified,
+        receiptNumber: 'RCP-00000001',
+        issuedAt,
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'PAYMENT_NOT_VERIFIED' }));
+  });
+
+  it("THREAT: refuses to issue a receipt for a different tenant's payment", () => {
+    const verified = payment({ organisationId: organisationB });
+    expect(() =>
+      createReceipt({
+        id: receiptId,
+        organisationId: organisationA,
+        billingAccountId: 'billing-account-a',
+        invoiceId,
+        payment: verified,
+        receiptNumber: 'RCP-00000001',
+        issuedAt,
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'TENANT_MISMATCH' }));
+  });
+
+  it('rejects an empty receipt number', () => {
+    const verified = payment();
+    expect(() =>
+      createReceipt({
+        id: receiptId,
+        organisationId: organisationA,
+        billingAccountId: 'billing-account-a',
+        invoiceId,
+        payment: verified,
+        receiptNumber: '  ',
+        issuedAt,
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'RECEIPT_NUMBER_REQUIRED' }));
   });
 });

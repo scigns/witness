@@ -162,6 +162,8 @@ model Organisation {
   purchaseOrders               PurchaseOrder[]
   paymentMethods               PaymentMethod[]
   payments                     Payment[]
+  receipts                     Receipt[]
+  receiptNumberCounter         ReceiptNumberCounter?
   invitationNotifications      InvitationNotification[]
 
   // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
@@ -299,6 +301,7 @@ model Invoice {
 
   lines              InvoiceLineItem[]
   payments           Payment[]
+  receipts           Receipt[]
   remittanceSnapshot InvoiceRemittanceSnapshot?
 
   @@unique([organisationId, id])
@@ -417,11 +420,53 @@ model Payment {
   createdAt                DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  receipt Receipt?
+
   @@unique([organisationId, method, sourceReference])
   @@unique([organisationId, settlementIdempotencyKey])
   @@index([organisationId, invoiceId])
   @@index([organisationId, status])
   @@map("payment")
+}
+
+/// A distinct, customer-facing settlement confirmation (Phase 5, Workstream
+/// 2.1) — always issued 1:1 with a verified `Payment` (`paymentId` unique),
+/// in the same transaction as the settlement itself
+/// (`ManualSettlementService.record`), so a receipt can never exist without
+/// the payment it evidences and vice versa. `receiptNumber` is allocated by
+/// `allocate_receipt_number`, the same atomic-counter pattern
+/// `allocate_invoice_number` already uses, via its own `ReceiptNumberCounter`
+/// sequence — never reused, even if a payment were later reversed.
+model Receipt {
+  id               String       @id @db.Uuid
+  organisationId   String       @map("organisation_id") @db.Uuid
+  organisation     Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  billingAccountId String       @map("billing_account_id") @db.Uuid
+
+  invoiceId String  @map("invoice_id") @db.Uuid
+  invoice   Invoice @relation(fields: [organisationId, invoiceId], references: [organisationId, id], onDelete: Restrict)
+
+  paymentId String  @unique @map("payment_id") @db.Uuid
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  receiptNumber String   @map("receipt_number") @db.VarChar(64)
+  amountMinor   BigInt   @map("amount_minor")
+  currency      String   @db.Char(3)
+  issuedAt      DateTime @map("issued_at") @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([organisationId, receiptNumber])
+  @@index([organisationId, invoiceId])
+  @@map("receipt")
+}
+
+model ReceiptNumberCounter {
+  organisationId String       @id @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  nextValue      BigInt       @default(1) @map("next_value")
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("receipt_number_counter")
 }
 
 /// A customer's requested commercial transition. It is deliberately separate

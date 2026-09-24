@@ -14,6 +14,7 @@ import type {
   PaymentId,
   PaymentMethodId,
   PurchaseOrderId,
+  ReceiptId,
 } from './ids.js';
 
 export const INVOICE_STATUSES = ['DRAFT', 'OPEN', 'PAID', 'OVERDUE', 'VOID', 'REFUNDED'] as const;
@@ -102,6 +103,28 @@ export interface Payment {
   readonly statusChangedAt: Date;
   readonly verifiedAt: Date | null;
   readonly rejectionReason: string | null;
+}
+
+/**
+ * A distinct, customer-facing settlement confirmation — deliberately not
+ * just "read the Payment row again": a receipt is what a customer expects
+ * to receive and file, with its own sequential number
+ * (`allocate_receipt_number`, mirroring `allocate_invoice_number`), never
+ * reused across payments even if a payment were somehow reversed and
+ * re-settled. Always issued 1:1 with a verified `Payment` — see
+ * `createReceipt`'s own invariant — so it carries no lifecycle of its own:
+ * once issued, a receipt is a fact about the past, not a record with
+ * further states to transition through.
+ */
+export interface Receipt {
+  readonly id: ReceiptId;
+  readonly organisationId: OrganisationId;
+  readonly billingAccountId: string;
+  readonly invoiceId: InvoiceId;
+  readonly paymentId: PaymentId;
+  readonly receiptNumber: string;
+  readonly amount: Money;
+  readonly issuedAt: Date;
 }
 
 export type PaymentAssessmentCode =
@@ -561,6 +584,51 @@ export function verifyPaymentEvidence(payment: Payment, at: Date): Payment {
     status: 'VERIFIED',
     statusChangedAt: changedAt,
     verifiedAt: changedAt,
+  });
+}
+
+/**
+ * Issue a receipt for verified settlement evidence. Only ever called once
+ * per payment in practice — the application layer enforces that with a
+ * unique `paymentId` column, the same "domain states the rule, persistence
+ * makes it stick" split every other exactly-once guarantee in this system
+ * uses — but the invariant here (verified evidence, matching owner and
+ * invoice) is checked regardless of what the database would also catch.
+ */
+export function createReceipt(input: {
+  readonly id: ReceiptId;
+  readonly organisationId: OrganisationId;
+  readonly billingAccountId: string;
+  readonly invoiceId: InvoiceId;
+  readonly payment: Payment;
+  readonly receiptNumber: string;
+  readonly issuedAt: Date;
+}): Receipt {
+  if (input.payment.status !== 'VERIFIED') {
+    throw new InvariantViolation(
+      'A receipt can only be issued for verified settlement evidence.',
+      'PAYMENT_NOT_VERIFIED',
+    );
+  }
+  if (
+    input.payment.organisationId !== input.organisationId ||
+    input.payment.billingAccountId !== input.billingAccountId ||
+    input.payment.invoiceId !== input.invoiceId
+  ) {
+    throw new InvariantViolation(
+      'Receipt, payment and invoice must have the same owner.',
+      'TENANT_MISMATCH',
+    );
+  }
+  return Object.freeze({
+    id: input.id,
+    organisationId: input.organisationId,
+    billingAccountId: input.billingAccountId,
+    invoiceId: input.invoiceId,
+    paymentId: input.payment.id,
+    receiptNumber: assertNonEmpty(input.receiptNumber, 'Receipt number', 'RECEIPT_NUMBER_REQUIRED'),
+    amount: money(input.payment.amount.currency, input.payment.amount.amountMinor),
+    issuedAt: cloneDate(input.issuedAt),
   });
 }
 

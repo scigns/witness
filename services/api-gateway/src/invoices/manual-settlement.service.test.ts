@@ -77,8 +77,23 @@ function fixture(overrides: Record<string, unknown> = {}) {
     receivedAt: new Date(receivedAt),
     verifiedAt: new Date(receivedAt),
   };
+  const receipt = {
+    id: '00000000-0000-4000-8000-000000000013',
+    organisationId: ids.organisation,
+    billingAccountId: ids.account,
+    invoiceId: ids.invoice,
+    paymentId: payment.id,
+    receiptNumber: 'RCP-00000001',
+    amountMinor: 120_000n,
+    currency: 'AUD',
+    issuedAt: new Date(receivedAt),
+  };
   const tx = {
     $executeRaw: vi.fn(),
+    $queryRaw: vi.fn().mockResolvedValue([{ allocate_receipt_number: receipt.receiptNumber }]),
+    receipt: {
+      create: vi.fn().mockImplementation(({ data }) => Promise.resolve({ ...receipt, ...data })),
+    },
     actor: {
       findFirst: vi
         .fn()
@@ -109,6 +124,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
   const prisma = {
     actor: tx.actor,
     payment: { findUniqueOrThrow: vi.fn().mockResolvedValue(payment) },
+    receipt: { findUniqueOrThrow: vi.fn().mockResolvedValue(receipt) },
     $transaction: vi.fn((callback) => callback(tx)),
   };
   const invoiceView = {
@@ -145,7 +161,18 @@ function fixture(overrides: Record<string, unknown> = {}) {
     kind: 'human',
     roles: [],
   } as never;
-  return { service, request, principal, prisma, tx, invoice, change, subscription, payment };
+  return {
+    service,
+    request,
+    principal,
+    prisma,
+    tx,
+    invoice,
+    change,
+    subscription,
+    payment,
+    receipt,
+  };
 }
 
 describe('ManualSettlementService', () => {
@@ -158,7 +185,11 @@ describe('ManualSettlementService', () => {
     expect(result.resolvedEntitlements).toContainEqual(
       expect.objectContaining({ capabilityCode: 'workspace.create', enabled: true }),
     );
+    expect(result.receipt).toEqual(
+      expect.objectContaining({ receiptNumber: 'RCP-00000001', paymentId: f.payment.id }),
+    );
     expect(f.tx.payment.create).toHaveBeenCalledTimes(1);
+    expect(f.tx.receipt.create).toHaveBeenCalledTimes(1);
     expect(f.tx.invoice.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'PAID' }) }),
     );
@@ -170,7 +201,7 @@ describe('ManualSettlementService', () => {
     expect(f.tx.commercialChangeRequest.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'APPLIED' }) }),
     );
-    expect(f.tx.auditEvent.create).toHaveBeenCalledTimes(3);
+    expect(f.tx.auditEvent.create).toHaveBeenCalledTimes(4);
   });
 
   it('returns the original result on an identical idempotent retry without applying twice', async () => {
@@ -178,6 +209,7 @@ describe('ManualSettlementService', () => {
     f.tx.payment.findUnique.mockResolvedValue(f.payment);
     await f.service.record(ids.organisation, ids.invoice, f.request, f.principal);
     expect(f.tx.payment.create).not.toHaveBeenCalled();
+    expect(f.tx.receipt.create).not.toHaveBeenCalled();
     expect(f.tx.invoice.update).not.toHaveBeenCalled();
     expect(f.tx.subscription.update).not.toHaveBeenCalled();
     expect(f.tx.auditEvent.create).not.toHaveBeenCalled();

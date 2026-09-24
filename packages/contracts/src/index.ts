@@ -425,6 +425,22 @@ export interface ManualSettlementContextView {
   requestedPlan: PublicPlan;
 }
 
+/**
+ * A distinct, customer-facing settlement confirmation (Phase 5, Workstream
+ * 2.1) — never just "the payment row again". Always issued 1:1 with a
+ * verified payment; see `@witness/domain`'s `createReceipt`.
+ */
+export interface ReceiptView {
+  id: string;
+  organisationId: string;
+  invoiceId: string;
+  paymentId: string;
+  receiptNumber: string;
+  amountMinor: string;
+  currency: string;
+  issuedAt: string;
+}
+
 export interface ManualSettlementResultView {
   payment: {
     id: string;
@@ -436,6 +452,7 @@ export interface ManualSettlementResultView {
     receivedAt: string;
     verifiedAt: string;
   };
+  receipt: ReceiptView;
   invoice: InvoiceView;
   subscription: BillingOverview['subscription'];
   plan: PublicPlan;

@@ -9,6 +9,7 @@ import {
   createManualBankTransferEvidence,
   createManualBankTransferMethod,
   createInvoiceLineItem,
+  createReceipt,
   markInvoicePaid,
   money,
   toInvoiceId,
@@ -16,6 +17,7 @@ import {
   toOrganisationId,
   toPaymentId,
   toPaymentMethodId,
+  toReceiptId,
   verifyPaymentEvidence,
   type Invoice,
 } from '@witness/domain';
@@ -312,6 +314,7 @@ export class ManualSettlementService {
           verifiedAt: verified.verifiedAt,
         },
       });
+
       await tx.invoice.update({
         where: { id: invoiceId },
         data: {
@@ -334,6 +337,42 @@ export class ManualSettlementService {
       await tx.commercialChangeRequest.update({
         where: { id: change.id },
         data: { status: 'APPLIED', effectiveAt: verifiedAt },
+      });
+
+      // Every mutation that could still fail (plan lookup, activation,
+      // change-request update) has now succeeded — only from here does the
+      // transaction write anything it would not want to have written had an
+      // earlier step thrown. The receipt follows the same discipline the
+      // three audit events below already do. Same transaction as the
+      // payment it evidences — a receipt must never exist without its
+      // payment, or vice versa (Payment.receipt is a unique 1:1 relation).
+      // Allocated via the same atomic-counter pattern
+      // "allocate_invoice_number" already uses, so concurrent settlements
+      // across organisations never race for the same sequence.
+      const receiptNumberRows = await tx.$queryRaw<
+        Array<{ allocate_receipt_number: string }>
+      >`SELECT "allocate_receipt_number"(${organisationId}::uuid)`;
+      const receipt = createReceipt({
+        id: toReceiptId(randomUUID()),
+        organisationId: toOrganisationId(organisationId),
+        billingAccountId: invoice.billingAccountId,
+        invoiceId: toInvoiceId(invoiceId),
+        payment: verified,
+        receiptNumber: receiptNumberRows[0]!.allocate_receipt_number,
+        issuedAt: verifiedAt,
+      });
+      await tx.receipt.create({
+        data: {
+          id: receipt.id,
+          organisationId,
+          billingAccountId: invoice.billingAccountId,
+          invoiceId,
+          paymentId: receipt.paymentId,
+          receiptNumber: receipt.receiptNumber,
+          amountMinor: receipt.amount.amountMinor,
+          currency: receipt.amount.currency,
+          issuedAt: receipt.issuedAt,
+        },
       });
 
       const safeMetadata = {
@@ -373,11 +412,23 @@ export class ManualSettlementService {
         { action: 'subscription.activated', actor, metadata: safeMetadata },
         verifiedAt,
       );
+      await appendAuditEvent(
+        tx,
+        'receipt',
+        receipt.id,
+        {
+          action: 'receipt.issued',
+          actor,
+          metadata: { ...safeMetadata, receiptNumber: receipt.receiptNumber },
+        },
+        verifiedAt,
+      );
       return verified.id;
     });
 
-    const [payment, invoice, overview] = await Promise.all([
+    const [payment, receipt, invoice, overview] = await Promise.all([
       this.prisma.payment.findUniqueOrThrow({ where: { id: paymentId } }),
+      this.prisma.receipt.findUniqueOrThrow({ where: { paymentId } }),
       this.invoices.get(organisationId, invoiceId),
       this.commercial.overview(organisationId),
     ]);
@@ -391,6 +442,16 @@ export class ManualSettlementService {
         currency: payment.currency,
         receivedAt: payment.receivedAt.toISOString(),
         verifiedAt: payment.verifiedAt!.toISOString(),
+      },
+      receipt: {
+        id: receipt.id,
+        organisationId: receipt.organisationId,
+        invoiceId: receipt.invoiceId,
+        paymentId: receipt.paymentId,
+        receiptNumber: receipt.receiptNumber,
+        amountMinor: receipt.amountMinor.toString(),
+        currency: receipt.currency,
+        issuedAt: receipt.issuedAt.toISOString(),
       },
       invoice,
       subscription: overview.subscription,
