@@ -17,6 +17,7 @@ import type { CoDesignSessionDetail, SessionParticipantSummary } from '@witness/
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { SessionJoinLinksPanel } from '@/components/session-join-links-panel';
 import {
   Button,
   Card,
@@ -185,6 +186,10 @@ export default function SessionParticipantsPage({
           </LinkButton>
         </div>
       </div>
+
+      {user !== null && (
+        <SessionJoinLinksPanel workspaceId={workspaceId} sessionId={sessionId} user={user} />
+      )}
 
       {error === null && participants.length > 0 && (
         <section aria-labelledby="participant-preparation-heading" className="space-y-3">
