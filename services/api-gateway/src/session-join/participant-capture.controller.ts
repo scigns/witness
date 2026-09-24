@@ -16,13 +16,19 @@ import {
   Controller,
   Get,
   Headers,
+  Param,
+  ParseUUIDPipe,
   Post,
   UnauthorizedException,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 import {
   participantCaptureConsentRequestSchema,
   participantCaptureEvidenceRequestSchema,
+  type EvidenceAttachmentView,
   type ParticipantCaptureContextView,
   type ParticipantCaptureEvidenceResult,
 } from '@witness/contracts';
@@ -30,6 +36,9 @@ import {
 import { ParticipantCaptureService } from './participant-capture.service.js';
 
 const CAPTURE_TOKEN_HEADER = 'x-witness-capture-token';
+/** Mirrors `evidence.controller.ts`'s own ceiling — Multer's hard cap; the
+ * real, configured limit is enforced inside `EvidenceAttachmentService`. */
+const MULTER_HARD_CEILING_BYTES = 500 * 1024 * 1024;
 
 function requireCaptureToken(header: string | string[] | undefined): string {
   const value = Array.isArray(header) ? header[0] : header;
@@ -72,6 +81,17 @@ export class ParticipantCaptureController {
       });
     }
     return this.capture.captureEvidence(token, parsed.data);
+  }
+
+  @Post('evidence/:evidenceId/attachment')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MULTER_HARD_CEILING_BYTES } }))
+  async uploadAttachment(
+    @Headers(CAPTURE_TOKEN_HEADER) header: string | undefined,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ): Promise<EvidenceAttachmentView> {
+    const token = requireCaptureToken(header);
+    return this.capture.uploadAttachment(token, evidenceId, file);
   }
 
   @Post('consent')

@@ -23,11 +23,17 @@
  * body cannot make one participant act as another.
  */
 
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { randomBytes, randomUUID } from 'node:crypto';
 
 import type { EvidenceAttributionMode, ParticipantIdentityMode } from '@witness/domain';
 import type {
+  EvidenceAttachmentView,
   ParticipantCaptureConsentRequest,
   ParticipantCaptureContextView,
   ParticipantCaptureEvidenceRequest,
@@ -38,6 +44,10 @@ import { PrismaService } from '../infrastructure/prisma.service.js';
 import { sha256 } from '../infrastructure/hashing.js';
 import type { Principal } from '../authz/authorization.port.js';
 import { EvidenceService } from '../evidence/evidence.service.js';
+import {
+  EvidenceAttachmentService,
+  type UploadedAttachmentFile,
+} from '../evidence/evidence-attachment.service.js';
 import { ParticipantConsentRecordsService } from '../participant-consent-records/participant-consent-records.service.js';
 
 /** Session-scoped, not tied to the join link's own (often much shorter) expiry. */
@@ -98,6 +108,7 @@ export class ParticipantCaptureService {
     private readonly prisma: PrismaService,
     private readonly evidence: EvidenceService,
     private readonly participantConsent: ParticipantConsentRecordsService,
+    private readonly attachments: EvidenceAttachmentService,
   ) {}
 
   async mint(participantId: string, now: Date): Promise<string> {
@@ -172,6 +183,31 @@ export class ParticipantCaptureService {
     return { evidenceId: detail.id, reviewStatus: detail.reviewStatus };
   }
 
+  /**
+   * Attach the recorded audio (or a document/image) to evidence this same
+   * token already created. `evidenceId` is caller-supplied — the security
+   * property is verifying it actually belongs to the resolved participant
+   * (`requireOwnEvidence`) before ever reaching `EvidenceAttachmentService`,
+   * so a forged `evidenceId` cannot attach a file to someone else's evidence.
+   */
+  async uploadAttachment(
+    rawToken: string,
+    evidenceId: string,
+    file: UploadedAttachmentFile | undefined,
+  ): Promise<EvidenceAttachmentView> {
+    const resolved = await this.resolveToken(rawToken);
+    await this.requireOwnEvidence(resolved.participantId, evidenceId);
+    const principal = participantPrincipal(resolved.participantId, resolved.displayName);
+
+    return this.attachments.upload(
+      resolved.workspaceId,
+      resolved.sessionId,
+      evidenceId,
+      file,
+      principal,
+    );
+  }
+
   async captureConsent(rawToken: string, request: ParticipantCaptureConsentRequest): Promise<void> {
     const resolved = await this.resolveToken(rawToken);
     const principal = participantPrincipal(resolved.participantId, resolved.displayName);
@@ -189,6 +225,21 @@ export class ParticipantCaptureService {
   }
 
   // ─── Internals ────────────────────────────────────────────────────────────
+
+  private async requireOwnEvidence(participantId: string, evidenceId: string): Promise<void> {
+    const row = await this.prisma.evidence.findUnique({
+      where: { id: evidenceId },
+      select: { sourceParticipantId: true },
+    });
+    if (row === null || row.sourceParticipantId !== participantId) {
+      throw new NotFoundException({
+        error: {
+          code: 'EVIDENCE_NOT_FOUND',
+          message: `No evidence '${evidenceId}' available to this capture token.`,
+        },
+      });
+    }
+  }
 
   private async resolveToken(rawToken: string): Promise<ResolvedToken> {
     const tokenHash = sha256(rawToken);

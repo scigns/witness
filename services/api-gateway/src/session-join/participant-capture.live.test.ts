@@ -28,6 +28,8 @@ import { ConsentPolicyService } from '../consent/consent-policy.service.js';
 import { ConsentTemplatesService } from '../consent-templates/consent-templates.service.js';
 import { SessionConsentConfigurationService } from '../session-consent-configuration/session-consent-configuration.service.js';
 import { EvidenceService } from '../evidence/evidence.service.js';
+import { EvidenceAttachmentService } from '../evidence/evidence-attachment.service.js';
+import { StorageQuotaService } from '../organisations/storage-quota.service.js';
 import { ParticipantConsentRecordsService } from '../participant-consent-records/participant-consent-records.service.js';
 import { ParticipantCaptureService } from './participant-capture.service.js';
 import { SessionJoinService } from './session-join.service.js';
@@ -81,7 +83,19 @@ describe.skipIf(prisma === null)(
     const participantConsentService = new ParticipantConsentRecordsService(db, policyEnforcement);
     const consentTemplatesService = new ConsentTemplatesService(db);
     const sessionConsentConfigService = new SessionConsentConfigurationService(db);
-    const capture = new ParticipantCaptureService(db, evidenceService, participantConsentService);
+    const attachmentService = new EvidenceAttachmentService(
+      db,
+      consentPolicy,
+      { maxEvidenceAttachmentMb: 200 } as never,
+      null,
+      new StorageQuotaService(db),
+    );
+    const capture = new ParticipantCaptureService(
+      db,
+      evidenceService,
+      participantConsentService,
+      attachmentService,
+    );
     const joinService = new SessionJoinService(db, new SessionService(db));
 
     const organisationId = randomUUID();
@@ -122,6 +136,7 @@ describe.skipIf(prisma === null)(
           categories: [
             { category: 'participation', required: true },
             { category: 'evidence_submission', required: true },
+            { category: 'audio_recording', required: true },
             { category: 'anonymous_quotation', required: false },
           ],
         },
@@ -139,7 +154,7 @@ describe.skipIf(prisma === null)(
         sessionId,
         {
           consentTemplateId: template.id,
-          requiredCategories: ['participation', 'evidence_submission'],
+          requiredCategories: ['participation', 'evidence_submission', 'audio_recording'],
           optionalCategories: ['anonymous_quotation'],
         },
         FACILITATOR,
@@ -195,6 +210,7 @@ describe.skipIf(prisma === null)(
       await db.participantCaptureToken.deleteMany({
         where: { participant: { workspaceId } },
       });
+      await db.evidenceAttachment.deleteMany({ where: { evidence: { workspaceId } } });
       await db.evidence.deleteMany({ where: { workspaceId } });
       await db.participantConsentRecord.deleteMany({ where: { workspaceId } });
       await db.sessionJoinAttempt.deleteMany({ where: { joinLink: { workspaceId } } });
@@ -239,6 +255,7 @@ describe.skipIf(prisma === null)(
         categoryDecisions: [
           { category: 'participation', granted: true },
           { category: 'evidence_submission', granted: true },
+          { category: 'audio_recording', granted: true },
           { category: 'anonymous_quotation', granted: true },
         ],
       });
@@ -263,6 +280,7 @@ describe.skipIf(prisma === null)(
         categoryDecisions: [
           { category: 'participation', granted: true },
           { category: 'evidence_submission', granted: true },
+          { category: 'audio_recording', granted: true },
           { category: 'anonymous_quotation', granted: true },
         ],
       });
@@ -353,6 +371,72 @@ describe.skipIf(prisma === null)(
       });
 
       await expect(capture.context(captureToken)).rejects.toThrow();
+    });
+
+    it('attaches recorded audio to evidence this same token created', async () => {
+      const sessionId = await createOpenSessionWithConsent();
+      const { participantId, captureToken } = await joinAnonymously(sessionId);
+      await capture.captureConsent(captureToken, {
+        categoryDecisions: [
+          { category: 'participation', granted: true },
+          { category: 'evidence_submission', granted: true },
+          { category: 'audio_recording', granted: true },
+          { category: 'anonymous_quotation', granted: true },
+        ],
+      });
+      const { evidenceId } = await capture.captureEvidence(captureToken, {
+        evidenceType: 'audio_note',
+        title: 'My contribution',
+        content: 'placeholder — audio attached separately',
+        clientRequestId: randomUUID(),
+      });
+
+      const attachment = await capture.uploadAttachment(captureToken, evidenceId, {
+        originalname: 'contribution.webm',
+        mimetype: 'audio/webm',
+        size: 4,
+        buffer: Buffer.from([0x1a, 0x45, 0xdf, 0xa3]),
+      });
+      expect(attachment.kind).toBe('audio');
+
+      const row = await db.evidenceAttachment.findUniqueOrThrow({ where: { evidenceId } });
+      expect(row.evidenceId).toBe(evidenceId);
+      const evidenceRow = await db.evidence.findUniqueOrThrow({ where: { id: evidenceId } });
+      expect(evidenceRow.sourceParticipantId).toBe(participantId);
+    });
+
+    it("THREAT: one participant's token cannot attach a file to another participant's evidence", async () => {
+      const sessionId = await createOpenSessionWithConsent();
+      const a = await joinAnonymously(sessionId);
+      const b = await joinAnonymously(sessionId);
+      for (const p of [a, b]) {
+        await capture.captureConsent(p.captureToken, {
+          categoryDecisions: [
+            { category: 'participation', granted: true },
+            { category: 'evidence_submission', granted: true },
+            { category: 'audio_recording', granted: true },
+            { category: 'anonymous_quotation', granted: true },
+          ],
+        });
+      }
+      const { evidenceId } = await capture.captureEvidence(a.captureToken, {
+        evidenceType: 'audio_note',
+        title: "A's contribution",
+        content: 'placeholder',
+        clientRequestId: randomUUID(),
+      });
+
+      await expect(
+        capture.uploadAttachment(b.captureToken, evidenceId, {
+          originalname: 'forged.webm',
+          mimetype: 'audio/webm',
+          size: 4,
+          buffer: Buffer.from([0x1a, 0x45, 0xdf, 0xa3]),
+        }),
+      ).rejects.toThrow();
+
+      const row = await db.evidenceAttachment.findUnique({ where: { evidenceId } });
+      expect(row).toBeNull();
     });
   },
 );
