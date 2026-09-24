@@ -72,6 +72,12 @@ describe.skipIf(prisma === null)(
     const workspaceId = randomUUID();
     const otherWorkspaceId = randomUUID();
     const facilitatorUserId = randomUUID();
+    // Every user this file creates, so afterAll can clean up precisely —
+    // deliberately never a shared `email endsWith '.example'` filter, which
+    // would race another live-test file's fixtures under concurrent
+    // `test:live` execution (confirmed: that broad filter was the actual
+    // cause of an intermittent cross-file FK failure here).
+    const createdUserIds: string[] = [facilitatorUserId];
 
     const FACILITATOR: Principal = {
       subject: `user:${facilitatorUserId}`,
@@ -85,6 +91,7 @@ describe.skipIf(prisma === null)(
       await db.user.create({
         data: { id, email, displayName: email.split('@')[0] ?? email, accountState: 'active' },
       });
+      createdUserIds.push(id);
       return id;
     }
 
@@ -136,7 +143,7 @@ describe.skipIf(prisma === null)(
       await db.user.create({
         data: {
           id: facilitatorUserId,
-          email: 'facilitator@join-org.example',
+          email: `facilitator-${facilitatorUserId}@join-org.example`,
           displayName: 'Live Test Facilitator',
           accountState: 'active',
         },
@@ -163,12 +170,12 @@ describe.skipIf(prisma === null)(
       await db.coDesignSession.deleteMany({
         where: { workspaceId: { in: [workspaceId, otherWorkspaceId] } },
       });
-      await db.authSession.deleteMany({ where: { user: { email: { endsWith: '.example' } } } });
+      await db.authSession.deleteMany({ where: { userId: { in: createdUserIds } } });
       await db.workspace.deleteMany({ where: { id: { in: [workspaceId, otherWorkspaceId] } } });
       await db.organisation.deleteMany({
         where: { id: { in: [organisationId, otherOrganisationId] } },
       });
-      await db.user.deleteMany({ where: { email: { endsWith: '.example' } } });
+      await db.user.deleteMany({ where: { id: { in: createdUserIds } } });
       await db.$disconnect();
     });
 

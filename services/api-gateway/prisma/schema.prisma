@@ -1031,11 +1031,43 @@ model SessionParticipant {
   consentRecords ParticipantConsentRecord[]
   evidence       Evidence[]
   joinAttempts   SessionJoinAttempt[]
+  captureTokens  ParticipantCaptureToken[]
 
   @@index([sessionId])
   @@index([workspaceId])
   @@index([linkedUserId])
   @@map("session_participant")
+}
+
+/// The credential a participant who joined via QR/link — and therefore may
+/// hold no Witness `User` account at all (pseudonymous/anonymous
+/// `identityMode`) — uses for every subsequent capture action as
+/// themselves, for the rest of the session. Minted once, at join
+/// (`SessionJoinService.join`), for every governance mode uniformly: even a
+/// `verified_guest`/`invited_only` joiner who *does* have a real Witness
+/// session gets one, because holding a Witness account grants no
+/// session-scoped capture authority on its own (Casbin tiers model
+/// organisation/workspace roles, not "this one participant, this one
+/// session").
+///
+/// Deliberately outside `AuthorizationGuard`/Casbin entirely — same
+/// reasoning as `SessionJoinLink`: authority here comes from possessing a
+/// narrow, single-purpose, expiring token, not from a role. See
+/// `ParticipantCaptureService`.
+model ParticipantCaptureToken {
+  id        String @id @db.Uuid
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
+
+  participantId String             @map("participant_id") @db.Uuid
+  participant   SessionParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  @@index([participantId])
+  @@index([expiresAt])
+  @@map("participant_capture_token")
 }
 
 /// A governed, session-scoped join credential (Phase 5, Workstream 1.6) — how

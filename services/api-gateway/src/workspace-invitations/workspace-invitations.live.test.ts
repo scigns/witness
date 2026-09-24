@@ -62,6 +62,13 @@ describe.skipIf(prisma === null)('workspace invitations (live PostgreSQL) — AD
   const adminUserId = randomUUID();
   const adminActorId = randomUUID();
   const orgBMemberUserId = randomUUID();
+  // Every user this file creates, so afterAll can clean up precisely —
+  // deliberately never a shared `email endsWith '.example'` filter, which
+  // races another live-test file's fixtures under concurrent `test:live`
+  // execution (confirmed: that broad filter causes an intermittent
+  // cross-file FK failure once more than one live-test file creates
+  // `.example` users).
+  const createdUserIds: string[] = [adminUserId, orgBMemberUserId];
 
   const ADMIN_PRINCIPAL: Principal = {
     subject: `user:${adminUserId}`,
@@ -75,6 +82,7 @@ describe.skipIf(prisma === null)('workspace invitations (live PostgreSQL) — AD
     await db.user.create({
       data: { id, email, displayName: email.split('@')[0] ?? email, accountState: 'active' },
     });
+    createdUserIds.push(id);
     return id;
   }
 
@@ -165,7 +173,7 @@ describe.skipIf(prisma === null)('workspace invitations (live PostgreSQL) — AD
     await db.workspaceInvitation.deleteMany({
       where: { workspaceId: { in: [workspaceAId, workspaceA2Id, workspaceBId] } },
     });
-    await db.authSession.deleteMany({ where: { user: { email: { endsWith: '.example' } } } });
+    await db.authSession.deleteMany({ where: { userId: { in: createdUserIds } } });
     await db.organisationMembership.deleteMany({
       where: { organisationId: { in: [organisationAId, organisationBId] } },
     });
@@ -173,7 +181,7 @@ describe.skipIf(prisma === null)('workspace invitations (live PostgreSQL) — AD
       where: { id: { in: [workspaceAId, workspaceA2Id, workspaceBId] } },
     });
     await db.organisation.deleteMany({ where: { id: { in: [organisationAId, organisationBId] } } });
-    await db.user.deleteMany({ where: { email: { endsWith: '.example' } } });
+    await db.user.deleteMany({ where: { id: { in: createdUserIds } } });
     // Actor rows are never deleted by design in this system (they are
     // permanent audit-trail identities — audit_event.actor_id is RESTRICT,
     // not CASCADE) — the throwaway actor this test creates is left behind

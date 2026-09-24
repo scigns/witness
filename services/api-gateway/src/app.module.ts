@@ -91,6 +91,8 @@ import {
   SessionJoinLinksController,
 } from './session-join/session-join.controller.js';
 import { SessionJoinService } from './session-join/session-join.service.js';
+import { ParticipantCaptureController } from './session-join/participant-capture.controller.js';
+import { ParticipantCaptureService } from './session-join/participant-capture.service.js';
 import { WITNESS_CONFIG } from './tokens.js';
 import { UsersController } from './users/users.controller.js';
 import { UsersService } from './users/users.service.js';
@@ -142,6 +144,7 @@ import { MailerService } from './infrastructure/mailer.js';
     ParticipantsController,
     SessionJoinLinksController,
     SessionJoinController,
+    ParticipantCaptureController,
     ConsentTemplatesController,
     SessionConsentConfigurationController,
     ParticipantConsentRecordsController,
@@ -200,6 +203,7 @@ import { MailerService } from './infrastructure/mailer.js';
     SessionsService,
     ParticipantsService,
     SessionJoinService,
+    ParticipantCaptureService,
     ConsentTemplatesService,
     ConsentPolicyService,
     SessionConsentConfigurationService,

@@ -73,6 +73,7 @@ import { sha256 } from '../infrastructure/hashing.js';
 import { sessionToken } from '../authn/browser-session.js';
 import { SessionService } from '../authn/session.service.js';
 import type { Principal } from '../authz/authorization.port.js';
+import { captureTokenExpiry, generateCaptureToken } from './participant-capture.service.js';
 
 /** Same trailing-window burst guard shape as any token-bucket, sized for a
  * roomful of phones scanning at once, not a scripted flood. */
@@ -275,12 +276,14 @@ export class SessionJoinService {
         const participant = await tx.sessionParticipant.findUniqueOrThrow({
           where: { id: replay.participantId },
         });
+        const captureToken = await this.mintCaptureToken(tx as PrismaService, participant.id, now);
         return {
           participantId: participant.id,
           sessionId: participant.sessionId,
           workspaceId: participant.workspaceId,
           identityMode: participant.identityMode as JoinSessionResult['identityMode'],
           displayName: participant.displayName,
+          captureToken,
         };
       }
 
@@ -351,17 +354,46 @@ export class SessionJoinService {
         now,
       );
 
+      const captureToken = await this.mintCaptureToken(
+        tx as PrismaService,
+        outcome.participant.id,
+        now,
+      );
+
       return {
         participantId: outcome.participant.id,
         sessionId: outcome.participant.sessionId,
         workspaceId: outcome.participant.workspaceId,
         identityMode: outcome.participant.identityMode,
         displayName: outcome.participant.displayName,
+        captureToken,
       };
     });
   }
 
   // ─── Internals ────────────────────────────────────────────────────────────
+
+  /**
+   * Minted inside the same transaction as participant creation — a
+   * participant must never exist without a usable capture token, and a
+   * capture token must never exist for a participant that failed to commit.
+   */
+  private async mintCaptureToken(
+    tx: PrismaService,
+    participantId: string,
+    now: Date,
+  ): Promise<string> {
+    const token = generateCaptureToken();
+    await tx.participantCaptureToken.create({
+      data: {
+        id: randomUUID(),
+        tokenHash: token.hash,
+        participantId,
+        expiresAt: captureTokenExpiry(now),
+      },
+    });
+    return token.raw;
+  }
 
   private async assertRateLimitOk(tx: PrismaService, joinLinkId: string, now: Date): Promise<void> {
     const since = new Date(now.getTime() - JOIN_RATE_LIMIT_WINDOW_MS);

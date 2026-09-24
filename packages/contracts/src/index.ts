@@ -813,6 +813,14 @@ export interface JoinSessionResult {
   workspaceId: string;
   identityMode: ParticipantIdentityMode;
   displayName: string;
+  /**
+   * The credential this participant's device uses for every subsequent
+   * capture action — never the join token itself, and never reusable to
+   * join again. Store it (e.g. in IndexedDB, alongside the offline queue)
+   * and send it back as `X-Witness-Capture-Token` on every
+   * `/api/v1/participant-capture/*` call for the rest of the session.
+   */
+  captureToken: string;
 }
 
 // ─── Consent management (BUILD_ROADMAP.md Milestone 4) ────────────────────────
@@ -976,6 +984,52 @@ export const withdrawParticipantConsentRequestSchema = z.object({
 });
 export type WithdrawParticipantConsentRequest = z.infer<
   typeof withdrawParticipantConsentRequestSchema
+>;
+
+// ─── Participant self-capture (Phase 5, Workstream 1.1-1.4) ───────────────────
+// Reachable by capture-token possession alone, the same discipline as
+// session joining above — a participant who joined pseudonymously or
+// anonymously has no Witness account and therefore no Casbin-tier grant to
+// check; the token itself is the only authority.
+
+export interface ParticipantCaptureContextView {
+  sessionId: string;
+  sessionTitle: string;
+  sessionStatus: string;
+  facilitatorDisplayName: string;
+  participantId: string;
+  displayName: string;
+  identityMode: ParticipantIdentityMode;
+  consentStatusSummary: ParticipantConsentStatusSummary;
+  requiredConsentCategories: string[];
+}
+
+export const participantCaptureEvidenceRequestSchema = z.object({
+  evidenceType: z.string().trim().min(1, 'An evidence type is required').max(100),
+  title: z.string().trim().min(1, 'A title is required').max(300),
+  content: z.string().trim().min(1, 'Content is required').max(20000),
+  language: z.string().trim().max(50).optional(),
+  sessionOffsetSeconds: z.number().int().min(0).optional(),
+  tags: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
+  /** Same idempotent-retry convention as `captureEvidenceRequestSchema`. */
+  clientRequestId: z.string().uuid('A valid client request id is required'),
+});
+export type ParticipantCaptureEvidenceRequest = z.infer<
+  typeof participantCaptureEvidenceRequestSchema
+>;
+
+export interface ParticipantCaptureEvidenceResult {
+  evidenceId: string;
+  reviewStatus: string;
+}
+
+export const participantCaptureConsentRequestSchema = z.object({
+  categoryDecisions: z
+    .array(consentCategoryDecisionRequestSchema)
+    .min(1, 'At least one category decision is required'),
+});
+export type ParticipantCaptureConsentRequest = z.infer<
+  typeof participantCaptureConsentRequestSchema
 >;
 
 // ─── Evidence capture (BUILD_ROADMAP.md Milestone 5) ───────────────────────────
