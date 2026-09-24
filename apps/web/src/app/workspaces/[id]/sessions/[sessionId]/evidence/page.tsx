@@ -32,7 +32,14 @@ import {
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
-import { Button, Card, EmptyState, ErrorNotice, EvidenceReviewStatusBadge } from '@/components/ui';
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorNotice,
+  EvidenceReviewStatusBadge,
+  LinkButton,
+} from '@/components/ui';
 import {
   enqueue,
   isNetworkFailure,
@@ -343,14 +350,23 @@ export default function SessionEvidencePage({
 
       {error !== null && <ErrorNotice message={error} />}
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Contributions{session !== null ? ` — ${session.title}` : ''}
-        </h1>
-        <p className="mt-1 text-[var(--color-ink-muted)]">
-          What was said, observed, proposed, or objected to during this session, captured as it
-          happens.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Contributions{session !== null ? ` — ${session.title}` : ''}
+          </h1>
+          <p className="mt-1 text-[var(--color-ink-muted)]">
+            What was said, observed, proposed, or objected to during this session, captured as it
+            happens.
+          </p>
+        </div>
+        {sessionOpen && canCapture && (
+          <LinkButton
+            href={`/workspaces/${workspaceId}/sessions/${sessionId}/evidence/bulk-upload`}
+          >
+            Bulk upload
+          </LinkButton>
+        )}
       </div>
 
       {session !== null && !sessionOpen && (
