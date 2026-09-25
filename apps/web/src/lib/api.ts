@@ -2554,8 +2554,20 @@ export const api = {
  * HttpOnly cookie; these calls never receive or expose its opaque value.
  */
 export const authApi = {
-  /** Where the browser navigates to start a real sign-in. Not a fetch — a full-page redirect. */
-  loginUrl: (): string => `${BASE_URL}/api/v1/auth/login`,
+  /**
+   * Where the browser navigates to start a real sign-in. Not a fetch — a
+   * full-page redirect. `returnTo` (Track C, ADR-0030) is this app's own
+   * root-relative path (e.g. `/join/abc123`) — never an absolute URL — so
+   * that a `verified_guest`/`invited_only` participant who has to sign in
+   * from an invitation lands back on that invitation after the OIDC
+   * round-trip, not a generic dashboard. The server independently validates
+   * and re-validates this; a malformed value here just degrades to no
+   * return path, never a broken sign-in.
+   */
+  loginUrl: (returnTo?: string): string =>
+    returnTo === undefined
+      ? `${BASE_URL}/api/v1/auth/login`
+      : `${BASE_URL}/api/v1/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
   registerUrl: (): string => `${BASE_URL}/api/v1/auth/register`,
   forgotPasswordUrl: (): string => `${BASE_URL}/api/v1/auth/forgot-password`,
 

@@ -209,18 +209,31 @@ export default function ParticipantCapturePage({
       setSubmittedCount((count) => count + 1);
     } catch (caught) {
       if (isNetworkFailure(caught)) {
-        await enqueue({
-          kind: 'participant',
-          id: clientRequestId,
-          sessionId,
-          captureToken: session.captureToken,
-          body,
-          attachment: { blob, filename },
-          status: 'pending',
-          createdAt: Date.now(),
-          lastError: null,
-        });
-        await refreshQueued();
+        try {
+          await enqueue({
+            kind: 'participant',
+            id: clientRequestId,
+            sessionId,
+            captureToken: session.captureToken,
+            body,
+            attachment: { blob, filename },
+            status: 'pending',
+            createdAt: Date.now(),
+            lastError: null,
+          });
+          await refreshQueued();
+        } catch {
+          // IndexedDB unavailable or quota-exceeded (private browsing,
+          // full storage) — without this, enqueue()'s rejection would
+          // propagate as an unhandled promise rejection and the recording
+          // would be silently lost with no message at all. Tell the
+          // participant plainly rather than losing their contribution
+          // silently.
+          setSubmitError(
+            "Couldn't save this offline — your device's storage may be full or unavailable. " +
+              'Try again once you have a connection.',
+          );
+        }
       } else {
         setSubmitError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
       }
@@ -228,6 +241,8 @@ export default function ParticipantCapturePage({
       setSubmitBusy(false);
     }
   };
+
+  const retryQueuedNow = () => void flushQueue();
 
   if (session === undefined) {
     return (
@@ -349,9 +364,18 @@ export default function ParticipantCapturePage({
             </>
           )}
           {queued.length > 0 && (
-            <p role="status" className="text-center text-xs text-[var(--color-ink-muted)]">
-              {queued.length} waiting to send once you&rsquo;re back online.
-            </p>
+            <div className="flex items-center justify-center gap-2">
+              <p role="status" className="text-center text-xs text-[var(--color-ink-muted)]">
+                {queued.length} waiting to send once you&rsquo;re back online.
+              </p>
+              <button
+                type="button"
+                onClick={retryQueuedNow}
+                className="text-xs font-medium text-[var(--color-accent)] underline"
+              >
+                Retry now
+              </button>
+            </div>
           )}
           <AudioRecorder
             onSubmit={(blob, mime, seconds) => void submitRecording(blob, mime, seconds)}
