@@ -1,0 +1,12 @@
+# Gitleaks false-positive allowlist — one fingerprint per line, each with a
+# reason. Never a broad path/rule exclusion: every entry here names the
+# exact commit:file:rule:line gitleaks reported, verified by reading the
+# actual content at that commit before being added, so a genuine future
+# leak on the same line can never hide behind this file.
+
+# deployments/cloud-managed/.env.example line 85: `NEO4J_PASSWORD=` with no
+# value — an intentionally empty example variable (an operator fills it in
+# at deploy time; see docs/operations/KNOWLEDGE_GRAPH_PRODUCTION_RUNBOOK.md).
+# gitleaks' generic-api-key heuristic matched across the blank value and the
+# following line; no secret is present.
+53360782bfc43a79cb3336716061200ef0e67120:deployments/cloud-managed/.env.example:generic-api-key:85
