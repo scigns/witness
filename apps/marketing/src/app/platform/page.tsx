@@ -69,6 +69,21 @@ const explore = [
     'Built to be read later - by people who were not in the room.',
     '/platform/institutional-memory',
   ],
+  [
+    'Co-design',
+    'How several organisations, facilitators, reviewers and participants run co-design together.',
+    '/platform/co-design',
+  ],
+  [
+    'Knowledge',
+    'How ideas, evidence, disagreement and decisions relate to each other - and trace back.',
+    '/platform/knowledge',
+  ],
+  [
+    'Change over time',
+    'How institutional learning carries from one workshop to the next, and to the decision after.',
+    '/platform/change',
+  ],
 ] as const;
 
 export default function PlatformPage() {
