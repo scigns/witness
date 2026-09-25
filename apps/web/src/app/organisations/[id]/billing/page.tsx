@@ -7,6 +7,7 @@ import type {
   PublicPlan,
 } from '@witness/contracts';
 import { PricingCards } from '@/components/pricing-cards';
+import { AgreementPanel } from '@/components/agreement-panel';
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { OrganisationNav } from '@/components/organisation-nav';
@@ -265,6 +266,7 @@ export default function BillingPage({ params }: { params: Promise<{ id: string }
           </div>
         )}
       </section>
+      <AgreementPanel organisationId={id} user={user} />
       <section aria-labelledby="change-heading">
         <h2 id="change-heading" className="text-xl font-semibold">
           Change plan

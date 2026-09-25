@@ -49,6 +49,7 @@ model Actor {
   reportsApproved            Report[]                  @relation("ReportApprovedBy")
   reportSourcesIncluded      ReportSource[]            @relation("ReportSourceIncludedBy")
   commercialChangesRequested CommercialChangeRequest[]
+  agreementsCreated          Agreement[]
 
   // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
   knowledgeDomainsCreated       KnowledgeDomain[]
@@ -164,6 +165,7 @@ model Organisation {
   payments                     Payment[]
   receipts                     Receipt[]
   receiptNumberCounter         ReceiptNumberCounter?
+  agreements                   Agreement[]
   invitationNotifications      InvitationNotification[]
 
   // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
@@ -255,6 +257,7 @@ model BillingAccount {
   purchaseOrders PurchaseOrder[]
   paymentMethods PaymentMethod[]
   payments       Payment[]
+  agreements     Agreement[]
 
   @@unique([organisationId, id])
   @@map("billing_account")
@@ -467,6 +470,43 @@ model ReceiptNumberCounter {
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("receipt_number_counter")
+}
+
+/// The commercial term an organisation's paid access is authorised under
+/// (Phase 5, Workstream 2.4) — deliberately minimal: a reference to an
+/// agreement that exists outside Witness, its term, and a renewal chain.
+/// Not a contract-management suite (see packages/domain/src/agreement.ts's
+/// module header for the fuller vision this deliberately does not build).
+/// `status` only changes through an explicit renewal or termination; a
+/// lapsed term is derived at read time (`effectiveAgreementStatus`), not
+/// stored, so there is no background job keeping it in sync.
+model Agreement {
+  id               String         @id @db.Uuid
+  organisationId   String         @map("organisation_id") @db.Uuid
+  organisation     Organisation   @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  billingAccountId String         @map("billing_account_id") @db.Uuid
+  billingAccount   BillingAccount @relation(fields: [organisationId, billingAccountId], references: [organisationId, id], onDelete: Restrict)
+
+  reference String    @db.VarChar(200)
+  status    String    @default("ACTIVE") @db.VarChar(16)
+  termStart DateTime  @map("term_start") @db.Timestamptz(6)
+  termEnd   DateTime? @map("term_end") @db.Timestamptz(6)
+  notes     String?   @db.VarChar(2000)
+
+  previousAgreementId String?     @map("previous_agreement_id") @db.Uuid
+  previousAgreement   Agreement?  @relation("AgreementRenewal", fields: [organisationId, previousAgreementId], references: [organisationId, id], onDelete: Restrict)
+  renewals            Agreement[] @relation("AgreementRenewal")
+
+  statusChangedAt DateTime @default(now()) @map("status_changed_at") @db.Timestamptz(6)
+  statusReason    String?  @map("status_reason") @db.VarChar(500)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdById     String   @map("created_by_id") @db.Uuid
+  createdBy       Actor    @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([organisationId, id])
+  @@unique([organisationId, previousAgreementId])
+  @@index([organisationId, status])
+  @@map("agreement")
 }
 
 /// A customer's requested commercial transition. It is deliberately separate

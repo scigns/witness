@@ -33,6 +33,7 @@ const ROLES: ReadonlyArray<ActingUser['role']> = [
   'contributor',
   'reviewer',
   'steward',
+  'billing_manager',
   'admin',
 ];
 

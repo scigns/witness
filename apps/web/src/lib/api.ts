@@ -146,6 +146,10 @@ import type {
   ProposeCandidateAssertionRequest,
   ProvenanceRecord,
   ReceiptView,
+  AgreementView,
+  CreateAgreementRequest,
+  RenewAgreementRequest,
+  TerminateAgreementRequest,
   RespondToCandidateClarificationRequest,
   ReviewCandidateAssertionRequest,
   UpdateKnowledgeDomainPolicyRequest,
@@ -195,7 +199,7 @@ export class ApiError extends Error {
 
 export interface ActingUser {
   name: string;
-  role: 'reader' | 'contributor' | 'reviewer' | 'steward' | 'admin';
+  role: 'reader' | 'contributor' | 'reviewer' | 'steward' | 'billing_manager' | 'admin';
 }
 
 /**
@@ -424,6 +428,45 @@ export const api = {
     requestBlob(
       `/api/v1/organisations/${encodeURIComponent(organisationId)}/invoices/${encodeURIComponent(invoiceId)}/receipt/render`,
       user,
+    ),
+
+  // ─── Agreements (Phase 5, Workstream 2.4) ──────────────────────────────────
+
+  listAgreements: (organisationId: string, user: ActingUser): Promise<AgreementView[]> =>
+    request(`/api/v1/organisations/${encodeURIComponent(organisationId)}/agreements`, user),
+
+  createAgreement: (
+    organisationId: string,
+    body: CreateAgreementRequest,
+    user: ActingUser,
+  ): Promise<AgreementView> =>
+    request(`/api/v1/organisations/${encodeURIComponent(organisationId)}/agreements`, user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  renewAgreement: (
+    organisationId: string,
+    agreementId: string,
+    body: RenewAgreementRequest,
+    user: ActingUser,
+  ): Promise<AgreementView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/agreements/${encodeURIComponent(agreementId)}/renewals`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  terminateAgreement: (
+    organisationId: string,
+    agreementId: string,
+    body: TerminateAgreementRequest,
+    user: ActingUser,
+  ): Promise<AgreementView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/agreements/${encodeURIComponent(agreementId)}/termination`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
     ),
 
   listRecords: (user: ActingUser): Promise<{ records: RecordSummary[] }> =>

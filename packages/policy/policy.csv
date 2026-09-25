@@ -129,6 +129,7 @@
 p, reader, record:read
 p, reader, organisation:read
 p, reader, invoice:read
+p, reader, agreement:read
 p, reader, workspace:read
 p, reader, role:read
 p, reader, session:read
@@ -168,6 +169,7 @@ p, contributor, record:read
 p, contributor, record:create
 p, contributor, organisation:read
 p, contributor, invoice:read
+p, contributor, agreement:read
 p, contributor, workspace:read
 p, contributor, workspace:update
 p, contributor, workspace:transition
@@ -238,6 +240,7 @@ p, reviewer, record:create
 p, reviewer, record:review
 p, reviewer, organisation:read
 p, reviewer, invoice:read
+p, reviewer, agreement:read
 p, reviewer, workspace:read
 p, reviewer, role:read
 p, reviewer, session:read
@@ -309,32 +312,42 @@ p, steward, knowledge_candidate:validate_community
 p, steward, knowledge_entity:steward
 p, steward, knowledge_entity:publish
 
-# Billing manager (Phase 5, Workstream 2.3) — organisation-scoped billing
+# Billing manager (Phase 5, Workstream 2.3/2.4) — organisation-scoped billing
 # authority, deliberately separate from generic organisation admin: issue,
-# render and settle invoices without also gaining organisation:update,
-# workspace:*, user:*, or role_assignment:* (`role-grants-parity.test.ts`
-# checks this file and role-grants.ts agree on the exact set). Assigned
-# exactly like every other role via a `RoleAssignment` — billing actions
-# resolve to organisation scope (invoices carry no workspaceId), so a
-# workspace-scoped assignment of this role has no effect on any of these
-# actions by construction (role-resolution.service.ts's tiersForOrganisation
-# only counts organisation-scoped assignments).
+# render and settle invoices, and record/renew/terminate the commercial
+# agreement an organisation's paid access is authorised under, without also
+# gaining organisation:update, workspace:*, user:*, or role_assignment:*
+# (`role-grants-parity.test.ts` checks this file and role-grants.ts agree on
+# the exact set). Assigned exactly like every other role via a
+# `RoleAssignment` — billing actions resolve to organisation scope (invoices
+# and agreements carry no workspaceId), so a workspace-scoped assignment of
+# this role has no effect on any of these actions by construction
+# (role-resolution.service.ts's tiersForOrganisation only counts
+# organisation-scoped assignments).
 p, billing_manager, organisation:read
 p, billing_manager, invoice:read
 p, billing_manager, invoice:create
 p, billing_manager, invoice:render
 p, billing_manager, payment:settle
+p, billing_manager, agreement:read
+p, billing_manager, agreement:create
+p, billing_manager, agreement:renew
+p, billing_manager, agreement:terminate
 
 p, admin, record:read
 p, admin, record:create
 p, admin, record:review
 p, admin, organisation:read
 p, admin, invoice:read
+p, admin, agreement:read
 p, admin, organisation:create
 p, admin, organisation:update
 p, admin, invoice:create
 p, admin, invoice:render
 p, admin, payment:settle
+p, admin, agreement:create
+p, admin, agreement:renew
+p, admin, agreement:terminate
 p, admin, platform_role:read
 p, admin, platform_role:write
 p, admin, platform_role:delete

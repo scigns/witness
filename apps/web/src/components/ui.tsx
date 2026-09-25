@@ -150,6 +150,7 @@ const ROLE_LABELS: Readonly<Record<WitnessRole, string>> = {
   participant: 'Participant',
   reader: 'Read-only',
   steward: 'Knowledge Steward',
+  billing_manager: 'Billing Manager',
 };
 
 /**

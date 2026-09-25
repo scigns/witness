@@ -489,6 +489,59 @@ export interface ReceiptRenderView extends ReceiptView {
   customer: InvoiceView['customer'];
 }
 
+/**
+ * The commercial term an organisation's paid access is authorised under
+ * (Phase 5, Workstream 2.4). `status` is what is stored; `effectiveStatus`
+ * folds in a lapsed term (`termEnd` in the past) without Witness needing a
+ * background job to keep an `EXPIRED` status in sync — see
+ * `@witness/domain`'s `effectiveAgreementStatus`.
+ */
+export interface AgreementView {
+  id: string;
+  organisationId: string;
+  billingAccountId: string;
+  reference: string;
+  status: 'ACTIVE' | 'TERMINATED' | 'SUPERSEDED';
+  effectiveStatus: 'ACTIVE' | 'TERMINATED' | 'SUPERSEDED' | 'EXPIRED';
+  termStart: string;
+  termEnd: string | null;
+  notes: string | null;
+  previousAgreementId: string | null;
+  statusChangedAt: string;
+  statusReason: string | null;
+  createdAt: string;
+}
+
+const agreementReferenceSchema = z.string().trim().min(1).max(200);
+const agreementNotesSchema = z.string().trim().max(2000).nullable().optional();
+
+export const createAgreementRequestSchema = z
+  .object({
+    reference: agreementReferenceSchema,
+    termStart: z.string().datetime({ offset: true }),
+    termEnd: z.string().datetime({ offset: true }).nullable().optional(),
+    notes: agreementNotesSchema,
+  })
+  .strict();
+export type CreateAgreementRequest = z.infer<typeof createAgreementRequestSchema>;
+
+export const renewAgreementRequestSchema = z
+  .object({
+    reference: agreementReferenceSchema,
+    termStart: z.string().datetime({ offset: true }),
+    termEnd: z.string().datetime({ offset: true }).nullable().optional(),
+    notes: agreementNotesSchema,
+  })
+  .strict();
+export type RenewAgreementRequest = z.infer<typeof renewAgreementRequestSchema>;
+
+export const terminateAgreementRequestSchema = z
+  .object({
+    reason: z.string().trim().min(1).max(500),
+  })
+  .strict();
+export type TerminateAgreementRequest = z.infer<typeof terminateAgreementRequestSchema>;
+
 // ─── Co-design sessions (BUILD_ROADMAP.md Milestone 2) ────────────────────────
 
 export const SESSION_STATUSES = ['draft', 'scheduled', 'open', 'closed', 'archived'] as const;

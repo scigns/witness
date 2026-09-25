@@ -60,6 +60,8 @@ export type PaymentMethodId = Branded<string, 'PaymentMethodId'>;
 export type PurchaseOrderId = Branded<string, 'PurchaseOrderId'>;
 /** Phase 5, Workstream 2.1 — a distinct, customer-facing settlement confirmation. */
 export type ReceiptId = Branded<string, 'ReceiptId'>;
+/** Phase 5, Workstream 2.4 — the commercial term an organisation's paid access is authorised under. */
+export type AgreementId = Branded<string, 'AgreementId'>;
 
 // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
 export type KnowledgeDomainId = Branded<string, 'KnowledgeDomainId'>;
@@ -284,6 +286,11 @@ export function toPaymentMethodId(value: string): PaymentMethodId {
 export function toPurchaseOrderId(value: string): PurchaseOrderId {
   assertUuid(value, 'PurchaseOrderId');
   return value as PurchaseOrderId;
+}
+
+export function toAgreementId(value: string): AgreementId {
+  assertUuid(value, 'AgreementId');
+  return value as AgreementId;
 }
 
 export function toKnowledgeDomainId(value: string): KnowledgeDomainId {

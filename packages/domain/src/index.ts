@@ -51,6 +51,7 @@ export * from './agenda-item.js';
 export * from './resource.js';
 export * from './commercial.js';
 export * from './invoice.js';
+export * from './agreement.js';
 export * from './billing-snapshot.js';
 
 // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).

@@ -36,6 +36,11 @@ export const AUDIT_ACTIONS = [
   'payment.settled',
   'invoice.paid',
   'receipt.issued',
+  // Agreement — the commercial term an organisation's paid access is
+  // authorised under (Phase 5, Workstream 2.4).
+  'agreement.created',
+  'agreement.renewed',
+  'agreement.terminated',
   'subscription.activated',
   'entitlement.overridden',
   'workspace.created',
@@ -247,6 +252,7 @@ export const AUDIT_SUBJECT_TYPES = [
   'invoice',
   'payment',
   'receipt',
+  'agreement',
   'knowledge_domain',
   'knowledge_entity',
   'entity_alias',
