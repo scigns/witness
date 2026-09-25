@@ -45,6 +45,7 @@ record of having been wrong is part of the value.
 | [0027](ADR-0027-canonical-merge-and-governance-projection.md) | Canonical merge resolution and governance-state projection | Accepted | **P3**, P5, P6 |
 | [0028](ADR-0028-organisation-workspace-session-participant-model.md) | Organisation → Workspace → Session → Participant model, and external collaboration | Accepted | P1, P3, P6 |
 | [0029](ADR-0029-development-environment-strategy.md) | Development environment strategy — Codespaces-first, CI-verified, local-optional | Accepted | P1, P6 |
+| [0030](ADR-0030-mobile-participation-strategy.md) | Mobile participation strategy — responsive web, PWA, and native companion | Accepted | P1, P2, P6, P7, P8 |
 
 Bold principles indicate an ADR that is a primary expression of that principle. Changing one of
 those requires Steering Committee approval, and where consent, provenance or Indigenous data
