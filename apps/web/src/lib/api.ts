@@ -150,6 +150,7 @@ import type {
   CreateAgreementRequest,
   RenewAgreementRequest,
   TerminateAgreementRequest,
+  OperatorHealthView,
   RespondToCandidateClarificationRequest,
   ReviewCandidateAssertionRequest,
   UpdateKnowledgeDomainPolicyRequest,
@@ -468,6 +469,11 @@ export const api = {
       user,
       { method: 'POST', body: JSON.stringify(body) },
     ),
+
+  // ─── Operator visibility (Phase 5, Workstream 4.2) ─────────────────────────
+
+  getOperatorHealth: (user: ActingUser): Promise<OperatorHealthView> =>
+    request('/api/v1/operator/health', user),
 
   listRecords: (user: ActingUser): Promise<{ records: RecordSummary[] }> =>
     request<{ records: RecordSummary[] }>('/api/v1/records', user),

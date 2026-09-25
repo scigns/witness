@@ -123,6 +123,8 @@ import { InvoicesService } from './invoices/invoices.service.js';
 import { ManualSettlementService } from './invoices/manual-settlement.service.js';
 import { AgreementsController } from './agreements/agreements.controller.js';
 import { AgreementsService } from './agreements/agreements.service.js';
+import { OperatorController } from './operator/operator.controller.js';
+import { OperatorService } from './operator/operator.service.js';
 import { PlatformRolesController } from './platform-roles/platform-roles.controller.js';
 import { PlatformRolesService } from './platform-roles/platform-roles.service.js';
 import { MailerService } from './infrastructure/mailer.js';
@@ -165,6 +167,7 @@ import { MailerService } from './infrastructure/mailer.js';
     BillingController,
     InvoicesController,
     AgreementsController,
+    OperatorController,
     PlatformRolesController,
     KnowledgeDomainsController,
     KnowledgeEntitiesController,
@@ -190,6 +193,7 @@ import { MailerService } from './infrastructure/mailer.js';
     InvoicesService,
     ManualSettlementService,
     AgreementsService,
+    OperatorService,
     PlatformRolesService,
     KnowledgeDomainsService,
     KnowledgeEntitiesService,

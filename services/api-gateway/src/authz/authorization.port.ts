@@ -43,6 +43,7 @@ export type Action =
   | 'platform_role:read'
   | 'platform_role:write'
   | 'platform_role:delete'
+  | 'operator:read'
   | 'workspace:read'
   | 'workspace:create'
   | 'workspace:update'

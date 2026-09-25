@@ -2722,6 +2722,52 @@ export interface HealthResponse {
   notImplemented: string[];
 }
 
+// ─── Operator visibility (Phase 5, Workstream 4.2) ─────────────────────────────
+
+/**
+ * One failed or stuck-attention item across organisations — a triage entry,
+ * not a full record. `organisationName` is denormalised here because this
+ * view exists precisely so an operator does not have to open each
+ * organisation individually to know what needs attention. The `link*` ids
+ * are whichever the item actually has (a failed transcript has an evidence
+ * id; a failed invitation email does not) — the UI builds a deep link into
+ * the existing per-record retry surface from whichever are present, rather
+ * than this duplicating retry actions itself.
+ */
+export interface OperatorFailureItem {
+  id: string;
+  organisationId: string;
+  organisationName: string;
+  detail: string;
+  reason: string | null;
+  occurredAt: string;
+  linkWorkspaceId: string | null;
+  linkSessionId: string | null;
+  linkEvidenceId: string | null;
+}
+
+export interface OperatorFailureGroup {
+  count: number;
+  items: OperatorFailureItem[];
+}
+
+/**
+ * Cross-organisation "what needs attention" view for Witness's own
+ * operators (`agreement:read`'s counterpart for jobs, not billing) —
+ * platform-scoped, never reachable via an organisation-scoped role, the
+ * same trust boundary `payment:settle` already draws. Deliberately a
+ * read-only aggregate of existing state (failed transcripts/summaries,
+ * undelivered invitation emails, overdue invoices and rejected payments),
+ * not a new job queue or alerting system.
+ */
+export interface OperatorHealthView {
+  transcription: OperatorFailureGroup;
+  summaries: OperatorFailureGroup;
+  email: OperatorFailureGroup;
+  settlement: OperatorFailureGroup;
+  generatedAt: string;
+}
+
 // ─── Search (Phase 6) ──────────────────────────────────────────────────────────
 
 export const SEARCH_RESULT_TYPES = [

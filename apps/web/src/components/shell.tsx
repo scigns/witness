@@ -159,6 +159,12 @@ export function Shell({ children }: { children: ReactNode }) {
                     >
                       Users
                     </Link>
+                    <Link
+                      href="/operator"
+                      className="block rounded px-3 py-2 text-sm hover:bg-[var(--color-paper)]"
+                    >
+                      Operator health
+                    </Link>
                     {currentUser.organisations
                       .filter((organisation) => organisation.role === 'admin')
                       .map((organisation) => (

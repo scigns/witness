@@ -286,6 +286,7 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'platform_role:read',
     'platform_role:write',
     'platform_role:delete',
+    'operator:read',
     'workspace:read',
     'workspace:create',
     'workspace:update',
