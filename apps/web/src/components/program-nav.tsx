@@ -24,6 +24,9 @@ export function ProgramNav({ workspaceId, role }: ProgramNavProps) {
     ...(role !== null && REVIEW_ROLES.has(role)
       ? [{ href: `${base}/review`, label: 'Review' }]
       : []),
+    ...(role !== null && REVIEW_ROLES.has(role)
+      ? [{ href: `${base}/customer-stories`, label: 'Stories' }]
+      : []),
     { href: `${base}/search`, label: 'Search' },
     ...(role !== null && MANAGE_ROLES.has(role)
       ? [{ href: `${base}/manage`, label: 'Manage' }]

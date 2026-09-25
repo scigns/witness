@@ -28,6 +28,7 @@ import type { ParticipantCaptureContextView } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
 import { AudioRecorder } from '@/components/audio-recorder';
+import { MicroSurvey } from '@/components/micro-survey';
 import { Card, ErrorNotice, categoryLabel } from '@/components/ui';
 import { type CaptureSession, loadCaptureSession } from '@/lib/capture-session';
 import {
@@ -322,10 +323,30 @@ export default function ParticipantCapturePage({
         <div className="space-y-4">
           {submitError !== null && <ErrorNotice message={submitError} />}
           {submittedCount > 0 && (
-            <p role="status" className="text-center text-sm text-[var(--color-ink)]">
-              {submittedCount} contribution{submittedCount === 1 ? '' : 's'} submitted. Record
-              another any time.
-            </p>
+            <>
+              <p role="status" className="text-center text-sm text-[var(--color-ink)]">
+                {submittedCount} contribution{submittedCount === 1 ? '' : 's'} submitted. Record
+                another any time.
+              </p>
+              <MicroSurvey
+                productArea="evidence_capture"
+                question="How easy was it to contribute today?"
+                submitFeedback={async (rating, comment) => {
+                  const result = await api.captureParticipantFeedback(session.captureToken, {
+                    rating,
+                    comment,
+                  });
+                  return { feedbackId: result.id, offerTestimonial: result.offerTestimonial };
+                }}
+                submitTestimonialConsent={async (feedbackId, request) => {
+                  await api.captureParticipantTestimonialConsent(
+                    session.captureToken,
+                    feedbackId,
+                    request,
+                  );
+                }}
+              />
+            </>
           )}
           {queued.length > 0 && (
             <p role="status" className="text-center text-xs text-[var(--color-ink-muted)]">

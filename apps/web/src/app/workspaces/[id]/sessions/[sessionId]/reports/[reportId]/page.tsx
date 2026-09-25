@@ -36,6 +36,7 @@ import {
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { MicroSurvey } from '@/components/micro-survey';
 import { Button, Card, ErrorNotice, ReportStatusBadge } from '@/components/ui';
 
 const ACTION_LABELS: Record<ReportTransitionRequest['action'], string> = {
@@ -87,6 +88,7 @@ export default function ReportDetailPage({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [exporting, setExporting] = useState<ReportExportFormat | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   /**
    * What this report may cite: the session's validated evidence and its
@@ -140,6 +142,7 @@ export default function ReportDetailPage({
     // download asynchronously and a URL revoked in the same task can be gone
     // before it is read.
     setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    setShowFeedback(true);
 
     // The download above already succeeded and cannot be undone by anything
     // below — the server also records this export (both in the report's
@@ -748,6 +751,30 @@ export default function ReportDetailPage({
             ))}
           </div>
         </Card>
+      )}
+
+      {showFeedback && (
+        <MicroSurvey
+          productArea="reporting"
+          question="Did this report reflect the evidence you reviewed?"
+          submitFeedback={async (rating, comment) => {
+            const result = await api.submitProductFeedback(
+              workspaceId,
+              {
+                productArea: 'reporting',
+                moment: 'report_export_success',
+                rating,
+                comment,
+                sessionId,
+              },
+              user,
+            );
+            return { feedbackId: result.id, offerTestimonial: result.offerTestimonial };
+          }}
+          submitTestimonialConsent={async (feedbackId, request) => {
+            await api.submitTestimonialConsent(workspaceId, feedbackId, request, user);
+          }}
+        />
       )}
 
       {history.length > 0 && (

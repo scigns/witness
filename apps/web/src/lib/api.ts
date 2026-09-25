@@ -164,6 +164,13 @@ import type {
   SessionJoinContextView,
   SessionJoinLinkCreatedView,
   SessionJoinLinkView,
+  CaptureParticipantFeedbackRequest,
+  CustomerStoryView,
+  EditCustomerStoryWordingRequest,
+  ModerateCustomerStoryRequest,
+  ProductFeedbackView,
+  SubmitProductFeedbackRequest,
+  SubmitTestimonialConsentRequest,
 } from '@witness/contracts';
 
 import { API_BASE_URL } from './runtime-config';
@@ -881,6 +888,31 @@ export const api = {
       body: JSON.stringify(body),
       headers: { 'X-Witness-Capture-Token': captureToken },
     }),
+
+  captureParticipantFeedback: (
+    captureToken: string,
+    body: CaptureParticipantFeedbackRequest,
+  ): Promise<ProductFeedbackView> =>
+    request<ProductFeedbackView>('/api/v1/participant-capture/feedback', null, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { 'X-Witness-Capture-Token': captureToken },
+    }),
+
+  captureParticipantTestimonialConsent: (
+    captureToken: string,
+    feedbackId: string,
+    body: SubmitTestimonialConsentRequest,
+  ): Promise<CustomerStoryView | null> =>
+    request<CustomerStoryView | null>(
+      `/api/v1/participant-capture/feedback/${feedbackId}/testimonial-consent`,
+      null,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: { 'X-Witness-Capture-Token': captureToken },
+      },
+    ),
 
   uploadParticipantCaptureAttachment: (
     captureToken: string,
@@ -2429,6 +2461,91 @@ export const api = {
     request(
       `/api/v1/organisations/${encodeURIComponent(organisationId)}/workspaces/${encodeURIComponent(workspaceId)}/knowledge/graph/search?q=${encodeURIComponent(query)}`,
       user,
+    ),
+
+  // Product feedback micro-surveys and governed testimonial publication
+  // (Phase 6, Track B).
+
+  submitProductFeedback: (
+    workspaceId: string,
+    body: SubmitProductFeedbackRequest,
+    user: ActingUser,
+  ): Promise<ProductFeedbackView> =>
+    request<ProductFeedbackView>(`/api/v1/workspaces/${workspaceId}/product-feedback`, user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  submitTestimonialConsent: (
+    workspaceId: string,
+    feedbackId: string,
+    body: SubmitTestimonialConsentRequest,
+    user: ActingUser,
+  ): Promise<CustomerStoryView | null> =>
+    request<CustomerStoryView | null>(
+      `/api/v1/workspaces/${workspaceId}/product-feedback/${feedbackId}/testimonial-consent`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  listCustomerStories: (workspaceId: string, user: ActingUser): Promise<CustomerStoryView[]> =>
+    request<CustomerStoryView[]>(`/api/v1/workspaces/${workspaceId}/customer-stories`, user),
+
+  editCustomerStoryWording: (
+    workspaceId: string,
+    storyId: string,
+    body: EditCustomerStoryWordingRequest,
+    user: ActingUser,
+  ): Promise<CustomerStoryView> =>
+    request<CustomerStoryView>(
+      `/api/v1/workspaces/${workspaceId}/customer-stories/${storyId}/wording`,
+      user,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  moderateCustomerStory: (
+    workspaceId: string,
+    storyId: string,
+    body: ModerateCustomerStoryRequest,
+    user: ActingUser,
+  ): Promise<CustomerStoryView> =>
+    request<CustomerStoryView>(
+      `/api/v1/workspaces/${workspaceId}/customer-stories/${storyId}/moderation`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  publishCustomerStory: (
+    workspaceId: string,
+    storyId: string,
+    user: ActingUser,
+  ): Promise<CustomerStoryView> =>
+    request<CustomerStoryView>(
+      `/api/v1/workspaces/${workspaceId}/customer-stories/${storyId}/publication`,
+      user,
+      { method: 'POST' },
+    ),
+
+  unpublishCustomerStory: (
+    workspaceId: string,
+    storyId: string,
+    user: ActingUser,
+  ): Promise<CustomerStoryView> =>
+    request<CustomerStoryView>(
+      `/api/v1/workspaces/${workspaceId}/customer-stories/${storyId}/publication`,
+      user,
+      { method: 'DELETE' },
+    ),
+
+  withdrawCustomerStoryConsent: (
+    workspaceId: string,
+    storyId: string,
+    user: ActingUser,
+  ): Promise<CustomerStoryView> =>
+    request<CustomerStoryView>(
+      `/api/v1/workspaces/${workspaceId}/customer-stories/${storyId}/consent`,
+      user,
+      { method: 'DELETE' },
     ),
 };
 
