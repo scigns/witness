@@ -204,6 +204,36 @@ describe('AuthenticationController — dev-idp/authorize redirect_uri validation
   });
 });
 
+describe('AuthenticationController — login returnTo (Track C, ADR-0030)', () => {
+  it('forwards a valid returnTo path to startLogin', async () => {
+    const startLogin = vi.fn().mockResolvedValue({ redirectUrl: 'https://idp.example/authorize' });
+    const controller = new AuthenticationController(
+      { startLogin } as unknown as AuthenticationService,
+      {} as IdentityProviderPort,
+      { profile: 'hybrid' } as WitnessConfig,
+    );
+    const response = { redirect: vi.fn() } as never;
+
+    await controller.login(undefined, '/join/abc123', response);
+
+    expect(startLogin).toHaveBeenCalledWith(undefined, '/join/abc123');
+  });
+
+  it('drops an unsafe returnTo before it ever reaches startLogin', async () => {
+    const startLogin = vi.fn().mockResolvedValue({ redirectUrl: 'https://idp.example/authorize' });
+    const controller = new AuthenticationController(
+      { startLogin } as unknown as AuthenticationService,
+      {} as IdentityProviderPort,
+      { profile: 'hybrid' } as WitnessConfig,
+    );
+    const response = { redirect: vi.fn() } as never;
+
+    await controller.login(undefined, 'https://evil.example/', response);
+
+    expect(startLogin).toHaveBeenCalledWith(undefined, undefined);
+  });
+});
+
 describe('AuthenticationController — independent application callback', () => {
   it('returns a successful OIDC callback to the configured root-host application', async () => {
     const authentication = {
@@ -233,6 +263,49 @@ describe('AuthenticationController — independent application callback', () => 
     });
     expect(response.redirect).toHaveBeenCalledWith(302, 'https://app.buildwithwitness.com/');
     expect(JSON.stringify(response.redirect.mock.calls)).not.toContain('session-token');
+  });
+
+  it('returns to a valid returnTo path (Track C, ADR-0030) instead of the generic root', async () => {
+    const authentication = {
+      handleCallback: vi.fn().mockResolvedValue({
+        token: 'session-token',
+        expiresAt: new Date('2030-01-01T00:00:00Z'),
+        returnTo: '/join/abc123',
+      }),
+    } as unknown as AuthenticationService;
+    const response = { redirect: vi.fn(), cookie: vi.fn() } as never;
+    const controller = new AuthenticationController(
+      authentication,
+      {} as IdentityProviderPort,
+      { webBaseUrl: 'https://app.buildwithwitness.com/', profile: 'hybrid' } as WitnessConfig,
+    );
+
+    await controller.callback('oidc-code', 'oidc-state', response);
+
+    expect(response.redirect).toHaveBeenCalledWith(
+      302,
+      'https://app.buildwithwitness.com/join/abc123',
+    );
+  });
+
+  it('never redirects off-origin even if handleCallback somehow returned an absolute URL', async () => {
+    const authentication = {
+      handleCallback: vi.fn().mockResolvedValue({
+        token: 'session-token',
+        expiresAt: new Date('2030-01-01T00:00:00Z'),
+        returnTo: 'https://evil.example/',
+      }),
+    } as unknown as AuthenticationService;
+    const response = { redirect: vi.fn(), cookie: vi.fn() } as never;
+    const controller = new AuthenticationController(
+      authentication,
+      {} as IdentityProviderPort,
+      { webBaseUrl: 'https://app.buildwithwitness.com/', profile: 'hybrid' } as WitnessConfig,
+    );
+
+    await controller.callback('oidc-code', 'oidc-state', response);
+
+    expect(response.redirect).toHaveBeenCalledWith(302, 'https://app.buildwithwitness.com/');
   });
 
   it('revokes server authority and expires the host-only browser cookie on logout', async () => {

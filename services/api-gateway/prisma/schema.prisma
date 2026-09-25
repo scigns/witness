@@ -853,6 +853,14 @@ model AuthLoginAttempt {
   codeVerifier String @map("code_verifier") @db.VarChar(128)
   redirectUri  String @map("redirect_uri") @db.VarChar(500)
 
+  /// A root-relative path (e.g. `/join/abc123`) to return to after a
+  /// successful callback — never an absolute URL (validated at write time
+  /// in `AuthenticationController.login` and re-validated at read time in
+  /// `handleCallback`, so a corrupted or hand-crafted row can never become
+  /// an open redirect). Null falls back to the fixed web origin, the
+  /// pre-existing behaviour (Track C, ADR-0030).
+  returnTo String? @map("return_to") @db.VarChar(500)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
 
