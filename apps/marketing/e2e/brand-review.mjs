@@ -25,6 +25,14 @@ const contentPaths = [
   '/solutions/research',
   '/solutions/consultation',
   '/demo',
+  '/platform/co-design',
+  '/platform/knowledge',
+  '/platform/change',
+  '/trust',
+  '/trust/security',
+  '/trust/data-sovereignty',
+  '/trust/privacy',
+  '/stories',
 ];
 
 async function waitForServer() {

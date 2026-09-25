@@ -27,6 +27,16 @@ import ConsultationSolutionPage, {
   metadata as consultationMetadata,
 } from '../src/app/solutions/consultation/page';
 import DemoPage, { metadata as demoMetadata } from '../src/app/demo/page';
+import CoDesignPage, { metadata as coDesignMetadata } from '../src/app/platform/co-design/page';
+import KnowledgePage, { metadata as knowledgeMetadata } from '../src/app/platform/knowledge/page';
+import ChangePage, { metadata as changeMetadata } from '../src/app/platform/change/page';
+import TrustPage, { metadata as trustMetadata } from '../src/app/trust/page';
+import SecurityPage, { metadata as securityMetadata } from '../src/app/trust/security/page';
+import DataSovereigntyPage, {
+  metadata as dataSovereigntyMetadata,
+} from '../src/app/trust/data-sovereignty/page';
+import PrivacyPage, { metadata as privacyMetadata } from '../src/app/trust/privacy/page';
+import StoriesPage, { metadata as storiesMetadata } from '../src/app/stories/page';
 import robots from '../src/app/robots';
 import sitemap from '../src/app/sitemap';
 import { GET } from '../src/app/health/route';
@@ -156,6 +166,7 @@ describe('independent marketing foundation', () => {
       'Platform',
       'Solutions',
       'Why Witness',
+      'Trust',
     ]);
     expect(hrefs).toEqual(
       expect.arrayContaining([
@@ -168,6 +179,11 @@ describe('independent marketing foundation', () => {
         '/solutions/international-development',
         '/solutions/research',
         '/solutions/consultation',
+        '/trust',
+        '/trust/security',
+        '/trust/data-sovereignty',
+        '/trust/privacy',
+        '/stories',
         'https://app.buildwithwitness.com/signin',
         'https://app.buildwithwitness.com/pricing',
         'mailto:hello@buildwithwitness.com?subject=Witness%20institutional%20pilot%20enquiry',
@@ -176,7 +192,6 @@ describe('independent marketing foundation', () => {
     );
     // The launch navigation exposes only implemented routes.
     expect(hrefs.some((href) => href.startsWith('/pricing'))).toBe(false);
-    expect(hrefs.some((href) => href.startsWith('/trust'))).toBe(false);
     expect(hrefs.some((href) => href.startsWith('/resources'))).toBe(false);
   });
 
@@ -433,6 +448,14 @@ describe('independent marketing foundation', () => {
         '/solutions/research',
         '/solutions/consultation',
         '/demo',
+        '/platform/co-design',
+        '/platform/knowledge',
+        '/platform/change',
+        '/trust',
+        '/trust/security',
+        '/trust/data-sovereignty',
+        '/trust/privacy',
+        '/stories',
         '/brand/witness-logo-transparent.png', // next/image priority preload on every page
       ]);
       for (const { Page } of pages) {
@@ -512,6 +535,14 @@ describe('independent marketing foundation', () => {
         '/solutions/research',
         '/solutions/consultation',
         '/demo',
+        '/platform/co-design',
+        '/platform/knowledge',
+        '/platform/change',
+        '/trust',
+        '/trust/security',
+        '/trust/data-sovereignty',
+        '/trust/privacy',
+        '/stories',
         '/brand/witness-logo-transparent.png',
       ]);
       for (const { Page } of pages) {
@@ -607,6 +638,14 @@ describe('independent marketing foundation', () => {
         '/solutions/research',
         '/solutions/consultation',
         '/demo',
+        '/platform/co-design',
+        '/platform/knowledge',
+        '/platform/change',
+        '/trust',
+        '/trust/security',
+        '/trust/data-sovereignty',
+        '/trust/privacy',
+        '/stories',
         '/brand/witness-logo-transparent.png',
       ]);
       const html = renderToStaticMarkup(
@@ -639,6 +678,221 @@ describe('independent marketing foundation', () => {
       ]) {
         expect(html).toContain(category);
       }
+    });
+  });
+
+  describe('Phase 6 platform depth pages (co-design, knowledge, change)', () => {
+    const pages = [
+      {
+        name: 'platform/co-design',
+        Page: CoDesignPage,
+        metadata: coDesignMetadata,
+        path: '/platform/co-design',
+      },
+      {
+        name: 'platform/knowledge',
+        Page: KnowledgePage,
+        metadata: knowledgeMetadata,
+        path: '/platform/knowledge',
+      },
+      {
+        name: 'platform/change',
+        Page: ChangePage,
+        metadata: changeMetadata,
+        path: '/platform/change',
+      },
+    ] as const;
+
+    it.each(pages)(
+      '$name renders exactly one h1 and safe canonical metadata',
+      ({ Page, metadata, path }) => {
+        const html = renderToStaticMarkup(
+          <MarketingShell>
+            <Page />
+          </MarketingShell>,
+        );
+        expect(html.match(/<h1/g)).toHaveLength(1);
+        expect(metadata.alternates?.canonical).toBe(`https://buildwithwitness.com${path}`);
+        expect(metadata.robots).toEqual({ index: false, follow: false });
+      },
+    );
+
+    it('uses only real perspective/consent vocabulary from packages/domain', () => {
+      const html = renderToStaticMarkup(
+        <MarketingShell>
+          <KnowledgePage />
+        </MarketingShell>,
+      );
+      // packages/domain/src/knowledge-assertion.ts PERSPECTIVE_TAGS, human-readable form.
+      for (const tag of [
+        'contested',
+        'minority perspective',
+        'culturally significant',
+        'unresolved',
+      ]) {
+        expect(html.toLowerCase()).toContain(tag);
+      }
+    });
+
+    it('cross-links only to routes that exist in this app', () => {
+      const realRoutes = new Set([
+        '/',
+        '/platform',
+        '/platform/evidence',
+        '/platform/decisions',
+        '/platform/institutional-memory',
+        '/platform/co-design',
+        '/platform/knowledge',
+        '/platform/change',
+        '/solutions',
+        '/solutions/government',
+        '/solutions/international-development',
+        '/solutions/research',
+        '/solutions/consultation',
+        '/how-it-works',
+        '/why-witness',
+        '/demo',
+        '/trust',
+        '/trust/security',
+        '/trust/data-sovereignty',
+        '/trust/privacy',
+        '/stories',
+        '/brand/witness-logo-transparent.png',
+      ]);
+      for (const { Page } of pages) {
+        const html = renderToStaticMarkup(
+          <MarketingShell>
+            <Page />
+          </MarketingShell>,
+        );
+        const hrefs = [...html.matchAll(/href="([^"]+)"/g)].flatMap((match) =>
+          match[1] === undefined ? [] : [match[1]],
+        );
+        for (const href of hrefs) {
+          if (href.startsWith('/') && href !== '#main-content') {
+            expect(realRoutes.has(href), `${href} is not a real route`).toBe(true);
+          }
+        }
+      }
+    });
+  });
+
+  describe('Phase 6 trust centre', () => {
+    const pages = [
+      { name: 'trust', Page: TrustPage, metadata: trustMetadata, path: '/trust' },
+      {
+        name: 'trust/security',
+        Page: SecurityPage,
+        metadata: securityMetadata,
+        path: '/trust/security',
+      },
+      {
+        name: 'trust/data-sovereignty',
+        Page: DataSovereigntyPage,
+        metadata: dataSovereigntyMetadata,
+        path: '/trust/data-sovereignty',
+      },
+      {
+        name: 'trust/privacy',
+        Page: PrivacyPage,
+        metadata: privacyMetadata,
+        path: '/trust/privacy',
+      },
+    ] as const;
+
+    it.each(pages)(
+      '$name renders exactly one h1 and safe canonical metadata',
+      ({ Page, metadata, path }) => {
+        const html = renderToStaticMarkup(
+          <MarketingShell>
+            <Page />
+          </MarketingShell>,
+        );
+        expect(html.match(/<h1/g)).toHaveLength(1);
+        expect(metadata.alternates?.canonical).toBe(`https://buildwithwitness.com${path}`);
+        expect(metadata.robots).toEqual({ index: false, follow: false });
+      },
+    );
+
+    it('never claims a certification Witness does not hold, on any trust page', () => {
+      const forbidden = ['SOC 2', 'SOC2', 'ISO 27001', 'ISO27001', 'HIPAA compliant', 'FedRAMP'];
+      for (const { Page } of pages) {
+        const html = renderToStaticMarkup(
+          <MarketingShell>
+            <Page />
+          </MarketingShell>,
+        );
+        for (const claim of forbidden) {
+          // The only permitted appearance is inside an explicit denial sentence
+          // ("does not hold", "No SOC 2"), never a bare claim.
+          if (html.includes(claim)) {
+            const context = html.slice(Math.max(0, html.indexOf(claim) - 40), html.indexOf(claim));
+            expect(/no |not |does not/i.test(context)).toBe(true);
+          }
+        }
+      }
+    });
+
+    it('cross-links only to routes that exist in this app', () => {
+      const realRoutes = new Set([
+        '/',
+        '/platform',
+        '/platform/evidence',
+        '/platform/decisions',
+        '/platform/institutional-memory',
+        '/platform/co-design',
+        '/platform/knowledge',
+        '/platform/change',
+        '/how-it-works',
+        '/why-witness',
+        '/demo',
+        '/solutions',
+        '/solutions/government',
+        '/solutions/international-development',
+        '/solutions/research',
+        '/solutions/consultation',
+        '/trust',
+        '/trust/security',
+        '/trust/data-sovereignty',
+        '/trust/privacy',
+        '/stories',
+        '/brand/witness-logo-transparent.png',
+      ]);
+      for (const { Page } of pages) {
+        const html = renderToStaticMarkup(
+          <MarketingShell>
+            <Page />
+          </MarketingShell>,
+        );
+        const hrefs = [...html.matchAll(/href="([^"]+)"/g)].flatMap((match) =>
+          match[1] === undefined ? [] : [match[1]],
+        );
+        for (const href of hrefs) {
+          if (href.startsWith('/') && href !== '#main-content') {
+            expect(realRoutes.has(href), `${href} is not a real route`).toBe(true);
+          }
+        }
+      }
+    });
+  });
+
+  describe('Phase 6 customer stories', () => {
+    it('renders exactly one h1, an honest empty state, and safe canonical metadata', () => {
+      const html = renderToStaticMarkup(
+        <MarketingShell>
+          <StoriesPage />
+        </MarketingShell>,
+      );
+      expect(html.match(/<h1/g)).toHaveLength(1);
+      expect(html).toContain('No public stories yet');
+      expect(storiesMetadata.alternates?.canonical).toBe('https://buildwithwitness.com/stories');
+      expect(storiesMetadata.robots).toEqual({ index: false, follow: false });
+    });
+
+    it('does not import the product application, auth, session, or protected API', () => {
+      const contents = readFileSync(join(process.cwd(), 'src/app/stories/page.tsx'), 'utf8');
+      expect(contents).not.toMatch(/apps\/web|@witness\/web|lib\/auth|lib\/session|lib\/api/);
+      expect(contents).not.toMatch(/document\.cookie|credentials:\s*['"]include['"]|fetch\(/);
     });
   });
 });

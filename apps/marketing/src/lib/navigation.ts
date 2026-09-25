@@ -13,6 +13,7 @@ export const marketingNavigation = {
     { label: 'Platform', href: '/platform' },
     { label: 'Solutions', href: '/solutions' },
     { label: 'Why Witness', href: '/why-witness' },
+    { label: 'Trust', href: '/trust' },
   ],
   footer: [
     {
@@ -21,6 +22,9 @@ export const marketingNavigation = {
         { label: 'Overview', href: '/platform' },
         { label: 'How it works', href: '/how-it-works' },
         { label: 'Evidence', href: '/platform/evidence' },
+        { label: 'Co-design', href: '/platform/co-design' },
+        { label: 'Knowledge', href: '/platform/knowledge' },
+        { label: 'Change over time', href: '/platform/change' },
         { label: 'Institutional memory', href: '/platform/institutional-memory' },
       ],
     },
@@ -34,9 +38,19 @@ export const marketingNavigation = {
       ],
     },
     {
+      label: 'Trust',
+      items: [
+        { label: 'Overview', href: '/trust' },
+        { label: 'Security', href: '/trust/security' },
+        { label: 'Data & sovereignty', href: '/trust/data-sovereignty' },
+        { label: 'Privacy', href: '/trust/privacy' },
+      ],
+    },
+    {
       label: 'Witness',
       items: [
         { label: 'Why Witness', href: '/why-witness' },
+        { label: 'Customer stories', href: '/stories' },
         { label: 'Open source', href: 'https://github.com/scigns/witness' },
       ],
     },
