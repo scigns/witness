@@ -145,6 +145,7 @@ import type {
   MergeKnowledgeEntitiesRequest,
   ProposeCandidateAssertionRequest,
   ProvenanceRecord,
+  ReceiptView,
   RespondToCandidateClarificationRequest,
   ReviewCandidateAssertionRequest,
   UpdateKnowledgeDomainPolicyRequest,
@@ -388,6 +389,41 @@ export const api = {
       `/api/v1/organisations/${encodeURIComponent(organisationId)}/invoices/${encodeURIComponent(invoiceId)}/settlements`,
       user,
       { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  getInvoiceRenderBlob: (
+    organisationId: string,
+    invoiceId: string,
+    user: ActingUser,
+  ): Promise<Blob> =>
+    requestBlob(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/invoices/${encodeURIComponent(invoiceId)}/render`,
+      user,
+    ),
+
+  // ─── Receipts (Phase 5, Workstream 2.1-2.2) ────────────────────────────────
+
+  getReceipt: (
+    organisationId: string,
+    invoiceId: string,
+    user: ActingUser,
+  ): Promise<ReceiptView | null> =>
+    request<ReceiptView>(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/invoices/${encodeURIComponent(invoiceId)}/receipt`,
+      user,
+    ).catch((caught) => {
+      if (caught instanceof ApiError && caught.code === 'RECEIPT_NOT_FOUND') return null;
+      throw caught;
+    }),
+
+  getReceiptRenderBlob: (
+    organisationId: string,
+    invoiceId: string,
+    user: ActingUser,
+  ): Promise<Blob> =>
+    requestBlob(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/invoices/${encodeURIComponent(invoiceId)}/receipt/render`,
+      user,
     ),
 
   listRecords: (user: ActingUser): Promise<{ records: RecordSummary[] }> =>

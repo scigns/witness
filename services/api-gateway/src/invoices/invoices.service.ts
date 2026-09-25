@@ -19,7 +19,13 @@ import {
   toOrganisationId,
   toPurchaseOrderId,
 } from '@witness/domain';
-import type { IssueInvoiceRequest, InvoiceRenderView, InvoiceView } from '@witness/contracts';
+import type {
+  IssueInvoiceRequest,
+  InvoiceRenderView,
+  InvoiceView,
+  ReceiptRenderView,
+  ReceiptView,
+} from '@witness/contracts';
 import type { WitnessConfig } from '@witness/config';
 import type { Principal } from '../authz/authorization.port.js';
 import { PrismaService } from '../infrastructure/prisma.service.js';
@@ -448,6 +454,65 @@ export class InvoicesService {
         accountNumber: row.remittanceSnapshot.accountNumber,
         paymentInstructions: row.remittanceSnapshot.paymentInstructions,
       },
+    };
+  }
+
+  private async requireReceiptRow(organisationId: string, invoiceId: string) {
+    const row = await this.prisma.receipt.findFirst({
+      where: { organisationId, invoiceId },
+      include: { invoice: true, payment: true },
+    });
+    if (!row) {
+      throw new NotFoundException({
+        error: {
+          code: 'RECEIPT_NOT_FOUND',
+          message: 'No receipt has been issued for this invoice yet.',
+        },
+      });
+    }
+    return row;
+  }
+
+  async getReceipt(organisationId: string, invoiceId: string): Promise<ReceiptView> {
+    const row = await this.requireReceiptRow(organisationId, invoiceId);
+    return {
+      id: row.id,
+      organisationId: row.organisationId,
+      invoiceId: row.invoiceId,
+      paymentId: row.paymentId,
+      receiptNumber: row.receiptNumber,
+      amountMinor: row.amountMinor.toString(),
+      currency: row.currency,
+      issuedAt: row.issuedAt.toISOString(),
+    };
+  }
+
+  async renderReceipt(organisationId: string, invoiceId: string): Promise<ReceiptRenderView> {
+    const row = await this.requireReceiptRow(organisationId, invoiceId);
+    const invoiceRow = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, organisationId },
+      include: { lines: true },
+    });
+    if (!invoiceRow || !invoiceRow.invoiceNumber) {
+      throw new NotFoundException({
+        error: { code: 'INVOICE_NOT_FOUND', message: 'Invoice not found.' },
+      });
+    }
+    const invoiceView = toView(invoiceRow);
+    return {
+      id: row.id,
+      organisationId: row.organisationId,
+      invoiceId: row.invoiceId,
+      paymentId: row.paymentId,
+      receiptNumber: row.receiptNumber,
+      amountMinor: row.amountMinor.toString(),
+      currency: row.currency,
+      issuedAt: row.issuedAt.toISOString(),
+      invoiceNumber: invoiceView.invoiceNumber,
+      paymentMethod: row.payment.method as 'MANUAL_BANK_TRANSFER',
+      sourceReference: row.payment.sourceReference,
+      supplier: invoiceView.supplier,
+      customer: invoiceView.customer,
     };
   }
 }

@@ -469,6 +469,20 @@ export interface InvoiceRenderView extends InvoiceView {
   };
 }
 
+/**
+ * Everything `renderReceiptHtml` needs. Borrows its invoice's supplier and
+ * customer snapshot rather than keeping its own — an issued invoice is
+ * immutable (`prevent_issued_invoice_mutation`), so the identity facts at
+ * settlement time are, by construction, the same ones at issuance time.
+ */
+export interface ReceiptRenderView extends ReceiptView {
+  invoiceNumber: string;
+  paymentMethod: 'MANUAL_BANK_TRANSFER';
+  sourceReference: string;
+  supplier: InvoiceView['supplier'];
+  customer: InvoiceView['customer'];
+}
+
 // ─── Co-design sessions (BUILD_ROADMAP.md Milestone 2) ────────────────────────
 
 export const SESSION_STATUSES = ['draft', 'scheduled', 'open', 'closed', 'archived'] as const;

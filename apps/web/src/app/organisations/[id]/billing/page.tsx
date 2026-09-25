@@ -19,6 +19,8 @@ export default function BillingPage({ params }: { params: Promise<{ id: string }
   const [method, setMethod] = useState<PaymentMethodChoice>('BANK_TRANSFER');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const load = useCallback(async () => {
     try {
       setOverview(await api.getBillingOverview(id, user));
@@ -30,6 +32,31 @@ export default function BillingPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     if (ready) void load();
   }, [ready, load]);
+  const download = async (kind: 'invoice' | 'receipt', invoiceId: string, filenameHint: string) => {
+    setDownloadingId(`${kind}:${invoiceId}`);
+    setDownloadError(null);
+    try {
+      const blob =
+        kind === 'invoice'
+          ? await api.getInvoiceRenderBlob(id, invoiceId, user)
+          : await api.getReceiptRenderBlob(id, invoiceId, user);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${filenameHint}.html`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (caught) {
+      setDownloadError(
+        caught instanceof ApiError ? caught.message : `Could not download the ${kind}. Try again.`,
+      );
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const request = async (plan: PublicPlan) => {
     setBusy(true);
     try {
@@ -171,6 +198,11 @@ export default function BillingPage({ params }: { params: Promise<{ id: string }
         <h2 id="invoices-heading" className="text-xl font-semibold">
           Invoices
         </h2>
+        {downloadError !== null && (
+          <p role="alert" className="text-sm text-[var(--color-attention)]">
+            {downloadError}
+          </p>
+        )}
         {overview.invoices.length === 0 ? (
           <p className="text-sm text-[var(--color-ink-muted)]">No invoices have been issued.</p>
         ) : (
@@ -182,6 +214,7 @@ export default function BillingPage({ params }: { params: Promise<{ id: string }
                   <th>Status</th>
                   <th>Total</th>
                   <th>Issued</th>
+                  <th>Documents</th>
                 </tr>
               </thead>
               <tbody>
@@ -199,6 +232,32 @@ export default function BillingPage({ params }: { params: Promise<{ id: string }
                       {invoice.currency} {(Number(invoice.totalMinor) / 100).toFixed(2)}
                     </td>
                     <td>{new Date(invoice.issuedAt).toLocaleDateString()}</td>
+                    <td className="space-x-3">
+                      {invoice.status !== 'DRAFT' && (
+                        <button
+                          type="button"
+                          className="underline disabled:opacity-50"
+                          disabled={downloadingId === `invoice:${invoice.id}`}
+                          onClick={() =>
+                            void download('invoice', invoice.id, invoice.invoiceNumber)
+                          }
+                        >
+                          {downloadingId === `invoice:${invoice.id}` ? 'Downloading…' : 'Invoice'}
+                        </button>
+                      )}
+                      {invoice.status === 'PAID' && (
+                        <button
+                          type="button"
+                          className="underline disabled:opacity-50"
+                          disabled={downloadingId === `receipt:${invoice.id}`}
+                          onClick={() =>
+                            void download('receipt', invoice.id, `${invoice.invoiceNumber}-receipt`)
+                          }
+                        >
+                          {downloadingId === `receipt:${invoice.id}` ? 'Downloading…' : 'Receipt'}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

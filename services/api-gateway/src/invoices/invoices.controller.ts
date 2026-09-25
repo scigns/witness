@@ -17,6 +17,7 @@ import {
   type InvoiceView,
   type ManualSettlementContextView,
   type ManualSettlementResultView,
+  type ReceiptView,
 } from '@witness/contracts';
 import { DomainError } from '@witness/domain';
 import {
@@ -25,7 +26,7 @@ import {
   type RequestWithPrincipal,
 } from '../authz/authorization.guard.js';
 import { InvoicesService } from './invoices.service.js';
-import { renderInvoiceHtml } from './invoice-render.js';
+import { renderInvoiceHtml, renderReceiptHtml } from './invoice-render.js';
 import { ManualSettlementService } from './manual-settlement.service.js';
 
 @Controller('api/v1/organisations/:organisationId/invoices')
@@ -120,5 +121,29 @@ export class InvoicesController {
       .set('Cache-Control', 'no-store')
       .set('Content-Disposition', `attachment; filename="${invoice.invoiceNumber}.html"`)
       .send(renderInvoiceHtml(invoice));
+  }
+
+  @Get(':invoiceId/receipt')
+  @Requires('invoice:read')
+  async getReceipt(
+    @Param('organisationId', new ParseUUIDPipe()) organisationId: string,
+    @Param('invoiceId', new ParseUUIDPipe()) invoiceId: string,
+  ): Promise<ReceiptView> {
+    return this.invoices.getReceipt(organisationId, invoiceId);
+  }
+
+  @Get(':invoiceId/receipt/render')
+  @Requires('invoice:render')
+  async renderReceipt(
+    @Param('organisationId', new ParseUUIDPipe()) organisationId: string,
+    @Param('invoiceId', new ParseUUIDPipe()) invoiceId: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const receipt = await this.invoices.renderReceipt(organisationId, invoiceId);
+    response
+      .type('html')
+      .set('Cache-Control', 'no-store')
+      .set('Content-Disposition', `attachment; filename="${receipt.receiptNumber}.html"`)
+      .send(renderReceiptHtml(receipt));
   }
 }
