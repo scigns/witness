@@ -1,0 +1,37 @@
+# Codespaces/devcontainer override — adds only a `workspace` service on top
+# of the real `infrastructure/docker/docker-compose.yml` (merged by
+# `devcontainer.json`'s `dockerComposeFile` array). This is deliberately not
+# a second definition of Postgres/Neo4j/Keycloak: there is exactly one
+# compose file that knows how to start them, and Codespaces reuses it
+# unchanged, so a service that works in a Codespace works identically on a
+# contributor's own machine and vice versa.
+#
+# No Docker-in-Docker: this container talks to sibling containers (postgres,
+# neo4j, keycloak) over the compose network by service name, the same way
+# `apps/web`/`services/api-gateway` do when run with `pnpm dev` inside this
+# container — nothing here needs to start its own nested Docker daemon.
+services:
+  # Cleared here, not in the main compose file: this devcontainer IS the
+  # dev-integration tier by definition (see devcontainer.json's `name`), so
+  # neo4j/keycloak start by default inside it without needing `--profile
+  # integration` — a flag the devcontainer CLI's `runServices` does not pass.
+  # A contributor's own Mac still needs `make dev-integration` explicitly.
+  neo4j:
+    profiles: !reset []
+  keycloak:
+    profiles: !reset []
+
+  workspace:
+    image: mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm
+    volumes:
+      - ../..:/workspaces:cached
+    command: sleep infinity
+    environment:
+      # Service-name DNS, not localhost — this container is a sibling of
+      # postgres/neo4j/keycloak on the compose network, not the host.
+      POSTGRES_HOST: postgres
+      NEO4J_HOST: neo4j
+      KEYCLOAK_HOST: keycloak
+    depends_on:
+      postgres:
+        condition: service_healthy

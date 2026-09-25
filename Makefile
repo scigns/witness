@@ -12,6 +12,7 @@ SHELL := /bin/bash
 # compose file still resolve against infrastructure/docker/, which is why this is
 # --env-file rather than --project-directory.
 COMPOSE := docker compose --env-file .env -f infrastructure/docker/docker-compose.yml
+COMPOSE_INTEGRATION := $(COMPOSE) --profile integration
 COMPOSE_FULL := $(COMPOSE) --profile full
 COMPOSE_OBS := $(COMPOSE) -f infrastructure/docker/docker-compose.observability.yml
 
@@ -29,6 +30,14 @@ help: ## Show this help
 	@cp .env.example .env
 	@echo "Created .env from .env.example. Review it before using a real deployment."
 
+.PHONY: doctor
+doctor: ## Check disk, toolchain, Docker, Postgres and ports before starting real work
+	@bash scripts/dev/doctor.sh
+
+.PHONY: disk-usage
+disk-usage: ## Show what Witness's own Docker resources are using, and what's safe to remove
+	@bash scripts/dev/disk-usage.sh
+
 .PHONY: bootstrap
 bootstrap: .env ## First-time setup: check prerequisites, install deps, create .env
 	@bash scripts/dev/check-prerequisites.sh
@@ -42,12 +51,17 @@ bootstrap: .env ## First-time setup: check prerequisites, install deps, create .
 	@echo "Bootstrap complete. Next:  make dev  &&  make migrate  &&  make seed  &&  make app"
 
 .PHONY: dev
-dev: .env ## Start the dependencies the Developer Preview needs (Postgres, Valkey)
+dev: .env ## dev-lite: start only Postgres — enough for most domain/API/web work
 	$(COMPOSE) up -d
 	@bash scripts/dev/wait-for-healthy.sh
 
+.PHONY: dev-integration
+dev-integration: .env ## dev-integration: adds Neo4j and Keycloak — real auth, knowledge graph, cross-service tests
+	$(COMPOSE_INTEGRATION) up -d
+	@COMPOSE_FILE=infrastructure/docker/docker-compose.yml bash scripts/dev/wait-for-healthy.sh
+
 .PHONY: dev-full
-dev-full: .env ## Start the complete stack (adds Neo4j, OpenSearch, MinIO, NATS, Keycloak, Ollama)
+dev-full: .env ## dev-full: the complete stack (adds OpenSearch, MinIO, NATS, Ollama, Valkey) — release-candidate acceptance
 	$(COMPOSE_FULL) up -d
 	@COMPOSE_FILE=infrastructure/docker/docker-compose.yml bash scripts/dev/wait-for-healthy.sh
 

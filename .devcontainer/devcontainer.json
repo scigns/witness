@@ -1,0 +1,52 @@
+{
+  "name": "Witness (dev-integration: Postgres + Neo4j + Keycloak)",
+  "dockerComposeFile": ["../infrastructure/docker/docker-compose.yml", "docker-compose.yml"],
+  "service": "workspace",
+  "workspaceFolder": "/workspaces/witness",
+  "runServices": ["workspace", "postgres", "neo4j", "keycloak"],
+  "shutdownAction": "stopCompose",
+
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": false
+    }
+  },
+
+  "forwardPorts": [3000, 3001, 5432, 7474, 7687, 8080],
+  "portsAttributes": {
+    "3000": { "label": "web", "onAutoForward": "notify" },
+    "3001": { "label": "api", "onAutoForward": "notify" },
+    "5432": { "label": "postgres", "onAutoForward": "silent" },
+    "7474": { "label": "neo4j browser", "onAutoForward": "silent" },
+    "7687": { "label": "neo4j bolt", "onAutoForward": "silent" },
+    "8080": { "label": "keycloak", "onAutoForward": "silent" }
+  },
+
+  // Idempotent — see postCreate.sh's own header. Safe to re-run.
+  "postCreateCommand": "bash .devcontainer/postCreate.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "Prisma.prisma",
+        "vitest.explorer"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "typescript.tsdk": "node_modules/typescript/lib"
+      }
+    }
+  },
+
+  // No production secrets anywhere in this file or postCreate.sh — every
+  // credential it sets is freshly generated per Codespace, never a value
+  // that also protects a real deployment. See
+  // docs/engineering/DEVELOPMENT_ENVIRONMENTS.md for the full boundary.
+  "remoteEnv": {
+    "WITNESS_DEPLOYMENT_PROFILE": "development"
+  }
+}

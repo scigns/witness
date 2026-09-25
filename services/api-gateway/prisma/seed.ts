@@ -104,6 +104,190 @@ const FIXTURES = [
   },
 ] as const;
 
+// ─── Modern domain model (organisation/workspace/session/evidence) ──────────
+//
+// The fixtures above only ever exercised the original Milestone 1 `Record`/
+// `Source` vocabulary. Everything built since — organisations, workspaces,
+// role-based access, co-design sessions, consent, evidence — had no
+// synthetic fixtures at all, so exercising it locally meant hand-building
+// rows through the API one call at a time. This section is deliberately
+// modest (one organisation, one workspace, one session, one piece of
+// evidence) rather than exhaustive: it exists to make `pnpm dev` show a
+// real programme immediately, not to be a full acceptance-scenario fixture
+// set. Extend it as new domain areas need a seeded example.
+const ORG_ID = '0195a1f0-0000-7000-9000-000000000001';
+const WORKSPACE_ID = '0195a1f0-0000-7000-9000-000000000002';
+const SESSION_ID = '0195a1f0-0000-7000-9000-000000000003';
+const CONSENT_TEMPLATE_ID = '0195a1f0-0000-7000-9000-000000000004';
+const CONSENT_CONFIG_ID = '0195a1f0-0000-7000-9000-000000000005';
+const EVIDENCE_ID = '0195a1f0-0000-7000-9000-000000000006';
+
+const USERS = [
+  {
+    id: '0195a1f0-0000-7000-9000-000000000011',
+    email: 'admin@northshore-council.example.invalid',
+    displayName: 'Admin User',
+    role: 'admin',
+  },
+  {
+    id: '0195a1f0-0000-7000-9000-000000000012',
+    email: 'facilitator@northshore-council.example.invalid',
+    displayName: 'Facilitator User',
+    role: 'facilitator',
+  },
+  {
+    id: '0195a1f0-0000-7000-9000-000000000013',
+    email: 'reviewer@northshore-council.example.invalid',
+    displayName: 'Reviewer User',
+    role: 'reviewer',
+  },
+  {
+    id: '0195a1f0-0000-7000-9000-000000000014',
+    email: 'steward@northshore-council.example.invalid',
+    displayName: 'Knowledge Steward User',
+    role: 'steward',
+  },
+] as const;
+
+// `.invalid` is reserved by RFC 2606 for exactly this — a domain name
+// guaranteed to never resolve or collide with a real one.
+async function seedModernFixtures(): Promise<void> {
+  const existingOrg = await prisma.organisation.findUnique({ where: { id: ORG_ID } });
+  if (existingOrg !== null) {
+    process.stdout.write('  = Northshore Regional Council programme (already present)\n');
+    return;
+  }
+
+  for (const user of USERS) {
+    await prisma.user.upsert({
+      where: { id: user.id },
+      update: {},
+      create: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        accountState: 'active',
+      },
+    });
+  }
+
+  await prisma.organisation.create({
+    data: {
+      id: ORG_ID,
+      name: 'Northshore Regional Council (synthetic)',
+      storageQuotaBytes: 5 * 1024 * 1024 * 1024,
+      profile: 'general',
+    },
+  });
+
+  for (const user of USERS) {
+    await prisma.organisationMembership.create({
+      data: { id: randomUUID(), organisationId: ORG_ID, userId: user.id, state: 'active' },
+    });
+    await prisma.roleAssignment.create({
+      data: {
+        id: randomUUID(),
+        scopeType: 'organisation',
+        organisationId: ORG_ID,
+        userId: user.id,
+        role: user.role,
+      },
+    });
+  }
+
+  await prisma.workspace.create({
+    data: {
+      id: WORKSPACE_ID,
+      organisationId: ORG_ID,
+      name: 'Coastal Infrastructure Renewal Programme (synthetic)',
+      description: 'A synthetic programme for local development — not a real consultation.',
+      status: 'active',
+    },
+  });
+
+  const facilitator = USERS.find((u) => u.role === 'facilitator')!;
+
+  await prisma.consentTemplate.create({
+    data: {
+      id: CONSENT_TEMPLATE_ID,
+      familyId: 'northshore-standard-consent',
+      organisationId: ORG_ID,
+      workspaceId: WORKSPACE_ID,
+      name: 'Standard co-design consent (synthetic)',
+      purpose: 'Synthetic development fixture for consent-gated capture.',
+      version: 1,
+      status: 'active',
+      plainLanguageSummary:
+        'We may record what you say, quote you if you agree, and use what you share to inform this programme.',
+      supportedLanguages: ['en'],
+      categories: [
+        { category: 'participation', required: true },
+        { category: 'audio_recording', required: true },
+        { category: 'attributed_quotation', required: false },
+        { category: 'anonymous_quotation', required: false },
+        { category: 'internal_use', required: true },
+      ],
+    },
+  });
+
+  await prisma.coDesignSession.create({
+    data: {
+      id: SESSION_ID,
+      organisationId: ORG_ID,
+      workspaceId: WORKSPACE_ID,
+      title: 'Community workshop — coastal path renewal (synthetic)',
+      purpose: 'Gather community input on the proposed coastal path renewal options.',
+      sessionType: 'workshop',
+      deliveryMode: 'in_person',
+      primaryFacilitatorId: facilitator.id,
+      status: 'open',
+      participantVisibility: 'facilitators_only',
+      consentConfigurationState: 'configured',
+      openedAt: new Date(),
+    },
+  });
+
+  await prisma.sessionConsentConfiguration.create({
+    data: {
+      id: CONSENT_CONFIG_ID,
+      organisationId: ORG_ID,
+      workspaceId: WORKSPACE_ID,
+      sessionId: SESSION_ID,
+      consentTemplateId: CONSENT_TEMPLATE_ID,
+      templateVersion: 1,
+      requiredCategories: ['participation', 'audio_recording', 'internal_use'],
+      optionalCategories: ['attributed_quotation', 'anonymous_quotation'],
+      effectiveDate: new Date(),
+      status: 'active',
+    },
+  });
+
+  await prisma.evidence.create({
+    data: {
+      id: EVIDENCE_ID,
+      organisationId: ORG_ID,
+      workspaceId: WORKSPACE_ID,
+      sessionId: SESSION_ID,
+      evidenceType: 'concern',
+      title: 'Concern about path closure during peak season (synthetic)',
+      content:
+        'A resident raised concern that closing the coastal path during the summer peak season ' +
+        'would disproportionately affect local tourism operators, and asked whether staged works ' +
+        'outside peak months had been costed as an alternative.',
+      capturedAt: new Date(),
+      attributionMode: 'facilitator_observation',
+      identityVisibility: 'visible_to_all_participants',
+      consentBasis: ['participation', 'internal_use'],
+      reviewStatus: 'submitted',
+    },
+  });
+
+  process.stdout.write(
+    '  + Northshore Regional Council programme: 1 organisation, 1 workspace, 4 users ' +
+      '(admin/facilitator/reviewer/steward), 1 session, 1 evidence record\n',
+  );
+}
+
 async function main(): Promise<void> {
   process.stdout.write('Seeding synthetic development fixtures...\n');
 
@@ -216,6 +400,8 @@ async function main(): Promise<void> {
 
     process.stdout.write(`  + ${fixture.title.slice(0, 50)}... (${fixture.state})\n`);
   }
+
+  await seedModernFixtures();
 
   process.stdout.write('\nSeed complete. All fixtures are synthetic.\n');
 }

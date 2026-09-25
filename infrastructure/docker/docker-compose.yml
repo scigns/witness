@@ -7,15 +7,22 @@
 # Sovereignty note: every image here is self-hosted. Nothing in this stack makes an
 # outbound connection. `make egress-test` verifies that claim.
 #
-# Profiles. Services required by the current Developer Preview start by default;
-# everything the preview does not yet use carries `profiles: ["full"]`.
+# Three tiers (docs/engineering/DEVELOPMENT_ENVIRONMENTS.md has the full reasoning
+# and when to reach for each one):
 #
-#   make dev        postgres + valkey        — what 0.1.0 actually needs
-#   make dev-full   the complete stack       — the Phase 2 target
+#   make dev              postgres only                    — most domain/API/web work
+#   make dev-integration  + neo4j, keycloak                 — real auth, knowledge graph
+#   make dev-full         the complete stack (--profile full) — release-candidate acceptance
 #
-# The reason is honesty, not convenience: starting Neo4j, OpenSearch, Keycloak and
-# Ollama for an application that does not yet call any of them would suggest they
-# are integrated. They are not. They activate as the phases that own them land.
+# `valkey` has no caller anywhere in the codebase today (verified by grep, not
+# assumed) despite being a default-profile service historically — it moved to
+# `full` rather than being deleted, since .env.example still documents it as
+# planned cache/rate-limiting/job-coordination infrastructure. Re-promote it to
+# a lower tier the day something actually calls it, not before.
+#
+# The reason for the tiering is honesty, not convenience: starting Neo4j,
+# OpenSearch, Keycloak and Ollama for work that does not touch any of them would
+# suggest they are required. They are not, for most changes.
 
 name: witness
 
@@ -50,7 +57,7 @@ services:
   # ── Projections — rebuildable, NOT backed up (ADR-0011) ────────────────────
   neo4j:
     <<: *common
-    profiles: ["full"]
+    profiles: ["integration", "full"]
     image: neo4j:5-community
     environment:
       NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?NEO4J_PASSWORD must be set}
@@ -91,8 +98,12 @@ services:
       retries: 15
 
   # ── Ephemeral state only. Valkey, not Redis — see OSS_EVALUATION.md ────────
+  # Unused today (no code in the workspace connects to it) — see the file
+  # header. Kept at `full` rather than deleted; promote it when something
+  # actually calls it.
   valkey:
     <<: *common
+    profiles: ["full"]
     image: valkey/valkey:8-alpine
     command: valkey-server --save "" --appendonly no
     ports: ["${REDIS_PORT:-6379}:6379"]
@@ -141,7 +152,7 @@ services:
   # ── Identity (ADR-0007) ────────────────────────────────────────────────────
   keycloak:
     <<: *common
-    profiles: ["full"]
+    profiles: ["integration", "full"]
     image: quay.io/keycloak/keycloak:26.0
     command: ["start-dev", "--import-realm"]
     environment:
