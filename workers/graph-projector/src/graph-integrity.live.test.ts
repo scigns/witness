@@ -96,7 +96,8 @@ describe.skipIf(live === null)('graph integrity (live PostgreSQL + Neo4j)', () =
 
   async function insertWorkspace(): Promise<void> {
     await pool.query(
-      `INSERT INTO workspace (id, name, organisation_id) VALUES ($1, 'Live Test Workspace', $2)`,
+      `INSERT INTO workspace (id, name, organisation_id, updated_at)
+       VALUES ($1, 'Live Test Workspace', $2, now())`,
       [workspaceId, organisationId],
     );
   }
