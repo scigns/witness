@@ -107,6 +107,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Cache turbo build outputs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
       - run: make format-check
       - run: make lint
       - run: make typecheck
@@ -130,6 +137,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Cache turbo build outputs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
       - name: Unit and integration tests
         run: make test
       - name: Contract tests
@@ -148,6 +162,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Cache turbo build outputs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
       # INV-1..INV-8: consent, provenance, tenant isolation, layering, projection rebuild.
       # These encode what Witness promises. A weakened assertion here is the loudest
       # possible signal in code review.
@@ -163,6 +184,68 @@ jobs:
       - name: Infrastructure contract tests
         run: pnpm test:infrastructure
 
+  # Real Postgres and Neo4j, disposable per run — the same suites a
+  # contributor runs locally via `pnpm --filter <pkg> test:live` against
+  # `make dev-integration`, now proven to pass somewhere that is not one
+  # laptop's Docker install (docs/engineering/DEVELOPMENT_ENVIRONMENTS.md).
+  # Each service container is destroyed when the job ends; nothing here is
+  # ever reused between runs, so a stale local volume can never be the
+  # reason a live suite passes in CI but not for a new contributor.
+  integration:
+    name: Integration (live Postgres + Neo4j)
+    needs: detect
+    if: needs.detect.outputs.has_code == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: witness
+          POSTGRES_USER: witness
+          POSTGRES_PASSWORD: witness-ci-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U witness -d witness"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+      neo4j:
+        image: neo4j:5-community
+        env:
+          NEO4J_AUTH: neo4j/witness-ci-only
+        ports: ["7687:7687", "7474:7474"]
+        options: >-
+          --health-cmd "wget -qO- http://localhost:7474 || exit 1"
+          --health-interval 10s --health-timeout 10s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://witness:witness-ci-only@localhost:5432/witness?schema=public
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: witness-ci-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache turbo build outputs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+      - name: Build workspace packages
+        run: pnpm turbo run build --filter=@witness/api --filter=@witness/knowledge-graph --filter=@witness/graph-projector
+      - name: Apply database migrations
+        run: pnpm --filter @witness/api exec prisma migrate deploy
+      - name: API live suite (real Postgres)
+        run: pnpm --filter @witness/api test:live
+      - name: Knowledge graph live suite (real Neo4j)
+        run: pnpm --filter @witness/knowledge-graph test:live
+      - name: Graph projector live suite (real Postgres + Neo4j)
+        run: pnpm --filter @witness/graph-projector test:live
+
   build:
     name: Build
     needs: [detect, static]
@@ -176,6 +259,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Cache turbo build outputs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
       - run: make build
       - name: Bundle size budget
         run: bash scripts/ci/check-bundle-size.sh
@@ -183,7 +273,7 @@ jobs:
   gate:
     name: CI gate
     if: always()
-    needs: [docs, governance, static, test, invariants, build]
+    needs: [docs, governance, static, test, invariants, integration, build]
     runs-on: ubuntu-latest
     steps:
       - name: Assert no required job failed
