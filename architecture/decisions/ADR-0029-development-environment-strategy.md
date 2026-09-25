@@ -163,13 +163,16 @@ spent against pre-emptively.
 
 ### Risks accepted
 
-- This ADR's devcontainer configuration and the CI `integration` job's YAML have been syntax- and
-  schema-validated (`docker compose config`, a real YAML parse) but **not yet run end-to-end** — no
-  actual Codespace has been created from this configuration, and no PR has yet exercised the new CI
-  job for real. Both are recorded as pending verification in
+- **Update, post-merge:** the CI `integration` job has now run end-to-end for real, on PR #232 —
+  see `docs/engineering/DEVELOPMENT_ENVIRONMENT_STRATEGY.md`'s "Unresolved risks" for what it found
+  and what was fixed. This item is resolved for CI; the devcontainer/Codespaces half (no actual
+  Codespace created yet) remains open, tracked below.
+- This ADR's devcontainer configuration has been syntax- and schema-validated (`docker compose
+  config`, a real YAML parse) but **not yet run end-to-end** — no actual Codespace has been created
+  from this configuration. Recorded as pending verification in
   `docs/engineering/DEVELOPMENT_ENVIRONMENT_STRATEGY.md` rather than claimed as proven, because
-  creating a real Codespace and pushing a real PR both have a cost/quota impact on the repository
-  owner's account this ADR does not assume permission to spend without asking first.
+  creating a real Codespace has a cost/quota impact on the repository owner's account this ADR does
+  not assume permission to spend without asking first.
 - Path-based CI filtering (skip the expensive jobs entirely for documentation-only PRs) was
   identified as a further, real cost optimisation but deliberately not implemented here — the
   existing `detect` job answers "does this repository contain code," not "did this specific PR

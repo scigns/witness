@@ -305,10 +305,22 @@ contractual SLA, SSO/SCIM, security assessments. Not committed architecture — 
    services actually reach `healthy`, does `pnpm dev` actually serve the app through forwarded
    ports) is not. Creating one consumes the repository owner's Codespaces quota/cost — recommended
    as the very next step, with explicit go-ahead.
-2. **No real GitHub Actions run has exercised the new `integration` job or the turbo-cache
-   additions.** Pushing a branch to trigger one is low-cost on a repository already using hosted
-   Actions, but was not done without asking first, consistent with this session's general practice
-   of confirming before actions with an external, account-level effect.
+2. **Resolved.** The `integration` job has now run for real, on PR #232, and found three genuine
+   bugs no prior CI run had ever caught (because `test:live` had never run in CI before this branch
+   wired it in):
+   - The job called `test:live` directly, bypassing turbo's `test` task and its `dependsOn: ["^build"]`
+     — `@witness/domain`'s `dist/` and the generated Prisma client didn't exist yet. Fixed by adding
+     an explicit `pnpm turbo run build --filter=...` step before the live suites.
+   - `graph-integrity.live.test.ts`'s `insertWorkspace` raw-SQL fixture omitted `updated_at`. Prisma's
+     `@updatedAt` is a client-side behaviour, not a Postgres column default, so the bare column is
+     `NOT NULL` with nothing to satisfy it outside the Prisma Client. Fixed by setting it explicitly.
+   - Pushing `main` through CI for the first time also surfaced ~70 lines of pre-existing
+     `markdownlint` debt (`ROADMAP.md`, two ADRs, `PHASE5_FINAL_REPORT.md`) and a pre-existing bundle-
+     budget breach on `/workspaces/[id]/knowledge/graph` (258 KB vs. the 200 KB budget, ADR-0020) —
+     neither caused by this branch, both now fixed (docs: formatting-only rewrap; bundle: dynamic-
+     import `cytoscape`, landed separately as PR #233 and merged first).
+   All fixes are on `chore/dev-environment-strategy`; PR #232's CI gate is fully green as of this
+   report.
 3. **Real Keycloak OIDC sign-in through a Codespace's forwarded ports is a known, unsolved rough
    edge** (see ADR-0029's consequences) — documented, not fixed. The dev-header path is unaffected
    and covers most work.
