@@ -26,11 +26,15 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 
 import {
+  captureParticipantFeedbackRequestSchema,
   participantCaptureConsentRequestSchema,
   participantCaptureEvidenceRequestSchema,
+  submitTestimonialConsentRequestSchema,
+  type CustomerStoryView,
   type EvidenceAttachmentView,
   type ParticipantCaptureContextView,
   type ParticipantCaptureEvidenceResult,
+  type ProductFeedbackView,
 } from '@witness/contracts';
 
 import { ParticipantCaptureService } from './participant-capture.service.js';
@@ -112,5 +116,44 @@ export class ParticipantCaptureController {
     }
     await this.capture.captureConsent(token, parsed.data);
     return { status: 'captured' };
+  }
+
+  @Post('feedback')
+  async captureFeedback(
+    @Headers(CAPTURE_TOKEN_HEADER) header: string | undefined,
+    @Body() body: unknown,
+  ): Promise<ProductFeedbackView> {
+    const token = requireCaptureToken(header);
+    const parsed = captureParticipantFeedbackRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: 'The request body is not valid.',
+          fields: parsed.error.flatten().fieldErrors,
+        },
+      });
+    }
+    return this.capture.captureFeedback(token, parsed.data);
+  }
+
+  @Post('feedback/:feedbackId/testimonial-consent')
+  async captureTestimonialConsent(
+    @Headers(CAPTURE_TOKEN_HEADER) header: string | undefined,
+    @Param('feedbackId', ParseUUIDPipe) feedbackId: string,
+    @Body() body: unknown,
+  ): Promise<CustomerStoryView | null> {
+    const token = requireCaptureToken(header);
+    const parsed = submitTestimonialConsentRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: 'The request body is not valid.',
+          fields: parsed.error.flatten().fieldErrors,
+        },
+      });
+    }
+    return this.capture.captureTestimonialConsent(token, feedbackId, parsed.data);
   }
 }

@@ -128,6 +128,11 @@ import { OperatorService } from './operator/operator.service.js';
 import { PlatformRolesController } from './platform-roles/platform-roles.controller.js';
 import { PlatformRolesService } from './platform-roles/platform-roles.service.js';
 import { MailerService } from './infrastructure/mailer.js';
+import { ProductFeedbackController } from './product-feedback/product-feedback.controller.js';
+import { ProductFeedbackService } from './product-feedback/product-feedback.service.js';
+import { CustomerStoriesController } from './customer-stories/customer-stories.controller.js';
+import { CustomerStoriesService } from './customer-stories/customer-stories.service.js';
+import { StoriesPublicController } from './customer-stories/stories-public.controller.js';
 
 @Module({
   controllers: [
@@ -174,6 +179,9 @@ import { MailerService } from './infrastructure/mailer.js';
     KnowledgeCandidatesController,
     KnowledgeGraphQueryController,
     KnowledgeAssertionsController,
+    ProductFeedbackController,
+    CustomerStoriesController,
+    StoriesPublicController,
   ],
   providers: [
     PrismaService,
@@ -200,6 +208,8 @@ import { MailerService } from './infrastructure/mailer.js';
     KnowledgeCandidatesService,
     KnowledgeGraphQueryService,
     MailerService,
+    ProductFeedbackService,
+    CustomerStoriesService,
     WorkspacesService,
     UsersService,
     OrganisationInvitationsService,

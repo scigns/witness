@@ -33,11 +33,15 @@ import { randomBytes, randomUUID } from 'node:crypto';
 
 import type { EvidenceAttributionMode, ParticipantIdentityMode } from '@witness/domain';
 import type {
+  CaptureParticipantFeedbackRequest,
+  CustomerStoryView,
   EvidenceAttachmentView,
   ParticipantCaptureConsentRequest,
   ParticipantCaptureContextView,
   ParticipantCaptureEvidenceRequest,
   ParticipantCaptureEvidenceResult,
+  ProductFeedbackView,
+  SubmitTestimonialConsentRequest,
 } from '@witness/contracts';
 
 import { PrismaService } from '../infrastructure/prisma.service.js';
@@ -49,6 +53,8 @@ import {
   type UploadedAttachmentFile,
 } from '../evidence/evidence-attachment.service.js';
 import { ParticipantConsentRecordsService } from '../participant-consent-records/participant-consent-records.service.js';
+import { ProductFeedbackService } from '../product-feedback/product-feedback.service.js';
+import { CustomerStoriesService } from '../customer-stories/customer-stories.service.js';
 
 /** Session-scoped, not tied to the join link's own (often much shorter) expiry. */
 export const CAPTURE_TOKEN_TTL_HOURS = 24;
@@ -109,6 +115,8 @@ export class ParticipantCaptureService {
     private readonly evidence: EvidenceService,
     private readonly participantConsent: ParticipantConsentRecordsService,
     private readonly attachments: EvidenceAttachmentService,
+    private readonly productFeedback: ProductFeedbackService,
+    private readonly customerStories: CustomerStoriesService,
   ) {}
 
   async mint(participantId: string, now: Date): Promise<string> {
@@ -224,7 +232,69 @@ export class ParticipantCaptureService {
     );
   }
 
+  /**
+   * A participant may only ever give feedback tagged
+   * `participant_capture_success`, scoped to their own resolved session and
+   * identity — never client-supplied, the same discipline `captureEvidence`
+   * applies to `sourceParticipantId`.
+   */
+  async captureFeedback(
+    rawToken: string,
+    request: CaptureParticipantFeedbackRequest,
+  ): Promise<ProductFeedbackView> {
+    const resolved = await this.resolveToken(rawToken);
+    const principal = participantPrincipal(resolved.participantId, resolved.displayName);
+
+    return this.productFeedback.submitForParticipant(
+      resolved.workspaceId,
+      resolved.sessionId,
+      resolved.participantId,
+      { rating: request.rating, comment: request.comment ?? null },
+      principal,
+    );
+  }
+
+  /**
+   * `feedbackId` is caller-supplied — `requireOwnFeedback` verifies it
+   * actually belongs to the resolved participant before ever reaching
+   * `CustomerStoriesService`, mirroring `requireOwnEvidence` above, so a
+   * forged `feedbackId` cannot consent to a testimonial on someone else's
+   * feedback.
+   */
+  async captureTestimonialConsent(
+    rawToken: string,
+    feedbackId: string,
+    request: SubmitTestimonialConsentRequest,
+  ): Promise<CustomerStoryView | null> {
+    const resolved = await this.resolveToken(rawToken);
+    await this.requireOwnFeedback(resolved.participantId, feedbackId);
+    const principal = participantPrincipal(resolved.participantId, resolved.displayName);
+
+    return this.customerStories.proposeFromFeedbackForParticipant(
+      resolved.workspaceId,
+      feedbackId,
+      resolved.participantId,
+      request,
+      principal,
+    );
+  }
+
   // ─── Internals ────────────────────────────────────────────────────────────
+
+  private async requireOwnFeedback(participantId: string, feedbackId: string): Promise<void> {
+    const row = await this.prisma.productFeedback.findUnique({
+      where: { id: feedbackId },
+      select: { sourceParticipantId: true },
+    });
+    if (row === null || row.sourceParticipantId !== participantId) {
+      throw new NotFoundException({
+        error: {
+          code: 'FEEDBACK_NOT_FOUND',
+          message: `No feedback '${feedbackId}' available to this capture token.`,
+        },
+      });
+    }
+  }
 
   private async requireOwnEvidence(participantId: string, evidenceId: string): Promise<void> {
     const row = await this.prisma.evidence.findUnique({
