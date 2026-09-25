@@ -17,6 +17,7 @@ const ROLE_LABELS: Readonly<Record<WitnessRole, string>> = Object.freeze({
   participant: 'Participant',
   reader: 'Read-only',
   steward: 'Knowledge Steward',
+  billing_manager: 'Billing Manager',
 });
 
 const ROLE_DESCRIPTIONS: Readonly<Record<WitnessRole, string>> = Object.freeze({
@@ -30,6 +31,10 @@ const ROLE_DESCRIPTIONS: Readonly<Record<WitnessRole, string>> = Object.freeze({
   // as every other role — never a global platform role.
   steward:
     'Curates the knowledge graph: manages aliases, merges or splits concepts, and routes assertions for review or community validation.',
+  // Phase 5, Workstream 2.3: organisation-scoped billing authority, separate
+  // from generic organisation admin.
+  billing_manager:
+    'Issues and renders invoices, and settles payments. Does not manage members, roles, or workspaces.',
 });
 
 export function roleLabel(role: WitnessRole): string {

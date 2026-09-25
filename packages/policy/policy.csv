@@ -309,6 +309,22 @@ p, steward, knowledge_candidate:validate_community
 p, steward, knowledge_entity:steward
 p, steward, knowledge_entity:publish
 
+# Billing manager (Phase 5, Workstream 2.3) — organisation-scoped billing
+# authority, deliberately separate from generic organisation admin: issue,
+# render and settle invoices without also gaining organisation:update,
+# workspace:*, user:*, or role_assignment:* (`role-grants-parity.test.ts`
+# checks this file and role-grants.ts agree on the exact set). Assigned
+# exactly like every other role via a `RoleAssignment` — billing actions
+# resolve to organisation scope (invoices carry no workspaceId), so a
+# workspace-scoped assignment of this role has no effect on any of these
+# actions by construction (role-resolution.service.ts's tiersForOrganisation
+# only counts organisation-scoped assignments).
+p, billing_manager, organisation:read
+p, billing_manager, invoice:read
+p, billing_manager, invoice:create
+p, billing_manager, invoice:render
+p, billing_manager, payment:settle
+
 p, admin, record:read
 p, admin, record:create
 p, admin, record:review

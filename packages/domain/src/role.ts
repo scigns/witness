@@ -35,6 +35,13 @@ export const WITNESS_ROLES = [
   // (`knowledge_entity:steward`, `knowledge_entity:publish`) neither of those
   // tiers should hold by default.
   'steward',
+  // Billing manager (Phase 5, Workstream 2.3): organisation-scoped billing
+  // authority (issue/render invoices, settle payments) separate from
+  // generic organisation admin — the same "own tier, not collapsed onto a
+  // broader one" precedent Knowledge Steward already established, applied
+  // here so a finance officer can be given exactly this authority without
+  // also gaining workspace/member/role management.
+  'billing_manager',
 ] as const;
 
 export type WitnessRole = (typeof WITNESS_ROLES)[number];
@@ -157,6 +164,14 @@ export const ROLE_PERMISSIONS_BY_ROLE: Readonly<Record<WitnessRole, readonly Rol
       'knowledge:review',
       'knowledge:steward',
     ],
+    // Billing manager — see the `WITNESS_ROLES` comment above. Empty here
+    // deliberately: this legacy `RolePermission` vocabulary predates
+    // billing entirely and has no invoice/payment concept to grant: the
+    // role's real authority (`invoice:create`, `invoice:render`,
+    // `payment:settle`) lives in the Casbin tier vocabulary
+    // (`role-grants.ts`/`policy.csv`), which is what `AuthorizationGuard`
+    // actually enforces requests against.
+    billing_manager: [],
   });
 
 export function permittedActionsForRole(role: WitnessRole): readonly RolePermission[] {

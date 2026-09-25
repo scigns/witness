@@ -41,6 +41,12 @@ export const WITNESS_ROLES = [
   // WITNESS_ROLES; kept as a separate literal here per this package's
   // deliberate independence from the GPL domain package (see file header).
   'steward',
+  // Billing manager (Phase 5, Workstream 2.3) — organisation-scoped billing
+  // authority (issue/render invoices, settle payments) separate from
+  // generic organisation admin. Its own tier, the same "narrower than
+  // admin" precedent Knowledge Steward already established; see
+  // role-resolution.service.ts's ROLE_TO_TIER.
+  'billing_manager',
 ] as const;
 export type WitnessRole = (typeof WITNESS_ROLES)[number];
 

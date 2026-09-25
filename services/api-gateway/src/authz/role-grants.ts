@@ -392,6 +392,15 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'knowledge_entity:steward',
     'knowledge_entity:publish',
   ],
+  // Billing manager (Phase 5, Workstream 2.3) — see policy.csv's matching
+  // comment for the full reasoning.
+  billing_manager: [
+    'organisation:read',
+    'invoice:read',
+    'invoice:create',
+    'invoice:render',
+    'payment:settle',
+  ],
 });
 
 export function decideByRoleGrants(principal: Principal, action: Action): AuthorizationDecision {

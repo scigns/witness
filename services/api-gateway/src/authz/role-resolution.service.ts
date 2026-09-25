@@ -64,6 +64,10 @@ const ROLE_TO_TIER: Readonly<Record<WitnessRole, string>> = Object.freeze({
   // not collapsed onto contributor/reviewer, since it grants
   // knowledge-graph-specific capabilities neither of those tiers holds.
   steward: 'steward',
+  // Billing manager (Phase 5, Workstream 2.3) — same reasoning: its own
+  // tier, deliberately not collapsed onto admin, so billing authority is
+  // grantable without organisation/workspace/member management alongside it.
+  billing_manager: 'billing_manager',
 });
 
 @Injectable()
