@@ -877,22 +877,34 @@ describe('independent marketing foundation', () => {
   });
 
   describe('Phase 6 customer stories', () => {
-    it('renders exactly one h1, an honest empty state, and safe canonical metadata', () => {
-      const html = renderToStaticMarkup(
-        <MarketingShell>
-          <StoriesPage />
-        </MarketingShell>,
-      );
+    it('renders exactly one h1, an honest empty state, and safe canonical metadata', async () => {
+      // StoriesPage is an async Server Component (it fetches published
+      // stories server-side) — react-dom/server's synchronous
+      // renderToStaticMarkup cannot render a Promise-returning component
+      // directly, so the element is awaited first and the resolved element
+      // tree is rendered, the standard pattern for testing an async RSC
+      // outside the Next.js app router's own streaming renderer. No API is
+      // running in this test process, so the fetch fails closed to an empty
+      // list — the same honest "no stories yet" state a real deployment
+      // shows before anything is published.
+      const element = await StoriesPage();
+      const html = renderToStaticMarkup(<MarketingShell>{element}</MarketingShell>);
       expect(html.match(/<h1/g)).toHaveLength(1);
       expect(html).toContain('No public stories yet');
       expect(storiesMetadata.alternates?.canonical).toBe('https://buildwithwitness.com/stories');
       expect(storiesMetadata.robots).toEqual({ index: false, follow: false });
     });
 
-    it('does not import the product application, auth, session, or protected API', () => {
+    it('does not import the product application, auth, or session', () => {
       const contents = readFileSync(join(process.cwd(), 'src/app/stories/page.tsx'), 'utf8');
-      expect(contents).not.toMatch(/apps\/web|@witness\/web|lib\/auth|lib\/session|lib\/api/);
-      expect(contents).not.toMatch(/document\.cookie|credentials:\s*['"]include['"]|fetch\(/);
+      expect(contents).not.toMatch(/apps\/web|@witness\/web|lib\/auth|lib\/session/);
+      expect(contents).not.toMatch(/document\.cookie|credentials:\s*['"]include['"]/);
+    });
+
+    it('fetches published stories only from the server-side stories API helper, never the browser-facing lib/api client', () => {
+      const contents = readFileSync(join(process.cwd(), 'src/app/stories/page.tsx'), 'utf8');
+      expect(contents).not.toMatch(/lib\/api['"]/);
+      expect(contents).toMatch(/fetchPublishedStories/);
     });
   });
 });
