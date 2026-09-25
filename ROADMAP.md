@@ -195,7 +195,7 @@ recorded so this table stays honest about what changed and why. A facilitator, r
 can today propose a concept from evidence, review/reject/request clarification/route it for
 community validation, merge duplicate concepts with a preview, configure per-domain governance
 policy, and explore the resulting graph — all with AI-assisted extraction (Phase 5) switched off
-entirely. 4.3 (entity resolution with human adjudication) and 4.4's *projection* of bitemporal data
+entirely. 4.3 (entity resolution with human adjudication) and 4.4's _projection_ of bitemporal data
 into the graph remain outstanding; the write model's bitemporal columns (`validFrom`/`validTo`)
 exist and are populated, but no UI or API answers "what did we believe on date X?" yet.
 

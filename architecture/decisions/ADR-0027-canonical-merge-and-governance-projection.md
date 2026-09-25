@@ -211,7 +211,8 @@ migration, exactly as ADR-0011 promises for ontology-adjacent changes.
 
 ## References
 
-- [`KNOWLEDGE_GRAPH.md` §13](../KNOWLEDGE_GRAPH.md) · [ADR-0011](ADR-0011-knowledge-graph-as-projection.md) ·
+- [`KNOWLEDGE_GRAPH.md` §13](../KNOWLEDGE_GRAPH.md) ·
+  [ADR-0011](ADR-0011-knowledge-graph-as-projection.md) ·
   [ADR-0012](ADR-0012-provenance-and-human-in-the-loop.md) ·
   [ADR-0013](ADR-0013-tenancy-and-deployment-topology.md) ·
   [ADR-0026](ADR-0026-evidence-knowledge-graph-implementation.md)

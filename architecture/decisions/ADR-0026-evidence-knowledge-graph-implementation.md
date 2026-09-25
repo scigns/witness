@@ -64,8 +64,9 @@ complete.
    consumed by the assertion lifecycle, never projected into Neo4j as a node.
 
 4. **Terminology maps onto the ratified names:** the request's `KnowledgeAssertion` is
-   `CandidateAssertion` (unconfirmed) and `Assertion` (confirmed) exactly as ADR-0012 requires — we do
-   not introduce a third name. `KnowledgeRelationship` is the ratified `Relationship` write-model row.
+   `CandidateAssertion` (unconfirmed) and `Assertion` (confirmed) exactly as ADR-0012 requires — we
+   do not introduce a third name. `KnowledgeRelationship` is the ratified `Relationship` write-model
+   row.
    `KnowledgeAlias` is `EntityAlias`. `KnowledgeReview`/`KnowledgeValidation` are `ReviewDecision` plus
    lifecycle state on `Assertion` — a dedicated community-response aggregate is Phase 6 work and is
    *not* built in this pass beyond the lifecycle-state field it will eventually drive.
@@ -120,9 +121,10 @@ complete.
 
 ## Options considered
 
-### Option A — Extend the ontology with new core node types (`CulturalConcept`, `Issue`, `Proposal`, `Outcome`)
+### Option A — Extend the ontology with new core node types
 
-**Pros:** matches the incoming request's vocabulary exactly; no translation layer.
+**Pros:** matches the incoming request's vocabulary exactly (`CulturalConcept`, `Issue`,
+`Proposal`, `Outcome` as new core node types); no translation layer.
 **Cons:** directly contradicts `KNOWLEDGE_GRAPH.md` §2's "small and stable core" principle and §11's
 governance gate (core-type changes need Knowledge Graph Lead + Principal Architect sign-off and an
 ADR of their own — which this ADR is not attempting, since no such review has occurred). Would
@@ -130,20 +132,21 @@ invalidate the exit gate ("delete the graph, rebuild, byte-comparable") for reas
 feature. **Rejected** — this ADR does not carry the authority to change the ontology's core, only to
 implement within it.
 
-### Option B — Map the request's vocabulary onto the ratified ontology and ratified provenance model, translating names *(chosen)*
+### Option B — Map the request's vocabulary onto the ratified ontology, translating names *(chosen)*
 
-**Pros:** keeps the ontology, the provenance model and the event catalogue coherent with everything
-already built and documented; every reconciliation point is named rather than silently resolved;
-nothing forecloses a future, properly-reviewed ontology change.
+**Pros:** keeps the ontology, the ratified provenance model, and the event catalogue coherent with
+everything already built and documented; every reconciliation point is named rather than silently
+resolved; nothing forecloses a future, properly-reviewed ontology change.
 **Cons:** the request's object names (`KnowledgeAssertion`, `KnowledgeAlias`, ...) do not appear
 verbatim in code, which costs a reader unfamiliar with `ADR-0011`/`ADR-0012` a lookup.
 **Why we chose it:** the ratified documents represent prior, considered, governed decisions;
 overriding them casually because a new request phrased things differently is exactly the failure mode
 ADR-0021 exists to prevent.
 
-### Option C — Build a second, parallel schema matching the request's vocabulary, separate from the ratified ontology
+### Option C — Build a second, parallel schema matching the request's vocabulary
 
-**Pros:** satisfies the letter of the request without touching ratified names at all.
+**Pros:** satisfies the letter of the request, separate from the ratified ontology, without
+touching ratified names at all.
 **Cons:** two ontologies for one graph is strictly worse than one with a translation table — it is
 the `docs/vision.md` / `VISION.md` failure from ADR-0021 recreated inside a single feature.
 **Rejected** without further consideration.

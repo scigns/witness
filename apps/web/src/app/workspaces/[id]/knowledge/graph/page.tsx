@@ -28,7 +28,7 @@
  * see the edge at all, exactly as it always was via "why is this here?".
  */
 
-import cytoscape, { type Core, type ElementDefinition } from 'cytoscape';
+import type { Core, ElementDefinition } from 'cytoscape';
 import Link from 'next/link';
 import { use, useCallback, useEffect, useRef, useState } from 'react';
 
@@ -199,9 +199,13 @@ export default function GraphExplorerPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  // Cytoscape lifecycle — only ever touches the DOM inside effects.
+  // Cytoscape lifecycle — only ever touches the DOM inside effects. Loaded
+  // dynamically: it is a large canvas-rendering library needed only once
+  // this tab actually mounts, not part of every route's initial JS
+  // (bundle budget, ADR-0020).
   useEffect(() => {
     if (cyContainerRef.current === null) return;
+    let cancelled = false;
 
     const elements: ElementDefinition[] = [
       ...nodes.map((node) => ({
@@ -234,99 +238,105 @@ export default function GraphExplorerPage({ params }: { params: Promise<{ id: st
       }),
     ];
 
-    const cy = cytoscape({
-      container: cyContainerRef.current,
-      elements,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            // Cytoscape's stylesheet is parsed by its own engine, not the
-            // browser's CSS engine — it cannot resolve `var(...)` or
-            // `oklch(...)` (the app theme tokens use both), so this is a
-            // literal fallback, not a themed value.
-            'background-color': '#4f7cff',
-            label: 'data(label)',
-            color: '#e5e7eb',
-            'font-size': 10,
-            'text-valign': 'bottom',
-            'text-margin-y': 4,
-            width: 36,
-            height: 36,
-            shape: (el) => (ENTITY_SHAPES[el.data('entityType') as string] ?? 'ellipse') as never,
+    void (async () => {
+      const { default: cytoscape } = await import('cytoscape');
+      if (cancelled || cyContainerRef.current === null) return;
+      const cy = cytoscape({
+        container: cyContainerRef.current,
+        elements,
+        style: [
+          {
+            selector: 'node',
+            style: {
+              // Cytoscape's stylesheet is parsed by its own engine, not the
+              // browser's CSS engine — it cannot resolve `var(...)` or
+              // `oklch(...)` (the app theme tokens use both), so this is a
+              // literal fallback, not a themed value.
+              'background-color': '#4f7cff',
+              label: 'data(label)',
+              color: '#e5e7eb',
+              'font-size': 10,
+              'text-valign': 'bottom',
+              'text-margin-y': 4,
+              width: 36,
+              height: 36,
+              shape: (el) => (ENTITY_SHAPES[el.data('entityType') as string] ?? 'ellipse') as never,
+            },
           },
-        },
-        {
-          selector: 'node[status = "merged"], node[status = "superseded"]',
-          style: {
-            'background-opacity': 0.4,
-            'border-width': 2,
-            'border-style': 'dashed',
-            'border-color': '#f59e0b',
+          {
+            selector: 'node[status = "merged"], node[status = "superseded"]',
+            style: {
+              'background-opacity': 0.4,
+              'border-width': 2,
+              'border-style': 'dashed',
+              'border-color': '#f59e0b',
+            },
           },
-        },
-        {
-          selector:
-            'node[sensitivityClass = "confidential"], node[sensitivityClass = "restricted"]',
-          style: {
-            'border-width': 3,
-            'border-color': '#dc2626',
+          {
+            selector:
+              'node[sensitivityClass = "confidential"], node[sensitivityClass = "restricted"]',
+            style: {
+              'border-width': 3,
+              'border-color': '#dc2626',
+            },
           },
-        },
-        {
-          selector: `node[id = "${centerId ?? ''}"]`,
-          style: {
-            'border-width': 4,
-            'border-color': '#22c55e',
+          {
+            selector: `node[id = "${centerId ?? ''}"]`,
+            style: {
+              'border-width': 4,
+              'border-color': '#22c55e',
+            },
           },
-        },
-        {
-          selector: 'edge',
-          style: {
-            width: 2,
-            'line-color': '#6b7280',
-            'target-arrow-color': '#6b7280',
-            'target-arrow-shape': 'triangle',
-            'curve-style': 'bezier',
-            label: 'data(label)',
-            'font-size': 8,
-            color: '#9ca3af',
+          {
+            selector: 'edge',
+            style: {
+              width: 2,
+              'line-color': '#6b7280',
+              'target-arrow-color': '#6b7280',
+              'target-arrow-shape': 'triangle',
+              'curve-style': 'bezier',
+              label: 'data(label)',
+              'font-size': 8,
+              color: '#9ca3af',
+            },
           },
-        },
-        {
-          selector: 'edge[?historical]',
-          style: {
-            'line-style': 'dashed',
-            label: 'data(label) + " (historical)"' as never,
+          {
+            selector: 'edge[?historical]',
+            style: {
+              'line-style': 'dashed',
+              label: 'data(label) + " (historical)"' as never,
+            },
           },
-        },
-        {
-          selector: 'edge[?contested]',
-          style: {
-            'line-style': 'dotted',
-            width: 3,
-            'line-color': '#d97706',
-            'target-arrow-color': '#d97706',
-            color: '#d97706',
+          {
+            selector: 'edge[?contested]',
+            style: {
+              'line-style': 'dotted',
+              width: 3,
+              'line-color': '#d97706',
+              'target-arrow-color': '#d97706',
+              color: '#d97706',
+            },
           },
-        },
-      ],
-      layout: { name: 'cose', animate: false },
-    });
+        ],
+        layout: { name: 'cose', animate: false },
+      });
 
-    cy.on('tap', 'node', (evt) => {
-      const nodeId = evt.target.id();
-      void centerOn(nodeId);
-    });
-    cy.on('tap', 'edge', (evt) => {
-      const edgeId = evt.target.id();
-      const edge = edges.find((e) => e.id === edgeId);
-      if (edge !== undefined) void inspectEdge(edge);
-    });
+      cy.on('tap', 'node', (evt) => {
+        const nodeId = evt.target.id();
+        void centerOn(nodeId);
+      });
+      cy.on('tap', 'edge', (evt) => {
+        const edgeId = evt.target.id();
+        const edge = edges.find((e) => e.id === edgeId);
+        if (edge !== undefined) void inspectEdge(edge);
+      });
 
-    cyRef.current = cy;
+      cyRef.current = cy;
+    })();
+
     return () => {
-      cy.destroy();
+      cancelled = true;
+      cyRef.current?.destroy();
       cyRef.current = null;
     };
   }, [nodes, edges, centerId, centerOn]);
