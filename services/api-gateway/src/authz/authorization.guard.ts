@@ -132,7 +132,9 @@ export class AuthorizationGuard implements CanActivate {
     // header, even on localhost. Settlement and platform-role management require
     // a real OIDC-backed session and a platform-scoped role resolved below.
     if (
-      (required === 'payment:settle' || required.startsWith('platform_role:')) &&
+      (required === 'payment:settle' ||
+        required === 'customer_story:publish' ||
+        required.startsWith('platform_role:')) &&
       sessionPrincipal === null
     ) {
       throw new UnauthorizedException({

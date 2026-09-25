@@ -50,6 +50,8 @@ model Actor {
   reportSourcesIncluded      ReportSource[]            @relation("ReportSourceIncludedBy")
   commercialChangesRequested CommercialChangeRequest[]
   agreementsCreated          Agreement[]
+  productFeedbackSubmitted   ProductFeedback[]
+  customerStoriesModerated   CustomerStory[]
 
   // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
   knowledgeDomainsCreated       KnowledgeDomain[]
@@ -167,6 +169,8 @@ model Organisation {
   receiptNumberCounter         ReceiptNumberCounter?
   agreements                   Agreement[]
   invitationNotifications      InvitationNotification[]
+  productFeedback              ProductFeedback[]
+  customerStories              CustomerStory[]
 
   // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
   knowledgeDomains       KnowledgeDomain[]
@@ -509,6 +513,89 @@ model Agreement {
   @@map("agreement")
 }
 
+/// A private micro-survey response captured at a natural completion moment
+/// (Phase 6, Track B). Deliberately create-only: no code path in this
+/// service updates a row here after insert — see
+/// packages/domain/src/product-feedback.ts's file header.
+model ProductFeedback {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String?          @map("session_id") @db.Uuid
+  session   CoDesignSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  /// Set only when submitted by an unauthenticated capture-token participant.
+  sourceParticipantId String?             @map("source_participant_id") @db.Uuid
+  sourceParticipant   SessionParticipant? @relation(fields: [sourceParticipantId], references: [id], onDelete: SetNull)
+
+  productArea String  @map("product_area") @db.VarChar(24)
+  moment      String  @db.VarChar(32)
+  rating      Int
+  comment     String? @db.VarChar(2000)
+
+  submittedById String @map("submitted_by_id") @db.Uuid
+  submittedBy   Actor  @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  customerStory CustomerStory?
+
+  @@index([workspaceId, productArea])
+  @@index([sourceParticipantId])
+  @@map("product_feedback")
+}
+
+/// A governed testimonial candidate derived from positive ProductFeedback
+/// (Phase 6, Track B). `quote`/`context`/`organisationLabel` are always
+/// distinct columns from anything on ProductFeedback — an edited public
+/// quote is never the same storage as the source feedback. See
+/// packages/domain/src/customer-story.ts's file header for the full
+/// lifecycle and the moderate/publish capability separation.
+model CustomerStory {
+  id String @id @db.Uuid
+
+  productFeedbackId String          @unique @map("product_feedback_id") @db.Uuid
+  productFeedback   ProductFeedback @relation(fields: [productFeedbackId], references: [id], onDelete: Restrict)
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  consentChoice                  String    @map("consent_choice") @db.VarChar(16)
+  organisationAttributionConsent Boolean   @default(false) @map("organisation_attribution_consent")
+  attributedName                 String?   @map("attributed_name") @db.VarChar(200)
+  consentGivenAt                 DateTime  @map("consent_given_at") @db.Timestamptz(6)
+  consentWithdrawnAt             DateTime? @map("consent_withdrawn_at") @db.Timestamptz(6)
+
+  roleLabel String  @map("role_label") @db.VarChar(40)
+  rawQuote  String? @map("raw_quote") @db.VarChar(2000)
+
+  quote             String? @db.VarChar(1000)
+  context           String? @db.VarChar(500)
+  organisationLabel String? @map("organisation_label") @db.VarChar(200)
+
+  moderationStatus String    @default("pending") @map("moderation_status") @db.VarChar(16)
+  moderationReason String?   @map("moderation_reason") @db.VarChar(500)
+  moderatedById    String?   @map("moderated_by_id") @db.Uuid
+  moderatedBy      Actor?    @relation(fields: [moderatedById], references: [id], onDelete: SetNull)
+  moderatedAt      DateTime? @map("moderated_at") @db.Timestamptz(6)
+
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  version     Int       @default(1)
+
+  @@index([workspaceId, moderationStatus])
+  @@index([moderationStatus, publishedAt])
+  @@map("customer_story")
+}
+
 /// A customer's requested commercial transition. It is deliberately separate
 /// from Subscription: a request never represents settlement or paid access.
 model CommercialChangeRequest {
@@ -635,6 +722,9 @@ model Workspace {
 
   // Governed QR/link session joining (Phase 5, Workstream 1.6).
   sessionJoinLinks SessionJoinLink[]
+
+  productFeedback ProductFeedback[]
+  customerStories CustomerStory[]
 
   @@index([organisationId])
   @@map("workspace")
@@ -1052,6 +1142,7 @@ model CoDesignSession {
   agendaItems               AgendaItem[]
   resources                 Resource[]
   joinLinks                 SessionJoinLink[]
+  productFeedback           ProductFeedback[]
 
   @@index([organisationId])
   @@index([workspaceId, status])
@@ -1113,10 +1204,11 @@ model SessionParticipant {
 
   version Int @default(1)
 
-  consentRecords ParticipantConsentRecord[]
-  evidence       Evidence[]
-  joinAttempts   SessionJoinAttempt[]
-  captureTokens  ParticipantCaptureToken[]
+  consentRecords  ParticipantConsentRecord[]
+  evidence        Evidence[]
+  joinAttempts    SessionJoinAttempt[]
+  captureTokens   ParticipantCaptureToken[]
+  productFeedback ProductFeedback[]
 
   @@index([sessionId])
   @@index([workspaceId])

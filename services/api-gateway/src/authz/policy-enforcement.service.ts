@@ -38,6 +38,11 @@ const PLATFORM_ONLY_ACTIONS: ReadonlySet<Action> = new Set([
   'platform_role:write',
   'platform_role:delete',
   'operator:read',
+  // Publishing a testimonial to Witness's own public marketing site — kept
+  // separate from `customer_story:moderate` (ordinary workspace tier) so an
+  // organisation's own admin curating and approving a candidate never
+  // implicitly gains publish authority. See policy.csv's matching comment.
+  'customer_story:publish',
 ]);
 
 function scopeLabel(scope: ResourceScope): string {

@@ -131,7 +131,17 @@ export type Action =
   | 'knowledge_candidate:validate_community'
   | 'knowledge_entity:steward'
   | 'knowledge_entity:publish'
-  | 'knowledge_governance:configure';
+  | 'knowledge_governance:configure'
+  // Product feedback micro-surveys and governed testimonial publication
+  // (Phase 6, Track B). `customer_story:publish` is a PLATFORM_ONLY_ACTIONS
+  // entry (policy-enforcement.service.ts) — see policy.csv's matching
+  // comment for why an organisation-scoped admin never reaches it.
+  | 'product_feedback:create'
+  | 'product_feedback:read'
+  | 'customer_story:create'
+  | 'customer_story:read'
+  | 'customer_story:moderate'
+  | 'customer_story:publish';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;

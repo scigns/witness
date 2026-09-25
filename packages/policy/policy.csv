@@ -453,3 +453,39 @@ p, admin, knowledge_candidate:validate_community
 p, admin, knowledge_entity:steward
 p, admin, knowledge_entity:publish
 p, admin, knowledge_governance:configure
+
+# Product feedback micro-surveys and governed testimonial publication (Phase
+# 6, Track B). `product_feedback:create`/`customer_story:create` are granted
+# broadly (reader included) — submitting feedback about, and optionally
+# consenting to a testimonial from, one's own just-completed action is
+# low-risk, self-only data, the same "broadly useful" reasoning role:read
+# gets above. `customer_story:read`/`:moderate` (the internal moderation
+# queue) stay reviewer/admin, matching evidence_review's own precedent.
+#
+# `customer_story:publish` is deliberately NOT reachable by an ordinary
+# organisation/workspace-scoped admin, even though the tier name below reads
+# 'admin': PolicyEnforcementService routes PLATFORM_ONLY_ACTIONS through
+# `platformGrantTiers`, which requires a genuine `scopeType: 'platform'`
+# RoleAssignment — structurally impossible for any organisation- or
+# workspace-scoped grant to satisfy. This is the exact same mechanism
+# `operator:read`/`platform_role:*` above already use to keep platform
+# authority separate from organisation authority; an organisation's own
+# admin can curate and approve a testimonial candidate
+# (`customer_story:moderate`) but cannot make it public on Witness's own
+# marketing site without a separately granted platform-scope role (see
+# `platform-roles.controller.ts` for how that capability is granted).
+p, reader, product_feedback:create
+p, reader, customer_story:create
+p, contributor, product_feedback:create
+p, contributor, customer_story:create
+p, reviewer, product_feedback:create
+p, reviewer, product_feedback:read
+p, reviewer, customer_story:create
+p, reviewer, customer_story:read
+p, reviewer, customer_story:moderate
+p, admin, product_feedback:create
+p, admin, product_feedback:read
+p, admin, customer_story:create
+p, admin, customer_story:read
+p, admin, customer_story:moderate
+p, admin, customer_story:publish

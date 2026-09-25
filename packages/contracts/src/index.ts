@@ -3301,3 +3301,139 @@ export interface KnowledgeProvenanceChainView {
   confirmedByName: string;
   confirmedAt: string;
 }
+
+// ─── Product feedback micro-surveys and governed testimonial publication (Phase 6, Track B) ───
+
+/**
+ * Mirrors @witness/domain's `ProductArea`/`FeedbackMoment`, kept as separate
+ * literals here per this package's deliberate independence from the GPL
+ * domain package (see file header) — cross-checked by contracts-drift.test.ts.
+ */
+export const PRODUCT_AREAS = ['evidence_capture', 'facilitation', 'review', 'reporting'] as const;
+export type ProductArea = (typeof PRODUCT_AREAS)[number];
+
+export const FEEDBACK_MOMENTS = [
+  'participant_capture_success',
+  'facilitator_recap',
+  'reviewer_queue_cleared',
+  'report_export_success',
+] as const;
+export type FeedbackMoment = (typeof FEEDBACK_MOMENTS)[number];
+
+export const submitProductFeedbackRequestSchema = z
+  .object({
+    productArea: z.enum(PRODUCT_AREAS),
+    moment: z.enum(FEEDBACK_MOMENTS),
+    rating: z.number().int().min(1).max(5),
+    comment: z.string().trim().max(2000).nullable().optional(),
+    sessionId: z.string().uuid().nullable().optional(),
+  })
+  .strict();
+export type SubmitProductFeedbackRequest = z.infer<typeof submitProductFeedbackRequestSchema>;
+
+/** The subset a capture-token participant may submit — area/moment/session are always server-derived for that flow. */
+export const captureParticipantFeedbackRequestSchema = z
+  .object({
+    rating: z.number().int().min(1).max(5),
+    comment: z.string().trim().max(2000).nullable().optional(),
+  })
+  .strict();
+export type CaptureParticipantFeedbackRequest = z.infer<
+  typeof captureParticipantFeedbackRequestSchema
+>;
+
+export interface ProductFeedbackView {
+  id: string;
+  productArea: ProductArea;
+  moment: FeedbackMoment;
+  rating: number;
+  comment: string | null;
+  /** Whether this feedback is positive enough to offer a testimonial follow-up. */
+  offerTestimonial: boolean;
+  createdAt: string;
+}
+
+export const CUSTOMER_STORY_CONSENT_CHOICES = ['declined', 'named', 'anonymous'] as const;
+export type CustomerStoryConsentChoice = (typeof CUSTOMER_STORY_CONSENT_CHOICES)[number];
+
+export const submitTestimonialConsentRequestSchema = z
+  .object({
+    consentChoice: z.enum(CUSTOMER_STORY_CONSENT_CHOICES),
+    organisationAttributionConsent: z.boolean().optional(),
+    attributedName: z.string().trim().min(1).max(200).nullable().optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.consentChoice === 'anonymous' && value.attributedName != null) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['attributedName'],
+        message: 'A name cannot be attributed to an anonymous consent choice.',
+      });
+    }
+  });
+export type SubmitTestimonialConsentRequest = z.infer<typeof submitTestimonialConsentRequestSchema>;
+
+export const CUSTOMER_STORY_MODERATION_STATUSES = ['pending', 'approved', 'rejected'] as const;
+export type CustomerStoryModerationStatus = (typeof CUSTOMER_STORY_MODERATION_STATUSES)[number];
+
+export const editCustomerStoryWordingRequestSchema = z
+  .object({
+    quote: z.string().trim().min(1).max(1000),
+    context: z.string().trim().min(1).max(500),
+    organisationLabel: z.string().trim().min(1).max(200).nullable().optional(),
+  })
+  .strict();
+export type EditCustomerStoryWordingRequest = z.infer<typeof editCustomerStoryWordingRequestSchema>;
+
+export const moderateCustomerStoryRequestSchema = z.discriminatedUnion('decision', [
+  z.object({ decision: z.literal('approve') }).strict(),
+  z.object({ decision: z.literal('reject'), reason: z.string().trim().min(1).max(500) }).strict(),
+]);
+export type ModerateCustomerStoryRequest = z.infer<typeof moderateCustomerStoryRequestSchema>;
+
+/** The full internal shape, for the workspace moderation page. */
+export interface CustomerStoryView {
+  id: string;
+  productFeedbackId: string;
+  organisationId: string;
+  workspaceId: string;
+
+  consentChoice: 'named' | 'anonymous';
+  organisationAttributionConsent: boolean;
+  attributedName: string | null;
+  consentGivenAt: string;
+  consentWithdrawnAt: string | null;
+
+  roleLabel: string;
+  rawQuote: string | null;
+
+  quote: string | null;
+  context: string | null;
+  organisationLabel: string | null;
+
+  moderationStatus: CustomerStoryModerationStatus;
+  moderationReason: string | null;
+  moderatedByName: string | null;
+  moderatedAt: string | null;
+
+  publishedAt: string | null;
+  createdAt: string;
+
+  /** Whether the *current* principal holds the platform-scope publish capability — lets the UI hide the button rather than show-then-403. */
+  canPublish: boolean;
+}
+
+/**
+ * The public, unauthenticated shape — `apps/marketing`'s stories page imports
+ * this instead of declaring its own local interface. `attributedName` is
+ * populated only when the story's consent choice was `named`; `organisationLabel`
+ * is populated only when organisation attribution was separately consented to.
+ */
+export interface PublishedStoryCard {
+  organisationLabel: string;
+  quote: string;
+  context: string;
+  role: string;
+  attributedName?: string;
+}

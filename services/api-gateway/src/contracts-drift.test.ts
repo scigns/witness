@@ -56,6 +56,10 @@ import {
   KNOWLEDGE_REVIEW_DECISIONS as CONTRACT_KNOWLEDGE_REVIEW_DECISIONS,
   ASSERTION_LIFECYCLE_STATES as CONTRACT_ASSERTION_LIFECYCLE_STATES,
   PERSPECTIVE_TAGS as CONTRACT_PERSPECTIVE_TAGS,
+  PRODUCT_AREAS as CONTRACT_PRODUCT_AREAS,
+  FEEDBACK_MOMENTS as CONTRACT_FEEDBACK_MOMENTS,
+  CUSTOMER_STORY_CONSENT_CHOICES as CONTRACT_CUSTOMER_STORY_CONSENT_CHOICES,
+  CUSTOMER_STORY_MODERATION_STATUSES as CONTRACT_CUSTOMER_STORY_MODERATION_STATUSES,
 } from '@witness/contracts';
 import {
   ACCOUNT_STATES as DOMAIN_ACCOUNT_STATES,
@@ -98,6 +102,10 @@ import {
   KNOWLEDGE_REVIEW_DECISIONS as DOMAIN_KNOWLEDGE_REVIEW_DECISIONS,
   ASSERTION_LIFECYCLE_STATES as DOMAIN_ASSERTION_LIFECYCLE_STATES,
   PERSPECTIVE_TAGS as DOMAIN_PERSPECTIVE_TAGS,
+  PRODUCT_AREAS as DOMAIN_PRODUCT_AREAS,
+  FEEDBACK_MOMENTS as DOMAIN_FEEDBACK_MOMENTS,
+  CUSTOMER_STORY_CONSENT_CHOICES as DOMAIN_CUSTOMER_STORY_CONSENT_CHOICES,
+  CUSTOMER_STORY_MODERATION_STATUSES as DOMAIN_CUSTOMER_STORY_MODERATION_STATUSES,
 } from '@witness/domain';
 
 describe('contracts and domain agree across the licence boundary', () => {
@@ -313,5 +321,25 @@ describe('contracts and domain agree across the licence boundary', () => {
 
   it('perspective tags are identical', () => {
     expect([...CONTRACT_PERSPECTIVE_TAGS].sort()).toEqual([...DOMAIN_PERSPECTIVE_TAGS].sort());
+  });
+
+  it('product areas are identical', () => {
+    expect([...CONTRACT_PRODUCT_AREAS].sort()).toEqual([...DOMAIN_PRODUCT_AREAS].sort());
+  });
+
+  it('feedback moments are identical', () => {
+    expect([...CONTRACT_FEEDBACK_MOMENTS].sort()).toEqual([...DOMAIN_FEEDBACK_MOMENTS].sort());
+  });
+
+  it('customer story consent choices are identical', () => {
+    expect([...CONTRACT_CUSTOMER_STORY_CONSENT_CHOICES].sort()).toEqual(
+      [...DOMAIN_CUSTOMER_STORY_CONSENT_CHOICES].sort(),
+    );
+  });
+
+  it('customer story moderation statuses are identical', () => {
+    expect([...CONTRACT_CUSTOMER_STORY_MODERATION_STATUSES].sort()).toEqual(
+      [...DOMAIN_CUSTOMER_STORY_MODERATION_STATUSES].sort(),
+    );
   });
 });

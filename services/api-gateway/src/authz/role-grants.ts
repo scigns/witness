@@ -47,6 +47,8 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     // knowledge_provenance:inspect. See policy.csv's matching comment.
     'knowledge_domain:read',
     'knowledge_entity:read',
+    'product_feedback:create',
+    'customer_story:create',
   ],
   // `session:update`/`session:transition` are workspace-wide, not
   // per-session: any contributor in a workspace's scope may rename, close,
@@ -152,6 +154,8 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'knowledge_concept:suggest',
     'knowledge_relationship:suggest',
     'knowledge_candidate:validate_community',
+    'product_feedback:create',
+    'customer_story:create',
   ],
   // `evidence_review:*` (BUILD_ROADMAP.md Milestone 6, Evidence Review and
   // Validation) is where `reviewer` first gains write actions of its own —
@@ -252,6 +256,11 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'knowledge_entity:read',
     'knowledge_provenance:inspect',
     'knowledge_candidate:review',
+    'product_feedback:create',
+    'product_feedback:read',
+    'customer_story:create',
+    'customer_story:read',
+    'customer_story:moderate',
   ],
   // Least privilege (Constitution, Authority and Access): organisation and
   // workspace creation are the privileged actions in this slice, so they are the
@@ -377,6 +386,16 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'knowledge_entity:steward',
     'knowledge_entity:publish',
     'knowledge_governance:configure',
+    // `customer_story:publish` is a PLATFORM_ONLY_ACTIONS entry — listing it
+    // in this 'admin' array does not make it reachable by an ordinary
+    // organisation/workspace-scoped admin; see policy.csv's matching
+    // comment for the full reasoning (same mechanism as `operator:read`).
+    'product_feedback:create',
+    'product_feedback:read',
+    'customer_story:create',
+    'customer_story:read',
+    'customer_story:moderate',
+    'customer_story:publish',
   ],
   // Knowledge Steward (ADR-0026 point 8) — see packages/policy/policy.csv's
   // matching comment. This table and policy.csv must not disagree
