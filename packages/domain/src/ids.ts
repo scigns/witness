@@ -67,6 +67,10 @@ export type AgreementId = Branded<string, 'AgreementId'>;
 export type ProductFeedbackId = Branded<string, 'ProductFeedbackId'>;
 export type CustomerStoryId = Branded<string, 'CustomerStoryId'>;
 
+// Live workshop participant experience (Phase 6, Track E).
+export type ParticipantKnowledgeResponseId = Branded<string, 'ParticipantKnowledgeResponseId'>;
+export type SessionFeaturedInsightId = Branded<string, 'SessionFeaturedInsightId'>;
+
 // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
 export type KnowledgeDomainId = Branded<string, 'KnowledgeDomainId'>;
 export type KnowledgeEntityId = Branded<string, 'KnowledgeEntityId'>;
@@ -305,6 +309,16 @@ export function toProductFeedbackId(value: string): ProductFeedbackId {
 export function toCustomerStoryId(value: string): CustomerStoryId {
   assertUuid(value, 'CustomerStoryId');
   return value as CustomerStoryId;
+}
+
+export function toParticipantKnowledgeResponseId(value: string): ParticipantKnowledgeResponseId {
+  assertUuid(value, 'ParticipantKnowledgeResponseId');
+  return value as ParticipantKnowledgeResponseId;
+}
+
+export function toSessionFeaturedInsightId(value: string): SessionFeaturedInsightId {
+  assertUuid(value, 'SessionFeaturedInsightId');
+  return value as SessionFeaturedInsightId;
 }
 
 export function toKnowledgeDomainId(value: string): KnowledgeDomainId {

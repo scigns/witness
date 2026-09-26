@@ -133,6 +133,8 @@ import { ProductFeedbackService } from './product-feedback/product-feedback.serv
 import { CustomerStoriesController } from './customer-stories/customer-stories.controller.js';
 import { CustomerStoriesService } from './customer-stories/customer-stories.service.js';
 import { StoriesPublicController } from './customer-stories/stories-public.controller.js';
+import { SessionFeaturedInsightsController } from './session-featured-insights/session-featured-insights.controller.js';
+import { SessionFeaturedInsightsService } from './session-featured-insights/session-featured-insights.service.js';
 
 @Module({
   controllers: [
@@ -182,6 +184,7 @@ import { StoriesPublicController } from './customer-stories/stories-public.contr
     ProductFeedbackController,
     CustomerStoriesController,
     StoriesPublicController,
+    SessionFeaturedInsightsController,
   ],
   providers: [
     PrismaService,
@@ -210,6 +213,7 @@ import { StoriesPublicController } from './customer-stories/stories-public.contr
     MailerService,
     ProductFeedbackService,
     CustomerStoriesService,
+    SessionFeaturedInsightsService,
     WorkspacesService,
     UsersService,
     OrganisationInvitationsService,

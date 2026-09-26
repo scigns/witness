@@ -261,6 +261,8 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'customer_story:create',
     'customer_story:read',
     'customer_story:moderate',
+    'session_featured_insight:manage',
+    'participant_knowledge_response:read',
   ],
   // Least privilege (Constitution, Authority and Access): organisation and
   // workspace creation are the privileged actions in this slice, so they are the
@@ -396,6 +398,8 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
     'customer_story:read',
     'customer_story:moderate',
     'customer_story:publish',
+    'session_featured_insight:manage',
+    'participant_knowledge_response:read',
   ],
   // Knowledge Steward (ADR-0026 point 8) — see packages/policy/policy.csv's
   // matching comment. This table and policy.csv must not disagree

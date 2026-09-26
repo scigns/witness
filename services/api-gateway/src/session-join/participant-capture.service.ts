@@ -36,11 +36,14 @@ import type {
   CaptureParticipantFeedbackRequest,
   CustomerStoryView,
   EvidenceAttachmentView,
+  FeaturedInsightView,
   ParticipantCaptureConsentRequest,
   ParticipantCaptureContextView,
   ParticipantCaptureEvidenceRequest,
   ParticipantCaptureEvidenceResult,
+  ParticipantPromptView,
   ProductFeedbackView,
+  SubmitParticipantKnowledgeResponseRequest,
   SubmitTestimonialConsentRequest,
 } from '@witness/contracts';
 
@@ -55,6 +58,7 @@ import {
 import { ParticipantConsentRecordsService } from '../participant-consent-records/participant-consent-records.service.js';
 import { ProductFeedbackService } from '../product-feedback/product-feedback.service.js';
 import { CustomerStoriesService } from '../customer-stories/customer-stories.service.js';
+import { SessionFeaturedInsightsService } from '../session-featured-insights/session-featured-insights.service.js';
 
 /** Session-scoped, not tied to the join link's own (often much shorter) expiry. */
 export const CAPTURE_TOKEN_TTL_HOURS = 24;
@@ -117,6 +121,7 @@ export class ParticipantCaptureService {
     private readonly attachments: EvidenceAttachmentService,
     private readonly productFeedback: ProductFeedbackService,
     private readonly customerStories: CustomerStoriesService,
+    private readonly insights: SessionFeaturedInsightsService,
   ) {}
 
   async mint(participantId: string, now: Date): Promise<string> {
@@ -176,6 +181,7 @@ export class ParticipantCaptureService {
         content: request.content,
         language: request.language,
         sessionOffsetSeconds: request.sessionOffsetSeconds,
+        sourceAgendaItemId: request.sourceAgendaItemId,
         // Never client-supplied: this is the entire security property this
         // service exists to guarantee — a forged request body cannot make
         // one participant's token file evidence attributed to another.
@@ -273,6 +279,57 @@ export class ParticipantCaptureService {
     return this.customerStories.proposeFromFeedbackForParticipant(
       resolved.workspaceId,
       feedbackId,
+      resolved.participantId,
+      request,
+      principal,
+    );
+  }
+
+  /**
+   * The session's current workshop prompt, or `null` for open reflection /
+   * between prompts. `position`/`totalPrompts` come from the same
+   * `sortOrder` sequence `AgendaItemsController` already maintains — no new
+   * ordering concept, just a participant-safe read of it.
+   */
+  async getPrompt(rawToken: string): Promise<ParticipantPromptView | null> {
+    const resolved = await this.resolveToken(rawToken);
+
+    const items = await this.prisma.agendaItem.findMany({
+      where: { sessionId: resolved.sessionId },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, title: true, promptText: true, status: true },
+    });
+    if (items.length === 0) return null;
+
+    const currentIndex = items.findIndex((item) => item.status === 'current');
+    if (currentIndex === -1) return null;
+
+    const current = items[currentIndex]!;
+    return {
+      id: current.id,
+      title: current.title,
+      promptText: current.promptText,
+      position: currentIndex + 1,
+      totalPrompts: items.length,
+      status: current.status as ParticipantPromptView['status'],
+    };
+  }
+
+  async getInsights(rawToken: string): Promise<FeaturedInsightView[]> {
+    const resolved = await this.resolveToken(rawToken);
+    return this.insights.listForParticipant(resolved.sessionId, resolved.participantId);
+  }
+
+  async submitInsightResponse(
+    rawToken: string,
+    insightId: string,
+    request: SubmitParticipantKnowledgeResponseRequest,
+  ): Promise<void> {
+    const resolved = await this.resolveToken(rawToken);
+    const principal = participantPrincipal(resolved.participantId, resolved.displayName);
+    await this.insights.submitResponse(
+      resolved.sessionId,
+      insightId,
       resolved.participantId,
       request,
       principal,

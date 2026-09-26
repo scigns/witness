@@ -39,6 +39,7 @@ import {
   captureEvidence,
   requiredConsentCategoryForCapture,
   submitEvidence,
+  toAgendaItemId,
   toCoDesignSessionId,
   toEvidenceId,
   toOrganisationId,
@@ -140,6 +141,7 @@ export class EvidenceService {
         updatedAt: true,
         withdrawnAt: true,
         sourceParticipantId: true,
+        sourceAgendaItemId: true,
         attachment: { select: { kind: true } },
         transcript: { select: { status: true } },
       },
@@ -214,6 +216,23 @@ export class EvidenceService {
     let participantIdentityMode: ParticipantIdentityMode | null = null;
     let consentBasis: readonly string[] = [];
 
+    let sourceAgendaItemId: ReturnType<typeof toAgendaItemId> | null = null;
+    if (request.sourceAgendaItemId !== undefined) {
+      const agendaItem = await this.prisma.agendaItem.findUnique({
+        where: { id: request.sourceAgendaItemId },
+        select: { sessionId: true },
+      });
+      if (agendaItem === null || agendaItem.sessionId !== sessionId) {
+        throw new BadRequestException({
+          error: {
+            code: 'AGENDA_ITEM_NOT_IN_SESSION',
+            message: 'This prompt does not belong to this session.',
+          },
+        });
+      }
+      sourceAgendaItemId = toAgendaItemId(request.sourceAgendaItemId);
+    }
+
     if (request.sourceParticipantId !== undefined) {
       const participant = await this.requireParticipantRow(
         workspaceId,
@@ -241,6 +260,7 @@ export class EvidenceService {
       content: request.content,
       language: request.language,
       sessionOffsetSeconds: request.sessionOffsetSeconds,
+      sourceAgendaItemId,
       sourceParticipantId:
         request.sourceParticipantId !== undefined
           ? toSessionParticipantId(request.sourceParticipantId)
@@ -588,6 +608,8 @@ export function toDomainEvidence(row: EvidenceRow): Evidence {
     language: row.language,
     capturedAt: row.capturedAt,
     sessionOffsetSeconds: row.sessionOffsetSeconds,
+    sourceAgendaItemId:
+      row.sourceAgendaItemId !== null ? toAgendaItemId(row.sourceAgendaItemId) : null,
     sourceParticipantId:
       row.sourceParticipantId !== null ? toSessionParticipantId(row.sourceParticipantId) : null,
     attributionMode: row.attributionMode as Evidence['attributionMode'],
@@ -627,6 +649,7 @@ function toUpdateRow(evidence: Evidence) {
     language: evidence.language,
     capturedAt: evidence.capturedAt,
     sessionOffsetSeconds: evidence.sessionOffsetSeconds,
+    sourceAgendaItemId: evidence.sourceAgendaItemId,
     sourceParticipantId: evidence.sourceParticipantId,
     attributionMode: evidence.attributionMode,
     identityVisibility: evidence.identityVisibility,
@@ -664,6 +687,7 @@ type EvidenceSummaryRow = Pick<
   | 'updatedAt'
   | 'withdrawnAt'
   | 'sourceParticipantId'
+  | 'sourceAgendaItemId'
 > & {
   attachment?: { kind: string } | null;
   transcript?: { status: string } | null;
@@ -694,6 +718,7 @@ function toSummary(row: EvidenceSummaryRow): EvidenceSummary {
     ...(row.attributionMode === 'attributed' && row.sourceParticipantId !== null
       ? { sourceParticipantId: row.sourceParticipantId }
       : {}),
+    ...(row.sourceAgendaItemId !== null ? { sourceAgendaItemId: row.sourceAgendaItemId } : {}),
     ...(row.attachment !== undefined && row.attachment !== null
       ? { attachmentKind: row.attachment.kind as EvidenceAttachmentKind }
       : {}),

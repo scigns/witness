@@ -141,7 +141,11 @@ export type Action =
   | 'customer_story:create'
   | 'customer_story:read'
   | 'customer_story:moderate'
-  | 'customer_story:publish';
+  | 'customer_story:publish'
+  // Live workshop participant experience (Phase 6, Track E) — ordinary
+  // workspace governance, not a PLATFORM_ONLY_ACTIONS entry.
+  | 'session_featured_insight:manage'
+  | 'participant_knowledge_response:read';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;

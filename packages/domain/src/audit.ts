@@ -216,6 +216,10 @@ export const AUDIT_ACTIONS = [
   'customer_story.published',
   'customer_story.unpublished',
   'customer_story.consent_withdrawn',
+  // Live workshop participant experience (Phase 6, Track E).
+  'participant_knowledge_response.submitted',
+  'session_featured_insight.added',
+  'session_featured_insight.removed',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -274,6 +278,8 @@ export const AUDIT_SUBJECT_TYPES = [
   'knowledge_provenance_chain',
   'product_feedback',
   'customer_story',
+  'participant_knowledge_response',
+  'session_featured_insight',
 ] as const;
 export type AuditSubjectType = (typeof AUDIT_SUBJECT_TYPES)[number];
 

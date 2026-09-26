@@ -55,6 +55,8 @@ export * from './agreement.js';
 export * from './billing-snapshot.js';
 export * from './product-feedback.js';
 export * from './customer-story.js';
+export * from './participant-knowledge-response.js';
+export * from './session-featured-insight.js';
 
 // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
 export * from './relationship-vocabulary.js';

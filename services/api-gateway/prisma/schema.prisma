@@ -32,26 +32,29 @@ model Actor {
   displayName String   @map("display_name") @db.VarChar(200)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  capturedRecords            Record[]                  @relation("CapturedBy")
-  auditEvents                AuditEvent[]
-  evidenceLinks              EvidenceLink[]            @relation("EvidenceLinkCreatedBy")
-  reviewAssignmentsAssigned  ReviewAssignment[]        @relation("ReviewAssignmentAssignedBy")
-  clarificationsRequested    Clarification[]           @relation("ClarificationRequestedBy")
-  clarificationsResponded    Clarification[]           @relation("ClarificationRespondedBy")
-  decisionsProposed          Decision[]                @relation("DecisionProposedBy")
-  decisionsConfirmed         Decision[]                @relation("DecisionConfirmedBy")
-  commitmentsProposed        Commitment[]              @relation("CommitmentProposedBy")
-  commitmentsActivated       Commitment[]              @relation("CommitmentActivatedBy")
-  actionItemsCreated         ActionItem[]              @relation("ActionItemCreatedBy")
-  outcomeSupportsRecorded    OutcomeSupport[]          @relation("OutcomeSupportRecordedBy")
-  reportsCreated             Report[]                  @relation("ReportCreatedBy")
-  reportsSubmitted           Report[]                  @relation("ReportSubmittedBy")
-  reportsApproved            Report[]                  @relation("ReportApprovedBy")
-  reportSourcesIncluded      ReportSource[]            @relation("ReportSourceIncludedBy")
-  commercialChangesRequested CommercialChangeRequest[]
-  agreementsCreated          Agreement[]
-  productFeedbackSubmitted   ProductFeedback[]
-  customerStoriesModerated   CustomerStory[]
+  capturedRecords                        Record[]                       @relation("CapturedBy")
+  auditEvents                            AuditEvent[]
+  evidenceLinks                          EvidenceLink[]                 @relation("EvidenceLinkCreatedBy")
+  reviewAssignmentsAssigned              ReviewAssignment[]             @relation("ReviewAssignmentAssignedBy")
+  clarificationsRequested                Clarification[]                @relation("ClarificationRequestedBy")
+  clarificationsResponded                Clarification[]                @relation("ClarificationRespondedBy")
+  decisionsProposed                      Decision[]                     @relation("DecisionProposedBy")
+  decisionsConfirmed                     Decision[]                     @relation("DecisionConfirmedBy")
+  commitmentsProposed                    Commitment[]                   @relation("CommitmentProposedBy")
+  commitmentsActivated                   Commitment[]                   @relation("CommitmentActivatedBy")
+  actionItemsCreated                     ActionItem[]                   @relation("ActionItemCreatedBy")
+  outcomeSupportsRecorded                OutcomeSupport[]               @relation("OutcomeSupportRecordedBy")
+  reportsCreated                         Report[]                       @relation("ReportCreatedBy")
+  reportsSubmitted                       Report[]                       @relation("ReportSubmittedBy")
+  reportsApproved                        Report[]                       @relation("ReportApprovedBy")
+  reportSourcesIncluded                  ReportSource[]                 @relation("ReportSourceIncludedBy")
+  commercialChangesRequested             CommercialChangeRequest[]
+  agreementsCreated                      Agreement[]
+  productFeedbackSubmitted               ProductFeedback[]
+  customerStoriesModerated               CustomerStory[]
+  participantKnowledgeResponsesSubmitted ParticipantKnowledgeResponse[]
+  sessionFeaturedInsightsCurated         SessionFeaturedInsight[]       @relation("SessionFeaturedInsightCurated")
+  sessionFeaturedInsightsRemoved         SessionFeaturedInsight[]       @relation("SessionFeaturedInsightRemoved")
 
   // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
   knowledgeDomainsCreated       KnowledgeDomain[]
@@ -139,38 +142,40 @@ model Organisation {
   profile           String   @default("general") @db.VarChar(20)
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  workspaces                   Workspace[]
-  memberships                  OrganisationMembership[]
-  roleAssignments              RoleAssignment[]
-  coDesignSessions             CoDesignSession[]
-  sessionParticipants          SessionParticipant[]
-  consentTemplates             ConsentTemplate[]
-  sessionConsentConfigurations SessionConsentConfiguration[]
-  participantConsentRecords    ParticipantConsentRecord[]
-  evidence                     Evidence[]
-  evidenceLinks                EvidenceLink[]
-  reviewAssignments            ReviewAssignment[]
-  clarifications               Clarification[]
-  decisions                    Decision[]
-  commitments                  Commitment[]
-  actionItems                  ActionItem[]
-  outcomeSupports              OutcomeSupport[]
-  reports                      Report[]
-  reportSources                ReportSource[]
-  billingAccount               BillingAccount?
-  subscriptions                Subscription[]
-  commercialChangeRequests     CommercialChangeRequest[]
-  invoices                     Invoice[]
-  invoiceNumberCounter         InvoiceNumberCounter?
-  purchaseOrders               PurchaseOrder[]
-  paymentMethods               PaymentMethod[]
-  payments                     Payment[]
-  receipts                     Receipt[]
-  receiptNumberCounter         ReceiptNumberCounter?
-  agreements                   Agreement[]
-  invitationNotifications      InvitationNotification[]
-  productFeedback              ProductFeedback[]
-  customerStories              CustomerStory[]
+  workspaces                    Workspace[]
+  memberships                   OrganisationMembership[]
+  roleAssignments               RoleAssignment[]
+  coDesignSessions              CoDesignSession[]
+  sessionParticipants           SessionParticipant[]
+  consentTemplates              ConsentTemplate[]
+  sessionConsentConfigurations  SessionConsentConfiguration[]
+  participantConsentRecords     ParticipantConsentRecord[]
+  evidence                      Evidence[]
+  evidenceLinks                 EvidenceLink[]
+  reviewAssignments             ReviewAssignment[]
+  clarifications                Clarification[]
+  decisions                     Decision[]
+  commitments                   Commitment[]
+  actionItems                   ActionItem[]
+  outcomeSupports               OutcomeSupport[]
+  reports                       Report[]
+  reportSources                 ReportSource[]
+  billingAccount                BillingAccount?
+  subscriptions                 Subscription[]
+  commercialChangeRequests      CommercialChangeRequest[]
+  invoices                      Invoice[]
+  invoiceNumberCounter          InvoiceNumberCounter?
+  purchaseOrders                PurchaseOrder[]
+  paymentMethods                PaymentMethod[]
+  payments                      Payment[]
+  receipts                      Receipt[]
+  receiptNumberCounter          ReceiptNumberCounter?
+  agreements                    Agreement[]
+  invitationNotifications       InvitationNotification[]
+  productFeedback               ProductFeedback[]
+  customerStories               CustomerStory[]
+  participantKnowledgeResponses ParticipantKnowledgeResponse[]
+  sessionFeaturedInsights       SessionFeaturedInsight[]
 
   // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
   knowledgeDomains       KnowledgeDomain[]
@@ -596,6 +601,86 @@ model CustomerStory {
   @@map("customer_story")
 }
 
+/// A participant's reaction to a piece of confirmed Knowledge exposed back
+/// to them during a live workshop (Phase 6, Track E — "close the co-design
+/// loop"). Append-only: no service in this codebase updates a row here once
+/// created, same discipline as `ProductFeedback`. Deliberately references
+/// only a `KnowledgeAssertion` (never a candidate) — see
+/// `packages/domain/src/session-featured-insight.ts`'s file header for why.
+model ParticipantKnowledgeResponse {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  knowledgeAssertionId String             @map("knowledge_assertion_id") @db.Uuid
+  knowledgeAssertion   KnowledgeAssertion @relation(fields: [knowledgeAssertionId], references: [id], onDelete: Restrict)
+
+  sourceParticipantId String             @map("source_participant_id") @db.Uuid
+  sourceParticipant   SessionParticipant @relation(fields: [sourceParticipantId], references: [id], onDelete: Cascade)
+
+  /// `reflects` | `needs_nuance` | `missing_context` | `sees_differently` —
+  /// deliberately not a boolean/score; see the domain file header.
+  responseType String  @map("response_type") @db.VarChar(24)
+  comment      String? @db.VarChar(1000)
+
+  submittedById String @map("submitted_by_id") @db.Uuid
+  submittedBy   Actor  @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([sessionId])
+  @@index([knowledgeAssertionId])
+  @@index([sourceParticipantId])
+  @@map("participant_knowledge_response")
+}
+
+/// A facilitator's deliberate choice to surface one confirmed
+/// `KnowledgeAssertion` back to a live workshop's participants ("what we're
+/// hearing so far"), Phase 6, Track E. Unfeaturing is retained, not deleted
+/// (`removedAt`) — see `packages/domain/src/session-featured-insight.ts`.
+model SessionFeaturedInsight {
+  id String @id @db.Uuid
+
+  organisationId String       @map("organisation_id") @db.Uuid
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  sessionId String          @map("session_id") @db.Uuid
+  session   CoDesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  knowledgeAssertionId String             @map("knowledge_assertion_id") @db.Uuid
+  knowledgeAssertion   KnowledgeAssertion @relation(fields: [knowledgeAssertionId], references: [id], onDelete: Restrict)
+
+  displayOrder Int @default(0) @map("display_order")
+
+  curatedById String   @map("curated_by_id") @db.Uuid
+  curatedBy   Actor    @relation("SessionFeaturedInsightCurated", fields: [curatedById], references: [id], onDelete: Restrict)
+  curatedAt   DateTime @default(now()) @map("curated_at") @db.Timestamptz(6)
+
+  removedById String?   @map("removed_by_id") @db.Uuid
+  removedBy   Actor?    @relation("SessionFeaturedInsightRemoved", fields: [removedById], references: [id], onDelete: SetNull)
+  removedAt   DateTime? @map("removed_at") @db.Timestamptz(6)
+
+  /// A currently-active feature is unique per (session, assertion) — the
+  /// domain's "cannot feature the same assertion twice" guard restated as a
+  /// database constraint. Removed rows are retained and excluded from this
+  /// constraint via the partial-index-style `removedAt IS NULL` predicate,
+  /// which Prisma cannot express directly — enforced in the domain/service
+  /// layer's pre-check instead; this index supports that lookup.
+  @@index([sessionId, knowledgeAssertionId, removedAt])
+  @@index([sessionId])
+  @@map("session_featured_insight")
+}
+
 /// A customer's requested commercial transition. It is deliberately separate
 /// from Subscription: a request never represents settlement or paid access.
 model CommercialChangeRequest {
@@ -680,8 +765,8 @@ model Workspace {
   // Programme lifecycle (Phase 4F, ADR-0028) — draft/recruiting/active/
   // review/closed/archived. See packages/domain/src/workspace.ts for the
   // transition table.
-  status  String @default("draft") @db.VarChar(16)
-  version Int    @default(1)
+  status      String  @default("draft") @db.VarChar(16)
+  version     Int     @default(1)
 
   organisationId String       @map("organisation_id") @db.Uuid
   organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
@@ -723,8 +808,10 @@ model Workspace {
   // Governed QR/link session joining (Phase 5, Workstream 1.6).
   sessionJoinLinks SessionJoinLink[]
 
-  productFeedback ProductFeedback[]
-  customerStories CustomerStory[]
+  productFeedback               ProductFeedback[]
+  customerStories               CustomerStory[]
+  participantKnowledgeResponses ParticipantKnowledgeResponse[]
+  sessionFeaturedInsights       SessionFeaturedInsight[]
 
   @@index([organisationId])
   @@map("workspace")
@@ -750,22 +837,22 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organisationMemberships   OrganisationMembership[]
-  workspaceMemberships      WorkspaceMembership[]
-  roleAssignments           RoleAssignment[]
-  identityLinks             IdentityLink[]
-  authSessions              AuthSession[]
-  facilitatedSessions       CoDesignSession[]
-  linkedSessionParticipants SessionParticipant[]
-  reviewAssignments         ReviewAssignment[]       @relation("ReviewAssignmentReviewer")
-  ownedCommitments          Commitment[]             @relation("CommitmentOwner")
-  ownedActionItems          ActionItem[]             @relation("ActionItemOwner")
-  facilitatedAgendaItems    AgendaItem[]
-  uploadedResources         Resource[]
-  workspaceInvitationsSent     WorkspaceInvitation[] @relation("WorkspaceInvitationInviter")
-  workspaceInvitationsAccepted WorkspaceInvitation[] @relation("WorkspaceInvitationAcceptedBy")
-  invitationNotifications   InvitationNotification[]
-  sessionJoinLinksCreated   SessionJoinLink[]
+  organisationMemberships      OrganisationMembership[]
+  workspaceMemberships         WorkspaceMembership[]
+  roleAssignments              RoleAssignment[]
+  identityLinks                IdentityLink[]
+  authSessions                 AuthSession[]
+  facilitatedSessions          CoDesignSession[]
+  linkedSessionParticipants    SessionParticipant[]
+  reviewAssignments            ReviewAssignment[]       @relation("ReviewAssignmentReviewer")
+  ownedCommitments             Commitment[]             @relation("CommitmentOwner")
+  ownedActionItems             ActionItem[]             @relation("ActionItemOwner")
+  facilitatedAgendaItems       AgendaItem[]
+  uploadedResources            Resource[]
+  workspaceInvitationsSent     WorkspaceInvitation[]    @relation("WorkspaceInvitationInviter")
+  workspaceInvitationsAccepted WorkspaceInvitation[]    @relation("WorkspaceInvitationAcceptedBy")
+  invitationNotifications      InvitationNotification[]
+  sessionJoinLinksCreated      SessionJoinLink[]
 
   @@index([accountState])
   @@map("witness_user")
@@ -1055,8 +1142,8 @@ model WorkspaceInvitation {
   /// Delivery state — independent of `status` (ADR-0025's discipline,
   /// reapplied here): SMTP acceptance is never conflated with acceptance of
   /// the invitation itself.
-  deliveryStatus   String  @default("pending") @map("delivery_status") @db.VarChar(16)
-  deliveryAttempts Int     @default(0) @map("delivery_attempts")
+  deliveryStatus    String  @default("pending") @map("delivery_status") @db.VarChar(16)
+  deliveryAttempts  Int     @default(0) @map("delivery_attempts")
   lastDeliveryError String? @map("last_delivery_error") @db.VarChar(500)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1133,24 +1220,26 @@ model CoDesignSession {
 
   version Int @default(1)
 
-  participants              SessionParticipant[]
-  consentConfiguration      SessionConsentConfiguration?
-  participantConsentRecords ParticipantConsentRecord[]
-  evidence                  Evidence[]
-  evidenceLinks             EvidenceLink[]
-  reviewAssignments         ReviewAssignment[]
-  clarifications            Clarification[]
-  decisions                 Decision[]
-  commitments               Commitment[]
-  actionItems               ActionItem[]
-  outcomeSupports           OutcomeSupport[]
-  reports                   Report[]
-  reportSources             ReportSource[]
-  summary                   SessionSummary?
-  agendaItems               AgendaItem[]
-  resources                 Resource[]
-  joinLinks                 SessionJoinLink[]
-  productFeedback           ProductFeedback[]
+  participants                  SessionParticipant[]
+  consentConfiguration          SessionConsentConfiguration?
+  participantConsentRecords     ParticipantConsentRecord[]
+  evidence                      Evidence[]
+  evidenceLinks                 EvidenceLink[]
+  reviewAssignments             ReviewAssignment[]
+  clarifications                Clarification[]
+  decisions                     Decision[]
+  commitments                   Commitment[]
+  actionItems                   ActionItem[]
+  outcomeSupports               OutcomeSupport[]
+  reports                       Report[]
+  reportSources                 ReportSource[]
+  summary                       SessionSummary?
+  agendaItems                   AgendaItem[]
+  resources                     Resource[]
+  joinLinks                     SessionJoinLink[]
+  productFeedback               ProductFeedback[]
+  participantKnowledgeResponses ParticipantKnowledgeResponse[]
+  sessionFeaturedInsights       SessionFeaturedInsight[]
 
   @@index([organisationId])
   @@index([workspaceId, status])
@@ -1212,11 +1301,12 @@ model SessionParticipant {
 
   version Int @default(1)
 
-  consentRecords  ParticipantConsentRecord[]
-  evidence        Evidence[]
-  joinAttempts    SessionJoinAttempt[]
-  captureTokens   ParticipantCaptureToken[]
-  productFeedback ProductFeedback[]
+  consentRecords                ParticipantConsentRecord[]
+  evidence                      Evidence[]
+  joinAttempts                  SessionJoinAttempt[]
+  captureTokens                 ParticipantCaptureToken[]
+  productFeedback               ProductFeedback[]
+  participantKnowledgeResponses ParticipantKnowledgeResponse[]
 
   @@index([sessionId])
   @@index([workspaceId])
@@ -1584,6 +1674,13 @@ model Evidence {
   capturedAt           DateTime @map("captured_at") @db.Timestamptz(6)
   sessionOffsetSeconds Int?     @map("session_offset_seconds")
 
+  /// The workshop prompt (`AgendaItem`) this contribution answers, if any
+  /// (Phase 6, Track E) — null means open reflection / no active prompt at
+  /// capture time. Set once at capture and never changed afterward, same
+  /// discipline as `sessionOffsetSeconds`.
+  sourceAgendaItemId String?     @map("source_agenda_item_id") @db.Uuid
+  sourceAgendaItem   AgendaItem? @relation(fields: [sourceAgendaItemId], references: [id], onDelete: SetNull)
+
   sourceParticipantId String?             @map("source_participant_id") @db.Uuid
   sourceParticipant   SessionParticipant? @relation(fields: [sourceParticipantId], references: [id], onDelete: SetNull)
 
@@ -1634,6 +1731,7 @@ model Evidence {
   @@index([sessionId])
   @@index([workspaceId])
   @@index([sourceParticipantId])
+  @@index([sourceAgendaItemId])
   @@index([sessionId, reviewStatus])
   @@map("evidence")
 }
@@ -2390,7 +2488,10 @@ model AgendaItem {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  resources Resource[]
+  resources             Resource[]
+  /// Contributions captured while this item was the session's active
+  /// prompt (Phase 6, Track E) — see `Evidence.sourceAgendaItemId`.
+  evidenceContributions Evidence[]
 
   @@index([workspaceId, sortOrder])
   @@index([sessionId])
@@ -2831,8 +2932,10 @@ model KnowledgeAssertion {
 
   version Int @default(1)
 
-  entityAttributes KnowledgeEntityAttribute[]
-  relationships    KnowledgeRelationship[]
+  entityAttributes     KnowledgeEntityAttribute[]
+  relationships        KnowledgeRelationship[]
+  participantResponses ParticipantKnowledgeResponse[]
+  sessionFeaturedIn    SessionFeaturedInsight[]
 
   @@index([organisationId])
   @@index([workspaceId, lifecycleState])

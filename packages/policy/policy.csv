@@ -483,9 +483,13 @@ p, reviewer, product_feedback:read
 p, reviewer, customer_story:create
 p, reviewer, customer_story:read
 p, reviewer, customer_story:moderate
+p, reviewer, session_featured_insight:manage
+p, reviewer, participant_knowledge_response:read
 p, admin, product_feedback:create
 p, admin, product_feedback:read
 p, admin, customer_story:create
 p, admin, customer_story:read
 p, admin, customer_story:moderate
 p, admin, customer_story:publish
+p, admin, session_featured_insight:manage
+p, admin, participant_knowledge_response:read

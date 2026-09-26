@@ -60,6 +60,7 @@ import {
   FEEDBACK_MOMENTS as CONTRACT_FEEDBACK_MOMENTS,
   CUSTOMER_STORY_CONSENT_CHOICES as CONTRACT_CUSTOMER_STORY_CONSENT_CHOICES,
   CUSTOMER_STORY_MODERATION_STATUSES as CONTRACT_CUSTOMER_STORY_MODERATION_STATUSES,
+  PARTICIPANT_RESPONSE_TYPES as CONTRACT_PARTICIPANT_RESPONSE_TYPES,
 } from '@witness/contracts';
 import {
   ACCOUNT_STATES as DOMAIN_ACCOUNT_STATES,
@@ -106,6 +107,7 @@ import {
   FEEDBACK_MOMENTS as DOMAIN_FEEDBACK_MOMENTS,
   CUSTOMER_STORY_CONSENT_CHOICES as DOMAIN_CUSTOMER_STORY_CONSENT_CHOICES,
   CUSTOMER_STORY_MODERATION_STATUSES as DOMAIN_CUSTOMER_STORY_MODERATION_STATUSES,
+  PARTICIPANT_RESPONSE_TYPES as DOMAIN_PARTICIPANT_RESPONSE_TYPES,
 } from '@witness/domain';
 
 describe('contracts and domain agree across the licence boundary', () => {
@@ -340,6 +342,12 @@ describe('contracts and domain agree across the licence boundary', () => {
   it('customer story moderation statuses are identical', () => {
     expect([...CONTRACT_CUSTOMER_STORY_MODERATION_STATUSES].sort()).toEqual(
       [...DOMAIN_CUSTOMER_STORY_MODERATION_STATUSES].sort(),
+    );
+  });
+
+  it('participant knowledge response types are identical', () => {
+    expect([...CONTRACT_PARTICIPANT_RESPONSE_TYPES].sort()).toEqual(
+      [...DOMAIN_PARTICIPANT_RESPONSE_TYPES].sort(),
     );
   });
 });

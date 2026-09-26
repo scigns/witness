@@ -1101,6 +1101,8 @@ export const participantCaptureEvidenceRequestSchema = z.object({
   language: z.string().trim().max(50).optional(),
   sessionOffsetSeconds: z.number().int().min(0).optional(),
   tags: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
+  /** The workshop prompt (`AgendaItem`) this contribution answers, if any — omitted for open reflection. */
+  sourceAgendaItemId: z.string().uuid().optional(),
   /** Same idempotent-retry convention as `captureEvidenceRequestSchema`. */
   clientRequestId: z.string().uuid('A valid client request id is required'),
 });
@@ -1193,6 +1195,8 @@ export const captureEvidenceRequestSchema = z.object({
   language: z.string().trim().max(50).optional(),
   sessionOffsetSeconds: z.number().int().min(0).optional(),
   sourceParticipantId: z.string().uuid().optional(),
+  /** The workshop prompt (`AgendaItem`) this contribution answers, if any — omitted for open reflection. */
+  sourceAgendaItemId: z.string().uuid().optional(),
   attributionMode: z.enum(EVIDENCE_ATTRIBUTION_MODES),
   identityVisibility: z.enum(PARTICIPANT_IDENTITY_VISIBILITIES).optional(),
   tags: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
@@ -2226,6 +2230,8 @@ export interface EvidenceSummary {
   withdrawn: boolean;
   /** Present only when `attributionMode` is `attributed`. */
   sourceParticipantId?: string;
+  /** The workshop prompt this contribution answered, if any — absent for open reflection. */
+  sourceAgendaItemId?: string;
   /** Absent when no file has been attached to this evidence yet. */
   attachmentKind?: EvidenceAttachmentKind;
   /** Absent when the attachment has no transcript (not audio, or never requested). */
@@ -3436,4 +3442,103 @@ export interface PublishedStoryCard {
   context: string;
   role: string;
   attributedName?: string;
+}
+
+// ─── Live workshop participant experience (Phase 6, Track E) ───────────────────
+
+/**
+ * Mirrors @witness/domain's `ParticipantResponseType`, kept as a separate
+ * literal here per this package's independence from the GPL domain package
+ * — cross-checked by contracts-drift.test.ts. Deliberately preserves
+ * disagreement rather than collapsing to a score: `needs_nuance` and
+ * `sees_differently` are first-class outcomes, never a low rating.
+ */
+export const PARTICIPANT_RESPONSE_TYPES = [
+  'reflects',
+  'needs_nuance',
+  'missing_context',
+  'sees_differently',
+] as const;
+export type ParticipantResponseType = (typeof PARTICIPANT_RESPONSE_TYPES)[number];
+
+export const submitParticipantKnowledgeResponseRequestSchema = z
+  .object({
+    responseType: z.enum(PARTICIPANT_RESPONSE_TYPES),
+    comment: z.string().trim().max(1000).nullable().optional(),
+  })
+  .strict();
+export type SubmitParticipantKnowledgeResponseRequest = z.infer<
+  typeof submitParticipantKnowledgeResponseRequestSchema
+>;
+
+/**
+ * Derived, not stored: `contested`/`under_discussion` come from the
+ * assertion's existing `perspectiveTags`; a confirmed assertion with neither
+ * tag is `community_validated`. There is no `emerging` badge here — v1
+ * deliberately features only *confirmed* assertions, never candidates still
+ * in flux, so nothing surfaced to participants can read as more settled
+ * than it actually is.
+ */
+export const FEATURED_INSIGHT_BADGES = [
+  'under_discussion',
+  'contested',
+  'community_validated',
+] as const;
+export type FeaturedInsightBadge = (typeof FEATURED_INSIGHT_BADGES)[number];
+
+export const featureInsightRequestSchema = z
+  .object({
+    knowledgeAssertionId: z.string().uuid(),
+    displayOrder: z.number().int().min(0).optional(),
+  })
+  .strict();
+export type FeatureInsightRequest = z.infer<typeof featureInsightRequestSchema>;
+
+/**
+ * The participant-safe view of one featured insight — statement text and
+ * anonymised tallies only, never a list of who responded and how.
+ */
+export interface FeaturedInsightView {
+  id: string;
+  knowledgeAssertionId: string;
+  statement: string;
+  badge: FeaturedInsightBadge;
+  displayOrder: number;
+  responseTally: Record<ParticipantResponseType, number>;
+  /** This participant's own prior response, if any — lets the UI show "You said: …" instead of the buttons again. */
+  myResponseType: ParticipantResponseType | null;
+}
+
+/**
+ * The participant-safe view of the session's current workshop prompt — a
+ * deliberately narrow subset of `AgendaItemView`: no `facilitatorId`, no
+ * scheduling fields. `promptText: null` means open reflection, not "no
+ * prompt configured yet" — see ADR-00XX.
+ */
+export interface ParticipantPromptView {
+  id: string;
+  title: string;
+  promptText: string | null;
+  position: number;
+  totalPrompts: number;
+  status: AgendaItemStatus;
+}
+
+/**
+ * The facilitator's minimal live-control aggregate — counts only, no
+ * participant identities (enforced server-side when the session's
+ * governance mode is anonymous, not left to the frontend to hide).
+ */
+export interface SessionRoomView {
+  activeAgendaItem: AgendaItemView | null;
+  participantCount: number;
+  contributedCount: number;
+  totalContributions: number;
+  insights: Array<{
+    insightId: string;
+    knowledgeAssertionId: string;
+    statement: string;
+    badge: FeaturedInsightBadge;
+    responseTally: Record<ParticipantResponseType, number>;
+  }>;
 }

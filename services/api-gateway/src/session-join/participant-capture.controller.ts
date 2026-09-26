@@ -25,15 +25,20 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 
+import { DomainError } from '@witness/domain';
+
 import {
   captureParticipantFeedbackRequestSchema,
   participantCaptureConsentRequestSchema,
   participantCaptureEvidenceRequestSchema,
+  submitParticipantKnowledgeResponseRequestSchema,
   submitTestimonialConsentRequestSchema,
   type CustomerStoryView,
   type EvidenceAttachmentView,
+  type FeaturedInsightView,
   type ParticipantCaptureContextView,
   type ParticipantCaptureEvidenceResult,
+  type ParticipantPromptView,
   type ProductFeedbackView,
 } from '@witness/contracts';
 
@@ -114,7 +119,7 @@ export class ParticipantCaptureController {
         },
       });
     }
-    await this.capture.captureConsent(token, parsed.data);
+    await this.translateDomainErrors(() => this.capture.captureConsent(token, parsed.data));
     return { status: 'captured' };
   }
 
@@ -155,5 +160,69 @@ export class ParticipantCaptureController {
       });
     }
     return this.capture.captureTestimonialConsent(token, feedbackId, parsed.data);
+  }
+
+  @Get('prompt')
+  async getPrompt(
+    @Headers(CAPTURE_TOKEN_HEADER) header: string | undefined,
+  ): Promise<ParticipantPromptView | null> {
+    const token = requireCaptureToken(header);
+    return this.capture.getPrompt(token);
+  }
+
+  @Get('insights')
+  async getInsights(
+    @Headers(CAPTURE_TOKEN_HEADER) header: string | undefined,
+  ): Promise<FeaturedInsightView[]> {
+    const token = requireCaptureToken(header);
+    return this.capture.getInsights(token);
+  }
+
+  @Post('insights/:insightId/response')
+  async submitInsightResponse(
+    @Headers(CAPTURE_TOKEN_HEADER) header: string | undefined,
+    @Param('insightId', ParseUUIDPipe) insightId: string,
+    @Body() body: unknown,
+  ): Promise<{ status: 'captured' }> {
+    const token = requireCaptureToken(header);
+    const parsed = submitParticipantKnowledgeResponseRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        error: {
+          code: 'VALIDATION_FAILED',
+          message: 'The request body is not valid.',
+          fields: parsed.error.flatten().fieldErrors,
+        },
+      });
+    }
+    await this.translateDomainErrors(() =>
+      this.capture.submitInsightResponse(token, insightId, parsed.data),
+    );
+    return { status: 'captured' };
+  }
+
+  /**
+   * `ParticipantConsentRecordsService.capture()` — which `captureConsent`
+   * above delegates to — relies on its caller to translate a domain
+   * `DomainError` into an HTTP response (`errors.ts`'s own stated design:
+   * the domain layer knows nothing about transports). The
+   * facilitator-authenticated sibling controller
+   * (`participant-consent-records.controller.ts`) already does this; this
+   * unauthenticated participant-facing path did not, so a real category/
+   * configuration mismatch reached a real phone as an unhandled 500
+   * ("Something went wrong on the server") instead of a clear 400 —
+   * reproduced as MOBILE-002 during physical-device acceptance testing.
+   */
+  private async translateDomainErrors<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error instanceof DomainError) {
+        throw new BadRequestException({
+          error: { code: error.code, message: error.message },
+        });
+      }
+      throw error;
+    }
   }
 }
