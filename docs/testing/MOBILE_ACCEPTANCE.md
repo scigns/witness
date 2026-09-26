@@ -1,6 +1,10 @@
 # Mobile participation — physical-device acceptance sheet
 
-Phase 6, Track C (ADR-0030). This is an **executable manual test sheet**, not a
+**Owner:** Engineering (Phase 6)
+**Status:** Active — physical iPhone baseline partially verified (Rows 1-4); Track E rows pending
+
+Phase 6, Track C (ADR-0030) and Track E (the live workshop prompt/round companion, "close the
+co-design loop"). This is an **executable manual test sheet**, not a
 report of results — no automated environment used to build Witness (including the one that wrote
 this document) has physical iOS/Android hardware or a device-farm connection. Every row below must
 be run by a human, on real hardware, before "mobile-ready" can be claimed as proven rather than
@@ -13,13 +17,36 @@ not.
 ## How to run this
 
 1. Get a real invitation/QR link into a real co-design session (ask an engineer to create a test
-   session with `anonymous` or `pseudonymous` governance mode — no real participant data).
+   session with `anonymous` or `pseudonymous` governance mode — no real participant data). For the
+   **Track E — live workshop flow** section below, run
+   `pnpm --filter @witness/api exec tsx prisma/seed-live-workshop-acceptance.ts` instead (needs
+   `DATABASE_URL` set — see the root `.env`) — it extends the existing fixture session with agenda
+   prompts, a featurable insight, and a fresh join link, and prints the exact URLs to use. See
+   `docs/testing/LIVE_WORKSHOP_ACCEPTANCE_RUNBOOK.md` for the full operator walkthrough (starting the
+   app, the facilitator/participant URLs, and pass/fail criteria for each step).
 2. Work through each row on each device/browser combination below, in order.
 3. Record the exact result, not a summary — "recorded 5:03, uploaded, playback confirmed" beats
    "worked".
 4. If a step fails, stop that device's run at the failure, file it as a defect (link it in the
    table), and continue with the *next* device rather than the next step on the same one.
 5. Update this file directly with results — it is the record, not a separate spreadsheet.
+
+### Result terminology
+
+Use one of these five values in every Result cell — free text describing *what happened* still goes
+alongside it, exactly as the existing rows below already do:
+
+| Status | Meaning |
+|---|---|
+| **AUTOMATED PASS** | Verified by an automated test/build in this repository — never a substitute for a physical-device row, only ever used on a row that is explicitly about backend/build behaviour, not device behaviour. |
+| **PHYSICAL PASS** | A human personally ran this step on the named real device and observed the expected result. |
+| **PHYSICAL PENDING** | Not yet run on a real device. The honest default for every new row — do not backfill. |
+| **BLOCKED** | Cannot be attempted yet because an earlier step failed or a dependency is missing. |
+| **NOT APPLICABLE** | Genuinely does not apply to this governance mode/device/flow (state why). |
+
+An automated browser tool (including any AI agent's browser automation) is **not** a physical device
+and must never produce a PHYSICAL PASS/FAIL result — see the note on `claude-in-chrome` availability
+in the MOBILE-001 defect log below for why this distinction was already load-bearing once.
 
 ## iPhone
 
@@ -63,6 +90,44 @@ not.
 | 20 | Install ("Add to Home Screen") | Correct name, icon, and splash color (Brand Book ink/paper, not the old placeholder blue) | | |
 | 21 | Launch from home screen | Opens standalone (no Safari chrome), lands on the intended page | | |
 | 22 | Repeat steps 5-15 inside the installed PWA | Same behaviour as the browser flow | | |
+
+### Track E — live workshop flow (Phase 6, "close the co-design loop")
+
+Not yet run on physical hardware — every Result cell below is honestly **PHYSICAL PENDING** except
+where marked **AUTOMATED PASS** (backend/build behaviour already proven by the automated suites, not
+a substitute for the physical row it sits next to). Use the fixture from
+`prisma/seed-live-workshop-acceptance.ts` and `docs/testing/LIVE_WORKSHOP_ACCEPTANCE_RUNBOOK.md`.
+This reshapes the participant experience from Rows 1-22 above (an upload form) into a prompt/round
+companion — see `apps/web/src/app/capture/[sessionId]/page.tsx`'s file header and
+`apps/web/src/lib/live-workshop.ts` for the exact state machine these rows are testing.
+
+| # | Step | Expected | Result | Defect ref |
+|---|---|---|---|---|
+| 23 | Join → consent (fresh fixture link) | Same as Rows 1-4, against the fresh `seed-live-workshop-acceptance.ts` join link | PHYSICAL PENDING | |
+| 24 | Current facilitator prompt is shown | The prompt card shows the session's `current` agenda item's title/prompt text before any recording control — never silently blank | PHYSICAL PENDING | |
+| 25 | Record a short audio contribution while a prompt is active | Recorder behaves as Rows 6-9; the resulting `Evidence.sourceAgendaItemId` matches the active prompt (verify via facilitator's Evidence list or DB) | PHYSICAL PENDING | |
+| 26 | Submit a short **text** contribution (if the capture surface offers one) or otherwise confirm audio is the only path | Either a text path exists and behaves the same as audio, or its absence is recorded here rather than assumed | PHYSICAL PENDING | |
+| 27 | Playback/review before submit | Same as Row 8 — the participant can hear back what they are about to submit | PHYSICAL PENDING | |
+| 28 | Sending state | Immediately after tapping submit, the screen reads "Sending…" (not silence, not an immediate false "Received") | PHYSICAL PENDING | |
+| 29 | Received state (backend-confirmed) | Once the server has actually acknowledged the evidence + attachment, the screen changes to "Received" — this must never appear before the network call resolves | PHYSICAL PENDING | |
+| 30 | Deliberate next-action choice | After "Received", exactly three choices are offered: "Add another thought", "Wait for the next question", "I'm done for now" — no bare running contribution count as the primary message | PHYSICAL PENDING | |
+| 31 | "Add another thought" | Returns straight to the recorder against the same current prompt | PHYSICAL PENDING | |
+| 32 | "Wait for the next question" | Shows a calm waiting state; no recorder shown | PHYSICAL PENDING | |
+| 33 | Facilitator (on the Mac) advances to the next prompt | Facilitator's `/workspaces/:id/live` "Start" control on the next agenda item works, per the already-existing agenda-item flow | AUTOMATED PASS (agenda-item transition logic unit/live-tested; UI click itself is PHYSICAL PENDING) | |
+| 34 | Participant sees the updated prompt without manual refresh | Within one poll interval (~20s) the "waiting" participant automatically returns to the recorder showing the *new* prompt | PHYSICAL PENDING | |
+| 35 | Refresh/rejoin mid-session | Reloading the `/capture/:sessionId` page restores the correct current prompt and consent state, not a blank/broken page | PHYSICAL PENDING | |
+| 36 | Failed upload → retry, no duplicate | Force a failed submit (e.g. Airplane Mode), confirm it queues, retry once reconnected, and confirm exactly one `Evidence` row exists for it (same `clientRequestId` discipline as Row 13) | PHYSICAL PENDING | |
+| 37 | Local blob removed after successful upload | After a queued item successfully sends, confirm the offline queue no longer lists it (`lib/offline-queue.ts`'s `remove()`) — no indefinitely-accumulating local audio | PHYSICAL PENDING | |
+| 38 | Explicit `audio_recording` consent boundary | On a session/consent template that does **not** include `audio_recording`, confirm the recorder is unavailable or clearly blocked — never silently allowed on `evidence_submission` alone (this exact gap was MOBILE-002's root cause; the fixture script's session already declares both, so this row needs a *second*, deliberately-misconfigured session to actually exercise the boundary) | PHYSICAL PENDING | |
+| 39 | "What we're hearing" (emerging understanding) | The featured insight seeded by the fixture script appears, clearly labelled provisional, with the correct statement text — never presented as settled/canonical | PHYSICAL PENDING | |
+| 40 | Participant validation response | Tapping one of the four response options ("This reflects what I heard", "Needs more nuance", "Something is missing", "I see this differently") persists and then shows "You said: …" instead of the buttons again | PHYSICAL PENDING | |
+| 41 | Response never mutates canonical Knowledge | Confirm (ask an engineer to check, or via the facilitator's own view) that the featured insight's statement text is unchanged after the response — this is also proven automatically, see below | AUTOMATED PASS (`session-featured-insights.live.test.ts` test 7 — byte-identical `KnowledgeAssertion` before/after) | |
+| 42 | Removed/unavailable featured insight handled safely | Have a facilitator remove the featured insight (Live page "Remove"), then confirm the participant's view drops it cleanly on next refresh rather than erroring | PHYSICAL PENDING | |
+| 43 | Facilitator sees aggregate participation, not identities | On `/workspaces/:id/live`, confirm the "What we're hearing" panel shows counts/tallies only — no participant name/list anywhere on that panel | PHYSICAL PENDING | |
+| 44 | Anonymous session does not leak participant identity | Across Rows 23-43 on an `anonymous`-governance session, confirm no participant name/identifier is ever shown to the facilitator or to other participants | PHYSICAL PENDING | |
+| 45 | Survey does not interrupt an active round | Confirm the feedback/testimonial `MicroSurvey` never appears immediately after a "Received" receipt — only after "I'm done for now" or the session closes | PHYSICAL PENDING | |
+| 46 | Facilitator closes the session | Facilitator transitions the session to `closed` (existing session-lifecycle control) | AUTOMATED PASS (session transition logic unit/live-tested elsewhere; UI click itself is PHYSICAL PENDING) | |
+| 47 | Participant sees a clear completion state | Once closed, the participant's screen shows "Thank you", what they personally contributed, what the room heard, and what happens next — and only now may the feedback survey appear | PHYSICAL PENDING | |
 
 ## Android
 
@@ -126,6 +191,20 @@ verify without this sheet, so pay particular attention to them:
   capture token — on a device two different participants use one after another in the *same*
   session, the second person may see a leftover count from the first. No contribution *content* is
   exposed by this, only a count. Documented, not yet fixed — see the Track C mobile report.
+- **Row 34, the "wait for the next question" poll.** `LIVE_STATE_POLL_MS` in `lib/live-workshop.ts`'s
+  caller is a 20-second interval, not a push/websocket — a participant who moves straight from
+  "waiting" to checking their phone within a few seconds of the facilitator advancing may briefly
+  still see the old (or no) prompt. This is expected latency, not a defect, unless the return never
+  happens at all within a full poll cycle or two.
+- **Row 38, the audio-consent boundary.** The fixture session's own consent configuration already
+  includes `audio_recording` (fixed for MOBILE-002), so this row cannot be exercised against it —
+  testing the boundary itself requires a second, deliberately-misconfigured session/consent template
+  (declare `evidence_submission` without `audio_recording`) created the same way MOBILE-002's fix
+  was: through the real `consent-templates`/session-consent-configuration API, never a hand-edited row.
+- **Row 41 is the one row in this section already proven automatically**, not merely designed —
+  `session-featured-insights.live.test.ts`'s test 7 asserts the `KnowledgeAssertion` row is
+  byte-identical before and after a participant response. The physical row still exists because a
+  human should see this hold true in the actual UI, not only in a test log.
 
 ## Defect log
 
@@ -168,7 +247,7 @@ verify without this sheet, so pay particular attention to them:
 - **Resolved:** confirmed by the physical iPhone 13 (iOS 26.6.1, Safari) successfully rendering the
   session context on re-test, 2026-09-26. See Row 1 above.
 
-### MOBILE-002 — intermittent server error during participant consent flow (diagnosed and fixed; re-test pending)
+### MOBILE-002 — server error during participant consent (fixed; re-test pending)
 
 - **Device/context:** iPhone 13, iOS 26.6.1, Safari, physical hardware. Consent page rendered
   correctly (`Mobile Acceptance Test Session`, `Facilitated by Test Admin`, `Contributing as
@@ -177,7 +256,8 @@ verify without this sheet, so pay particular attention to them:
   inside the consent card; a subsequent view showed the same page with no error.
 - **Correlated from server logs (not guessed):** the API gateway log shows four occurrences at
   10:34:23, 10:34:27, 10:34:30, and 10:34:42 (26/09/2026) of:
-  ```
+
+  ```text
   ERROR [ExceptionsHandler] Category 'anonymous_quotation' is not part of this session's consent configuration.
   InvariantViolation: Category 'anonymous_quotation' is not part of this session's consent configuration.
       at assertCategoryDecisions (.../packages/domain/dist/participant-consent-record.js:84:19)
@@ -186,6 +266,7 @@ verify without this sheet, so pay particular attention to them:
       at async ParticipantCaptureService.captureConsent (.../session-join/participant-capture.service.js:168:9)
       at async ParticipantCaptureController.captureConsent (.../session-join/participant-capture.controller.js:82:9)
   ```
+
   This is the failing request: `POST /api/v1/participant-capture/consent` — persisting the
   participant's consent decisions. **Not the previous Docker/Postgres problem** — Postgres had been
   continuously healthy for the preceding ~15 minutes with zero restarts at the time this was

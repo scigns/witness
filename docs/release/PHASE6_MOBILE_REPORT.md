@@ -3,6 +3,15 @@
 **Status:** Complete, with a documented physical-device verification gap that remains open on
 purpose (see §5). Built on `phase6/customer-learning`, commits `1fd7ed5`..`c95eda8`.
 
+> **Track E addendum (later in this phase):** the participant capture page this report describes
+> (`apps/web/src/app/capture/[sessionId]/page.tsx`) was subsequently reshaped from an unlimited
+> upload form into a prompt-aware, receipt-driven live workshop companion. The physical-device gap
+> named throughout this report now also covers that new flow — see
+> [`PHASE6_FINAL_REPORT.md`](PHASE6_FINAL_REPORT.md)'s §D3.5 for what's implemented/automated-
+> verified/physical-pending, and `docs/testing/MOBILE_ACCEPTANCE.md`'s "Track E — live workshop
+> flow" table (rows 23-47) for the physical steps themselves. Nothing in §1-6 below was invalidated
+> by that work; the audio-recorder/offline-queue/OIDC-`returnTo` fixes it documents are unchanged.
+
 ## 1. ADR decision
 
 **[ADR-0030](../../architecture/decisions/ADR-0030-mobile-participation-strategy.md): Responsive

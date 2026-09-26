@@ -3,6 +3,14 @@
 **Status:** Complete. Built in this Phase 6 session, on `phase6/customer-learning`
 (`/private/tmp/witness-phase6-learning`), commits `3721056`..`a4518d6`.
 
+> **Track E addendum (later in this phase):** `ProductFeedback`/`CustomerStory` above are about
+> Witness's *own* customers giving feedback on the product. Track E built a related but distinct
+> concept — participants inside a live workshop responding to the *session's* emerging
+> understanding (`ParticipantKnowledgeResponse`, `SessionFeaturedInsight`) — reusing this track's
+> append-only, never-mutates-what-it-reacts-to discipline, not its `ProductFeedback` model directly.
+> See [`PHASE6_FINAL_REPORT.md`](PHASE6_FINAL_REPORT.md)'s §D3.5 for what's implemented/automated-
+> verified/physical-pending.
+
 ## 0. What this session actually started from
 
 Before any code was written, an exhaustive check found the branch this work resumed on was
