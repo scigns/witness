@@ -3510,6 +3510,20 @@ export interface FeaturedInsightView {
 }
 
 /**
+ * A confirmed assertion a facilitator could choose to feature next — the
+ * same statement/badge composition as `FeaturedInsightView`, minus the
+ * fields (`displayOrder`, `responseTally`, `myResponseType`) that only exist
+ * once something is actually featured. Only assertions not already actively
+ * featured for this session are offered, so curating one is never a
+ * confusing duplicate of an item already on the room's screen.
+ */
+export interface FeaturedInsightCandidateView {
+  knowledgeAssertionId: string;
+  statement: string;
+  badge: FeaturedInsightBadge;
+}
+
+/**
  * The participant-safe view of the session's current workshop prompt — a
  * deliberately narrow subset of `AgendaItemView`: no `facilitatorId`, no
  * scheduling fields. `promptText: null` means open reflection, not "no

@@ -37,6 +37,7 @@ import {
 import type {
   FeatureInsightRequest,
   FeaturedInsightBadge,
+  FeaturedInsightCandidateView,
   FeaturedInsightView,
   ParticipantResponseType,
   SessionRoomView,
@@ -227,6 +228,57 @@ export class SessionFeaturedInsightsService {
   async listForWorkspace(workspaceId: string, sessionId: string): Promise<FeaturedInsightView[]> {
     await this.requireSessionRow(workspaceId, sessionId);
     return this.listActive(sessionId, null);
+  }
+
+  /**
+   * What a facilitator could choose to feature next — every confirmed,
+   * non-retracted assertion in this workspace that isn't already actively
+   * featured for this session. Bounded and most-recent-first: a curation
+   * picker, not a full knowledge-graph browser.
+   */
+  async listCandidates(
+    workspaceId: string,
+    sessionId: string,
+  ): Promise<FeaturedInsightCandidateView[]> {
+    await this.requireSessionRow(workspaceId, sessionId);
+
+    const active = await this.prisma.sessionFeaturedInsight.findMany({
+      where: { sessionId, removedAt: null },
+      select: { knowledgeAssertionId: true },
+    });
+    const activeIds = new Set(active.map((row) => row.knowledgeAssertionId));
+
+    const assertions = await this.prisma.knowledgeAssertion.findMany({
+      where: {
+        workspaceId,
+        lifecycleState: { notIn: [...RETRACTED_LIFECYCLE_STATES] },
+      },
+      select: {
+        id: true,
+        lifecycleState: true,
+        perspectiveTags: true,
+        entityAttributes: {
+          select: {
+            attributeKey: true,
+            attributeValue: true,
+            entity: { select: { canonicalLabel: true } },
+          },
+        },
+      },
+      orderBy: { recordedAt: 'desc' },
+      take: 50,
+    });
+
+    return assertions
+      .filter((assertion) => !activeIds.has(assertion.id))
+      .map((assertion) => ({
+        knowledgeAssertionId: assertion.id,
+        statement: composeStatement(
+          assertion.entityAttributes[0]?.entity.canonicalLabel ?? 'This theme',
+          assertion.entityAttributes,
+        ),
+        badge: deriveBadge(assertion.lifecycleState, assertion.perspectiveTags),
+      }));
   }
 
   /** The narrow participant-facing read — same rows, plus `myResponseType`. */

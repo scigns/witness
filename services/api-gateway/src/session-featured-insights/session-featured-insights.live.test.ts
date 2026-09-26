@@ -420,6 +420,36 @@ describe.skipIf(prisma === null)(
       );
     });
 
+    it('3b. the curation candidate list offers confirmed, non-retracted assertions and excludes anything already actively featured', async () => {
+      const sessionId = await createOpenSession(workspaceId);
+      const { assertionId: candidateAssertionId } = await createConfirmedAssertion(
+        workspaceId,
+        sessionId,
+      );
+      const { assertionId: retractedAssertionId } = await createConfirmedAssertion(
+        workspaceId,
+        sessionId,
+        { lifecycleState: 'rejected' },
+      );
+      const { assertionId: alreadyFeaturedAssertionId } = await createConfirmedAssertion(
+        workspaceId,
+        sessionId,
+      );
+      await insights.curate(
+        workspaceId,
+        sessionId,
+        { knowledgeAssertionId: alreadyFeaturedAssertionId },
+        FACILITATOR,
+      );
+
+      const candidates = await insights.listCandidates(workspaceId, sessionId);
+      const candidateIds = candidates.map((c) => c.knowledgeAssertionId);
+
+      expect(candidateIds).toContain(candidateAssertionId);
+      expect(candidateIds).not.toContain(retractedAssertionId);
+      expect(candidateIds).not.toContain(alreadyFeaturedAssertionId);
+    });
+
     it('4. a rejected or superseded assertion cannot be featured, even though it is confirmed', async () => {
       const sessionId = await createOpenSession(workspaceId);
       const { assertionId } = await createConfirmedAssertion(workspaceId, sessionId, {

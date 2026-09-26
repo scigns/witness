@@ -21,6 +21,7 @@ import {
 
 import {
   featureInsightRequestSchema,
+  type FeaturedInsightCandidateView,
   type FeaturedInsightView,
   type SessionRoomView,
 } from '@witness/contracts';
@@ -44,6 +45,15 @@ export class SessionFeaturedInsightsController {
     @Param('sessionId', new ParseUUIDPipe()) sessionId: string,
   ): Promise<FeaturedInsightView[]> {
     return this.insights.listForWorkspace(workspaceId, sessionId);
+  }
+
+  @Get('featured-insights/candidates')
+  @Requires('session_featured_insight:manage')
+  candidates(
+    @Param('workspaceId', new ParseUUIDPipe()) workspaceId: string,
+    @Param('sessionId', new ParseUUIDPipe()) sessionId: string,
+  ): Promise<FeaturedInsightCandidateView[]> {
+    return this.insights.listCandidates(workspaceId, sessionId);
   }
 
   @Post('featured-insights')
