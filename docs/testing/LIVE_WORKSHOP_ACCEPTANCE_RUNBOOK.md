@@ -59,35 +59,81 @@ Use **your own run's output**, not the example above — the workspace/session i
 runs (this fixture extends the existing MOBILE_ACCEPTANCE.md session), but the join token changes
 every time.
 
-## 4. The two URLs
+## 4. Reaching the Mac from the phone
 
-| Role | URL (on the Mac, `localhost`) | Notes |
+**If the phone is on the same Wi-Fi/LAN as the Mac** (the common case — this is what's been proven
+working), the API needs to be told to accept browser requests from the Mac's LAN address instead of
+`localhost`, and the web app needs to be told its own API lives there too. Two settings, both
+git-ignored and both scoped to a single opt-in variable per side — never edit the shared root `.env`
+template or commit a real IP anywhere:
+
+1. Find the Mac's LAN IP (shown by `make app`'s own web server startup log as `Network:
+   http://<ip>:3000`, or `ipconfig getifaddr en0`).
+2. In the repo root's own `.env` (git-ignored — this is *your* copy, not the committed template),
+   add:
+
+   ```dotenv
+   WITNESS_DEV_LAN_ORIGIN=http://<your-lan-ip>:3000
+   ```
+
+   This is validated at API startup (`packages/config/src/index.ts`): refused outside the
+   development profile, and refused entirely unless `<your-lan-ip>` is a private RFC1918 address
+   (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) — a public hostname or IP here makes the API
+   refuse to start, not silently accept it. It takes priority over `WITNESS_WEB_ORIGIN` when set, so
+   you don't also need to touch that.
+3. In `apps/web/.env.local` (git-ignored), point the web app's own API calls at the same LAN
+   address:
+
+   ```dotenv
+   NEXT_PUBLIC_WITNESS_API_URL=http://<your-lan-ip>:3001
+   ```
+
+   No `NEXT_PUBLIC_WITNESS_ALLOW_REMOTE_DEV_API` needed — `apps/web/src/lib/runtime-config.ts`
+   already treats RFC1918 addresses as local.
+4. Restart `make app` so both processes pick up the change (`Ctrl-C`, then re-run `make app`).
+
+Confirm the API actually picked it up before touching the phone:
+
+```bash
+grep -E "Accepting browser requests|Sending signed-in" <make app's output>
+# Accepting browser requests from http://<your-lan-ip>:3000
+# Sending signed-in browsers back to http://<your-lan-ip>:3000/
+```
+
+If instead it still says `localhost:3000`, the API process was started before `.env` was edited, or
+`make dev`/`make app` is being run from a different worktree/`.env` than the one just edited —
+restart it, don't work around it.
+
+## 5. The two URLs
+
+| Role | URL | Notes |
 |---|---|---|
-| Facilitator | `http://localhost:3000/workspaces/<workspaceId>/live` | Sign in first — see step 5. |
-| Participant | `http://localhost:3000/join/<the fresh token>` | No sign-in — this is the link a real participant's QR code/invitation would open. |
+| Facilitator | `http://localhost:3000/workspaces/<workspaceId>/live` | On the Mac. Sign in first — see step 6. |
+| Participant | `http://<your-lan-ip-or-localhost>:3000/join/<the fresh token>` | Use the LAN address from step 4 when opening this on the phone; `localhost` only works on the Mac itself. |
 
-**If the iPhone needs to reach this over the internet** (not the same Wi-Fi/LAN as the Mac), the
-established approach already used for this exact fixture (see `MOBILE_ACCEPTANCE.md`'s MOBILE-001
-defect log) is a Cloudflare Quick Tunnel — no account or config needed:
+**If the phone genuinely cannot reach the Mac's LAN address** (different networks, corporate Wi-Fi
+client isolation, etc.), the established fallback already used for this exact fixture (see
+`MOBILE_ACCEPTANCE.md`'s MOBILE-001 defect log) is a Cloudflare Quick Tunnel — not used by default,
+since it exposes the unverified development API beyond the local network. Only reach for it if
+step 4 is confirmed not viable, and treat the tunnel URL as sensitive for the duration of the test
+(stop it when done):
 
 ```bash
 cloudflared tunnel --url http://localhost:3000    # gives you a *.trycloudflare.com URL for the web app
 cloudflared tunnel --url http://localhost:3001    # a second one for the API
 ```
 
-If you use the API tunnel, the web app must be told about it before it will accept it — create
-`apps/web/.env.local` (git-ignored) with:
+If you use the API tunnel, `apps/web/.env.local` needs both the tunnel URL and the explicit remote
+opt-in (a real, non-RFC1918 hostname does **not** get the automatic pass step 4 relies on):
 
 ```dotenv
 NEXT_PUBLIC_WITNESS_API_URL=https://<the api tunnel hostname>
 NEXT_PUBLIC_WITNESS_ALLOW_REMOTE_DEV_API=true
 ```
 
-and restart `make app` so the web build picks it up. Use the **web** tunnel URL's `/join/<token>`
-path on the phone either way — the API tunnel is only needed if the phone and Mac are not on the
-same network.
+and restart `make app`. Use the **web** tunnel URL's `/join/<token>` path on the phone either way.
 
-## 5. Sign in as the facilitator (on the Mac)
+## 6. Sign in as the facilitator (on the Mac)
 
 1. Open `http://localhost:3000/signin` in a browser on the Mac (not the phone).
 2. Click **Sign in**. The development identity-provider double signs you in as `dev@example.com`
@@ -96,14 +142,14 @@ same network.
    the fixture workspace, so you should land signed in with facilitator access. If you instead see
    `/auth/error?reason=unknown_identity`, the fixture script has not been run yet in this database —
    go back to step 3.
-4. Navigate to the facilitator live URL from step 4's table.
+4. Navigate to the facilitator live URL from step 5's table.
 
 You should see: the current agenda item ("What are we experiencing?"), the People/Consent/
 Contributions/Outcomes panels, and a "What we're hearing" panel with a "Feature an insight" button
 (the fixture's one confirmed assertion, "Bore access delays," is available there — not yet featured
 until you click it).
 
-## 6. What to do on the Mac as facilitator
+## 7. What to do on the Mac as facilitator
 
 - **Feature the insight** before the participant reaches that part of the flow: on the Live page's
   "What we're hearing" panel, click **Feature an insight**, then **Feature** next to "Bore access
@@ -115,7 +161,7 @@ until you click it).
 - **Close the session** for Row 46: use the session detail page's lifecycle control
   (`/workspaces/<id>/sessions/<sessionId>`) to transition it to Closed.
 
-## 7. What to do on the iPhone as participant
+## 8. What to do on the iPhone as participant
 
 Open the participant URL from step 4 in Safari and work through
 `MOBILE_ACCEPTANCE.md`'s "Track E — live workshop flow" table, rows 23-47, in order — the table's
@@ -123,7 +169,7 @@ Open the participant URL from step 4 in Safari and work through
 to switch back to the Mac to advance the facilitator side (rows 33, 42, 46 specifically need a
 facilitator action first).
 
-## 8. Pass/fail at each step
+## 9. Pass/fail at each step
 
 Use `MOBILE_ACCEPTANCE.md`'s own Result terminology (**PHYSICAL PASS** / **PHYSICAL PENDING** /
 **BLOCKED** / **NOT APPLICABLE** — never "AUTOMATED PASS" for anything you did on the phone

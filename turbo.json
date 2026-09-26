@@ -10,7 +10,8 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": ["WITNESS_WEB_ORIGIN", "WITNESS_WEB_BASE_URL", "WITNESS_DEV_LAN_ORIGIN"]
     },
     "lint": {
       "dependsOn": ["^build"]
