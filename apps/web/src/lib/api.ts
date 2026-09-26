@@ -171,6 +171,12 @@ import type {
   ProductFeedbackView,
   SubmitProductFeedbackRequest,
   SubmitTestimonialConsentRequest,
+  FeatureInsightRequest,
+  FeaturedInsightCandidateView,
+  FeaturedInsightView,
+  ParticipantPromptView,
+  SessionRoomView,
+  SubmitParticipantKnowledgeResponseRequest,
 } from '@witness/contracts';
 
 import { API_BASE_URL } from './runtime-config';
@@ -929,6 +935,33 @@ export const api = {
       { headers: { 'X-Witness-Capture-Token': captureToken } },
     );
   },
+
+  // ─── Live workshop participant experience (Phase 6, Track E) ──────────────
+
+  getParticipantPrompt: (captureToken: string): Promise<ParticipantPromptView | null> =>
+    request<ParticipantPromptView | null>('/api/v1/participant-capture/prompt', null, {
+      headers: { 'X-Witness-Capture-Token': captureToken },
+    }),
+
+  getParticipantInsights: (captureToken: string): Promise<FeaturedInsightView[]> =>
+    request<FeaturedInsightView[]>('/api/v1/participant-capture/insights', null, {
+      headers: { 'X-Witness-Capture-Token': captureToken },
+    }),
+
+  submitParticipantInsightResponse: (
+    captureToken: string,
+    insightId: string,
+    body: SubmitParticipantKnowledgeResponseRequest,
+  ): Promise<{ status: 'captured' }> =>
+    request<{ status: 'captured' }>(
+      `/api/v1/participant-capture/insights/${encodeURIComponent(insightId)}/response`,
+      null,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: { 'X-Witness-Capture-Token': captureToken },
+      },
+    ),
 
   listSessions: (
     workspaceId: string,
@@ -2153,6 +2186,62 @@ export const api = {
       `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/agenda-items/${encodeURIComponent(itemId)}/reorder`,
       user,
       { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  // ─── Live workshop featured insights & room view (Phase 6, Track E) ───────
+
+  getSessionRoomView: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<SessionRoomView> =>
+    request<SessionRoomView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/room-view`,
+      user,
+    ),
+
+  listFeaturedInsights: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<FeaturedInsightView[]> =>
+    request<FeaturedInsightView[]>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/featured-insights`,
+      user,
+    ),
+
+  listFeaturedInsightCandidates: (
+    workspaceId: string,
+    sessionId: string,
+    user: ActingUser,
+  ): Promise<FeaturedInsightCandidateView[]> =>
+    request<FeaturedInsightCandidateView[]>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/featured-insights/candidates`,
+      user,
+    ),
+
+  curateFeaturedInsight: (
+    workspaceId: string,
+    sessionId: string,
+    body: FeatureInsightRequest,
+    user: ActingUser,
+  ): Promise<FeaturedInsightView> =>
+    request<FeaturedInsightView>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/featured-insights`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  removeFeaturedInsight: (
+    workspaceId: string,
+    sessionId: string,
+    insightId: string,
+    user: ActingUser,
+  ): Promise<void> =>
+    request<void>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/featured-insights/${encodeURIComponent(insightId)}`,
+      user,
+      { method: 'DELETE' },
     ),
 
   // ─── Program resources (Client-Ready Experience overhaul, Phase 12) ───────

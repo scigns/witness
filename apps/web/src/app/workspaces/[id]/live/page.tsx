@@ -24,13 +24,16 @@ import type {
   ConsentFacilitatorDashboardView,
   DecisionSummary,
   EvidenceSummary,
+  FeaturedInsightCandidateView,
   SessionParticipantSummary,
+  SessionRoomView,
   WorkspaceSummary,
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { useAuth } from '@/lib/auth';
+import { sumResponseTally } from '@/lib/live-workshop';
 import {
   Button,
   Card,
@@ -56,6 +59,10 @@ export default function LiveSessionPage({ params }: { params: Promise<{ id: stri
   const [decisions, setDecisions] = useState<DecisionSummary[]>([]);
   const [actions, setActions] = useState<ActionItemSummary[]>([]);
   const [consent, setConsent] = useState<ConsentFacilitatorDashboardView | null>(null);
+  const [roomView, setRoomView] = useState<SessionRoomView | null>(null);
+  const [candidates, setCandidates] = useState<FeaturedInsightCandidateView[] | null>(null);
+  const [insightBusy, setInsightBusy] = useState(false);
+  const [insightError, setInsightError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -107,8 +114,14 @@ export default function LiveSessionPage({ params }: { params: Promise<{ id: stri
           setActions(actionsResult.actions.filter((a) => a.status !== 'cancelled').slice(0, 4));
 
           if (canManage) {
-            const dashboard = await api.getConsentDashboard(id, sessionId, user).catch(() => null);
-            if (!cancelledRef.current) setConsent(dashboard);
+            const [dashboard, room] = await Promise.all([
+              api.getConsentDashboard(id, sessionId, user).catch(() => null),
+              api.getSessionRoomView(id, sessionId, user).catch(() => null),
+            ]);
+            if (!cancelledRef.current) {
+              setConsent(dashboard);
+              setRoomView(room);
+            }
           }
         } else {
           setLinkedSession(null);
@@ -117,6 +130,8 @@ export default function LiveSessionPage({ params }: { params: Promise<{ id: stri
           setDecisions([]);
           setActions([]);
           setConsent(null);
+          setRoomView(null);
+          setCandidates(null);
         }
 
         setError(null);
@@ -163,6 +178,45 @@ export default function LiveSessionPage({ params }: { params: Promise<{ id: stri
       setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const openCandidatePicker = async () => {
+    if (linkedSession === null) return;
+    setInsightError(null);
+    try {
+      setCandidates(await api.listFeaturedInsightCandidates(id, linkedSession.id, user));
+    } catch (caught) {
+      setInsightError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    }
+  };
+
+  const featureInsight = async (knowledgeAssertionId: string) => {
+    if (linkedSession === null) return;
+    setInsightBusy(true);
+    setInsightError(null);
+    try {
+      await api.curateFeaturedInsight(id, linkedSession.id, { knowledgeAssertionId }, user);
+      setCandidates(null);
+      await load({ current: false });
+    } catch (caught) {
+      setInsightError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setInsightBusy(false);
+    }
+  };
+
+  const removeInsight = async (insightId: string) => {
+    if (linkedSession === null) return;
+    setInsightBusy(true);
+    setInsightError(null);
+    try {
+      await api.removeFeaturedInsight(id, linkedSession.id, insightId, user);
+      await load({ current: false });
+    } catch (caught) {
+      setInsightError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
+    } finally {
+      setInsightBusy(false);
     }
   };
 
@@ -401,6 +455,99 @@ export default function LiveSessionPage({ params }: { params: Promise<{ id: stri
             </Card>
           </section>
         </div>
+      )}
+
+      {canManage && linkedSession !== null && (
+        <section aria-labelledby="insights-heading" className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2
+              id="insights-heading"
+              className="text-sm font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]"
+            >
+              What we&rsquo;re hearing
+            </h2>
+            {roomView !== null && (
+              <p className="text-xs text-[var(--color-ink-muted)]">
+                {roomView.participantCount} in the room · {roomView.contributedCount} have
+                contributed · {roomView.totalContributions} contributions total
+              </p>
+            )}
+          </div>
+
+          {insightError !== null && <ErrorNotice message={insightError} />}
+
+          <Card className="space-y-3">
+            {roomView === null || roomView.insights.length === 0 ? (
+              <p className="text-sm text-[var(--color-ink-muted)]">
+                Nothing featured for participants yet.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {roomView.insights.map((insight) => {
+                  const tally = insight.responseTally;
+                  const total = sumResponseTally(tally);
+                  return (
+                    <li
+                      key={insight.insightId}
+                      className="space-y-1 border-b border-[var(--color-line)] pb-2 last:border-0 last:pb-0"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm">{insight.statement}</p>
+                        <Button
+                          variant="secondary"
+                          disabled={insightBusy}
+                          onClick={() => void removeInsight(insight.insightId)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                      <p className="text-xs text-[var(--color-ink-muted)]">
+                        {total === 0
+                          ? 'No participant responses yet.'
+                          : `${tally.reflects} reflects · ${tally.needs_nuance} need nuance · ${tally.missing_context} missing context · ${tally.sees_differently} see differently`}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            {candidates === null ? (
+              <Button variant="secondary" onClick={() => void openCandidatePicker()}>
+                Feature an insight
+              </Button>
+            ) : (
+              <div className="space-y-2 border-t border-[var(--color-line)] pt-3">
+                {candidates.length === 0 ? (
+                  <p className="text-sm text-[var(--color-ink-muted)]">
+                    No confirmed assertions are available to feature right now.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {candidates.map((candidate) => (
+                      <li
+                        key={candidate.knowledgeAssertionId}
+                        className="flex items-center justify-between gap-2 text-sm"
+                      >
+                        <span className="truncate">{candidate.statement}</span>
+                        <Button
+                          variant="primary"
+                          disabled={insightBusy}
+                          onClick={() => void featureInsight(candidate.knowledgeAssertionId)}
+                        >
+                          Feature
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Button variant="secondary" onClick={() => setCandidates(null)}>
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </Card>
+        </section>
       )}
 
       {/* NEXT */}
