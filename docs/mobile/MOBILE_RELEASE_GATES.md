@@ -66,21 +66,22 @@ dependencies this environment genuinely does not have.
 
 | Item | Status | Evidence |
 |---|---|---|
-| Android CI compile | **PASS** | `.github/workflows/mobile-android.yml`, reproduced across three independent green runs on PR #254 (most recently [36308447009](https://github.com/scigns/witness/actions/runs/36308447009), head `098ce02`, merge-ref build) |
-| Android debug APK | **PASS** | Same run — `witness-participate-62f4b93-debug-apk`. Downloaded via `gh run download`, extracted size 4,581,839 bytes, SHA-256 `e7a2b89c572b11a22caaa52a1ec5808a3669eb0ead40276a5b19dd5acf2c33c8` (computed locally, not copied from a log) |
-| Android release AAB build logic | **PASS** (unsigned) | Same run — `witness-participate-62f4b93-release-unsigned-aab`, 3,257,815 bytes. "Compiles as a release bundle" and "signed, store-uploadable" are different claims; only the first is proven |
+| Android CI compile | **PASS** | `.github/workflows/mobile-android.yml`, reproduced across **five** independent green runs on PR #254 (most recently [36317217221](https://github.com/scigns/witness/actions/runs/36317217221), head `4f3cd1d` — matches this branch's current HEAD exactly, not a stale build) |
+| Android debug APK | **PASS** | Same run — `witness-participate-0a5d649-debug-apk`. Downloaded via `gh run download` to `/tmp/witness-android-acceptance` (outside the repository, never committed), extracted size 4,581,839 bytes, SHA-256 `2cb2ee847dc10503507eba64a904867b1b7ce240dd8164c512180a9c347be3fd` (computed locally, not copied from a log) |
+| Android release AAB build logic | **PASS** (unsigned) | Same run — `witness-participate-0a5d649-release-unsigned-aab`, 3,257,815 bytes. "Compiles as a release bundle" and "signed, store-uploadable" are different claims; only the first is proven |
 | Android release signing | **BLOCKED** | No keystore exists anywhere in this repository or in CI — see `docs/mobile/STORE_ACCOUNT_SETUP.md` and M7 |
 | Android physical install | **BLOCKED** | `adb devices` returns an empty list — no physical Android device connected to this Mac. `platform-tools` (adb/fastboot only, ~30 MB via Homebrew cask) was installed to make this check possible without installing the Android SDK or Android Studio, per the governing instruction |
 | Android physical journey | **BLOCKED** | Depends on the above — nothing in `MOBILE_ACCEPTANCE.md`'s native Android rows has been executed |
 | Android verified App Link | **BLOCKED** | `assetlinks.json` still carries its `<SHA256_SIGNING_CERT_FINGERPRINT>` placeholder (no release keystore exists to produce a real one) — local intent-filter handling (`AndroidManifest.xml`'s `autoVerify` intent-filter) is configured, but domain-verified association cannot be proven until a real fingerprint is published |
 | Google Play internal testing | **BLOCKED** | No Play Console account, no signed AAB — see `docs/mobile/STORE_ACCOUNT_SETUP.md` |
 
-**What changed this cycle:** the Android CI proof from the previous cycle
-was reproduced end-to-end — same commit's merge-ref build, downloaded and
-independently checksummed. `platform-tools` was added locally (adb/fastboot
-only) specifically to make the "no physical device" finding a checked fact
-rather than an assumption. No physical Android device was available to
-progress further.
+**What changed this cycle:** re-verified from scratch, not assumed from the
+previous checkpoint — PR #254 re-inspected fresh (19/19 checks green,
+independently confirmed via the GitHub API), the latest Android CI run
+matched against the current branch HEAD by SHA before treating its
+artifact as current, and a fresh APK downloaded and independently
+checksummed. `adb devices` was re-run and again returned no device — this
+remains a checked fact each cycle, not carried forward as an assumption.
 
 ### iOS
 
@@ -141,11 +142,17 @@ Native-specific, **PARTIAL** — real, but not yet physically proven:
   hand-constructed URL strings, not yet against a real Universal Link /
   App Link handoff from iOS/Android (M6).
 - The secure-storage adapter's shape-validation (`isCaptureSession`) fails
-  safely on malformed stored data (`secure-capture-session-store.test.ts`)
-  — but the underlying claim that this plugin genuinely uses Keychain/
-  Keystore is verified from the plugin's own documentation
-  (`SECURE_TOKEN_STORAGE.md`), not from inspecting a real device's Keychain
-  directly.
+  safely on malformed stored data (`secure-capture-session-store.test.ts`).
+  This cycle, the plugin's genuine use of platform secure storage was
+  re-verified from its actual **source code**, not merely its documentation
+  as before — iOS: `Plugin.swift` imports `KeychainSwift`
+  (`evgenyneu/keychain-swift`, a real, independent Keychain-Services
+  wrapper), with no `UserDefaults` reference anywhere in the file; Android:
+  `SecureStorage.java` references `"AndroidKeyStore"` directly. Neither
+  claim has yet been confirmed by inspecting a real device's Keychain/
+  Keystore contents directly — that still requires the blocked M6 physical
+  acceptance. A sweep of `apps/participant-mobile/src` for any
+  `console.log`/plain-`localStorage` use of the capture token found none.
 
 ## M5 — Privacy & compliance preparation
 
@@ -169,18 +176,19 @@ Native-specific, **PARTIAL** — real, but not yet physically proven:
 
 ## M6 — Physical device verification
 
-**Status: BLOCKED** — actively checked this cycle, not merely restated.
-`adb devices` (via a freshly-installed `platform-tools` — adb/fastboot
-only, not the Android SDK or Android Studio) returns an empty device list:
-no physical Android device is connected to this Mac. No Xcode and no
-physical iPhone exist for the iOS half either. A freshly-downloaded,
-independently-checksummed debug APK
-(`witness-participate-62f4b93-debug-apk`, SHA-256
-`e7a2b89c572b11a22caaa52a1ec5808a3669eb0ead40276a5b19dd5acf2c33c8`) is
-sitting ready in a scratch directory outside version control, and
-`docs/testing/MOBILE_ACCEPTANCE.md`'s native-app rows are ready to run —
-**zero rows have been executed**. A generated APK is not a substitute for a
-human tapping a real recorder control on a real phone; per the governing
+**Status: BLOCKED** — re-checked this cycle, not carried forward as an
+assumption. `adb devices` (platform-tools already installed from the
+previous cycle — adb/fastboot only, not the Android SDK or Android Studio)
+again returns an empty device list: no physical Android device is
+connected to this Mac. No Xcode and no physical iPhone exist for the iOS
+half either. A freshly-downloaded, independently-checksummed debug APK for
+the current branch HEAD
+(`witness-participate-0a5d649-debug-apk`, SHA-256
+`2cb2ee847dc10503507eba64a904867b1b7ce240dd8164c512180a9c347be3fd`) is
+sitting ready in `/tmp/witness-android-acceptance` outside version control,
+and `docs/testing/MOBILE_ACCEPTANCE.md`'s native-app rows are ready to run
+— **zero rows have been executed**. A generated APK is not a substitute for
+a human tapping a real recorder control on a real phone; per the governing
 instruction, "do not call the programme store-ready based on compilation
 alone."
 
@@ -221,10 +229,10 @@ the same items in summary form.
 |---|---|
 | M1 — Architecture | PASS |
 | M2 — Core functionality | PASS |
-| M3 — Native shell | PARTIAL — Android build logic PASS (real CI compile, verified debug APK + unsigned release AAB, reproduced twice); Android signing/physical-device/verified-App-Link and all of iOS (including a confirmed `xcodebuild` environment blocker) remain BLOCKED |
-| M4 — Security | PASS (backend) / PARTIAL (native-specific physical proof) |
+| M3 — Native shell | PARTIAL — Android build logic PASS (real CI compile, verified debug APK + unsigned release AAB, reproduced across five independent runs including the current HEAD); Android signing/physical-device/verified-App-Link and all of iOS (including a confirmed `xcodebuild` environment blocker) remain BLOCKED |
+| M4 — Security | PASS (backend) / PARTIAL (native-specific physical proof — secure-storage plugin now verified from source on both platforms, not just documentation) |
 | M5 — Privacy & compliance prep | PARTIAL (HUMAN/LEGAL REVIEW REQUIRED items open) |
-| M6 — Physical device verification | BLOCKED — actively checked: `adb devices` confirms no Android device connected; no Xcode/iPhone for iOS |
+| M6 — Physical device verification | BLOCKED — re-checked, not assumed: `adb devices` confirms no Android device connected; no Xcode/iPhone for iOS |
 | M7 — Distribution | BLOCKED (no Apple/Google accounts, signing, or DNS in this environment) |
 
 **STORE SUBMISSION = NO-GO.** M3, M6, and M7 are not PASS, and M4/M5 are not
