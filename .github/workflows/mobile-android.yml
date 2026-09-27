@@ -131,6 +131,21 @@ jobs:
       # production key). This proves the release build *compiles*; actual
       # Play Store upload requires the signing step docs/mobile/
       # MOBILE_RELEASE_GATES.md still records as BLOCKED.
+      #
+      # Designed for eventual signing, not implemented: once a real release
+      # keystore exists (docs/mobile/MOBILE_RELEASE_GATES.md M7's HUMAN
+      # ACTION REQUIRED item), the expected shape is a base64-encoded
+      # keystore stored as a GitHub encrypted secret, decoded to a temp file
+      # in a signing-only job gated to a release environment/tag — never
+      # this job, which has no deployment permission and runs on every
+      # mobile-relevant PR. Expected secret names (not yet created):
+      #   ANDROID_RELEASE_KEYSTORE_BASE64
+      #   ANDROID_RELEASE_KEYSTORE_PASSWORD
+      #   ANDROID_RELEASE_KEY_ALIAS
+      #   ANDROID_RELEASE_KEY_PASSWORD
+      # None of these should ever be added to this job's `env:` — a signing
+      # job is a separate concern from this one, the same way deploy.yml is
+      # separate from ci.yml.
       - name: Bundle release AAB (unsigned)
         working-directory: apps/participant-mobile/android
         run: ./gradlew bundleRelease --no-daemon

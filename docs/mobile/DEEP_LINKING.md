@@ -95,6 +95,25 @@ their content, but cannot publish them (that's `apps/web`'s / the pilot
 deployment's infrastructure, outside this app's scope), and cannot verify a
 domain that isn't live yet.
 
+**Templates already exist in the repository**, ready to be filled in and
+deployed through the pilot's existing web deploy mechanism (no new
+publication tooling required): `apps/web/public/.well-known/apple-app-site-association`
+and `apps/web/public/.well-known/assetlinks.json`. Both carry a `_comment`
+key stating exactly what placeholder value must be replaced before the file
+is authoritative — deliberately not filled in with a plausible-looking real
+value.
+
+**HUMAN ACTION REQUIRED before either file is genuinely useful**, beyond
+filling in the placeholders: verify the deployed file is served with
+`Content-Type: application/json` (or, for the iOS file specifically, a type
+Apple's parser accepts — it does not require `.json`, but does require it
+not be served as `text/html`). Next.js's static file serving from `public/`
+does not guarantee a specific `Content-Type` for an extensionless file, and
+this has not been verified against the actual pilot deployment — check with
+`curl -I` once deployed, and if the content type is wrong, this may need a
+small Next.js route handler instead of a static file, which is not
+implemented here.
+
 ### iOS — `apple-app-site-association`
 
 Publish at `https://<host>/.well-known/apple-app-site-association` (no file

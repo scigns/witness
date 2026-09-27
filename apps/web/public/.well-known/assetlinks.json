@@ -1,0 +1,11 @@
+[
+  {
+    "_comment": "TEMPLATE — see docs/mobile/DEEP_LINKING.md. HUMAN ACTION REQUIRED: replace <SHA256_SIGNING_CERT_FINGERPRINT> with the real release-keystore certificate fingerprint before this file is authoritative. A placeholder fingerprint here means Android App Links will not verify — deliberately, rather than publishing a value that looks real but is not. Remove this comment key once real values are filled in.",
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.buildwithwitness.participate",
+      "sha256_cert_fingerprints": ["<SHA256_SIGNING_CERT_FINGERPRINT>"]
+    }
+  }
+]
