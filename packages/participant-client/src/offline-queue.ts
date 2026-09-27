@@ -1,29 +1,25 @@
 /**
- * Offline contribution queue (low-connectivity Level 3).
+ * Offline contribution queue (low-connectivity Level 3) — extracted from
+ * `apps/web/src/lib/offline-queue.ts` unchanged in behaviour, for both
+ * `apps/web` and `apps/participant-mobile` to share (ADR-0031).
  *
- * Scoped deliberately narrow: only the evidence "share a contribution"
- * write path queues offline, not the whole application. That path is the
- * one the low-connectivity promise is actually about — a participant on a
- * bad connection needs their words saved locally the moment the network
- * drops, not a generic offline framework for every screen.
+ * IndexedDB, not a native filesystem bridge: `docs/mobile/OFFLINE_STORAGE.md`
+ * records the explicit evaluation this decision needed — a Capacitor
+ * WebView on both iOS and Android exposes a real IndexedDB implementation,
+ * including `Blob` storage, so a native filesystem bridge is not
+ * *necessary* today. It becomes necessary the moment physical-device
+ * evidence shows otherwise (the same "reuse until evidence says
+ * otherwise" discipline ADR-0031 already applied to audio), not before.
  *
  * Each queued item carries a client-generated `clientRequestId` (a UUID),
- * which the API's evidence-capture endpoint treats as an idempotency key
- * (`services/api-gateway/src/evidence/evidence.service.ts`'s `capture()`):
+ * which the API's evidence-capture endpoint treats as an idempotency key:
  * retrying the same queued item after reconnect — including a retry that
  * races a response which actually landed — resolves to one evidence row,
- * never a duplicate. That server-side guarantee is what makes queuing and
+ * never a duplicate (`docs/mobile/PARTICIPANT_API_CONTRACT.md`'s
+ * idempotency rows). That server-side guarantee is what makes queuing and
  * retrying safe at all; this module does not invent its own conflict
  * resolution because it does not need one.
- *
- * IndexedDB, not localStorage: a queued contribution can be a full evidence
- * payload up to 20,000 characters, worth keeping in a real database rather
- * than a synchronous, size-limited string store — and IndexedDB survives a
- * closed tab, which localStorage does for small data too but this is the
- * more correct tool for a small structured record store either way.
  */
-
-'use client';
 
 import type { CaptureEvidenceRequest, ParticipantCaptureEvidenceRequest } from '@witness/contracts';
 
@@ -33,7 +29,7 @@ const STORE_NAME = 'queued-contributions';
 
 export type QueueItemStatus = 'pending' | 'syncing' | 'synced' | 'failed';
 
-/** A facilitator/contributor capture, sent with their signed-in session. */
+/** A facilitator/contributor capture, sent with their signed-in session. Not used by the participant-only mobile client — kept here only because the underlying store is shared with apps/web. */
 export interface QueuedFacilitatorContribution {
   kind: 'facilitator';
   /** The clientRequestId — doubles as the IndexedDB key and the API idempotency key. */
@@ -47,10 +43,10 @@ export interface QueuedFacilitatorContribution {
 }
 
 /**
- * A participant self-capture (Phase 5, Workstream 1.8) — same idempotency
- * discipline, but authorised by a capture token rather than a signed-in
- * session, and carrying the recorded audio inline: IndexedDB stores Blobs
- * natively, so the attachment survives a closed tab exactly like the text
+ * A participant self-capture — same idempotency discipline, but authorised
+ * by a capture token rather than a signed-in session, and carrying the
+ * recorded audio inline: IndexedDB stores `Blob`s natively, so the
+ * attachment survives a closed tab/backgrounded app exactly like the text
  * fields do, and is uploaded once the evidence row itself confirms.
  */
 export interface QueuedParticipantContribution {
@@ -70,7 +66,7 @@ export type QueuedContribution = QueuedFacilitatorContribution | QueuedParticipa
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
-      reject(new Error('IndexedDB is not available in this browser.'));
+      reject(new Error('IndexedDB is not available in this environment.'));
       return;
     }
     const request = indexedDB.open(DB_NAME, DB_VERSION);

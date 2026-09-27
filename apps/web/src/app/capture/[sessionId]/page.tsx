@@ -26,7 +26,8 @@
  * closes — never immediately after a contribution, mid-round.
  *
  * Offline resilience (Workstream 1.8) integrates with the existing queue
- * (`lib/offline-queue.ts`) rather than inventing a second one: a submission
+ * (`@witness/participant-client`'s offline queue, ADR-0031) rather than
+ * inventing a second one: a submission
  * that fails on a genuine network error is queued with the same
  * `clientRequestId` idempotency discipline the facilitator capture path
  * already relies on, and flushed automatically once the browser's `online`
@@ -43,27 +44,30 @@ import type {
   ParticipantResponseType,
 } from '@witness/contracts';
 
+import {
+  type CaptureSession,
+  createLocalStorageCaptureSessionStore,
+  enqueue,
+  isNetworkFailure,
+  isReceived,
+  listForParticipantSession,
+  newClientRequestId,
+  remove as removeQueued,
+  shouldReturnToPromptAfterWaiting,
+  shouldShowNextActionChoices,
+  shouldShowSessionEndState,
+  updateStatus as updateQueuedStatus,
+  type PostSubmitChoice,
+  type QueuedParticipantContribution,
+  type SubmitPhase,
+} from '@witness/participant-client';
+
 import { api, ApiError } from '@/lib/api';
 import { AudioRecorder } from '@/components/audio-recorder';
 import { MicroSurvey } from '@/components/micro-survey';
 import { Card, ErrorNotice, categoryLabel } from '@/components/ui';
-import { type CaptureSession, loadCaptureSession } from '@/lib/capture-session';
-import {
-  isReceived,
-  shouldReturnToPromptAfterWaiting,
-  shouldShowNextActionChoices,
-  shouldShowSessionEndState,
-  type PostSubmitChoice,
-  type SubmitPhase,
-} from '@/lib/live-workshop';
-import {
-  enqueue,
-  isNetworkFailure,
-  listForParticipantSession,
-  remove as removeQueued,
-  updateStatus as updateQueuedStatus,
-  type QueuedParticipantContribution,
-} from '@/lib/offline-queue';
+
+const captureSessionStore = createLocalStorageCaptureSessionStore();
 
 /** How often the prompt and "what we're hearing" panels refresh in the background — a calm companion, not a live feed. */
 const LIVE_STATE_POLL_MS = 20_000;
@@ -80,12 +84,6 @@ const BADGE_LABELS: Record<FeaturedInsightView['badge'], string> = {
   contested: 'Views differ',
   community_validated: 'Reflected by the room',
 };
-
-function newClientRequestId(): string {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random()}`;
-}
 
 function extensionFor(mimeType: string): string {
   return mimeType.split(';')[0]?.split('/')[1] ?? 'webm';
@@ -155,7 +153,7 @@ export default function ParticipantCapturePage({
   const promptIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setSession(loadCaptureSession(sessionId));
+    void captureSessionStore.load(sessionId).then(setSession);
   }, [sessionId]);
 
   const loadContext = useCallback(async (captureToken: string) => {

@@ -18,9 +18,13 @@ import { use, useCallback, useEffect, useState } from 'react';
 
 import type { SessionJoinContextView } from '@witness/contracts';
 
+import {
+  createLocalStorageCaptureSessionStore,
+  newClientRequestId,
+} from '@witness/participant-client';
+
 import { api, ApiError, authApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { saveCaptureSession } from '@/lib/capture-session';
 import { Card, ErrorNotice } from '@/components/ui';
 
 // Manually prefixed, like `manifest.ts`/`service-worker.tsx` — this path is
@@ -29,11 +33,7 @@ import { Card, ErrorNotice } from '@/components/ui';
 // so it needs the same real, browser-visible path those files already do.
 const BASE_PATH = process.env['NEXT_PUBLIC_WITNESS_BASE_PATH'] ?? '';
 
-function newClientRequestId(): string {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random()}`;
-}
+const captureSessionStore = createLocalStorageCaptureSessionStore();
 
 const GOVERNANCE_LABELS: Record<SessionJoinContextView['governanceMode'], string> = {
   invited_only: 'Open to people already invited into this workspace',
@@ -75,7 +75,7 @@ export default function JoinSessionPage({ params }: { params: Promise<{ token: s
         clientRequestId: newClientRequestId(),
         displayName: displayName.trim() === '' ? undefined : displayName.trim(),
       });
-      saveCaptureSession({
+      await captureSessionStore.save({
         sessionId: result.sessionId,
         workspaceId: result.workspaceId,
         participantId: result.participantId,

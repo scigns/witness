@@ -28,6 +28,14 @@ import {
   type EvidenceSummary,
   type SessionParticipantSummary,
 } from '@witness/contracts';
+import {
+  enqueue,
+  isNetworkFailure,
+  listForSession,
+  remove as removeQueued,
+  updateStatus as updateQueuedStatus,
+  type QueuedFacilitatorContribution,
+} from '@witness/participant-client';
 
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -40,14 +48,6 @@ import {
   EvidenceReviewStatusBadge,
   LinkButton,
 } from '@/components/ui';
-import {
-  enqueue,
-  isNetworkFailure,
-  listForSession,
-  remove as removeQueued,
-  updateStatus as updateQueuedStatus,
-  type QueuedFacilitatorContribution,
-} from '@/lib/offline-queue';
 
 // Only `contributor`-tier and `admin` roles actually hold `evidence:create`
 // (role-grants.ts) — `reviewer` and `reader` never do, and `participant`

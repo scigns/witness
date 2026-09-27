@@ -29,11 +29,11 @@ import type {
   SessionRoomView,
   WorkspaceSummary,
 } from '@witness/contracts';
+import { sumResponseTally } from '@witness/participant-client';
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { useAuth } from '@/lib/auth';
-import { sumResponseTally } from '@/lib/live-workshop';
 import {
   Button,
   Card,

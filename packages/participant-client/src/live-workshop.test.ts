@@ -6,7 +6,7 @@ import {
   shouldShowNextActionChoices,
   shouldShowSessionEndState,
   sumResponseTally,
-} from '../src/lib/live-workshop';
+} from './live-workshop.js';
 
 describe('isReceived', () => {
   it('is true only for the two backend-confirmed outcomes', () => {

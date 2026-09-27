@@ -1,10 +1,11 @@
 /**
  * Pure state-transition rules for the live workshop participant companion
- * (Phase 6, Track E). Factored out of `app/capture/[sessionId]/page.tsx` so
- * the product invariants that page exists to enforce — a receipt is never
+ * (Phase 6, Track E) — extracted from `apps/web/src/lib/live-workshop.ts`
+ * unchanged, for `apps/web` and `apps/participant-mobile` to share
+ * (ADR-0031). The product invariants these enforce — a receipt is never
  * shown before the backend confirms it, the next-action choice is never
- * skipped, a survey never interrupts an active round — can be tested
- * directly, the same way `survey-suppression.ts` already is.
+ * skipped, a survey never interrupts an active round — apply identically on
+ * both platforms.
  */
 
 import type { ParticipantResponseType } from '@witness/contracts';
@@ -35,7 +36,7 @@ export function shouldShowNextActionChoices(phase: SubmitPhase, choice: PostSubm
  * The session-end experience appears either because the session itself
  * closed, or because the participant explicitly chose to stop for now —
  * these are the only two doors into it. A survey/testimonial ask is only
- * ever appropriate behind this same gate (Track E invariant J).
+ * ever appropriate behind this same gate.
  */
 export function shouldShowSessionEndState(
   sessionStatus: string,

@@ -9,6 +9,8 @@
  * a server proxy would make it look like a real session, and it is not one.
  */
 
+import { ApiError, createParticipantApiClient } from '@witness/participant-client';
+
 import type {
   AddMembershipRequest,
   AgendaItemTransitionRequest,
@@ -200,16 +202,22 @@ const DEPLOYMENT_PROFILE = process.env.WITNESS_BUILD_PROFILE ?? 'development';
 
 export const IS_DEVELOPMENT_BUILD = DEPLOYMENT_PROFILE === 'development';
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly code: string,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
+/**
+ * One `ApiError` class for the whole app, imported from
+ * `@witness/participant-client` above rather than defined a second time
+ * locally — every `caught instanceof ApiError` check across this file and
+ * its callers must recognise an error thrown by either the facilitator
+ * `request()` helper below or the shared participant client the same way.
+ */
+export { ApiError };
+
+/**
+ * The participant-only client (ADR-0031) — every `X-Witness-Capture-Token`
+ * call in this file below delegates here rather than re-implementing the
+ * same fetch/error-handling logic a second time. Shared with
+ * `apps/participant-mobile`.
+ */
+const participantClient = createParticipantApiClient(BASE_URL);
 
 export interface ActingUser {
   name: string;
@@ -853,115 +861,69 @@ export const api = {
       { method: 'POST' },
     ),
 
-  /** Public — token possession alone is enough to view context, never to join. */
+  // ─── Participant journey (ADR-0031) ───────────────────────────────────────
+  // Delegates to the shared `@witness/participant-client` rather than
+  // duplicating fetch logic — the same client apps/participant-mobile uses.
+  // Every call here carries a join-link or capture token, never an
+  // ActingUser — a pseudonymous/anonymous participant has no Witness
+  // account at all. See ParticipantCaptureController's own header comment
+  // for why the capture token is a distinct header, not Authorization:
+  // Bearer.
+
   getSessionJoinContext: (token: string): Promise<SessionJoinContextView> =>
-    request<SessionJoinContextView>(`/api/v1/session-join/${encodeURIComponent(token)}`, null),
+    participantClient.getSessionJoinContext(token),
 
-  /** Public — governance-mode-specific identity checks happen server-side. */
   joinSession: (token: string, body: JoinSessionRequest): Promise<JoinSessionResult> =>
-    request<JoinSessionResult>(`/api/v1/session-join/${encodeURIComponent(token)}/join`, null, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-
-  // ─── Participant self-capture (Phase 5, Workstream 1.1-1.4) ───────────────
-  // Every call here carries a capture token, never an ActingUser — a
-  // pseudonymous/anonymous participant has no Witness account at all. See
-  // ParticipantCaptureController's own header comment for why this is a
-  // distinct header, not Authorization: Bearer.
+    participantClient.joinSession(token, body),
 
   getParticipantCaptureContext: (captureToken: string): Promise<ParticipantCaptureContextView> =>
-    request<ParticipantCaptureContextView>('/api/v1/participant-capture/me', null, {
-      headers: { 'X-Witness-Capture-Token': captureToken },
-    }),
+    participantClient.getParticipantCaptureContext(captureToken),
 
   captureParticipantEvidence: (
     captureToken: string,
     body: ParticipantCaptureEvidenceRequest,
   ): Promise<ParticipantCaptureEvidenceResult> =>
-    request<ParticipantCaptureEvidenceResult>('/api/v1/participant-capture/evidence', null, {
-      method: 'POST',
-      body: JSON.stringify(body),
-      headers: { 'X-Witness-Capture-Token': captureToken },
-    }),
+    participantClient.captureParticipantEvidence(captureToken, body),
 
   captureParticipantSelfConsent: (
     captureToken: string,
     body: ParticipantCaptureConsentRequest,
   ): Promise<{ status: 'captured' }> =>
-    request<{ status: 'captured' }>('/api/v1/participant-capture/consent', null, {
-      method: 'POST',
-      body: JSON.stringify(body),
-      headers: { 'X-Witness-Capture-Token': captureToken },
-    }),
+    participantClient.captureParticipantSelfConsent(captureToken, body),
 
   captureParticipantFeedback: (
     captureToken: string,
     body: CaptureParticipantFeedbackRequest,
   ): Promise<ProductFeedbackView> =>
-    request<ProductFeedbackView>('/api/v1/participant-capture/feedback', null, {
-      method: 'POST',
-      body: JSON.stringify(body),
-      headers: { 'X-Witness-Capture-Token': captureToken },
-    }),
+    participantClient.captureParticipantFeedback(captureToken, body),
 
   captureParticipantTestimonialConsent: (
     captureToken: string,
     feedbackId: string,
     body: SubmitTestimonialConsentRequest,
   ): Promise<CustomerStoryView | null> =>
-    request<CustomerStoryView | null>(
-      `/api/v1/participant-capture/feedback/${feedbackId}/testimonial-consent`,
-      null,
-      {
-        method: 'POST',
-        body: JSON.stringify(body),
-        headers: { 'X-Witness-Capture-Token': captureToken },
-      },
-    ),
+    participantClient.captureParticipantTestimonialConsent(captureToken, feedbackId, body),
 
   uploadParticipantCaptureAttachment: (
     captureToken: string,
     evidenceId: string,
     file: Blob,
     filename: string,
-  ): Promise<EvidenceAttachmentView> => {
-    const form = new FormData();
-    form.append('file', file, filename);
-    return requestMultipart<EvidenceAttachmentView>(
-      `/api/v1/participant-capture/evidence/${evidenceId}/attachment`,
-      null,
-      form,
-      { headers: { 'X-Witness-Capture-Token': captureToken } },
-    );
-  },
-
-  // ─── Live workshop participant experience (Phase 6, Track E) ──────────────
+  ): Promise<EvidenceAttachmentView> =>
+    participantClient.uploadParticipantCaptureAttachment(captureToken, evidenceId, file, filename),
 
   getParticipantPrompt: (captureToken: string): Promise<ParticipantPromptView | null> =>
-    request<ParticipantPromptView | null>('/api/v1/participant-capture/prompt', null, {
-      headers: { 'X-Witness-Capture-Token': captureToken },
-    }),
+    participantClient.getParticipantPrompt(captureToken),
 
   getParticipantInsights: (captureToken: string): Promise<FeaturedInsightView[]> =>
-    request<FeaturedInsightView[]>('/api/v1/participant-capture/insights', null, {
-      headers: { 'X-Witness-Capture-Token': captureToken },
-    }),
+    participantClient.getParticipantInsights(captureToken),
 
   submitParticipantInsightResponse: (
     captureToken: string,
     insightId: string,
     body: SubmitParticipantKnowledgeResponseRequest,
   ): Promise<{ status: 'captured' }> =>
-    request<{ status: 'captured' }>(
-      `/api/v1/participant-capture/insights/${encodeURIComponent(insightId)}/response`,
-      null,
-      {
-        method: 'POST',
-        body: JSON.stringify(body),
-        headers: { 'X-Witness-Capture-Token': captureToken },
-      },
-    ),
+    participantClient.submitParticipantInsightResponse(captureToken, insightId, body),
 
   listSessions: (
     workspaceId: string,
