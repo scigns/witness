@@ -65,29 +65,63 @@ JSON key is used, requested, or should ever be created for this purpose.
 
 ### What a human must set up (cannot be done by this repository or by Claude)
 
-Requires an actual Google account signing into the Firebase/Google Cloud
-console — see the HUMAN ACTION REQUIRED block in the release checkpoint for
-the precise, itemised version. In outline:
+Exactly one step requires clicking through the Firebase console; everything
+after it is scripted and idempotent
+(`scripts/mobile/setup-firebase-test-lab.sh`). See the release checkpoint's
+HUMAN ACTION REQUIRED block for the step-by-step version aimed at a
+non-specialist.
 
-1. Create a Firebase project (Spark plan — no payment method).
-2. In the underlying Google Cloud project, create a Workload Identity Pool
-   and Provider scoped to this GitHub repository (`scigns/witness`), with an
-   attribute condition restricting it to this repo (Google's own setup guide
-   explicitly recommends this — "Always add an Attribute Condition to
-   restrict entry into the Workload Identity Pool").
-3. Create a minimally-scoped service account (Test Lab execution + read
-   access only — **not** a project-owner/editor role) and grant the
-   Workload Identity Pool permission to impersonate it
-   (`roles/iam.workloadIdentityUser`).
-4. Add three repository-level GitHub Actions **variables** (not secrets —
-   none of these three values is secret material; that is the entire point
-   of Workload Identity Federation over a service account key):
-   `FIREBASE_PROJECT_ID`, `FIREBASE_WORKLOAD_IDENTITY_PROVIDER` (the
-   provider's full resource name), and `FIREBASE_SERVICE_ACCOUNT` (the
-   service account's email). `.github/workflows/mobile-android-cloud.yml`
-   reads all three as `vars.*`, matching this.
+1. **Console (irreducible — no CLI creates a Firebase project
+   non-interactively without additional tooling this repository does not
+   depend on):** at [console.firebase.google.com](https://console.firebase.google.com),
+   create a new project, name it something identifying its purpose (e.g.
+   "Witness Mobile Test Lab"), and **decline/skip Google Analytics** when
+   offered (not needed for Test Lab, and keeps the project's permission
+   surface smaller). Stay on the Spark (free) plan — no payment method is
+   requested. Note the **Project ID** shown (not the display name) — it
+   looks like `witness-mobile-test-lab-a1b2c3`.
+2. **CLI, from here on (`gcloud auth login` first, with the Google account
+   that owns that project):**
 
-**No credential from this setup should ever be pasted into a chat session.**
+   ```bash
+   gcloud config set project <PROJECT_ID>
+   bash scripts/mobile/setup-firebase-test-lab.sh <PROJECT_ID>
+   ```
+
+   This single script:
+   - enables exactly six APIs: `iam.googleapis.com`,
+     `iamcredentials.googleapis.com`, `sts.googleapis.com`,
+     `cloudresourcemanager.googleapis.com`, `testing.googleapis.com`,
+     `toolresults.googleapis.com` — nothing broader;
+   - creates one dedicated service account and grants it
+     `roles/cloudtestservice.testAdmin` + `roles/firebase.analyticsViewer`
+     — the narrowest combination Firebase's own documentation names for
+     submitting Test Lab runs via `gcloud`
+     ([firebase.google.com/docs/projects/iam/permissions](https://firebase.google.com/docs/projects/iam/permissions)'s
+     "Test Lab" section) — **never** Owner or Editor. That page's own
+     caveat, repeated honestly here: these roles can read *all* Cloud
+     Storage buckets in the project, not just Test Lab's — acceptable only
+     because this project is dedicated to mobile testing and holds no
+     customer data by design;
+   - creates a Workload Identity Pool and an OIDC provider, with an
+     attribute condition scoped to **this repository's
+     `mobile-android-cloud.yml` workflow specifically** (via GitHub's
+     `job_workflow_ref` OIDC claim), not merely "any workflow in this
+     repo" — tighter than the minimum Google's own guide recommends
+     ("Always add an Attribute Condition to restrict entry"), and
+     deliberately does not scope to one specific branch/ref, since the
+     workflow is dispatched from whatever branch needs a release check;
+   - creates **no downloadable credential of any kind** — prints the three
+     `vars.*` values `mobile-android-cloud.yml` already expects
+     (`FIREBASE_PROJECT_ID`, `FIREBASE_WORKLOAD_IDENTITY_PROVIDER`,
+     `FIREBASE_SERVICE_ACCOUNT`) for the human to review and add as GitHub
+     repository **variables** (not secrets — none of these three values is
+     secret material; that is the entire point of Workload Identity
+     Federation over a service account key), either via the GitHub UI or
+     the `gh variable set` commands the script itself prints.
+
+**No credential from this setup should ever be pasted into a chat
+session** — and this setup produces none to paste; that is by design.
 Steps 2-4 are performed directly in the Google Cloud/GitHub UI or via
 `gcloud`/`gh` run by the human themselves.
 
