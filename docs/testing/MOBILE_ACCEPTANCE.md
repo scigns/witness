@@ -1,7 +1,21 @@
 # Mobile participation — physical-device acceptance sheet
 
-**Owner:** Engineering (Phase 6)
-**Status:** Active — physical iPhone baseline partially verified (Rows 1-4); Track E rows pending
+**Owner:** Engineering (Phase 6 / Witness Participate)
+**Status:** Active — physical iPhone baseline partially verified (Rows 1-4, browser/PWA); Track E
+rows pending; **native Witness Participate app acceptance not started** (see that section below —
+every row in it is PHYSICAL PENDING)
+
+**Browser-on-phone is not native-app acceptance.** Everything below "## Android" through the
+Android PWA section proves the existing **web** participant journey (Safari/Chrome, optionally
+installed as a PWA) works on real hardware — Phase 6, Track C/E. It says nothing about
+`apps/participant-mobile`, the actual iOS/Android **Witness Participate** app this programme builds
+(ADR-0031): different runtime (Capacitor's native WebView shell, not the system browser), different
+storage (OS Keychain/Keystore via `@aparajita/capacitor-secure-storage`, not browser
+localStorage/IndexedDB-only), different install path (TestFlight/Play internal testing, not "Add to
+Home Screen"), different permission model (a native iOS/Android permission prompt, not a browser
+permission prompt), and a Universal Link / App Link deep-link path that a PWA add-to-home-screen
+icon does not exercise at all. A PASS on any browser/PWA row above must never be read as evidence
+for the equivalent native-app row below — see the new section for why each needs its own run.
 
 Phase 6, Track C (ADR-0030) and Track E (the live workshop prompt/round companion, "close the
 co-design loop"). This is an **executable manual test sheet**, not a
@@ -212,6 +226,66 @@ verify without this sheet, so pay particular attention to them:
   confirm it is (the running API's own startup log doesn't announce this the way it announces the
   origin; verify with the commands that section gives) before treating a "PHYSICAL PASS" on this
   table as meaningful.
+
+## Native Witness Participate app (iOS/Android) — distinct acceptance
+
+**Not started.** No row in this section has been run — this environment has no Xcode, no Android
+SDK, and no physical device connection (confirmed: `xcodebuild` fails with only CLI tools present,
+`ANDROID_HOME` is unset with no `sdkmanager`/`adb`). Every row is a checklist to run **before**
+`STORE SUBMISSION` can honestly be called `GO` (`MOBILE_RELEASE_GATES.md`'s M6/M7), not a report of
+results. Do not backfill a PASS here from browser/PWA testing above, or from anything this repository's
+own automated build (`vite build`, `cap sync`, `tsc`) verified — those prove the bundle compiles and
+the native projects generate; they do not prove a human tapped a real recorder control on a real
+phone and heard back what they said.
+
+### Pre-testing setup checklist (do this once, before Row N1)
+
+| # | Step | Done |
+|---|---|---|
+| S1 | A human with Xcode installed has opened `apps/participant-mobile/ios/App/App.xcworkspace`, resolved the placeholder bundle ID (`capacitor.config.ts`'s header comment — confirm the real one with whoever owns the Apple Developer account) and confirmed the project builds to a simulator | |
+| S2 | The same has been done for `apps/participant-mobile/android` in Android Studio (real package name, confirmed Gradle sync + a debug build to an emulator) | |
+| S3 | A TestFlight internal-testing build has been uploaded and installed on at least one real iPhone | |
+| S4 | A Play Console internal-testing build (or a sideloaded debug APK, if internal testing isn't set up yet) has been installed on at least one real Android device | |
+| S5 | `docs/mobile/DEEP_LINKING.md`'s `apple-app-site-association` and `assetlinks.json` files are published and verified (or, if not yet published, this is noted and Rows N3-N4 below are marked BLOCKED, not skipped) | |
+| S6 | A facilitator has a real, open test session with a join link/QR ready (same fixture approach as the browser rows above) | |
+
+### iOS — Witness Participate (native)
+
+| # | Step | Expected | Result | Defect ref |
+|---|---|---|---|---|
+| N1 | Install from TestFlight | App installs and launches to the `NO_SESSION` screen ("Scan a facilitator's QR code…") with no crash | PHYSICAL PENDING | |
+| N2 | Cold-start deep link | With the app not running, tap a real join link (or scan its QR with the Camera app) — the app opens directly into `JoinScreen` with the correct session context, not Safari | PHYSICAL PENDING | |
+| N3 | Warm-start deep link | With the app already running in the background, tap a join link — the same `JoinScreen` transition happens without restarting the app | PHYSICAL PENDING | |
+| N4 | Universal Link verification | Confirm the link actually opens the app (not a browser) — if it opens Safari instead, S5 above is the likely cause; mark this row BLOCKED with that reference rather than FAIL if S5 is not yet done | PHYSICAL PENDING | |
+| N5 | Join | Same as browser Row 2-4 — governance-mode-correct join, consent shown before capture | PHYSICAL PENDING | |
+| N6 | Microphone permission (native prompt) | The **iOS system** microphone permission dialog appears (not a browser one), showing this app's exact `NSMicrophoneUsageDescription` string | PHYSICAL PENDING | |
+| N7 | No unexpected permission prompt | Confirm the OS never asks for camera, location, contacts, or Bluetooth at any point in the flow — only microphone | PHYSICAL PENDING | |
+| N8 | Text contribution | Write and submit a text contribution; confirm it reaches "Received" | PHYSICAL PENDING | |
+| N9 | Audio contribution | Record, preview, and submit an audio contribution — same as browser Rows 6-9, but proving `MediaRecorder` behaves correctly inside the Capacitor `WKWebView` specifically (ADR-0031's "test WebView reliability before any native rewrite") | PHYSICAL PENDING | |
+| N10 | Offline queue | Airplane Mode during submit → item queues; reconnect → sends automatically, exactly one contribution results | PHYSICAL PENDING | |
+| N11 | Force-quit with a queued item | Force-quit the app with an item still queued, relaunch — the item is still there (proves IndexedDB survives an app relaunch in this WebView, not just a tab reload) | PHYSICAL PENDING | |
+| N12 | Session persists across relaunch | Force-quit and relaunch with no deep link — the app returns straight to `PARTICIPATING` for the same session, not `NO_SESSION` (proves the Keychain-backed store round-trips across a real app lifecycle, not just this session's memory) | PHYSICAL PENDING | |
+| N13 | Token invalidation | Have a facilitator close the session or revoke the participant; next app action shows the "no longer available" screen, not a stuck spinner or crash | PHYSICAL PENDING | |
+| N14 | App deletion and reinstall | Delete the app, reinstall, relaunch with no deep link — confirm the actual observed behaviour (per `SECURE_TOKEN_STORAGE.md`, iOS Keychain data may survive app deletion) and record what was actually seen, not the documented expectation | PHYSICAL PENDING | |
+
+### Android — Witness Participate (native)
+
+| # | Step | Expected | Result | Defect ref |
+|---|---|---|---|---|
+| N1 | Install from Play internal testing (or sideloaded debug APK) | App installs and launches to `NO_SESSION` with no crash | PHYSICAL PENDING | |
+| N2 | Cold-start deep link | App not running, tap a join link — opens directly into `JoinScreen`, not Chrome | PHYSICAL PENDING | |
+| N3 | Warm-start deep link | App running in background, tap a join link — same transition without restart | PHYSICAL PENDING | |
+| N4 | App Link verification | Confirm the link opens the app, not a "choose an app" disambiguation dialog or the browser — if it doesn't, S5's `assetlinks.json` publication is the likely cause | PHYSICAL PENDING | |
+| N5 | Join | Governance-mode-correct join, consent shown before capture | PHYSICAL PENDING | |
+| N6 | Microphone permission (native prompt) | The **Android system** `RECORD_AUDIO` runtime permission dialog appears (not a browser one) | PHYSICAL PENDING | |
+| N7 | No unexpected permission prompt | Confirm no camera, location, contacts, or Bluetooth prompt at any point | PHYSICAL PENDING | |
+| N8 | Text contribution | Write and submit; confirm "Received" | PHYSICAL PENDING | |
+| N9 | Audio contribution | Record, preview, submit — proving `MediaRecorder` in Android's Chromium-based WebView specifically | PHYSICAL PENDING | |
+| N10 | Offline queue | Airplane Mode during submit → queues; reconnect → sends, exactly once | PHYSICAL PENDING | |
+| N11 | Force-quit with a queued item | Force-stop the app (not just switch away) with an item queued, relaunch — item still there | PHYSICAL PENDING | |
+| N12 | Session persists across relaunch | Force-stop and relaunch with no deep link — returns to `PARTICIPATING`, not `NO_SESSION` | PHYSICAL PENDING | |
+| N13 | Token invalidation | Facilitator closes/revokes; app shows "no longer available," not a stuck spinner or crash | PHYSICAL PENDING | |
+| N14 | App uninstall and reinstall | Uninstall, reinstall, relaunch with no deep link — confirm the store item is genuinely gone (per `SECURE_TOKEN_STORAGE.md`, Android's Keystore-backed storage is deleted on uninstall) — this is the one row expected to behave differently from iOS's N14 | PHYSICAL PENDING | |
 
 ## Defect log
 
