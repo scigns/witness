@@ -1,5 +1,8 @@
 # Secure token storage — Witness Participate
 
+**Owner:** Engineering (Mobile release programme)
+**Status:** Active — implemented and unit-tested; not yet verified against a real device Keychain/Keystore
+
 Where the participant capture token lives on a device between app launches,
 what actually protects it, and what does not.
 

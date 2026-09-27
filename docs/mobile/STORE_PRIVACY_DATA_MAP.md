@@ -1,5 +1,8 @@
 # Store privacy data map — Witness Participate
 
+**Owner:** Engineering (Mobile release programme)
+**Status:** Active — data inventory complete; HUMAN/LEGAL REVIEW REQUIRED items open, see below
+
 What this app actually collects, sends, and stores, for Apple App Store
 Privacy Nutrition Label and Google Play Data Safety form preparation.
 

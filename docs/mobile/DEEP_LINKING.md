@@ -1,5 +1,8 @@
 # Deep linking — Witness Participate
 
+**Owner:** Engineering (Mobile release programme)
+**Status:** Active — implemented and unit-tested; native association files not yet published
+
 How a facilitator's QR code or shared join link opens directly into the native
 app, and the threat model behind why the parser is as strict as it is.
 

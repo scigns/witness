@@ -1,0 +1,150 @@
+# Witness Participate — Android build (ADR-0031).
+#
+# Runs the Android half of the mobile toolchain in GitHub Actions rather than on
+# a contributor's Mac: Android SDK/build-tools/emulator images are large, grow
+# over time, and have nothing to do with the iOS/Xcode workflow the Mac exists
+# for. See docs/infrastructure/DEPLOYMENT_TOPOLOGY.md for the full boundary
+# ("GitHub builds the software, DigitalOcean runs it, Cloudflare routes it,
+# the Mac is the Apple workstation").
+#
+# Versions below are read from the generated Android project, not guessed —
+# see apps/participant-mobile/android/variables.gradle (compileSdk/targetSdk/
+# minSdk) and android/gradle/wrapper/gradle-wrapper.properties (Gradle) and
+# android/build.gradle (AGP). If those files change, update this workflow's
+# ANDROID_PLATFORM/ANDROID_BUILD_TOOLS/JAVA_VERSION to match — CI must
+# reproduce what the application actually requires, not "whatever is latest."
+#
+# This job builds only. It has no deployment permission and never uploads
+# anywhere but this run's own GitHub Actions artifacts (never published
+# publicly) — building and deploying are separate concerns, and production
+# deploys already run from deploy.yml against DigitalOcean, not here.
+
+name: Mobile — Android
+
+on:
+  pull_request:
+    paths:
+      - "apps/participant-mobile/**"
+      - "packages/participant-client/**"
+      - "packages/contracts/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/mobile-android.yml"
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  NODE_VERSION: "22"
+  # apps/participant-mobile/android/{variables.gradle,build.gradle,gradle/wrapper/gradle-wrapper.properties}
+  JAVA_VERSION: "17" # AGP 8.13's documented minimum JDK to run Gradle
+  ANDROID_PLATFORM: "36" # compileSdkVersion / targetSdkVersion
+  ANDROID_BUILD_TOOLS: "36.0.0"
+
+jobs:
+  android:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # pnpm before setup-node: `cache: pnpm` below resolves the store path by
+      # invoking pnpm, so setup-node fails if pnpm is not on PATH yet (same
+      # ordering ci.yml uses).
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache turbo build outputs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo
+          key: turbo-android-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-android-${{ runner.os }}-
+
+      - name: Lint (participant-mobile)
+        run: pnpm --filter @witness/participant-mobile lint
+
+      - name: Typecheck (participant-mobile)
+        run: pnpm --filter @witness/participant-mobile typecheck
+
+      - name: Unit tests (participant-mobile)
+        run: pnpm --filter @witness/participant-mobile test
+
+      - name: Web bundle build (Vite)
+        run: pnpm --filter @witness/participant-mobile build
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      # Installs exactly the SDK platform/build-tools the app's own
+      # variables.gradle declares — not "latest", not "whatever the action
+      # defaults to". No emulator image, no Android Studio: this job compiles,
+      # it never runs the app.
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: "platforms;android-${{ env.ANDROID_PLATFORM }} build-tools;${{ env.ANDROID_BUILD_TOOLS }} platform-tools"
+
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Capacitor sync (Android)
+        working-directory: apps/participant-mobile
+        run: pnpm exec cap sync android
+
+      - name: Gradle unit tests
+        working-directory: apps/participant-mobile/android
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Assemble debug APK
+        working-directory: apps/participant-mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      # Unsigned — no keystore exists in this repository or in CI (governing
+      # instruction: never commit signing material, never fabricate a
+      # production key). This proves the release build *compiles*; actual
+      # Play Store upload requires the signing step docs/mobile/
+      # MOBILE_RELEASE_GATES.md still records as BLOCKED.
+      - name: Bundle release AAB (unsigned)
+        working-directory: apps/participant-mobile/android
+        run: ./gradlew bundleRelease --no-daemon
+
+      - name: Locate build outputs
+        id: artifacts
+        run: |
+          apk=$(find apps/participant-mobile/android/app/build/outputs/apk/debug -name '*.apk' | head -1)
+          aab=$(find apps/participant-mobile/android/app/build/outputs/bundle/release -name '*.aab' | head -1)
+          test -s "$apk"
+          test -s "$aab"
+          {
+            echo "apk_path=$apk"
+            echo "aab_path=$aab"
+            echo "short_sha=$(git rev-parse --short HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: witness-participate-${{ steps.artifacts.outputs.short_sha }}-debug-apk
+          path: ${{ steps.artifacts.outputs.apk_path }}
+          retention-days: 14
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: witness-participate-${{ steps.artifacts.outputs.short_sha }}-release-unsigned-aab
+          path: ${{ steps.artifacts.outputs.aab_path }}
+          retention-days: 14
+          if-no-files-found: error

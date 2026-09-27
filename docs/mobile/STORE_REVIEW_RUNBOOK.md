@@ -1,5 +1,8 @@
 # Store review runbook — Witness Participate
 
+**Owner:** Engineering (Mobile release programme)
+**Status:** Active — ready to run once a store review build exists
+
 What an App Store / Play Store reviewer needs to actually exercise the app,
 without touching a real organisation, workspace, or participant's data.
 
