@@ -68,8 +68,16 @@ export class AuthenticationController {
     }
     // Invalid returnTo degrades to "no return path" (the pre-existing
     // behaviour), never a rejected sign-in — see isSafeReturnPath's comment.
+    // `typeof returnTo === 'string'`, not `returnTo !== undefined`: Express
+    // parses a repeated query parameter (`?returnTo=a&returnTo=b`) as an
+    // array, and Nest's `@Query()` type annotation is compile-time only —
+    // it does not coerce or reject that at runtime. Without this guard,
+    // `isSafeReturnPath` (typed to accept only `string`) would receive an
+    // array and throw on `.startsWith`, an unauthenticated 500 on this
+    // sign-in entry point. Same guard `authentication.service.ts`'s own
+    // read-back of a stored `returnTo` already uses.
     const safeReturnTo =
-      returnTo !== undefined && isSafeReturnPath(returnTo) ? returnTo : undefined;
+      typeof returnTo === 'string' && isSafeReturnPath(returnTo) ? returnTo : undefined;
     const { redirectUrl } = await this.authentication.startLogin(
       prompt as 'create' | undefined,
       safeReturnTo,

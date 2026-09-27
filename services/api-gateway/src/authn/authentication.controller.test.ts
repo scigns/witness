@@ -232,6 +232,29 @@ describe('AuthenticationController — login returnTo (Track C, ADR-0030)', () =
 
     expect(startLogin).toHaveBeenCalledWith(undefined, undefined);
   });
+
+  it('drops a returnTo that arrives as an array rather than throwing (CWE-843: repeated query params)', async () => {
+    // Express parses `?returnTo=a&returnTo=b` as an array; Nest's `@Query()`
+    // type annotation (`string | undefined`) is compile-time only and does
+    // not coerce this. Without the `typeof returnTo === 'string'` guard,
+    // `isSafeReturnPath` — typed to accept only `string` — receives an
+    // array and throws on `.startsWith`, an unauthenticated 500 on this
+    // sign-in entry point (caught by CodeQL as "type confusion through
+    // parameter tampering").
+    const startLogin = vi.fn().mockResolvedValue({ redirectUrl: 'https://idp.example/authorize' });
+    const controller = new AuthenticationController(
+      { startLogin } as unknown as AuthenticationService,
+      {} as IdentityProviderPort,
+      { profile: 'hybrid' } as WitnessConfig,
+    );
+    const response = { redirect: vi.fn() } as never;
+
+    await expect(
+      controller.login(undefined, ['/join/abc123', '/join/xyz789'] as unknown as string, response),
+    ).resolves.not.toThrow();
+
+    expect(startLogin).toHaveBeenCalledWith(undefined, undefined);
+  });
 });
 
 describe('AuthenticationController — independent application callback', () => {
