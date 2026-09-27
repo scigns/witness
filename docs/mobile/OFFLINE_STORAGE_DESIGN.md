@@ -1,7 +1,8 @@
 # Offline storage design — Witness Participate
 
 **Owner:** Engineering (Mobile release programme)
-**Status:** Active — implemented; IndexedDB-without-native-bridge decision to be revisited only on physical-device evidence
+**Status:** Active — implemented; the IndexedDB-without-native-bridge decision is revisited
+only on physical-device evidence
 
 Two genuinely different kinds of local data, deliberately kept in two
 different stores, with two different security properties. Conflating them —
