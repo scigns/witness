@@ -58,44 +58,52 @@ M6's job, not this gate's.**
 
 ## M3 — Native shell
 
-**Status: PARTIAL** — Android compiles for real, in CI; iOS does not compile
-anywhere yet.
+**Status: PARTIAL** — Android build logic proven twice, independently, in
+CI; Android physical acceptance and all of iOS remain blocked on external
+dependencies this environment genuinely does not have.
+
+### Android
 
 | Item | Status | Evidence |
 |---|---|---|
-| Android source project | **PASS** | `cap add android` completed; real Android Studio project at `apps/participant-mobile/android`, plugins correctly wired |
-| Android CI | **PASS** | `.github/workflows/mobile-android.yml` — real execution, not just valid YAML: [run 36302658382](https://github.com/scigns/witness/actions/runs/36302658382), `SUCCESS`, ~4 minutes, on a clean GitHub-hosted runner (see `docs/infrastructure/DEPLOYMENT_TOPOLOGY.md`'s CI-reproducibility proof) |
-| Android debug APK | **PASS** | Produced by that run — `witness-participate-ce30f5b-debug-apk`, 4,220,977 bytes, verified as a genuine multi-dex APK with a real `AndroidManifest.xml` (downloaded and inspected directly, not assumed from the log) |
-| Android release AAB | **PASS** (unsigned) | Same run — `witness-participate-ce30f5b-release-unsigned-aab`, 3,257,815 bytes. "Compiles as a release bundle" and "signed, store-uploadable" are different claims; only the first is proven |
-| Android signing | **BLOCKED** | No keystore exists anywhere in this repository or in CI (governing instruction: never commit one, never fabricate a production key). See M7 |
-| Android physical device | **BLOCKED** | No physical Android device or emulator in this environment — see M6 |
-| iOS source project | **PASS** | `cap add ios` completed; real Xcode project at `apps/participant-mobile/ios/App`, plugins correctly wired |
-| iOS local Xcode build | **BLOCKED** | No Xcode in this environment (CLI tools only — `xcodebuild` fails). Per the governing instruction, iOS stays Mac-first for this program — no GitHub macOS runner was substituted |
-| iOS signing | **BLOCKED** | No Apple Developer account, Team ID, certificate, or provisioning profile exists — see M7 |
-| iOS physical device | **BLOCKED** | No physical iPhone available in this environment — see M6 |
-| TestFlight | **BLOCKED** | Depends on iOS signing and an App Store Connect app record, neither of which exists — see M7 |
+| Android CI compile | **PASS** | `.github/workflows/mobile-android.yml`, reproduced across three independent green runs on PR #254 (most recently [36308447009](https://github.com/scigns/witness/actions/runs/36308447009), head `098ce02`, merge-ref build) |
+| Android debug APK | **PASS** | Same run — `witness-participate-62f4b93-debug-apk`. Downloaded via `gh run download`, extracted size 4,581,839 bytes, SHA-256 `e7a2b89c572b11a22caaa52a1ec5808a3669eb0ead40276a5b19dd5acf2c33c8` (computed locally, not copied from a log) |
+| Android release AAB build logic | **PASS** (unsigned) | Same run — `witness-participate-62f4b93-release-unsigned-aab`, 3,257,815 bytes. "Compiles as a release bundle" and "signed, store-uploadable" are different claims; only the first is proven |
+| Android release signing | **BLOCKED** | No keystore exists anywhere in this repository or in CI — see `docs/mobile/STORE_ACCOUNT_SETUP.md` and M7 |
+| Android physical install | **BLOCKED** | `adb devices` returns an empty list — no physical Android device connected to this Mac. `platform-tools` (adb/fastboot only, ~30 MB via Homebrew cask) was installed to make this check possible without installing the Android SDK or Android Studio, per the governing instruction |
+| Android physical journey | **BLOCKED** | Depends on the above — nothing in `MOBILE_ACCEPTANCE.md`'s native Android rows has been executed |
+| Android verified App Link | **BLOCKED** | `assetlinks.json` still carries its `<SHA256_SIGNING_CERT_FINGERPRINT>` placeholder (no release keystore exists to produce a real one) — local intent-filter handling (`AndroidManifest.xml`'s `autoVerify` intent-filter) is configured, but domain-verified association cannot be proven until a real fingerprint is published |
+| Google Play internal testing | **BLOCKED** | No Play Console account, no signed AAB — see `docs/mobile/STORE_ACCOUNT_SETUP.md` |
 
-**What changed this cycle:** Android compilation is no longer blocked on
-this Mac having an SDK installed — it is proven, for real, in GitHub
-Actions. Two genuine CI-configuration defects were found and fixed on the
-way there (both are real toolchain facts, not guesses):
+**What changed this cycle:** the Android CI proof from the previous cycle
+was reproduced end-to-end — same commit's merge-ref build, downloaded and
+independently checksummed. `platform-tools` was added locally (adb/fastboot
+only) specifically to make the "no physical device" finding a checked fact
+rather than an assumption. No physical Android device was available to
+progress further.
 
-1. `pnpm --filter X lint/typecheck/test/build` does not build workspace
-   dependencies first the way `turbo run` does — the first run failed with
-   "cannot find module `@witness/contracts`/`@witness/participant-client`".
-   Fixed by switching to `turbo run <task> --filter=...`, matching how
-   `ci.yml`'s own `make lint`/`make typecheck` already work.
-2. Capacitor 8's own Android library
-   (`node_modules/@capacitor/android/capacitor/build.gradle`) requires JDK
-   21 to compile (`sourceCompatibility`/`targetCompatibility
-   JavaVersion.VERSION_21`) — distinct from AGP 8.13's own minimum JDK to
-   *run* Gradle (17). The second run failed with `invalid source release:
-   21` until this was corrected.
+### iOS
 
-iOS remains exactly where it was: `cap add ios` produced a well-formed
-project, and nothing further has been attempted, per the governing
-instruction's explicit "do not attempt to replace Xcode/macOS in this
-task."
+| Item | Status | Evidence |
+|---|---|---|
+| iOS project generated | **PASS** | `cap add ios` completed; real Xcode project at `apps/participant-mobile/ios/App`, bundle id `com.buildwithwitness.participate`, deployment target iOS 15.0, Swift 5.0, `CODE_SIGN_STYLE = Automatic` — read directly from `project.pbxproj` |
+| iOS dependencies resolve | **NOT VERIFIED** | `CapApp-SPM/Package.swift` declares three Swift Package Manager dependencies (`capacitor-swift-pm` from GitHub, plus two local `node_modules` paths for the installed plugins) — no `Package.resolved` file exists anywhere in the project, meaning SPM has never actually run against it. Resolution requires `xcodebuild`/Xcode, which is unavailable (below) |
+| iOS simulator/generic compile | **BLOCKED** | `xcodebuild -project App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator build` fails immediately: `xcode-select: error: tool 'xcodebuild' requires Xcode, but active developer directory '/Library/Developer/CommandLineTools' is a command line tools instance`. This Mac has Command Line Tools only, not the full Xcode.app — CLI tools cannot build an iOS app target against the `iphonesimulator` SDK. **Genuine environment blocker, classified XCODE CONFIGURATION, not an application defect** — installing full Xcode was evaluated and not attempted: this Mac has 11 GB free disk, and Xcode.app alone (before any simulator runtime) typically requires well over that |
+| iOS signing | **BLOCKED** | No Apple Developer account, Team ID, certificate, or provisioning profile — see `docs/mobile/STORE_ACCOUNT_SETUP.md` |
+| iOS physical install | **BLOCKED** | No physical iPhone available, and no compiled build to install even if one were |
+| iOS Universal Link — client config | **PARTIAL** | `App.entitlements` exists with the correct `com.apple.developer.associated-domains` content (`applinks:witness-prod-web.pacificdigitalconsultancy.org`, `applinks:app.buildwithwitness.com`) — **but it is not wired into the Xcode project**: `project.pbxproj` contains no `CODE_SIGN_ENTITLEMENTS` build setting referencing it at all, confirmed by direct `grep`, not assumed. The file has existed since the previous cycle but was never actually attached to a build target — doing so requires Xcode's Signing & Capabilities UI (or careful manual `.pbxproj` editing this session chose not to attempt blind, per that same caution from the prior cycle) |
+| iOS Universal Link — AASA file template | **PASS** (template only) | `apps/web/public/.well-known/apple-app-site-association` exists with the correct `paths`/structure and an explicit `<TEAM_ID>` placeholder |
+| iOS Universal Link — live verified association | **BLOCKED** | Requires a real Team ID, the entitlement actually wired into a signed build, and the AASA file published on a live host — none of which exist |
+| TestFlight | **BLOCKED** | Depends on iOS signing and an App Store Connect app record, neither of which exists |
+
+**What changed this cycle:** the iOS project's actual configuration was
+read in full (bundle id, deployment target, Swift version, signing style,
+SPM dependencies, entitlements content) rather than only noting "Xcode
+unavailable" as before — and the entitlements-not-wired-into-the-project
+gap was found and documented precisely, which the previous cycle's summary
+did not distinguish from "entitlements file doesn't exist." The `xcodebuild`
+failure itself is unchanged and remains a genuine external blocker: no
+Xcode, and no reasonable path to installing it on 11 GB of free disk.
 
 ## M4 — Security
 
@@ -161,23 +169,26 @@ Native-specific, **PARTIAL** — real, but not yet physically proven:
 
 ## M6 — Physical device verification
 
-**Status: BLOCKED** — but the Android path is closer than it was:
-`docs/testing/MOBILE_ACCEPTANCE.md`'s "Native Witness Participate app"
-section (28 rows across iOS and Android, plus a 6-item pre-testing setup
-checklist) exists and is ready to run, and there is now a real,
-CI-verified debug APK to install for it
-(`witness-participate-ce30f5b-debug-apk`, from
-[run 36302658382](https://github.com/scigns/witness/actions/runs/36302658382),
-expires 2026-10-11 — a fresh one is one `workflow_dispatch` or PR away).
-**Zero rows have still been executed** — this environment has no physical
-Android device, and no Xcode/physical iPhone for the iOS half at all. A
-generated APK is not a substitute for a human tapping a real recorder
-control on a real phone; per the governing instruction, "do not call the
-programme store-ready based on compilation alone." The preferred next step
-for Android specifically is exactly `docs/infrastructure/DEPLOYMENT_TOPOLOGY.md`'s
-"CI artifact → physical device" path (section 29 of the governing
-instruction) — not installing an emulator merely to avoid finding a
-physical device.
+**Status: BLOCKED** — actively checked this cycle, not merely restated.
+`adb devices` (via a freshly-installed `platform-tools` — adb/fastboot
+only, not the Android SDK or Android Studio) returns an empty device list:
+no physical Android device is connected to this Mac. No Xcode and no
+physical iPhone exist for the iOS half either. A freshly-downloaded,
+independently-checksummed debug APK
+(`witness-participate-62f4b93-debug-apk`, SHA-256
+`e7a2b89c572b11a22caaa52a1ec5808a3669eb0ead40276a5b19dd5acf2c33c8`) is
+sitting ready in a scratch directory outside version control, and
+`docs/testing/MOBILE_ACCEPTANCE.md`'s native-app rows are ready to run —
+**zero rows have been executed**. A generated APK is not a substitute for a
+human tapping a real recorder control on a real phone; per the governing
+instruction, "do not call the programme store-ready based on compilation
+alone."
+
+**HUMAN ACTION REQUIRED:** connect an Android phone by USB (with USB
+debugging enabled) to this Mac, or otherwise make one available, to
+progress `MOBILE_ACCEPTANCE.md`'s native Android rows (N1-N14). Once
+connected, `adb install <the downloaded APK>` is the next command — no
+rebuild needed.
 
 ## M7 — Distribution
 
@@ -199,8 +210,10 @@ without a human's direct participation:
   (M5 prepares the data for these; submitting them requires store-account
   access).
 
-See the final checkpoint's HUMAN ACTION REQUIRED list for the exact,
-itemised asks.
+`docs/mobile/STORE_ACCOUNT_SETUP.md` is the concrete, itemised checklist
+for all of the above — what exactly to create, in what order, and what
+each unblocks. See the final checkpoint's HUMAN ACTION REQUIRED list for
+the same items in summary form.
 
 ## Summary
 
@@ -208,10 +221,10 @@ itemised asks.
 |---|---|
 | M1 — Architecture | PASS |
 | M2 — Core functionality | PASS |
-| M3 — Native shell | PARTIAL — Android build logic PASS (real CI compile, verified debug APK + unsigned release AAB); Android signing/physical-device and all of iOS remain BLOCKED |
+| M3 — Native shell | PARTIAL — Android build logic PASS (real CI compile, verified debug APK + unsigned release AAB, reproduced twice); Android signing/physical-device/verified-App-Link and all of iOS (including a confirmed `xcodebuild` environment blocker) remain BLOCKED |
 | M4 — Security | PASS (backend) / PARTIAL (native-specific physical proof) |
 | M5 — Privacy & compliance prep | PARTIAL (HUMAN/LEGAL REVIEW REQUIRED items open) |
-| M6 — Physical device verification | BLOCKED (no hardware/toolchain in this environment) |
+| M6 — Physical device verification | BLOCKED — actively checked: `adb devices` confirms no Android device connected; no Xcode/iPhone for iOS |
 | M7 — Distribution | BLOCKED (no Apple/Google accounts, signing, or DNS in this environment) |
 
 **STORE SUBMISSION = NO-GO.** M3, M6, and M7 are not PASS, and M4/M5 are not

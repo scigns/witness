@@ -243,9 +243,9 @@ phone and heard back what they said.
 | # | Step | Done |
 |---|---|---|
 | S1 | A human with Xcode installed has opened `apps/participant-mobile/ios/App/App.xcworkspace`, resolved the placeholder bundle ID (`capacitor.config.ts`'s header comment — confirm the real one with whoever owns the Apple Developer account) and confirmed the project builds to a simulator | |
-| S2 | The same has been done for `apps/participant-mobile/android` in Android Studio (real package name, confirmed Gradle sync + a debug build to an emulator) | |
+| S2 | **Superseded** — Android compilation now runs in GitHub Actions (`.github/workflows/mobile-android.yml`, `docs/infrastructure/DEPLOYMENT_TOPOLOGY.md`), not Android Studio locally. Confirm instead: the latest `Mobile — Android` workflow run on the branch under test is `SUCCESS`, and its debug APK artifact has been downloaded (`gh run download <run-id> -n <apk-artifact-name>`) — no Android Studio or emulator install required | |
 | S3 | A TestFlight internal-testing build has been uploaded and installed on at least one real iPhone | |
-| S4 | A Play Console internal-testing build (or a sideloaded debug APK, if internal testing isn't set up yet) has been installed on at least one real Android device | |
+| S4 | The CI-generated debug APK (S2) has been sideloaded onto at least one real Android device via `adb install` — `platform-tools` (adb/fastboot only, via `brew install --cask android-platform-tools`) is sufficient; no Play Console account is required for this step | |
 | S5 | `docs/mobile/DEEP_LINKING.md`'s `apple-app-site-association` and `assetlinks.json` files are published and verified (or, if not yet published, this is noted and Rows N3-N4 below are marked BLOCKED, not skipped) | |
 | S6 | A facilitator has a real, open test session with a join link/QR ready (same fixture approach as the browser rows above) | |
 
