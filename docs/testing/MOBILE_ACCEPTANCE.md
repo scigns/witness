@@ -205,6 +205,13 @@ verify without this sheet, so pay particular attention to them:
   `session-featured-insights.live.test.ts`'s test 7 asserts the `KnowledgeAssertion` row is
   byte-identical before and after a participant response. The physical row still exists because a
   human should see this hold true in the actual UI, not only in a test log.
+- **LAN exposure of the development profile (see MOBILE-003).** Binding the API to the LAN for this
+  section's rows makes the unverified `X-Witness-Dev-User` header and the development sign-in flow
+  API-reachable from any device on the same network unless the containment described in
+  `docs/testing/LIVE_WORKSHOP_ACCEPTANCE_RUNBOOK.md`'s "Security boundary" section is in place —
+  confirm it is (the running API's own startup log doesn't announce this the way it announces the
+  origin; verify with the commands that section gives) before treating a "PHYSICAL PASS" on this
+  table as meaningful.
 
 ## Defect log
 
@@ -332,6 +339,43 @@ verify without this sheet, so pay particular attention to them:
   underlying HTTP endpoints it calls. This is why the Result cell above says "re-test pending."
 - **Not yet done:** physical-device confirmation. The original join link/session
   (`85e05e82-...`) is now retired for this test — continue from the new URL below.
+
+### MOBILE-003 — LAN exposure of the unverified development profile (RESOLVED)
+
+- **Found during:** the physical Phase 6 acceptance pass, before any Track E row was run — flagged as
+  a genuine acceptance finding, not a code review comment.
+- **Observed:** with the API bound to the LAN so a phone could reach the participant flow, the web
+  app's "Developer Preview" banner and "Acting as" dev-header toolbar were also reachable from any
+  device on the same network, including privileged-looking session/evidence pages, without completing
+  the real sign-in flow.
+- **Root cause:** binding the API to `0.0.0.0` for the participant surface also exposed two unverified
+  development-only mechanisms to the same network: (1) `X-Witness-Dev-User`, read by
+  `AuthorizationGuard` on every `@Requires(...)`-guarded route with no location check beyond a
+  pre-existing, narrowly-scoped `invoice:*` special case; (2) the development identity-provider
+  double's sign-in flow (`/api/v1/auth/login`, `/dev-idp/authorize`, `/callback`), which "performs no
+  check that the caller is who they claim" by its own design and, combined with this fixture granting
+  its default identity (`dev@example.com`) facilitator access, gave a second route to the same
+  privilege.
+- **Fix:** `AuthorizationGuard`'s existing loopback-only containment (previously scoped to
+  `invoice:*` alone) was generalised to every dev-header-resolved request, regardless of action —
+  `401 DEVELOPMENT_ACCESS_LOCAL_ONLY` from anywhere but this machine. A new, narrowly-scoped
+  middleware (`dev-signin-loopback-guard.ts`) does the same for the sign-in paths —
+  `403 DEV_SIGNIN_LOOPBACK_ONLY`. Both are development-profile-only and both fail closed when the
+  peer address is unknown. See `docs/testing/LIVE_WORKSHOP_ACCEPTANCE_RUNBOOK.md`'s "Security
+  boundary" section for exactly what remains reachable.
+- **Verified, not assumed:** proven live against the running dev server from a genuine non-loopback
+  peer address (the Mac's own LAN interface, which produces a real non-loopback `remoteAddress` —
+  the same as a phone or laptop elsewhere on the network) — a forged admin `X-Witness-Dev-User`
+  correctly receives `401` from the LAN address and still succeeds from `localhost`; `/api/v1/auth/login`
+  correctly receives `403` from the LAN address and still `302`s from `localhost`; participant
+  join/capture and `/health` are unaffected from either address. Automated: 15 new tests
+  (`authorization.guard.test.ts`, `loopback.test.ts`, `dev-signin-loopback-guard.test.ts`), full
+  gateway suite (782/782) and live suite (61/61) re-run clean.
+- **Not fixed, deliberately out of scope:** this fixture's own grant of facilitator access to
+  `dev@example.com` (the development identity provider's default identity) remains a fixture-data
+  choice worth being deliberate about on future rounds, independent of the architecture fix above —
+  now moot in practice since that sign-in path itself is loopback-only, but worth knowing if a future
+  fixture script changes that.
 
 ## Do not claim success for a row not executed
 

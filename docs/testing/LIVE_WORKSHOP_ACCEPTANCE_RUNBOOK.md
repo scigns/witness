@@ -7,6 +7,50 @@ Exact, copy-pasteable steps for running the Track E ("close the co-design loop")
 pass in `docs/testing/MOBILE_ACCEPTANCE.md`'s "Track E — live workshop flow" table. This assumes the
 Mac and the phone are on the same local network, or the tunnel step below is used.
 
+## Security boundary — what the LAN can and cannot reach
+
+Physical-device testing binds the API to `0.0.0.0` on purpose, so a phone's participant traffic can
+reach it — but the development profile's two unverified mechanisms (the `X-Witness-Dev-User` header
+and the development identity-provider double's sign-in flow) do **not** become usable from anywhere
+but this machine as a side effect. This is enforced at the API layer
+(`services/api-gateway/src/authz/authorization.guard.ts`,
+`services/api-gateway/src/authn/dev-signin-loopback-guard.ts`), not by hiding UI elements — the "Acting
+as" toolbar still renders on a phone that loads the web app, exactly as before; every request it makes
+is what's actually rejected.
+
+**Reachable from another device on the LAN, by design:**
+
+- `GET /health`
+- `GET /api/v1/session-join/<token>` and `POST .../join` (anonymous/pseudonymous participant entry)
+- `GET|POST /api/v1/participant-capture/*` with a valid `X-Witness-Capture-Token` (consent, prompt,
+  evidence capture, insights, community-validation responses) — session-scoped, least-privilege by
+  construction; a token from one session cannot act on another (`participant-capture.live.test.ts`).
+- The web app itself (`http://<lan-ip>:3000/...`) — it renders for anyone who can reach it, same as
+  any other static/SSR page; this is expected and is what "do not simply hide UI elements" means in
+  practice — the rendered facilitator UI carries no real authority without an API call succeeding.
+
+**Rejected from anywhere but this machine, even with a forged/valid-looking credential:**
+
+- Any `@Requires(...)`-guarded facilitator/admin route (workspaces, sessions, knowledge, agenda
+  items, featured insights, billing, etc.) when authenticated via `X-Witness-Dev-User` —
+  `401 DEVELOPMENT_ACCESS_LOCAL_ONLY`, regardless of the role the header claims.
+- `GET /api/v1/auth/login`, `/register`, `/dev-idp/*`, `/callback` — `403 DEV_SIGNIN_LOOPBACK_ONLY`.
+  A LAN device cannot even *start* the development sign-in flow, so it cannot obtain a real session
+  either — closing the second route to the same privilege (completing sign-in as the fixture's
+  `dev@example.com` identity, which this fixture grants facilitator access).
+- A `X-Witness-Capture-Token` used against a facilitator/admin route — that header is never read by
+  `AuthorizationGuard` at all, so it authenticates nothing there.
+
+**Unaffected everywhere:** a real, verified session (cookie-based, from a real sign-in completed on
+this machine) works identically regardless of which address the API is bound to — this restriction
+only ever fires for the unverified development path. Production/hybrid/sovereign never construct the
+development authorization adapter or identity-provider double in the first place, so none of this
+code runs there.
+
+**Practical consequence for this runbook:** the facilitator must sign in and drive the Live/Agenda
+pages from the Mac, at `localhost` — never from the phone, and never by pointing the Mac's own
+browser at the LAN address. The phone only ever uses the participant capture-token flow.
+
 ## 1. Start the local environment
 
 ```bash
