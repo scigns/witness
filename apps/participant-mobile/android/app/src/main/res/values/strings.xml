@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Witness Participate</string>
+    <string name="title_activity_main">Witness Participate</string>
+    <string name="package_name">com.buildwithwitness.participate</string>
+    <string name="custom_url_scheme">com.buildwithwitness.participate</string>
+</resources>
