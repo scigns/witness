@@ -438,5 +438,31 @@ describe.skipIf(prisma === null)(
       const row = await db.evidenceAttachment.findUnique({ where: { evidenceId } });
       expect(row).toBeNull();
     });
+
+    it('THREAT: a join-link token cannot be used as a capture token — they are structurally distinct credentials', async () => {
+      const sessionId = await createOpenSessionWithConsent();
+      const link = await joinService.create(
+        workspaceId,
+        sessionId,
+        { governanceMode: 'anonymous', expiresInMinutes: 60 },
+        FACILITATOR,
+      );
+
+      await expect(capture.context(link.token)).rejects.toThrow();
+    });
+
+    it('THREAT: a capture token cannot be used as a join-link token — they are structurally distinct credentials', async () => {
+      const sessionId = await createOpenSessionWithConsent();
+      const { captureToken } = await joinAnonymously(sessionId);
+
+      await expect(joinService.getContext(captureToken)).rejects.toThrow();
+      await expect(
+        joinService.join(
+          captureToken,
+          { clientRequestId: randomUUID() },
+          fakeHttpRequest() as never,
+        ),
+      ).rejects.toThrow();
+    });
   },
 );

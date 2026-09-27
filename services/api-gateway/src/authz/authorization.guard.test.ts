@@ -306,6 +306,45 @@ describe('AuthorizationGuard — settlement identity', () => {
   });
 });
 
+describe('AuthorizationGuard — a capture token grants nothing here', () => {
+  /**
+   * `X-Witness-Capture-Token` is a structurally separate mechanism
+   * (`ParticipantCaptureController` reads it directly, never through this
+   * guard — see the comment above at line ~130). Proving that here, rather
+   * than only by omission in the participant controllers, closes the gap
+   * the governing instruction calls out: "not enforced by hiding
+   * navigation." A request carrying only this header, with no real session
+   * and no dev header, must be treated exactly like a request with no
+   * credential at all — on every kind of route this guard protects,
+   * including facilitator, organisation, billing, and platform actions.
+   */
+  it.each([
+    'record:read',
+    'workspace:create',
+    'organisation:update',
+    'invoice:read',
+    'payment:settle',
+    'platform_role:write',
+  ])('is UNAUTHENTICATED for %s when only a capture token is presented', async (action) => {
+    const guard = new AuthorizationGuard(
+      fakeReflector(action),
+      { authenticate: vi.fn().mockResolvedValue(null) } as never,
+      { authenticate: vi.fn().mockResolvedValue(null) } as never,
+      fakePolicyEnforcement(),
+    );
+
+    await expect(
+      guard.canActivate(
+        fakeContext({
+          headers: { 'x-witness-capture-token': 'a-real-looking-capture-token-value' },
+          params: {},
+          socket: { remoteAddress: '127.0.0.1' },
+        }),
+      ),
+    ).rejects.toMatchObject({ response: { error: { code: 'UNAUTHENTICATED' } } });
+  });
+});
+
 describe('AuthorizationGuard — platform authority identity', () => {
   it('never accepts the unverified development header for platform role mutation', async () => {
     const guard = new AuthorizationGuard(
