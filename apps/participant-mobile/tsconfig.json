@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "incremental": true,
+    "verbatimModuleSyntax": false,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "types": ["vite/client"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
+  "exclude": ["node_modules", "dist", "ios", "android"]
+}
