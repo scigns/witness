@@ -74,17 +74,23 @@ jobs:
           restore-keys: |
             turbo-android-${{ runner.os }}-
 
+      # `pnpm --filter X lint` alone does not build X's workspace dependencies
+      # first (@witness/contracts, @witness/participant-client) — their .d.ts
+      # output would be missing and typecheck would fail with "cannot find
+      # module". `turbo run` respects turbo.json's `dependsOn: ["^build"]` for
+      # each of these tasks, the same as `make lint`/`make typecheck` do in
+      # ci.yml, so it builds those dependencies first.
       - name: Lint (participant-mobile)
-        run: pnpm --filter @witness/participant-mobile lint
+        run: pnpm exec turbo run lint --filter=@witness/participant-mobile
 
       - name: Typecheck (participant-mobile)
-        run: pnpm --filter @witness/participant-mobile typecheck
+        run: pnpm exec turbo run typecheck --filter=@witness/participant-mobile
 
       - name: Unit tests (participant-mobile)
-        run: pnpm --filter @witness/participant-mobile test
+        run: pnpm exec turbo run test --filter=@witness/participant-mobile
 
       - name: Web bundle build (Vite)
-        run: pnpm --filter @witness/participant-mobile build
+        run: pnpm exec turbo run build --filter=@witness/participant-mobile
 
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
