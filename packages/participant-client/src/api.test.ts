@@ -109,16 +109,14 @@ describe('createParticipantApiClient — error handling', () => {
   it('throws ApiError with the server-provided code/message on a non-2xx response', async () => {
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          jsonResponse(
-            {
-              error: { code: 'CAPTURE_TOKEN_INVALID', message: 'This session is no longer valid.' },
-            },
-            401,
-          ),
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            error: { code: 'CAPTURE_TOKEN_INVALID', message: 'This session is no longer valid.' },
+          },
+          401,
         ),
+      ),
     );
 
     const client = createParticipantApiClient('https://api.example.org');
