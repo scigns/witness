@@ -43,7 +43,14 @@ concurrency:
 env:
   NODE_VERSION: "22"
   # apps/participant-mobile/android/{variables.gradle,build.gradle,gradle/wrapper/gradle-wrapper.properties}
-  JAVA_VERSION: "17" # AGP 8.13's documented minimum JDK to run Gradle
+  #
+  # JAVA_VERSION 21, not merely AGP 8.13's own minimum-to-run-Gradle (17): the
+  # first real CI run failed compileDebugJavaWithJavac with "invalid source
+  # release: 21" on JDK 17. node_modules/@capacitor/android/capacitor/
+  # build.gradle sets `sourceCompatibility`/`targetCompatibility
+  # JavaVersion.VERSION_21` — Capacitor 8's own Android library requires 21
+  # to compile, independent of what Gradle itself needs to run.
+  JAVA_VERSION: "21"
   ANDROID_PLATFORM: "36" # compileSdkVersion / targetSdkVersion
   ANDROID_BUILD_TOOLS: "36.0.0"
 
