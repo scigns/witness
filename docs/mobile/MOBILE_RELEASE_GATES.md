@@ -103,10 +103,15 @@ free, zero-billing, zero-payment-method path (Spark plan, 10 free
 virtual-device test runs/day) and keyless CI authentication (Workload
 Identity Federation, no long-lived service-account key). A new workflow,
 `mobile-android-cloud.yml`, is written, committed, and its skip-when-
-unconfigured path proven in a real GitHub Actions run — but it cannot
-actually execute a cloud test until a human completes the one-time Firebase
-project + Workload Identity Federation setup, which requires an interactive
-Google account sign-in this environment cannot perform. See
+unconfigured path proven in a real GitHub Actions run. The setup itself has
+been reduced to one irreducible console step (creating the Firebase
+project — no CLI does this non-interactively) followed by one idempotent
+script, `scripts/mobile/setup-firebase-test-lab.sh`, that creates the
+service account (narrowest documented roles, verified against Firebase's
+own IAM permissions page — an earlier draft incorrectly assumed a role
+that does not exist) and the Workload Identity Pool/provider, printing the
+three `vars.*` values to add — but **no human has run it yet**, no
+Firebase/GCP project exists, and zero cloud-device evidence exists. See
 `docs/mobile/CLOUD_ANDROID_TESTING.md` for the full design and the
 checkpoint's HUMAN ACTION REQUIRED block for the exact steps.
 
