@@ -47,16 +47,19 @@ not.
 
 ### Result terminology
 
-Use one of these five values in every Result cell — free text describing *what happened* still goes
-alongside it, exactly as the existing rows below already do:
+Use one of these six values in every Result cell — free text describing *what happened* still goes
+alongside it, exactly as the existing rows below already do. This doubles as the evidence-source
+record the row's result came from — each status names which of the four evidence levels
+(`docs/mobile/CLOUD_ANDROID_TESTING.md`) produced it:
 
-| Status | Meaning |
-|---|---|
-| **AUTOMATED PASS** | Verified by an automated test/build in this repository — never a substitute for a physical-device row, only ever used on a row that is explicitly about backend/build behaviour, not device behaviour. |
-| **PHYSICAL PASS** | A human personally ran this step on the named real device and observed the expected result. |
-| **PHYSICAL PENDING** | Not yet run on a real device. The honest default for every new row — do not backfill. |
-| **BLOCKED** | Cannot be attempted yet because an earlier step failed or a dependency is missing. |
-| **NOT APPLICABLE** | Genuinely does not apply to this governance mode/device/flow (state why). |
+| Status | Meaning | Evidence level |
+|---|---|---|
+| **AUTOMATED PASS** | Verified by an automated test/build in this repository — never a substitute for a physical-device row, only ever used on a row that is explicitly about backend/build behaviour, not device behaviour. | N/A (backend/build) |
+| **CLOUD PASS** | Verified against a Firebase Test Lab virtual device via `mobile-android-cloud.yml` — proves the APK installs/launches/navigates on Android, never a substitute for a physical-device row. State the Test Lab run link. | Level C |
+| **PHYSICAL PASS** | A human personally ran this step on the named real device and observed the expected result. | Level D |
+| **PHYSICAL PENDING** | Not yet run on a real device. The honest default for every new row — do not backfill. | — |
+| **BLOCKED** | Cannot be attempted yet because an earlier step failed or a dependency is missing. | — |
+| **NOT APPLICABLE** | Genuinely does not apply to this governance mode/device/flow (state why). | — |
 
 An automated browser tool (including any AI agent's browser automation) is **not** a physical device
 and must never produce a PHYSICAL PASS/FAIL result — see the note on `claude-in-chrome` availability
@@ -269,6 +272,11 @@ phone and heard back what they said.
 | N14 | App deletion and reinstall | Delete the app, reinstall, relaunch with no deep link — confirm the actual observed behaviour (per `SECURE_TOKEN_STORAGE.md`, iOS Keychain data may survive app deletion) and record what was actually seen, not the documented expectation | PHYSICAL PENDING | |
 
 ### Android — Witness Participate (native)
+
+Rows below are physical-device rows (Level D) — see `docs/mobile/CLOUD_ANDROID_TESTING.md` for
+the separate, non-substitutable Level C cloud path (`mobile-android-cloud.yml`, currently BLOCKED
+on a one-time human Firebase setup). Once cloud runs exist, record them as their own evidence —
+`CLOUD PASS` with a Test Lab run link — never by marking one of these physical rows PASS.
 
 | # | Step | Expected | Result | Defect ref |
 |---|---|---|---|---|

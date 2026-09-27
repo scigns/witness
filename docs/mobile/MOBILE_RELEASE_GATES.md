@@ -64,24 +64,51 @@ dependencies this environment genuinely does not have.
 
 ### Android
 
+Four separate, non-substitutable evidence levels — see
+`docs/mobile/CLOUD_ANDROID_TESTING.md`'s framing. Cloud evidence never
+silently marks a physical row PASS, and vice versa.
+
 | Item | Status | Evidence |
 |---|---|---|
-| Android CI compile | **PASS** | `.github/workflows/mobile-android.yml`, reproduced across **five** independent green runs on PR #254 (most recently [36317217221](https://github.com/scigns/witness/actions/runs/36317217221), head `4f3cd1d` — matches this branch's current HEAD exactly, not a stale build) |
-| Android debug APK | **PASS** | Same run — `witness-participate-0a5d649-debug-apk`. Downloaded via `gh run download` to `/tmp/witness-android-acceptance` (outside the repository, never committed), extracted size 4,581,839 bytes, SHA-256 `2cb2ee847dc10503507eba64a904867b1b7ce240dd8164c512180a9c347be3fd` (computed locally, not copied from a log) |
-| Android release AAB build logic | **PASS** (unsigned) | Same run — `witness-participate-0a5d649-release-unsigned-aab`, 3,257,815 bytes. "Compiles as a release bundle" and "signed, store-uploadable" are different claims; only the first is proven |
-| Android release signing | **BLOCKED** | No keystore exists anywhere in this repository or in CI — see `docs/mobile/STORE_ACCOUNT_SETUP.md` and M7 |
-| Android physical install | **BLOCKED** | `adb devices` returns an empty list — no physical Android device connected to this Mac. `platform-tools` (adb/fastboot only, ~30 MB via Homebrew cask) was installed to make this check possible without installing the Android SDK or Android Studio, per the governing instruction |
-| Android physical journey | **BLOCKED** | Depends on the above — nothing in `MOBILE_ACCEPTANCE.md`'s native Android rows has been executed |
+| Android web mobile (Level A) | **PASS** | Browser-based mobile acceptance rows 1-22 in `docs/testing/MOBILE_ACCEPTANCE.md`, proving the responsive participant UX/API/consent/offline path independent of native packaging |
+| Android CI build (Level B) | **PASS** | `.github/workflows/mobile-android.yml`, reproduced across **six** independent green runs on PR #254 (most recently [36318738995](https://github.com/scigns/witness/actions/runs/36318738995), head `967668e` — matches this branch's current HEAD exactly, not a stale build) |
+| Android debug APK | **PASS** | Same run — `witness-participate-c4f335f-debug-apk`. Downloaded via `gh run download` to `/tmp/witness-android-acceptance` (outside the repository, never committed), size 4,581,839 bytes, SHA-256 `cf3974624e6aa2b9f52e63ffe6e92075116bfdd4a080584a87d78cf4df51c69a` (computed locally, not copied from a log) |
+| Android release AAB build logic | **PASS** (unsigned) | Same run — `witness-participate-c4f335f-release-unsigned-aab`, 3,257,815 bytes. "Compiles as a release bundle" and "signed, store-uploadable" are different claims; only the first is proven |
+| Android cloud install (Level C) | **BLOCKED** | `.github/workflows/mobile-android-cloud.yml` exists and its probe/skip path is proven in a real CI run, but the Firebase project + Workload Identity Federation setup it depends on has not been performed — see `docs/mobile/CLOUD_ANDROID_TESTING.md` and the HUMAN ACTION REQUIRED item. Zero cloud device evidence exists yet |
+| Android cloud launch (Level C) | **BLOCKED** | Same — depends on the above |
+| Android cloud participant flow (Level C) | **BLOCKED** | Same. Note even once cloud install/launch exist, only Robo (crash/navigation smoke evidence) is wired up — an authoritative JOIN→CONSENT→CAPTURE→SUBMISSION proof would need an instrumentation suite this repository does not yet have (`docs/mobile/CLOUD_ANDROID_TESTING.md`'s "Automated participant journey" section) |
+| Android cloud security | **BLOCKED** | Same — no cloud run has ever executed |
+| Android cloud audio | **BLOCKED** | Same. Even once available, cloud audio evidence is capped at "permission path / recorder init / no crash," never real microphone quality — see `CLOUD_ANDROID_TESTING.md` |
+| Android physical install (Level D) | **BLOCKED** | `adb devices` returns an empty list — no physical Android device connected to this Mac. `platform-tools` (adb/fastboot only, ~30 MB via Homebrew cask) was installed to make this check possible without installing the Android SDK or Android Studio |
+| Android physical participant flow (Level D) | **BLOCKED** | Depends on the above — nothing in `MOBILE_ACCEPTANCE.md`'s native Android rows has been executed |
+| Android physical audio | **BLOCKED** | Same |
+| Android signing | **BLOCKED** | No keystore exists anywhere in this repository or in CI — see `docs/mobile/STORE_ACCOUNT_SETUP.md` and M7 |
 | Android verified App Link | **BLOCKED** | `assetlinks.json` still carries its `<SHA256_SIGNING_CERT_FINGERPRINT>` placeholder (no release keystore exists to produce a real one) — local intent-filter handling (`AndroidManifest.xml`'s `autoVerify` intent-filter) is configured, but domain-verified association cannot be proven until a real fingerprint is published |
 | Google Play internal testing | **BLOCKED** | No Play Console account, no signed AAB — see `docs/mobile/STORE_ACCOUNT_SETUP.md` |
+| Google Play production | **BLOCKED** | Depends on every row above |
 
 **What changed this cycle:** re-verified from scratch, not assumed from the
 previous checkpoint — PR #254 re-inspected fresh (19/19 checks green,
 independently confirmed via the GitHub API), the latest Android CI run
 matched against the current branch HEAD by SHA before treating its
 artifact as current, and a fresh APK downloaded and independently
-checksummed. `adb devices` was re-run and again returned no device — this
-remains a checked fact each cycle, not carried forward as an assumption.
+checksummed (the stale artifact from the prior cycle's HEAD was discarded,
+per the governing instruction's explicit "do NOT use the stale APK").
+`adb devices` was re-run and again returned no device.
+
+Investigated and designed, but genuinely blocked on a human account-setup
+step: cloud Android acceptance (Level C). Firebase Test Lab was verified —
+against Google's own current documentation, not assumed — to support a
+free, zero-billing, zero-payment-method path (Spark plan, 10 free
+virtual-device test runs/day) and keyless CI authentication (Workload
+Identity Federation, no long-lived service-account key). A new workflow,
+`mobile-android-cloud.yml`, is written, committed, and its skip-when-
+unconfigured path proven in a real GitHub Actions run — but it cannot
+actually execute a cloud test until a human completes the one-time Firebase
+project + Workload Identity Federation setup, which requires an interactive
+Google account sign-in this environment cannot perform. See
+`docs/mobile/CLOUD_ANDROID_TESTING.md` for the full design and the
+checkpoint's HUMAN ACTION REQUIRED block for the exact steps.
 
 ### iOS
 
@@ -177,26 +204,37 @@ Native-specific, **PARTIAL** — real, but not yet physically proven:
 ## M6 — Physical device verification
 
 **Status: BLOCKED** — re-checked this cycle, not carried forward as an
-assumption. `adb devices` (platform-tools already installed from the
+assumption. `adb devices` (platform-tools already installed from a
 previous cycle — adb/fastboot only, not the Android SDK or Android Studio)
 again returns an empty device list: no physical Android device is
 connected to this Mac. No Xcode and no physical iPhone exist for the iOS
 half either. A freshly-downloaded, independently-checksummed debug APK for
 the current branch HEAD
-(`witness-participate-0a5d649-debug-apk`, SHA-256
-`2cb2ee847dc10503507eba64a904867b1b7ce240dd8164c512180a9c347be3fd`) is
+(`witness-participate-c4f335f-debug-apk`, SHA-256
+`cf3974624e6aa2b9f52e63ffe6e92075116bfdd4a080584a87d78cf4df51c69a`) is
 sitting ready in `/tmp/witness-android-acceptance` outside version control,
 and `docs/testing/MOBILE_ACCEPTANCE.md`'s native-app rows are ready to run
 — **zero rows have been executed**. A generated APK is not a substitute for
 a human tapping a real recorder control on a real phone; per the governing
 instruction, "do not call the programme store-ready based on compilation
-alone."
+alone." **This cycle also designed (but could not execute) a cloud-Android
+path** — see M3's Android table and `docs/mobile/CLOUD_ANDROID_TESTING.md`
+— which, once a human completes its one-time Firebase setup, gives a
+repeatable Level C smoke check that reduces uncertainty before physical
+testing without ever substituting for it.
 
-**HUMAN ACTION REQUIRED:** connect an Android phone by USB (with USB
-debugging enabled) to this Mac, or otherwise make one available, to
-progress `MOBILE_ACCEPTANCE.md`'s native Android rows (N1-N14). Once
-connected, `adb install <the downloaded APK>` is the next command — no
-rebuild needed.
+**HUMAN ACTION REQUIRED (two independent paths, either helps):**
+
+1. Connect an Android phone by USB (with USB debugging enabled) to this
+   Mac, or otherwise make one available, to progress
+   `MOBILE_ACCEPTANCE.md`'s native Android rows (N1-N14) directly. Once
+   connected, `adb install <the downloaded APK>` is the next command — no
+   rebuild needed.
+2. Complete the one-time Firebase/Workload Identity Federation setup in
+   `docs/mobile/CLOUD_ANDROID_TESTING.md` to unlock Level C cloud
+   acceptance via `mobile-android-cloud.yml` — faster to arrange than a
+   physical device, but proves less (see that document's explicit "what
+   this buys us, and what it does not").
 
 ## M7 — Distribution
 
@@ -229,10 +267,10 @@ the same items in summary form.
 |---|---|
 | M1 — Architecture | PASS |
 | M2 — Core functionality | PASS |
-| M3 — Native shell | PARTIAL — Android build logic PASS (real CI compile, verified debug APK + unsigned release AAB, reproduced across five independent runs including the current HEAD); Android signing/physical-device/verified-App-Link and all of iOS (including a confirmed `xcodebuild` environment blocker) remain BLOCKED |
+| M3 — Native shell | PARTIAL — Android CI build logic PASS (real CI compile, verified debug APK + unsigned release AAB, reproduced across six independent runs including the current HEAD); Android cloud acceptance designed and its skip-path proven but BLOCKED on a human Firebase setup step; Android signing/physical-device/verified-App-Link and all of iOS (including a confirmed `xcodebuild` environment blocker) remain BLOCKED |
 | M4 — Security | PASS (backend) / PARTIAL (native-specific physical proof — secure-storage plugin now verified from source on both platforms, not just documentation) |
 | M5 — Privacy & compliance prep | PARTIAL (HUMAN/LEGAL REVIEW REQUIRED items open) |
-| M6 — Physical device verification | BLOCKED — re-checked, not assumed: `adb devices` confirms no Android device connected; no Xcode/iPhone for iOS |
+| M6 — Physical device verification | BLOCKED — re-checked, not assumed: `adb devices` confirms no Android device connected; no Xcode/iPhone for iOS. Cloud Android acceptance (a distinct, non-substitutable evidence level) also BLOCKED pending human Firebase setup |
 | M7 — Distribution | BLOCKED (no Apple/Google accounts, signing, or DNS in this environment) |
 
 **STORE SUBMISSION = NO-GO.** M3, M6, and M7 are not PASS, and M4/M5 are not
