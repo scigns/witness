@@ -31,6 +31,7 @@ import {
   type SessionJoinLinkCreatedView,
   type SessionJoinLinkView,
 } from '@witness/contracts';
+import { DomainError } from '@witness/domain';
 
 import {
   AuthorizationGuard,
@@ -119,6 +120,29 @@ export class SessionJoinController {
         },
       });
     }
-    return this.sessionJoin.join(token, parsed.data, request);
+    return this.translateDomainErrors(() => this.sessionJoin.join(token, parsed.data, request));
+  }
+
+  /**
+   * `SessionJoinService.join()` calls into `assertSessionJoinLinkUsable`
+   * (`packages/domain/src/session-join-link.ts`), which throws a raw
+   * `InvariantViolation` for an expired/revoked/wrong-status link — without
+   * this, that reached a real participant as an unhandled `500` rather than
+   * a clear `400` naming what actually went wrong ("this invitation has
+   * expired"), the same class of bug MOBILE-002 fixed on the consent path
+   * (`participant-capture.controller.ts`'s own `translateDomainErrors`,
+   * mirrored here).
+   */
+  private async translateDomainErrors<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error instanceof DomainError) {
+        throw new BadRequestException({
+          error: { code: error.code, message: error.message },
+        });
+      }
+      throw error;
+    }
   }
 }

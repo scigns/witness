@@ -74,14 +74,13 @@ below) — nothing has changed on this front since.
 
 **PARTIALLY IMPLEMENTED:**
 
-- A join link recovered from an expired state produces a raw `InvariantViolation` surfaced as an
-  unhandled `500` rather than a clean domain error — reproduced live during this audit (`POST
-  .../join` against an expired link on 2026-09-27, see `packages/domain/src/session-join-link.ts:256`,
-  `assertSessionJoinLinkUsable`). This is a genuine, if narrow, defect: an expired-link retry from a
-  mobile client would see a generic failure rather than "this invitation has expired," a materially
-  worse participant-facing message than the codebase's own established convention elsewhere (compare
-  MOBILE-002's fix in `docs/testing/MOBILE_ACCEPTANCE.md`, which fixed the identical class of bug on
-  the consent path). **Flagged as a P0-adjacent fix candidate**, not yet fixed by this audit.
+- ~~A join link recovered from an expired state produces a raw `InvariantViolation` surfaced as an
+  unhandled `500`~~ — reproduced live during this audit (`POST .../join` against an expired link on
+  2026-09-27, see `packages/domain/src/session-join-link.ts:256`, `assertSessionJoinLinkUsable`), then
+  **fixed the same day**: `SessionJoinController.join` now wraps the service call in the same
+  `translateDomainErrors` pattern `participant-capture.controller.ts` already uses for the identical
+  class of bug (MOBILE-002). 3 new tests (`session-join.controller.test.ts`); full gateway (785/785)
+  and live (23/23 for this module) suites re-run clean.
 
 ## 3. Participant backend — participant-capture
 
@@ -320,7 +319,7 @@ provided it is never given a facilitator-capable client library or credential.
 
 | Area | Status |
 |---|---|
-| Session-join (context, join, governance modes, rate limit) | IMPLEMENTED, one defect found (§2) |
+| Session-join (context, join, governance modes, rate limit) | IMPLEMENTED, one defect found and fixed same day (§2) |
 | Participant-capture (consent, evidence, prompt, insights, response) | IMPLEMENTED (text/photo/document UI: PARTIALLY) |
 | Consent enforcement (categories, audio-vs-evidence separation) | IMPLEMENTED |
 | Consent withdrawal (participant's own token) | MISSING |
