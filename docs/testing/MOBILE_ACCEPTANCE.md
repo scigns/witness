@@ -245,7 +245,7 @@ phone and heard back what they said.
 
 | # | Step | Done |
 |---|---|---|
-| S1 | A human with Xcode installed has opened `apps/participant-mobile/ios/App/App.xcworkspace`, resolved the placeholder bundle ID (`capacitor.config.ts`'s header comment — confirm the real one with whoever owns the Apple Developer account) and confirmed the project builds to a simulator | |
+| S1 | **Superseded** — local Xcode is not a release requirement (architecture decision: native iOS compilation runs in GitHub Actions, `.github/workflows/mobile-ios.yml`, not on a contributor's Mac). Confirm instead: the latest `Mobile — iOS` workflow run on the branch under test is `SUCCESS` (Stage 1, unsigned, `iphonesimulator` SDK) — the placeholder bundle ID (`capacitor.config.ts`'s header comment) still needs confirming with whoever owns the Apple Developer account before any real signing/TestFlight step | |
 | S2 | **Superseded** — Android compilation now runs in GitHub Actions (`.github/workflows/mobile-android.yml`, `docs/infrastructure/DEPLOYMENT_TOPOLOGY.md`), not Android Studio locally. Confirm instead: the latest `Mobile — Android` workflow run on the branch under test is `SUCCESS`, and its debug APK artifact has been downloaded (`gh run download <run-id> -n <apk-artifact-name>`) — no Android Studio or emulator install required | |
 | S3 | A TestFlight internal-testing build has been uploaded and installed on at least one real iPhone | |
 | S4 | The CI-generated debug APK (S2) has been sideloaded onto at least one real Android device via `adb install` — `platform-tools` (adb/fastboot only, via `brew install --cask android-platform-tools`) is sufficient; no Play Console account is required for this step | |
