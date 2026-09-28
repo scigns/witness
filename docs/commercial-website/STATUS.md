@@ -201,9 +201,10 @@ longer true.** Verified directly, not assumed:
   independent component primitives rather than a shared design system. They are visually aligned by
   convention (same Brand Book tokens, same self-hosted fonts) but not by shared code — a brand
   update currently has to be applied twice.
-- `apps/web` has materially weaker automated coverage than `apps/marketing`: no component/page
-  rendering tests (only config/runtime tests), and its one browser-QA script exercises 3 of ~65
-  routes (`/`, `/signin`, `/pricing`). See `docs/web/WEB_NEXT_01.md` for the plan to close this.
+- `apps/web` still has materially less automated coverage than `apps/marketing`: WEB-NEXT-01 added
+  16 component/behaviour tests (dashboard, onboarding, review, records, knowledge graph) and grew
+  browser QA from 3 to 7 of ~65 routes, but most routes still have neither. See
+  `docs/web/WEB_NEXT_01.md` for the remaining gap.
 - The serving preview build is now two feature waves behind `main` (missing MKT-05/06/09), see
   above — redeploy is an operational task, not a code gap.
 - Checked-in Cloudflare tunnel templates contain historical hostnames and are not proof of effective
