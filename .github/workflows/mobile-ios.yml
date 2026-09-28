@@ -1,0 +1,162 @@
+# Witness Participate — iOS build (ADR-0031, Stage 1 of the GitHub-hosted
+# macOS CI architecture decision).
+#
+# This Mac has no full Xcode installation and — per the governing
+# architecture decision — never will. Native iOS compilation moves to a
+# GitHub-hosted macOS runner instead: this workflow is now the canonical
+# place iOS compiles, the same way mobile-android.yml already is for
+# Android (see docs/infrastructure/DEPLOYMENT_TOPOLOGY.md).
+#
+# STAGE 1 ONLY — compiles the app unsigned, against the iOS Simulator SDK.
+# Deliberately does not: create/use a signing certificate, a provisioning
+# profile, Apple Developer credentials, or an App Store Connect record; do
+# not add any of those to this workflow without a separate, explicit
+# decision. CODE_SIGNING_ALLOWED=NO below is load-bearing, not incidental.
+#
+# No committed Xcode scheme exists yet (this project has never been opened
+# in Xcode.app, which is normally what generates one) — the "Discover
+# Xcode project schemes/targets" step below queries the real project via
+# `xcodebuild -list` and picks whatever xcodebuild itself reports, rather
+# than assuming a scheme name. This project also has no XCTest target (one
+# PBXNativeTarget exists: "App") — there is nothing native to run via
+# `xcodebuild test` yet; the existing JS/TS unit suite (run below, same as
+# mobile-android.yml) is the only automated test coverage this app has.
+#
+# workflow_dispatch only, deliberately: GitHub-hosted macOS runners bill at
+# a materially higher rate than Linux runners, and Stage 1 is a compile
+# proof, not a per-commit gate — same conservative-trigger reasoning
+# mobile-android-cloud.yml already uses for its own cost-sensitive path.
+
+name: Mobile — iOS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  ios:
+    name: Build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (participant-mobile)
+        run: pnpm exec turbo run lint --filter=@witness/participant-mobile
+
+      - name: Typecheck (participant-mobile)
+        run: pnpm exec turbo run typecheck --filter=@witness/participant-mobile
+
+      - name: Unit tests (participant-mobile)
+        run: pnpm exec turbo run test --filter=@witness/participant-mobile
+
+      # Same production origin mobile-android.yml bakes in — see that
+      # workflow's own comment. Public build config, not a secret.
+      - name: Web bundle build (Vite)
+        env:
+          VITE_WITNESS_BUILD_PROFILE: production
+          VITE_WITNESS_API_URL: https://witness-prod-api.pacificdigitalconsultancy.org
+        run: pnpm exec turbo run build --filter=@witness/participant-mobile
+
+      - name: Capacitor sync (iOS)
+        working-directory: apps/participant-mobile
+        run: pnpm exec cap sync ios
+
+      - name: Xcode/Swift environment (real, not assumed)
+        run: |
+          xcode-select -p
+          xcodebuild -version
+          swift --version
+
+      # CapApp-SPM/Package.swift references sibling plugin packages by
+      # relative filesystem path into node_modules/.pnpm/... — resolvable
+      # only because `pnpm install` already ran above. Separated from the
+      # build step so an SPM-resolution failure (e.g. the pinned
+      # capacitor-swift-pm@8.5.2 GitHub fetch) is distinguishable in the
+      # log from an actual compile failure.
+      - name: Resolve Swift package dependencies
+        working-directory: apps/participant-mobile/ios/App
+        run: xcodebuild -resolvePackageDependencies -project App.xcodeproj
+
+      - name: Discover Xcode project schemes/targets
+        id: xcode_discover
+        working-directory: apps/participant-mobile/ios/App
+        run: |
+          xcodebuild -list -project App.xcodeproj -json | tee /tmp/xcode-list.json
+          scheme=$(jq -r '.project.schemes[0] // empty' /tmp/xcode-list.json)
+          target=$(jq -r '.project.targets[0] // empty' /tmp/xcode-list.json)
+          echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          echo "Resolved scheme='$scheme' target='$target'"
+
+      # Simulator SDK + CODE_SIGNING_ALLOWED=NO: compiles without any
+      # certificate, provisioning profile, or Apple Developer account —
+      # Stage 1's explicit boundary. A device-SDK build would require
+      # signing even to compile; this deliberately does not attempt one.
+      - name: Compile iOS application (xcodebuild)
+        working-directory: apps/participant-mobile/ios/App
+        run: |
+          set -o pipefail
+          COMMON_ARGS=(
+            -project App.xcodeproj
+            -configuration Debug
+            -sdk iphonesimulator
+            -derivedDataPath "$RUNNER_TEMP/DerivedData"
+            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGN_IDENTITY=""
+          )
+          if [ -n "${{ steps.xcode_discover.outputs.scheme }}" ]; then
+            xcodebuild build \
+              "${COMMON_ARGS[@]}" \
+              -scheme "${{ steps.xcode_discover.outputs.scheme }}" \
+              -destination 'generic/platform=iOS Simulator' \
+              | tee "$RUNNER_TEMP/xcodebuild.log"
+          else
+            echo "No scheme reported by xcodebuild -list; building the '${{ steps.xcode_discover.outputs.target }}' target directly."
+            xcodebuild build \
+              "${COMMON_ARGS[@]}" \
+              -target "${{ steps.xcode_discover.outputs.target }}" \
+              | tee "$RUNNER_TEMP/xcodebuild.log"
+          fi
+
+      - name: Locate build output
+        if: always()
+        run: |
+          echo "--- DerivedData/Build/Products ---"
+          find "$RUNNER_TEMP/DerivedData/Build/Products" -maxdepth 2 2>/dev/null || echo "(no build products directory — build did not reach that stage)"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: mobile-ios-build-log-${{ github.run_id }}
+          path: |
+            /tmp/xcode-list.json
+            ${{ runner.temp }}/xcodebuild.log
+          retention-days: 14
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success()
+        with:
+          name: mobile-ios-simulator-app-${{ github.run_id }}
+          path: ${{ runner.temp }}/DerivedData/Build/Products/**/*.app
+          retention-days: 14
+          if-no-files-found: warn
