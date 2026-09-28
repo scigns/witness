@@ -96,38 +96,48 @@ describe('independent marketing foundation', () => {
 
     expect(html.match(/<main/g)).toHaveLength(1);
     expect(html.match(/<h1/g)).toHaveLength(1);
-    expect(html).toContain('Institutional memory you can prove.');
+    expect(html).toContain('Build better decisions with the people affected by them.');
     expect(html).toContain('id="hero"');
-    expect(html).toContain('id="open-infrastructure"');
+    expect(html).toContain('id="co-design"');
     expect(html).toContain('Illustrative example');
     expect(html).toContain('Institutional Transformation Programme');
     expect(html).toContain('Adopt revised complaints process');
     expect(html).toContain('Action #21');
-    expect(html).toContain('Discuss an organisational deployment');
-    expect(html).toContain('Start free');
+    expect(html).toContain('Talk to us about your project');
+    expect(html).toContain('That traceable chain is what Witness calls provenance.');
+    // Institutional-buyer positioning: "Start free" is not the homepage's dominant CTA.
+    expect(html).not.toContain('Start free');
     for (const title of [
-      'Co-design &amp; workshops',
-      'Consultation &amp; community engagement',
-      'Government &amp; public decisions',
+      'Workshop &amp; facilitation teams',
+      'Co-design programmes',
+      'Community consultation',
+      'Government and policy',
       'International development',
-      'Research &amp; evidence gathering',
-      'Institutional memory',
+      'Research and evidence programmes',
+      'Institutional learning &amp; organisational memory',
     ]) {
       expect(html).toContain(title);
     }
-    expect(html).toContain('Born in the Pacific. Built for institutions everywhere.');
-    expect(html).toContain('open-source foundations');
-    expect(html).toContain('Deployment choice');
+    for (const [title] of [
+      ['Video and meeting tools'],
+      ['Survey tools'],
+      ['Whiteboards'],
+      ['Document systems'],
+      ['Project systems'],
+    ]) {
+      expect(html).toContain(title);
+    }
     const sectionIds = [...html.matchAll(/<section[^>]*id="([^"]+)"/g)].map((match) => match[1]);
     expect(sectionIds).toEqual([
       'hero',
       'problem',
-      'how-it-works',
-      'product-preview',
-      'use-cases',
-      'provenance',
+      'before-during-after',
+      'co-design',
+      'worked-example',
+      'why-not-tools',
+      'solutions',
+      'outcomes',
       'trust',
-      'open-infrastructure',
       'contact',
     ]);
     expect(html).not.toMatch(/api\/v1|keycloak|sessionprovider|authprovider/i);
@@ -165,11 +175,12 @@ describe('independent marketing foundation', () => {
     );
 
     expect(marketingNavigation.primary.map((item) => item.label)).toEqual([
-      'Platform',
-      'Solutions',
       'Why Witness',
+      'How it works',
+      'Solutions',
+      'Co-design & workshops',
+      'Demo',
       'Trust',
-      'Get started',
     ]);
     expect(hrefs).toEqual(
       expect.arrayContaining([
@@ -209,23 +220,36 @@ describe('independent marketing foundation', () => {
     });
     expect(preview.indexable).toBe(false);
     expect(preview.deploymentUrl.href).toBe('https://preview.example/');
-    expect(preview.canonicalOrigin.href).toBe('https://buildwithwitness.com/');
+    expect(preview.canonicalOrigin.href).toBe('https://www.buildwithwitness.com/');
     expect(preview.appUrl.href).toBe('https://app.buildwithwitness.com/signin');
     expect(preview.pricingUrl.href).toBe('https://app.buildwithwitness.com/pricing');
     expect(robots()).toEqual({ rules: { userAgent: '*', disallow: '/' } });
-    expect(sitemap()[0]?.url).toBe('https://buildwithwitness.com/');
+    expect(sitemap()[0]?.url).toBe('https://www.buildwithwitness.com/');
+
+    // CW-034 (2026-09-28): `www` is canonical now, not the apex. Deploying with the
+    // *old* apex value must not accidentally satisfy the canonical-origin match and
+    // enable indexing — that would index a host `site-config.ts` no longer treats as
+    // canonical.
+    const deployedToOldApex = marketingSiteConfig({
+      WITNESS_MARKETING_SITE_URL: 'https://buildwithwitness.com',
+      WITNESS_MARKETING_INDEXABLE: 'true',
+      WITNESS_MARKETING_ENV: 'production',
+    });
+    expect(deployedToOldApex.indexable).toBe(false);
 
     const production = marketingSiteConfig({
-      WITNESS_MARKETING_SITE_URL: 'https://buildwithwitness.com',
+      WITNESS_MARKETING_SITE_URL: 'https://www.buildwithwitness.com',
       WITNESS_MARKETING_INDEXABLE: 'true',
       WITNESS_MARKETING_ENV: 'production',
     });
     expect(production.indexable).toBe(true);
     expect(robots(production)).toEqual({
       rules: { userAgent: '*', allow: '/' },
-      sitemap: 'https://buildwithwitness.com/sitemap.xml',
+      sitemap: 'https://www.buildwithwitness.com/sitemap.xml',
     });
-    expect(canonicalUrl('/platform', preview).href).toBe('https://buildwithwitness.com/platform');
+    expect(canonicalUrl('/platform', preview).href).toBe(
+      'https://www.buildwithwitness.com/platform',
+    );
   });
 
   it('creates complete page metadata with safe social fields', () => {
@@ -235,10 +259,10 @@ describe('independent marketing foundation', () => {
     });
 
     expect(metadata.description).toBe(DEFAULT_DESCRIPTION);
-    expect(metadata.alternates?.canonical).toBe('https://buildwithwitness.com/platform');
+    expect(metadata.alternates?.canonical).toBe('https://www.buildwithwitness.com/platform');
     expect(metadata.openGraph).toMatchObject({
       type: 'website',
-      url: 'https://buildwithwitness.com/platform',
+      url: 'https://www.buildwithwitness.com/platform',
       siteName: 'Witness',
       title: 'Platform | Witness',
       description: DEFAULT_DESCRIPTION,
@@ -256,7 +280,7 @@ describe('independent marketing foundation', () => {
       '@context': 'https://schema.org',
       '@type': 'Organization',
       name: 'Witness',
-      url: 'https://buildwithwitness.com/',
+      url: 'https://www.buildwithwitness.com/',
     });
   });
 
@@ -431,7 +455,7 @@ describe('independent marketing foundation', () => {
 
         expect(html.match(/<h1/g)).toHaveLength(1);
         expect(html).not.toMatch(/href="\/platform\/[a-z-]+\/[a-z-]+/); // no accidental nested fake routes
-        expect(metadata.alternates?.canonical).toBe(`https://buildwithwitness.com${path}`);
+        expect(metadata.alternates?.canonical).toBe(`https://www.buildwithwitness.com${path}`);
         // Every page inherits the fail-closed default (config.indexable is false outside an
         // explicit production build) via createMarketingMetadata, never an explicit override
         // that would fight it.
@@ -522,7 +546,7 @@ describe('independent marketing foundation', () => {
         );
 
         expect(html.match(/<h1/g)).toHaveLength(1);
-        expect(metadata.alternates?.canonical).toBe(`https://buildwithwitness.com${path}`);
+        expect(metadata.alternates?.canonical).toBe(`https://www.buildwithwitness.com${path}`);
         expect(metadata.robots).toEqual({ index: false, follow: false });
       },
     );
@@ -598,7 +622,7 @@ describe('independent marketing foundation', () => {
       expect(html.match(/<h1/g)).toHaveLength(1);
       expect(html).toContain('Synthetic demonstration');
       expect(html).toContain('fictional and illustrative');
-      expect(demoMetadata.alternates?.canonical).toBe('https://buildwithwitness.com/demo');
+      expect(demoMetadata.alternates?.canonical).toBe('https://www.buildwithwitness.com/demo');
       expect(demoMetadata.robots).toEqual({ index: false, follow: false });
     });
 
@@ -721,7 +745,7 @@ describe('independent marketing foundation', () => {
           </MarketingShell>,
         );
         expect(html.match(/<h1/g)).toHaveLength(1);
-        expect(metadata.alternates?.canonical).toBe(`https://buildwithwitness.com${path}`);
+        expect(metadata.alternates?.canonical).toBe(`https://www.buildwithwitness.com${path}`);
         expect(metadata.robots).toEqual({ index: false, follow: false });
       },
     );
@@ -819,7 +843,7 @@ describe('independent marketing foundation', () => {
           </MarketingShell>,
         );
         expect(html.match(/<h1/g)).toHaveLength(1);
-        expect(metadata.alternates?.canonical).toBe(`https://buildwithwitness.com${path}`);
+        expect(metadata.alternates?.canonical).toBe(`https://www.buildwithwitness.com${path}`);
         expect(metadata.robots).toEqual({ index: false, follow: false });
       },
     );
@@ -896,7 +920,9 @@ describe('independent marketing foundation', () => {
       );
       expect(html.match(/<h1/g)).toHaveLength(1);
       expect(html).toContain('No public stories yet');
-      expect(storiesMetadata.alternates?.canonical).toBe('https://buildwithwitness.com/stories');
+      expect(storiesMetadata.alternates?.canonical).toBe(
+        'https://www.buildwithwitness.com/stories',
+      );
       expect(storiesMetadata.robots).toEqual({ index: false, follow: false });
     });
 
@@ -924,7 +950,7 @@ describe('independent marketing foundation', () => {
         'mailto:hello@buildwithwitness.com?subject=Witness%20institutional%20pilot%20enquiry',
       );
       expect(getStartedMetadata.alternates?.canonical).toBe(
-        'https://buildwithwitness.com/get-started',
+        'https://www.buildwithwitness.com/get-started',
       );
       expect(getStartedMetadata.robots).toEqual({ index: false, follow: false });
     });

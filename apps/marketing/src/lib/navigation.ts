@@ -10,11 +10,12 @@ export interface NavigationGroup {
 
 export const marketingNavigation = {
   primary: [
-    { label: 'Platform', href: '/platform' },
-    { label: 'Solutions', href: '/solutions' },
     { label: 'Why Witness', href: '/why-witness' },
+    { label: 'How it works', href: '/how-it-works' },
+    { label: 'Solutions', href: '/solutions' },
+    { label: 'Co-design & workshops', href: '/platform/co-design' },
+    { label: 'Demo', href: '/demo' },
     { label: 'Trust', href: '/trust' },
-    { label: 'Get started', href: '/get-started' },
   ],
   footer: [
     {
@@ -51,6 +52,7 @@ export const marketingNavigation = {
       label: 'Witness',
       items: [
         { label: 'Why Witness', href: '/why-witness' },
+        { label: 'Get started', href: '/get-started' },
         { label: 'Customer stories', href: '/stories' },
         { label: 'Open source', href: 'https://github.com/scigns/witness' },
       ],

@@ -19,7 +19,7 @@ export function PublicFooter() {
           </div>
           <div className="footer-actions">
             <a href={pricingUrl.href}>View plans</a>
-            <a href={demoUrl.href}>Discuss a pilot</a>
+            <a href={demoUrl.href}>Talk to us about your project</a>
             <a href={appUrl.href}>Sign in</a>
           </div>
         </div>
