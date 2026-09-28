@@ -74,11 +74,11 @@ silently marks a physical row PASS, and vice versa.
 | Android CI build (Level B) | **PASS** | `.github/workflows/mobile-android.yml`, reproduced across **six** independent green runs on PR #254 (most recently [36318738995](https://github.com/scigns/witness/actions/runs/36318738995), head `967668e` — matches this branch's current HEAD exactly, not a stale build) |
 | Android debug APK | **PASS** | Same run — `witness-participate-c4f335f-debug-apk`. Downloaded via `gh run download` to `/tmp/witness-android-acceptance` (outside the repository, never committed), size 4,581,839 bytes, SHA-256 `cf3974624e6aa2b9f52e63ffe6e92075116bfdd4a080584a87d78cf4df51c69a` (computed locally, not copied from a log) |
 | Android release AAB build logic | **PASS** (unsigned) | Same run — `witness-participate-c4f335f-release-unsigned-aab`, 3,257,815 bytes. "Compiles as a release bundle" and "signed, store-uploadable" are different claims; only the first is proven |
-| Android cloud install (Level C) | **BLOCKED** | `.github/workflows/mobile-android-cloud.yml` exists and its probe/skip path is proven in a real CI run, but the Firebase project + Workload Identity Federation setup it depends on has not been performed — see `docs/mobile/CLOUD_ANDROID_TESTING.md` and the HUMAN ACTION REQUIRED item. Zero cloud device evidence exists yet |
-| Android cloud launch (Level C) | **BLOCKED** | Same — depends on the above |
-| Android cloud participant flow (Level C) | **BLOCKED** | Same. Note even once cloud install/launch exist, only Robo (crash/navigation smoke evidence) is wired up — an authoritative JOIN→CONSENT→CAPTURE→SUBMISSION proof would need an instrumentation suite this repository does not yet have (`docs/mobile/CLOUD_ANDROID_TESTING.md`'s "Automated participant journey" section) |
-| Android cloud security | **BLOCKED** | Same — no cloud run has ever executed |
-| Android cloud audio | **BLOCKED** | Same. Even once available, cloud audio evidence is capped at "permission path / recorder init / no crash," never real microphone quality — see `CLOUD_ANDROID_TESTING.md` |
+| Android cloud install (Level C) | **BLOCKED BY IAM CONSTRAINT** (not "not attempted") | Firebase/GCP setup was completed in full against a real, pre-existing, verified-empty project (`witness-f9f62`): 6 APIs enabled, a dedicated service account, Workload Identity Federation scoped to this exact workflow — zero long-lived credentials created. Five real, independent execution attempts (workflow runs 36371337987, 36371462321, 36371628341, 36372120962, 36381930216) all reached Firebase Test Lab authenticated as the correct service account, then failed identically: `403 storage.objects.create` denied on Test Lab's auto-provisioned default results bucket. Root cause, confirmed against Google's own documentation (not guessed): Google documents `roles/editor` as the supported CI service-account role for gcloud's default-bucket upload path (`firebase.google.com/docs/test-lab/android/continuous`); the narrower `roles/cloudtestservice.testAdmin` + `roles/firebase.analyticsViewer` combination is documented only for the *custom results-bucket* path, which itself requires a billing-enabled project. **Deliberately not resolved** — granting Editor and enabling billing were both evaluated and explicitly declined to preserve least-privilege / zero-cost. See `docs/mobile/CLOUD_ANDROID_TESTING.md`'s "Documented remediation path" for what would close this if the tradeoff is ever accepted |
+| Android cloud launch (Level C) | **BLOCKED BY IAM CONSTRAINT** | Same — never reached device allocation |
+| Android cloud participant flow (Level C) | **BLOCKED BY IAM CONSTRAINT** | Same. Also note even had upload succeeded, only Robo (crash/navigation smoke evidence) is wired up — an authoritative JOIN→CONSENT→CAPTURE→SUBMISSION proof would need an instrumentation suite this repository does not yet have (`docs/mobile/CLOUD_ANDROID_TESTING.md`'s "Automated participant journey" section) |
+| Android cloud security | **BLOCKED BY IAM CONSTRAINT** | Same — no cloud run has ever reached the device |
+| Android cloud audio | **BLOCKED BY IAM CONSTRAINT** | Same. Even had it run, cloud audio evidence is capped at "permission path / recorder init / no crash," never real microphone quality — see `CLOUD_ANDROID_TESTING.md` |
 | Android physical install (Level D) | **BLOCKED** | `adb devices` returns an empty list — no physical Android device connected to this Mac. `platform-tools` (adb/fastboot only, ~30 MB via Homebrew cask) was installed to make this check possible without installing the Android SDK or Android Studio |
 | Android physical participant flow (Level D) | **BLOCKED** | Depends on the above — nothing in `MOBILE_ACCEPTANCE.md`'s native Android rows has been executed |
 | Android physical audio | **BLOCKED** | Same |
@@ -96,24 +96,29 @@ checksummed (the stale artifact from the prior cycle's HEAD was discarded,
 per the governing instruction's explicit "do NOT use the stale APK").
 `adb devices` was re-run and again returned no device.
 
-Investigated and designed, but genuinely blocked on a human account-setup
-step: cloud Android acceptance (Level C). Firebase Test Lab was verified —
-against Google's own current documentation, not assumed — to support a
-free, zero-billing, zero-payment-method path (Spark plan, 10 free
-virtual-device test runs/day) and keyless CI authentication (Workload
-Identity Federation, no long-lived service-account key). A new workflow,
-`mobile-android-cloud.yml`, is written, committed, and its skip-when-
-unconfigured path proven in a real GitHub Actions run. The setup itself has
-been reduced to one irreducible console step (creating the Firebase
-project — no CLI does this non-interactively) followed by one idempotent
-script, `scripts/mobile/setup-firebase-test-lab.sh`, that creates the
-service account (narrowest documented roles, verified against Firebase's
-own IAM permissions page — an earlier draft incorrectly assumed a role
-that does not exist) and the Workload Identity Pool/provider, printing the
-three `vars.*` values to add — but **no human has run it yet**, no
-Firebase/GCP project exists, and zero cloud-device evidence exists. See
-`docs/mobile/CLOUD_ANDROID_TESTING.md` for the full design and the
-checkpoint's HUMAN ACTION REQUIRED block for the exact steps.
+**Cloud Android acceptance (Level C) is fully set up and was actually
+executed — five times — and is BLOCKED BY AN IAM CONSTRAINT, deliberately
+accepted rather than a gap in the work.** Firebase Test Lab, Workload
+Identity Federation, and a dedicated least-privilege service account are
+all live against a real, pre-existing, verified-empty Firebase project
+(`witness-f9f62`) — not a hypothetical setup. Every real execution
+authenticated correctly (OIDC → impersonation → an authenticated `gcloud`
+call reaching Firebase's API) and failed at the identical, precise point:
+Test Lab's auto-provisioned default results bucket rejects the service
+account's `storage.objects.create` attempt with a 403. Root cause
+confirmed against Google's own CI-specific documentation
+(`firebase.google.com/docs/test-lab/android/continuous`): Google's
+documented supported role for this exact free-tier pattern (custom service
+account, default bucket, gcloud CLI) is `roles/editor` — broader than this
+programme's least-privilege policy permits. The narrower roles
+(`cloudtestservice.testAdmin` + `firebase.analyticsViewer`) this repository
+uses are documented as sufficient only for the *custom results-bucket*
+path, which itself requires a billing-enabled project. Granting Editor and
+enabling billing were both evaluated and explicitly declined. See
+`docs/mobile/CLOUD_ANDROID_TESTING.md`'s "Documented remediation path" for
+exactly what would close this gap if that tradeoff is ever accepted, and
+its full investigation log (five run IDs, the categories ruled out with
+evidence, not speculation) for the complete record.
 
 ### iOS
 
@@ -272,10 +277,10 @@ the same items in summary form.
 |---|---|
 | M1 — Architecture | PASS |
 | M2 — Core functionality | PASS |
-| M3 — Native shell | PARTIAL — Android CI build logic PASS (real CI compile, verified debug APK + unsigned release AAB, reproduced across six independent runs including the current HEAD); Android cloud acceptance designed and its skip-path proven but BLOCKED on a human Firebase setup step; Android signing/physical-device/verified-App-Link and all of iOS (including a confirmed `xcodebuild` environment blocker) remain BLOCKED |
+| M3 — Native shell | PARTIAL — Android CI build logic PASS (real CI compile, verified debug APK + unsigned release AAB, reproduced across six independent runs including the current HEAD); Android cloud acceptance fully set up and actually executed (five real runs against a live Firebase project) but BLOCKED BY IAM CONSTRAINT — Google documents `roles/editor` as required for this free-tier CI pattern, deliberately not granted; Android signing/physical-device/verified-App-Link and all of iOS (including a confirmed `xcodebuild` environment blocker) remain BLOCKED |
 | M4 — Security | PASS (backend) / PARTIAL (native-specific physical proof — secure-storage plugin now verified from source on both platforms, not just documentation) |
 | M5 — Privacy & compliance prep | PARTIAL (HUMAN/LEGAL REVIEW REQUIRED items open) |
-| M6 — Physical device verification | BLOCKED — re-checked, not assumed: `adb devices` confirms no Android device connected; no Xcode/iPhone for iOS. Cloud Android acceptance (a distinct, non-substitutable evidence level) also BLOCKED pending human Firebase setup |
+| M6 — Physical device verification | BLOCKED — re-checked, not assumed: `adb devices` confirms no Android device connected; no Xcode/iPhone for iOS. Cloud Android acceptance (a distinct, non-substitutable evidence level) is BLOCKED BY IAM CONSTRAINT, not by missing setup — see M3 |
 | M7 — Distribution | BLOCKED (no Apple/Google accounts, signing, or DNS in this environment) |
 
 **STORE SUBMISSION = NO-GO.** M3, M6, and M7 are not PASS, and M4/M5 are not

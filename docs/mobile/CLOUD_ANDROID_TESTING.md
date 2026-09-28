@@ -1,8 +1,9 @@
 # Cloud Android testing — Witness Participate
 
 **Owner:** Engineering (Mobile release programme)
-**Status:** Active — feasibility verified against official Google documentation; setup not yet
-performed (requires a human Google account)
+**Status:** Setup complete and executed against a real Firebase project (`witness-f9f62`) —
+**BLOCKED BY AN IAM CONSTRAINT, deliberately accepted, not a gap in the work.** See "Investigation
+log" below for the full record.
 
 Investigates whether the existing CI-generated Witness Participate APK can be
 executed against a real (virtual) Android device without installing Android
@@ -152,6 +153,118 @@ Results: "a basic summary of your test results is printed by the gcloud
 tool," plus a link to the Firebase console; detailed artifacts (logs,
 screenshots, video where captured) live in a Google Cloud Storage bucket the
 console link resolves to.
+
+## Investigation log — real execution attempts (2026-09-27)
+
+Setup (`scripts/mobile/setup-firebase-test-lab.sh witness-f9f62`) was run
+against the user's existing Firebase project `witness-f9f62` after a
+read-only inspection confirmed it held no production/customer-data
+dependency and was safe to reuse (Spark plan, no billing account, no
+unrelated Firebase products enabled). Workload Identity Federation was
+configured exactly as described above — no service-account JSON key was
+created at any point.
+
+**Five real `workflow_dispatch` executions of `mobile-android-cloud.yml`**
+were then run against PR #254's head commit
+`15f835451a391004e98eb1fb21b6a026fe794219`, all pulling the same CI-built
+APK (`witness-participate-b5c9994-debug-apk`, SHA256
+`3e3389cea2f17acb548b4593de8ff3c77d212f2ecb4cd9a84f660708e783ebc6`, produced
+by `mobile-android.yml` run `36321457376`, itself matching that same head
+SHA — full provenance chain preserved):
+
+| Run ID | Result |
+|---|---|
+| 36371337987 | WIF auth succeeded; upload to Test Lab staging bucket failed |
+| 36371462321 | WIF auth succeeded; upload to Test Lab staging bucket failed |
+| 36371628341 | WIF auth succeeded; upload to Test Lab staging bucket failed |
+| 36372120962 | WIF auth succeeded; upload to Test Lab staging bucket failed (after granting `roles/storage.objectCreator` at project level — no change) |
+| 36381930216 | WIF auth succeeded; upload to Test Lab staging bucket failed (re-run after a human console visit to Test Lab's landing page confirmed no additional provisioning/terms prompt existed — no change) |
+
+**What every one of the five runs actually proved:**
+
+- **Authentication: succeeded, all 5/5.** `google-github-actions/auth` via
+  Workload Identity Federation exchanged the GitHub OIDC token for
+  short-lived Google credentials and impersonated
+  `witness-mobile-test-lab@witness-f9f62.iam.gserviceaccount.com`
+  successfully every time. No key, long-lived or otherwise, was ever
+  created.
+- **Test Lab API: reached, all 5/5.** `gcloud firebase test android run`
+  authenticated to `testing.googleapis.com` and began test submission —
+  this is a live, working piece of infrastructure, not a design on paper.
+- **Upload: failed, 5/5, identically.** Every run failed at the same step —
+  staging the APK to Test Lab's auto-provisioned default results bucket
+  (`gs://test-lab-<hash>`) — with `storage.objects.create` returning
+  **HTTP 403 (permission denied)**.
+- **Test matrix / device allocation: never reached.** Because the APK never
+  finished staging, no Test Lab test matrix was created and no virtual
+  device was ever allocated or booted.
+- **Quota consumed: zero.** The Spark plan's 10 free virtual-device
+  runs/day counts allocated test executions, not failed upload attempts —
+  no test run was ever recorded against that quota across all five
+  attempts.
+- **Cost: $0.** **Billing: none attached to the project at any point** —
+  `witness-f9f62` remained on the Spark plan throughout, with no payment
+  method entered and no billing account linked, before, during, or after
+  this investigation.
+- **IAM: no broad escalation accepted.** Across the entire investigation
+  the service account held at most three roles —
+  `roles/cloudtestservice.testAdmin`, `roles/firebase.analyticsViewer`, and
+  (added mid-investigation as a remediation attempt, without effect)
+  `roles/storage.objectCreator` — **never** `roles/editor` or
+  `roles/owner`. A direct attempt to inspect/grant IAM on the failing
+  bucket itself was also denied to the project's human Owner account,
+  confirming the bucket sits outside normal project-level IAM inheritance.
+
+### Root-cause classification
+
+Distinguishing among the eight documented candidate causes, using evidence
+from the five runs above plus Google's own published documentation
+(`firebase.google.com/docs/test-lab/android/continuous`,
+`firebase.google.com/docs/projects/iam/permissions`):
+
+| # | Candidate cause | Ruled in/out | Evidence |
+|---|---|---|---|
+| A | Insufficient service-account permission | **Contributing** | `roles/cloudtestservice.testAdmin` + `roles/firebase.analyticsViewer` are documented as sufficient only when a **custom** `--results-bucket` is supplied; that flag's own documentation requires the target bucket be "owned by a billing-enabled project" — not our path. |
+| B | Test Lab service-agent permission | Ruled out | The Test Lab service agent itself is a Google-managed identity, not something this project's IAM controls; no evidence any run was blocked at that layer — the 403 is attributed to our own service account, not a Test Lab-internal identity. |
+| C | Test Lab staging-bucket provisioning | Ruled out | The default bucket exists and is reachable (confirmed by the fact a specific, addressable 403 was returned for it, not a 404/"bucket not found") — this is an authorization failure, not a missing-resource failure. |
+| D | Firebase/GCP project configuration | **Root cause** | Google's own CI setup guide (`firebase.google.com/docs/test-lab/android/continuous`) documents `roles/editor` as the role required for a custom CI service account submitting to the **default, auto-provisioned** results bucket — the exact path this workflow uses. This is the documented, correct role for this scenario; it was deliberately not granted. |
+| E | Spark-plan limitation | Ruled out | Spark plan does not block Test Lab API access or authentication (both succeeded); the billing requirement that exists is scoped to the *custom-bucket* path (candidate A), not to Test Lab usage itself. |
+| F | WIF incompatibility/limitation | Ruled out | WIF authentication succeeded in all 5/5 runs; the failure occurs after authentication, at an authorization (IAM) check on a specific bucket. |
+| G | gcloud/Test Lab CLI behaviour | Ruled out | The CLI invocation matches Google's own documented command form exactly; the error returned is a standard GCS IAM 403, not a CLI defect or malformed request. |
+| H | Other documented cause | Ruled out | No other cause found in official documentation after this investigation. |
+
+**Conclusion: Category D.** The two roles Firebase's IAM-permissions page
+documents for `gcloud` Test Lab submission are correct only for the
+custom-results-bucket path (which itself requires a billing-enabled
+project). For the default-bucket path this workflow uses, Google's own
+Test Lab CI guide separately documents `roles/editor` as the required role.
+Granting project-wide Editor solely to make an acceptance smoke test run
+was evaluated and explicitly declined — this is a deliberate least-privilege
+trade-off, not an unresolved defect.
+
+### Documented remediation path (not pursued now — record only)
+
+Either of the following would close this gap, if the programme later
+decides the trade-off is worth it:
+
+1. **Supply a custom `--results-bucket`.** Requires: (a) a billing-enabled
+   (Blaze-plan) project — Google states the bucket "must be owned by a
+   billing-enabled project" — and (b) granting `roles/storage.objectCreator`
+   (already held) plus bucket-level write access on that customer-owned
+   bucket to the CI service account, keeping the existing
+   `roles/cloudtestservice.testAdmin` and `roles/firebase.analyticsViewer`
+   roles at the project level. Avoids Editor, but requires enabling billing,
+   which this investigation was explicitly instructed not to do.
+2. **Grant `roles/editor`** to the dedicated `witness-mobile-test-lab`
+   service account only (not to any human principal), on the
+   already-isolated `witness-f9f62`/dedicated-project boundary. Stays on
+   the free Spark plan, but widens the service account's permissions
+   project-wide, which is the specific trade-off this investigation's
+   governing decision declined to accept.
+
+Neither path is implemented. Both remain available, documented options if
+cloud Android acceptance is later prioritized above the least-privilege
+posture currently in force.
 
 ## What this buys us, and what it does not
 
