@@ -1,8 +1,11 @@
 # Witness Commercial Website Roadmap
 
 **Owner:** Product, Commercial and Engineering
-**Status:** MKT-01D repository hardening complete; preview remains gated
-**Last reviewed:** 2026-09-04
+**Status:** MKT-09 substantially delivered; WEB-NEXT-01 cross-app milestone active
+**Last reviewed:** 2026-09-28 — reconciled against `main` (`e081fdd`) for WEB-NEXT-01;
+see `docs/web/WEB_NEXT_01.md`. Classifications below use repository evidence (route files,
+`navigation.ts`, `sitemap.ts`, tests) gathered directly, not carried forward from the 2026-09-04
+review.
 
 ## State model
 
@@ -27,14 +30,15 @@ explicitly verified.
 | MKT-04 Platform & How It Works | `VERIFIED COMPLETE` | Six routes live: `/platform`, `/how-it-works`, `/why-witness`, `/platform/evidence`, `/platform/decisions`, `/platform/institutional-memory` |
 | MKT-05 Solutions | `VERIFIED COMPLETE` | `/solutions` hub plus `/solutions/{government,international-development,research,consultation}`, differentiated per sector |
 | MKT-06 Synthetic Demo | `VERIFIED COMPLETE` | `/demo` — a fictional programme record traced end to end, grounded in `packages/domain` |
-| MKT-07 Conversion Infrastructure | `NOT STARTED` | No public forms, Turnstile or lead workflow |
-| MKT-08 Commercial Packaging | `DESIGN / PLANNING` | Product `/pricing` exists; public packaging and claim verification remain |
-| MKT-09 Trust Centre | `NOT STARTED` | Extensive internal evidence exists; no publishable trust surface |
-| MKT-10 Onboarding | `IMPLEMENTATION` | Controlled invitations/account activation exist; self-service provenance activation does not |
+| MKT-07 Conversion Infrastructure | `NOT STARTED` | No public forms, Turnstile or lead workflow; "Book a demo" is a `mailto:` link |
+| MKT-08 Commercial Packaging | `PARTIALLY COMPLETE` | The marketing→product pricing hand-off already works end to end — `site-config.ts` resolves `pricingUrl` to the real `{appUrl}/pricing`, which calls the live plan-catalogue API — corrected here from the prior "not connected" framing. What's missing is a marketing-native packaging/positioning page and public claim verification, not a broken link |
+| MKT-09 Trust Centre | `VERIFIED COMPLETE` (repository) | `e081fdd` (#234, merged 2026-09-25) shipped `/trust` + `security`/`data-sovereignty`/`privacy`, each claim classified deployed/configured/planned with explicit denials (no SOC 2/ISO 27001, rate limiting configured not enforced). Not yet on the live preview (see `STATUS.md`'s "Remote preview" section) and not yet reflected in this table before this reconciliation |
+| MKT-10 Onboarding | `PARTIALLY COMPLETE` | Controlled invitations/account activation exist (`/activate`, `/workspace-invitations/[token]`); `apps/web` also has a built first-authenticated-session dashboard (`src/app/page.tsx`) and a five-step per-programme onboarding overlay (`src/components/onboarding.tsx`, wired into `/workspaces/[id]`) — self-service provenance activation still does not exist |
 | MKT-11 Knowledge Centre | `NOT STARTED` | Repository documentation exists but is not a public knowledge centre |
-| MKT-12 Customer Evidence | `NOT STARTED` | No public claims; evidence requires human approval |
+| MKT-12 Customer Evidence | `NOT STARTED` | No public claims; evidence requires human approval; unmerged customer-story/testimonial work on `phase6/customer-learning` is explicitly out of scope for this branch and not counted as progress here |
 | MKT-13 Commercial Analytics | `NOT STARTED` | No public or funnel instrumentation |
 | MKT-14 Internationalisation | `NOT STARTED` | Begin only after English quality and conversion evidence |
+| WEB-NEXT-01 Web Experience Reconciliation & Product Readiness | `IN PROGRESS` | Cross-app (`apps/marketing` + `apps/web`) milestone — see `docs/web/WEB_NEXT_01.md` for evidence, gaps and acceptance criteria |
 
 ## Safest implementation order
 
@@ -92,6 +96,16 @@ explicitly verified.
     `packages/domain/src/consent-template.ts`.
 25. Build conversion infrastructure, then packaging, trust, onboarding and analytics in milestone
     order, advancing partial existing capabilities only after their own acceptance checks.
+26. **MKT-09 — Trust Centre — `VERIFIED COMPLETE` (repository).** `/trust` hub plus `security`,
+    `data-sovereignty` and `privacy` children, built strictly to `TRUST_REQUIREMENTS.md`'s
+    publication rule; a test asserts no certification name appears outside an explicit denial
+    sentence. Delivered alongside `/platform/co-design`, `/platform/knowledge`, `/platform/change`
+    and an honest empty-state `/stories` in the same change (`e081fdd`, #234). Not yet on the live
+    preview container.
+27. **WEB-NEXT-01 — Web Experience Reconciliation & Product Readiness — `IN PROGRESS`.** Closes the
+    `apps/web` automated-test and browser-QA gap, reconciles authenticated-app route truth, and
+    verifies (rather than rebuilds) the existing first-use/onboarding experience. See
+    `docs/web/WEB_NEXT_01.md`.
 
 ## First small pull request
 

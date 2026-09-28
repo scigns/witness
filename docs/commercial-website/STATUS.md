@@ -3,11 +3,34 @@
 **Owner:** Product, Commercial and Engineering
 **Status:** Active programme
 
-Last updated: 2026-09-04
+Last updated: 2026-09-28 (WEB-NEXT-01 reconciliation — see `docs/web/WEB_NEXT_01.md`)
+
+## 2026-09-28 reconciliation note
+
+This document was last updated 2026-09-04 and had drifted from `main`. Two commits landed after
+that date without a status update:
+
+- `68887dc` — dynamic-imported Cytoscape on the product Knowledge Graph route (bundle hygiene, not
+  a marketing change).
+- `e081fdd` (#234) — shipped `/platform/co-design`, `/platform/knowledge`, `/platform/change`,
+  `/trust` + its three children (`security`, `data-sovereignty`, `privacy`), and `/stories`. This
+  is most of **MKT-09 Trust Centre**, previously listed below as `NOT STARTED`, and closes the
+  `sitemap.ts` staleness item that was listed as known debt (it now lists all 21 real content
+  routes, verified by reading the file directly).
+
+Corrections applied below reflect direct repository evidence (route files, `navigation.ts`,
+`sitemap.ts`, `site-config.ts`, test files) gathered 2026-09-28, not carried forward from the prior
+audit. One prior claim in this file was itself inaccurate and is corrected here: public pricing was
+described as not connected to a real destination. In fact `apps/marketing/src/lib/site-config.ts`
+already resolves `pricingUrl` to `{appUrl}/pricing` (the real product pricing page, which calls the
+live plan-catalogue API) and both header and footer "View plans" CTAs use it — this conversion path
+already works. What remains missing for MKT-08 is a marketing-native packaging/positioning page, not
+a broken or fake link.
 
 ## Current phase
 
- MKT-03I Mainline Alignment, Preview Deployment & Release Candidate — `VERIFIED COMPLETE`
+MKT-09 Trust Centre substantially delivered (2026-09-25, #234); WEB-NEXT-01 (see
+`docs/web/WEB_NEXT_01.md`) is the active cross-app milestone — `IN PROGRESS`.
 
 ## Programme health
 
@@ -15,7 +38,10 @@ AMBER
 
 The product is live behind Cloudflare and has strong delivery/security governance, but the apex and
 application hosts currently serve the same authenticated Next.js application. Public commercial
-separation, indexability, conversion and trust surfaces do not yet exist.
+separation and indexability do not yet exist. Content coverage is now broad (21 marketing routes
+including a real Trust Centre); conversion (MKT-07) and commercial packaging (MKT-08) remain the
+biggest content gaps. The authenticated product (`apps/web`) has materially weaker automated test
+coverage than the marketing site — see `docs/web/WEB_NEXT_01.md`.
 
 ## Completed
 
@@ -106,6 +132,15 @@ separation, indexability, conversion and trust surfaces do not yet exist.
   thirteen content routes, and a targeted keyboard-navigation check (skip link first, no traps,
   every link reachable) all pass. No production database, Keycloak, or API dependency — static
   synthetic content only.
+- MKT-09 (most of) — Trust Centre, institutional learning and co-design explanation —
+  `VERIFIED COMPLETE` in the repository, per `e081fdd` (#234, merged 2026-09-25): `/trust` hub +
+  `/trust/security`, `/trust/data-sovereignty`, `/trust/privacy` (every claim classified as
+  deployed/configured/planned, explicitly denying SOC 2/ISO 27001 and unenforced rate limiting
+  rather than omitting them), plus `/platform/co-design`, `/platform/knowledge`, `/platform/change`
+  filling content gaps left after MKT-04/05/06, plus an honest empty-state `/stories` page. 44 unit
+  tests (was 31), `sitemap.ts` now lists all 21 real routes, six-width Chrome QA across all 21
+  routes, 102 KB First Load JS unchanged. Not yet reflected in the roadmap's milestone table before
+  this reconciliation.
 
 ## In progress
 
@@ -148,20 +183,29 @@ longer true.** Verified directly, not assumed:
 
 ## Next recommended task
 
-- Redeploy the marketing preview container with current `main` (MKT-04/05/06 included) using the
+- Redeploy the marketing preview container with current `main` (MKT-04/05/06/09 included) using the
   same isolated, already-approved pattern recorded above, then complete the MKT-03I human-only
-  gates. This may proceed separately without changing production routing. MKT-07 (Conversion
-  Infrastructure) is the next content milestone per `ROADMAP.md`; it is not started here and
-  should not be inferred from this branch's other changes.
+  gates. This may proceed separately without changing production routing — it requires DigitalOcean
+  host and Cloudflare access this worktree does not have and does not attempt to use.
+- WEB-NEXT-01 (`docs/web/WEB_NEXT_01.md`): close the automated-test and browser-QA gap in
+  `apps/web` and reconcile authenticated-app route truth, without touching production or the
+  apex/app split above.
+- MKT-07 (Conversion Infrastructure) remains the next content milestone per `ROADMAP.md`'s
+  ordering; not started in this reconciliation.
 
 ## Known technical debt
 
-- `apps/marketing/src/app/sitemap.ts` has listed only `/` since MKT-01C and was not extended for
-  MKT-04, MKT-05 or MKT-06's new routes. Indexing is `noindex`-gated regardless, so this has no
-  live SEO effect today; left out of scope here to keep this change to the demo milestone.
 - Apex and app domains serve the same product application.
 - Product metadata is globally `noindex`; no public SEO foundation exists.
-- `packages/ui` is not implemented; the marketing foundation intentionally uses local minimal CSS.
+- `packages/ui` is not implemented; both `apps/marketing` and `apps/web` intentionally use local,
+  independent component primitives rather than a shared design system. They are visually aligned by
+  convention (same Brand Book tokens, same self-hosted fonts) but not by shared code — a brand
+  update currently has to be applied twice.
+- `apps/web` has materially weaker automated coverage than `apps/marketing`: no component/page
+  rendering tests (only config/runtime tests), and its one browser-QA script exercises 3 of ~65
+  routes (`/`, `/signin`, `/pricing`). See `docs/web/WEB_NEXT_01.md` for the plan to close this.
+- The serving preview build is now two feature waves behind `main` (missing MKT-05/06/09), see
+  above — redeploy is an operational task, not a code gap.
 - Checked-in Cloudflare tunnel templates contain historical hostnames and are not proof of effective
   production configuration.
 - API rate-limit configuration exists without enforcement.
