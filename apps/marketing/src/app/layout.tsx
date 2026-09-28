@@ -9,7 +9,7 @@ import { brandFontVariables } from '../lib/fonts';
 import './globals.css';
 
 export const metadata: Metadata = createMarketingMetadata({
-  title: 'Witness — Make important decisions traceable',
+  title: 'Witness — Build better decisions with the people affected by them',
 });
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
