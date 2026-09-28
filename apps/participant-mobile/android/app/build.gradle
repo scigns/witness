@@ -1,5 +1,21 @@
 apply plugin: 'com.android.application'
 
+// Release signing — never committed. Reads either a local
+// android/keystore.properties file (gitignored; for a human building
+// locally) or the ANDROID_RELEASE_KEYSTORE_* environment variables a CI
+// signing job would set from GitHub encrypted secrets (see
+// docs/mobile/MOBILE_RELEASE_GATES.md M7). Falls back to no signing config
+// at all when neither is present, so the existing CI build.yml unsigned
+// `bundleRelease` keeps working unchanged until a real keystore exists.
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+def hasKeystoreProperties = keystorePropertiesFile.exists()
+if (hasKeystoreProperties) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+def envKeystorePath = System.getenv('ANDROID_RELEASE_KEYSTORE_PATH')
+def hasReleaseSigning = hasKeystoreProperties || (envKeystorePath != null && !envKeystorePath.isEmpty())
+
 android {
     namespace = "com.buildwithwitness.participate"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,10 +32,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    if (hasReleaseSigning) {
+        signingConfigs {
+            release {
+                storeFile file(hasKeystoreProperties ? keystoreProperties['storeFile'] : envKeystorePath)
+                storePassword hasKeystoreProperties ? keystoreProperties['storePassword'] : System.getenv('ANDROID_RELEASE_KEYSTORE_PASSWORD')
+                keyAlias hasKeystoreProperties ? keystoreProperties['keyAlias'] : System.getenv('ANDROID_RELEASE_KEY_ALIAS')
+                keyPassword hasKeystoreProperties ? keystoreProperties['keyPassword'] : System.getenv('ANDROID_RELEASE_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

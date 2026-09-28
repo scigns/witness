@@ -96,7 +96,17 @@ jobs:
       - name: Unit tests (participant-mobile)
         run: pnpm exec turbo run test --filter=@witness/participant-mobile
 
+      # VITE_WITNESS_API_URL is public build config, not a secret — the same
+      # origin a browser's DevTools Network tab would show (see
+      # docs/infrastructure/DEPLOYMENT_TOPOLOGY.md). Without it,
+      # resolveApiBaseUrl() falls back to the development profile and bakes
+      # http://localhost:3001 into the shipped binary, which is unreachable
+      # from a real device and would leave the app non-functional out of the
+      # box.
       - name: Web bundle build (Vite)
+        env:
+          VITE_WITNESS_BUILD_PROFILE: production
+          VITE_WITNESS_API_URL: https://witness-prod-api.pacificdigitalconsultancy.org
         run: pnpm exec turbo run build --filter=@witness/participant-mobile
 
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1

@@ -56,6 +56,7 @@ captures/
 # credentials/provisioning profiles/keystores in this repository).
 *.jks
 *.keystore
+keystore.properties
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild
