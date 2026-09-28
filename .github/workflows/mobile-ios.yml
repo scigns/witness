@@ -30,6 +30,15 @@
 name: Mobile — iOS
 
 on:
+  # workflow_dispatch can't target this file until it exists on the default
+  # branch (a GitHub platform constraint, confirmed by a real 404 on first
+  # dispatch attempt against this branch) — this path-filtered pull_request
+  # trigger is the same "prove a new workflow via its own PR" pattern
+  # mobile-android-cloud.yml already uses, and gives a real run now via
+  # PR #254's existing synchronize event instead of waiting on a merge.
+  pull_request:
+    paths:
+      - ".github/workflows/mobile-ios.yml"
   workflow_dispatch:
 
 permissions:
