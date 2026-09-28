@@ -40,21 +40,32 @@ const ROLES: ReadonlyArray<ActingUser['role']> = [
 const REVIEW_ROLES = new Set(['admin', 'reviewer']);
 
 /**
- * Routes a participant reaches directly from a QR code or join link, with no
- * standing in the workspace at all — Phase 5, Workstream 1.5's explicit
- * "no admin nav" requirement. These render with none of the chrome below:
- * no preview banner, no header, no primary navigation, not even a sign-in
- * prompt — the simplest possible screen for someone who just scanned a code
- * on a workshop floor.
+ * Routes reached by someone with no standing in any workspace yet — Phase 5,
+ * Workstream 1.5's explicit "no admin nav" requirement, extended (WEB-NEXT-01)
+ * to the two other entry points that share the same property: an invitee or
+ * new account-holder who hasn't signed in, or has signed in but belongs to
+ * nothing yet. These render with none of the chrome below: no preview banner,
+ * no header, no primary navigation, no Admin menu, no dev-only "Acting as"
+ * switcher — each page is self-contained and shows its own context.
+ * `/join/` and `/capture/` are QR/link entry points from a workshop floor;
+ * `/activate` and `/workspace-invitations/` are email-invitation entry
+ * points — same "nothing to navigate to yet" property, different origin.
  */
-const BARE_ROUTE_PREFIXES = ['/join/', '/capture/'];
+const BARE_ROUTE_PREFIXES = ['/join/', '/capture/', '/workspace-invitations/'];
+
+// `/activate` has no child segments, so it is matched exactly — a prefix
+// match here would also (wrongly) swallow any future `/activate-…` route.
+const BARE_EXACT_ROUTES = ['/activate'];
 
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, setUser } = useSession();
   const { status, currentUser, errorMessage, signOut } = useAuth();
 
-  if (BARE_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+  if (
+    BARE_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ||
+    BARE_EXACT_ROUTES.includes(pathname)
+  ) {
     return <>{children}</>;
   }
 
