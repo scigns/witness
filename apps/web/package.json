@@ -17,7 +17,7 @@
   "dependencies": {
     "@witness/contracts": "workspace:*",
     "cytoscape": "^3.30.2",
-    "next": "^15.5.25",
+    "next": "^15.5.26",
     "qrcode": "^1.5.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
