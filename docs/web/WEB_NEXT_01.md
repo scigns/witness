@@ -107,6 +107,7 @@ A shared `EmptyState` component (`apps/web/src/components/ui.tsx`) is used consi
 `/records`, `/workspaces`, `/organisations`, `/review`, `/workspaces/[id]/sessions`,
 `/workspaces/[id]/knowledge/concepts`, and session evidence lists. Sampled instances already follow
 the what/why/next-action pattern, e.g.:
+
 - Records: "No records yet" / "Capture your first record to begin building institutional memory."
   / **Capture a record** button.
 - Review: "You're not a reviewer in any programme yet" / explains how that changes / (correctly no
@@ -141,7 +142,7 @@ pattern for pre-account routes.
 
 ## 2. Customer journey map (current, as evidenced above)
 
-```
+```text
 Public visitor
   → apps/marketing "/" understands Witness (real, tested homepage)
   → /platform, /how-it-works, /solutions, /demo, /trust: credible product proof,
