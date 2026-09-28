@@ -10,7 +10,15 @@ import {
 } from '../components/marketing-primitives';
 import { EvidenceRelationshipDiagram, LinearProvenanceChain } from '../components/provenance';
 import { ProductPreview } from '../components/product-preview';
+import { createMarketingMetadata } from '../lib/metadata';
 import { marketingSiteConfig } from '../lib/site-config';
+
+export const metadata = createMarketingMetadata({
+  title: 'Witness — Build better decisions with the people affected by them',
+  description:
+    'Witness helps organisations run workshops, consultations and co-design processes where contributions don’t disappear into sticky notes and reports — keeping the path from what people said to what was decided and what happens next.',
+  path: '/',
+});
 
 const engagementStages = [
   [
