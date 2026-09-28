@@ -109,11 +109,25 @@ jobs:
         working-directory: apps/participant-mobile/ios/App
         run: |
           xcodebuild -list -project App.xcodeproj -json | tee /tmp/xcode-list.json
-          scheme=$(jq -r '.project.schemes[0] // empty' /tmp/xcode-list.json)
-          target=$(jq -r '.project.targets[0] // empty' /tmp/xcode-list.json)
+          # xcodebuild autocreates a scheme per SPM product too (e.g. each
+          # Capacitor plugin), not just the app — schemes[0] is whichever
+          # sorts first alphabetically, which is a plugin, not the app, on
+          # this project (confirmed by a real run: schemes[0] was
+          # "AparajitaCapacitorSecureStorage"). Match the scheme whose name
+          # equals the project's own name instead of trusting index 0.
+          project_name=$(jq -r '.project.name' /tmp/xcode-list.json)
+          scheme=$(jq -r --arg name "$project_name" '.project.schemes[] | select(. == $name) // empty' /tmp/xcode-list.json)
+          target=$(jq -r --arg name "$project_name" '.project.targets[] | select(. == $name) // empty' /tmp/xcode-list.json)
+          if [ -z "$scheme" ]; then
+            scheme=$(jq -r '.project.schemes[0] // empty' /tmp/xcode-list.json)
+            echo "::warning::No scheme named '$project_name' found; falling back to '$scheme' — verify this is actually the app, not a dependency."
+          fi
+          if [ -z "$target" ]; then
+            target=$(jq -r '.project.targets[0] // empty' /tmp/xcode-list.json)
+          fi
           echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
           echo "target=$target" >> "$GITHUB_OUTPUT"
-          echo "Resolved scheme='$scheme' target='$target'"
+          echo "Resolved scheme='$scheme' target='$target' (project name: '$project_name')"
 
       # Simulator SDK + CODE_SIGNING_ALLOWED=NO: compiles without any
       # certificate, provisioning profile, or Apple Developer account —
@@ -151,6 +165,11 @@ jobs:
         run: |
           echo "--- DerivedData/Build/Products ---"
           find "$RUNNER_TEMP/DerivedData/Build/Products" -maxdepth 2 2>/dev/null || echo "(no build products directory — build did not reach that stage)"
+          # A real sanity check, not just "some .app exists" — this must be
+          # Witness Participate's own product, not a dependency's.
+          if [ -d "$RUNNER_TEMP/DerivedData/Build/Products" ]; then
+            find "$RUNNER_TEMP/DerivedData/Build/Products" -maxdepth 3 -name "App.app" -print -exec echo "Confirmed: App.app exists (the actual Witness Participate product, not a dependency)" \;
+          fi
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
