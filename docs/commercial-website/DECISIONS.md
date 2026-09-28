@@ -171,12 +171,13 @@ proposition. The problem narrative describes evidence fragmentation and knowledg
 unsupported outcomes or customer examples. How Witness Works is expressed with Capture, Connect,
 Govern, Trace and Remember and the existing provenance visual language.
 
-### CW-028 — Canonical host and cutover preparation
+### CW-028 — Canonical host and cutover preparation (superseded by CW-034)
 
-`https://buildwithwitness.com` is the sole canonical public domain. `www.buildwithwitness.com` will
-permanently redirect to the equivalent apex path and query. `app.buildwithwitness.com` remains the
-canonical authenticated application host; `api.` and `id.` remain separate. MKT-03G prepares but does
-not execute Cloudflare, Tunnel, Keycloak, cookie, CORS/CSRF, DNS, environment or indexing changes.
+**Superseded 2026-09-28 — see CW-034.** `https://buildwithwitness.com` is the sole canonical public
+domain. `www.buildwithwitness.com` will permanently redirect to the equivalent apex path and query.
+`app.buildwithwitness.com` remains the canonical authenticated application host; `api.` and `id.`
+remain separate. MKT-03G prepares but does not execute Cloudflare, Tunnel, Keycloak, cookie,
+CORS/CSRF, DNS, environment or indexing changes.
 
 The repository milestone may be `VERIFIED COMPLETE` while the production dry run is not ready: that
 status means the implementation, evidence gaps, runbook and rollback plan are complete. It never
@@ -218,13 +219,33 @@ Cloudflare record/Tunnel IDs, server image IDs, effective Keycloak client values
 flows. MKT-03J remains `NO-GO` until an authorised operator records those values and uses only an
 approved synthetic account and mailbox.
 
+### CW-034 — `www` is the canonical public marketing host (supersedes CW-028, CW-024)
+
+**Human product decision, 2026-09-28.** `https://www.buildwithwitness.com` is now the sole canonical
+public marketing domain, superseding CW-028's apex-canonical decision. The intended final routing
+state:
+
+- `www.buildwithwitness.com` → public commercial marketing application (`apps/marketing`).
+- `app.buildwithwitness.com` → authenticated Witness application (`apps/web`) — unchanged.
+- `api.buildwithwitness.com` → API — unchanged.
+- `id.buildwithwitness.com` → identity (Keycloak) — unchanged.
+- apex `buildwithwitness.com` → permanent redirect to the equivalent `https://www.buildwithwitness.com`
+  path and query — the reverse of CW-028's apex-canonical/`www`-redirects design.
+
+This is a documentation and code-level decision (`apps/marketing/src/lib/site-config.ts`'s
+`CANONICAL_MARKETING_ORIGIN`, canonical metadata, sitemap, robots) — it does not itself change
+production DNS, Cloudflare Tunnel ingress, Worker routes or environment values. See
+`CUTOVER_RUNBOOK.md`'s "Cloudflare apex→`www` plan" for the exact human Cloudflare configuration this
+decision requires before cutover, and CW-025 below: that cutover remains a separate, human-approved
+production action.
+
 ## Proposed
 
-### CW-024 — Canonical public/app route contract
+### CW-024 — Canonical public/app route contract (superseded by CW-034)
 
-Target apex for marketing and `app.` for product. Keep `api.` and `id.` unchanged. Add `www` redirect
-only during an approved production routing unit. Treat docs, trust and status subdomains as reserved,
-not live capabilities.
+**Superseded 2026-09-28 — see CW-034.** Target apex for marketing and `app.` for product. Keep `api.`
+and `id.` unchanged. Add `www` redirect only during an approved production routing unit. Treat docs,
+trust and status subdomains as reserved, not live capabilities.
 
 ## Human approval required
 

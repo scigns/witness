@@ -15,12 +15,18 @@ follow described the state as of their own dates and is superseded: the preview 
 the current, verified state before relying on anything preview-related below — the dated sections
 are kept as history, not corrected in place.
 
+**Canonical host policy superseded 2026-09-28 (CW-034, `DECISIONS.md`).** Every reference to the apex
+as the canonical marketing host below this note describes the *prior* policy and is kept as history,
+not corrected in place. The current policy is in the "Canonical host policy" section immediately
+below, and the reversed Cloudflare plan is in "Cloudflare apex→`www` plan (do not execute here)",
+which supersedes the earlier "Cloudflare `www` plan" section for execution purposes.
+
 ## Canonical host policy
 
-- Canonical public domain: `https://buildwithwitness.com`
-- `www.buildwithwitness.com` is not a second site; it permanently redirects to the apex.
+- Canonical public domain: `https://www.buildwithwitness.com`
+- Apex `buildwithwitness.com` is not a second site; it permanently redirects to `www`.
 - Redirects preserve path and query, for example `/platform?source=campaign` remains the same path and
-  query on the apex.
+  query on `www`.
 - Canonical authenticated application host: `https://app.buildwithwitness.com`
 - API host: `https://api.buildwithwitness.com`
 - Identity host: `https://id.buildwithwitness.com`
@@ -47,6 +53,57 @@ to Cloudflare rather than the origin; dashboard route changes can take effect wi
 origin-address DNS TTL. Record authoritative dashboard values at cutover and do not change TTL
 without a demonstrated need.
 
+## Current topology (read-only verification, 2026-09-28)
+
+Verified from outside the production network — public DNS and HTTPS only. No SSH, Cloudflare
+dashboard/API or DigitalOcean access was available from this environment; this table does not
+supersede a privileged operator's own verification, it only records what an external client can see
+today.
+
+| Surface | Verified state |
+| --- | --- |
+| `buildwithwitness.com` (apex) | DNS resolves (Cloudflare anycast); HTTPS 200; `<title>Witness</title>` — serves the authenticated product build, same as `app.` |
+| `app.buildwithwitness.com` | DNS resolves; HTTPS 200; `<title>Witness</title>` — same product build as apex |
+| `www.buildwithwitness.com` | **No A/CNAME answer** — does not resolve at all (`curl`: could not resolve host) |
+| `api.buildwithwitness.com` | DNS resolves; HTTPS 404 on `/` (expected — API has no `/` route) |
+| `id.buildwithwitness.com` | DNS resolves; HTTPS 200, redirects to `/admin/master/console/` (Keycloak) |
+| `preview.buildwithwitness.com` | DNS resolves; HTTPS 200; `/health` → `{"service":"witness-marketing","status":"ok"}`; `<title>Witness — Make important decisions traceable</title>` — a **stale** marketing build, older than even the pre-2026-09-28 `main`: its `/sitemap.xml` lists only `/`, and `/get-started` (merged to `main` in `f8153d4`, 2026-09-28) 404s. `robots.txt` correctly disallows all. |
+
+All hosts present `server: cloudflare` and Cloudflare `cf-ray` headers, confirming Cloudflare
+proxying is active for every provisioned hostname. Exact Cloudflare Tunnel ingress rules, DNS record
+IDs, Worker routes, running container image digests and the checked-out commit on the production
+host remain `REQUIRES HUMAN CLOUDFLARE/SSH VERIFICATION` — not established here.
+
+**Conclusion: the `f8153d4` marketing changes (including this runbook's own `www`-canonical decision,
+the reworked homepage and `/get-started`) are not live anywhere publicly.** The only publicly
+reachable marketing build is the stale `preview.` container from on or before 2026-09-05.
+
+## Cloudflare apex→`www` plan (do not execute here)
+
+**Current plan — supersedes "Cloudflare `www` plan" below for execution.** Reverses which hostname
+gets the redirect: `www` now takes the DNS/proxy/certificate/origin role the apex held under CW-028;
+the apex now takes the redirect-rule role `www` held.
+
+1. In the `buildwithwitness.com` zone, provision `www` as a proxied DNS record pointed at the
+   marketing origin (Tunnel/Compose service), the same way apex pointed at the product origin before.
+2. Confirm Universal SSL or the approved custom certificate covers `www` (and continues to cover the
+   apex) before HTTPS testing.
+3. Create a Dynamic Redirect Rule matching `http.host eq "buildwithwitness.com"` for HTTP and HTTPS
+   requests. Set the target expression to
+   `concat("https://www.buildwithwitness.com", http.request.uri.path)`, status 308 (or approved 301),
+   and enable **Preserve query string**.
+4. Ensure the rule runs before any origin route, does not match the `www` host, and cannot loop.
+5. Test `/`, `/example`, unknown paths and query strings over HTTP and HTTPS; expect one permanent
+   redirect and the `www` path/query unchanged.
+6. Redeploy the marketing container to `www`'s origin with `WITNESS_MARKETING_SITE_URL=
+   https://www.buildwithwitness.com` so canonical metadata, sitemap and robots agree with the live
+   host — the indexability check in `site-config.ts` fails closed if these disagree.
+7. Record rule identifier, prior DNS/route values and rollback action in the change ticket.
+
+`REQUIRES HUMAN CLOUDFLARE VERIFICATION`: DNS record/proxy state, certificate coverage, rule
+precedence, effective redirect status, propagation and rollback identifiers — none of this was
+executed or assumed here.
+
 ## Pre-cutover checklist
 
 - [ ] Freeze unrelated production changes and record the current apex/app/API/id DNS and route state.
@@ -63,7 +120,7 @@ without a demonstrated need.
 - [ ] Confirm `www` DNS/proxy/certificate readiness and tested path/query-preserving redirect rule.
 - [ ] Review marketing build with `WITNESS_MARKETING_INDEXABLE=false`.
 
-## Cloudflare `www` plan (do not execute here)
+## Cloudflare `www` plan (superseded 2026-09-28 — kept as history, do not execute)
 
 1. In the `buildwithwitness.com` zone, provision `www` as the approved proxied DNS target for the
    redirect rule (a proxied placeholder record is sufficient when the Redirect Rule intercepts it);
@@ -320,7 +377,13 @@ WITNESS_MARKETING_E2E_BASE_URL=https://preview.buildwithwitness.com \
 
 Do not call the preview ready until these real HTTPS checks pass.
 
-### Exact `www` human configuration
+### Exact `www` human configuration (superseded 2026-09-28 — see "Cloudflare apex→`www` plan" above)
+
+This section described provisioning `www` as a *redirect-only* placeholder under the old
+apex-canonical policy. Under CW-034, `www` is the canonical origin and gets the real DNS/certificate
+configuration below is now the wrong shape (a redirect-only placeholder, not the marketing origin);
+the apex gets the redirect instead. Kept as history, not corrected in place — use "Cloudflare
+apex→`www` plan" above for the current steps.
 
 1. Cloudflare Dashboard → `buildwithwitness.com` → **DNS → Records** → Add record.
 2. Type: `A`; Name: `www`; IPv4 address: `192.0.2.1` (documentation-only placeholder); Proxy status:

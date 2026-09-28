@@ -6,7 +6,7 @@ import { WitnessLogo } from './witness-logo';
 import { LinkButton } from './marketing-primitives';
 
 export function PublicHeader() {
-  const { appUrl, pricingUrl } = marketingSiteConfig();
+  const { appUrl, demoUrl } = marketingSiteConfig();
   return (
     <header className="site-header">
       <PageContainer className="header-inner">
@@ -20,7 +20,7 @@ export function PublicHeader() {
           <LinkButton variant="tertiary" href={appUrl.href}>
             Sign in
           </LinkButton>
-          <LinkButton href={pricingUrl.href}>View plans</LinkButton>
+          <LinkButton href={demoUrl.href}>Talk to us</LinkButton>
         </div>
         <details className="mobile-navigation">
           <summary>Menu</summary>
@@ -30,7 +30,7 @@ export function PublicHeader() {
               <LinkButton variant="tertiary" href={appUrl.href}>
                 Sign in
               </LinkButton>
-              <LinkButton href={pricingUrl.href}>View plans</LinkButton>
+              <LinkButton href={demoUrl.href}>Talk to us</LinkButton>
             </div>
           </nav>
         </details>

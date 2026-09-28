@@ -27,17 +27,37 @@ live plan-catalogue API) and both header and footer "View plans" CTAs use it —
 already works. What remains missing for MKT-08 is a marketing-native packaging/positioning page, not
 a broken or fake link.
 
+## 2026-09-28 — `www` canonical decision and fresh live-state audit
+
+**Human product decision (CW-034, `DECISIONS.md`): `https://www.buildwithwitness.com` is now the
+canonical public marketing host**, superseding the prior apex-canonical decision (CW-028). Apex will
+permanently redirect to `www` once cut over — see `CUTOVER_RUNBOOK.md`'s "Cloudflare apex→`www` plan".
+This is a documentation/code decision only (`site-config.ts`'s `CANONICAL_MARKETING_ORIGIN`,
+canonical metadata, sitemap, robots); no DNS/Cloudflare change has been made.
+
+Fresh external verification (public DNS/HTTPS only, no SSH/Cloudflare access available):
+`www.buildwithwitness.com` still has no DNS record at all. Apex and `app.` both still serve the
+authenticated product build (byte-identical `<title>Witness</title>`), unchanged from prior audits.
+`preview.buildwithwitness.com` is live but serves a **stale** marketing build predating even the
+2026-09-04 sitemap expansion (`/sitemap.xml` lists only `/`; `/get-started`, merged in `f8153d4`,
+404s). **The `f8153d4` marketing changes (WEB-NEXT-01, the reworked homepage, `/get-started`, and this
+`www` decision) are not deployed anywhere publicly** — repository state and live state remain
+distinct. See `CUTOVER_RUNBOOK.md`'s "Current topology (read-only verification, 2026-09-28)" for the
+full per-host table.
+
 ## Current phase
 
 MKT-09 Trust Centre substantially delivered (2026-09-25, #234); WEB-NEXT-01 (see
-`docs/web/WEB_NEXT_01.md`) is the active cross-app milestone — `IN PROGRESS`.
+`docs/web/WEB_NEXT_01.md`) is complete; the commercial-front-door homepage rework (see this file's
+2026-09-28 note above) is the active milestone — `IN PROGRESS`.
 
 ## Programme health
 
 AMBER
 
 The product is live behind Cloudflare and has strong delivery/security governance, but the apex and
-application hosts currently serve the same authenticated Next.js application. Public commercial
+application hosts currently serve the same authenticated Next.js application, and the reworked
+marketing site is not deployed anywhere publicly yet (see the 2026-09-28 note above). Public commercial
 separation and indexability do not yet exist. Content coverage is now broad (21 marketing routes
 including a real Trust Centre); conversion (MKT-07) and commercial packaging (MKT-08) remain the
 biggest content gaps. The authenticated product (`apps/web`) has materially weaker automated test

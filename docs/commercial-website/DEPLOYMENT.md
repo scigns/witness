@@ -100,12 +100,12 @@ application owns no persistent production data.
 `HUMAN ACTION REQUIRED: YES` before any item below:
 
 1. Provision and verify an isolated preview hostname and origin.
-2. Review the Cloudflare route/DNS change that moves `buildwithwitness.com` from the current product
-   origin to the marketing origin.
+2. Review the Cloudflare route/DNS change that moves `www.buildwithwitness.com` from DNS-absent to the
+   marketing origin.
 3. Preserve `app.buildwithwitness.com` on the authenticated product origin.
 4. Verify Keycloak redirect URIs, callback/return paths, invitation links and password-reset links.
 5. Verify API CORS, CSRF, cookie scope and application redirects.
-6. Configure and test `www.buildwithwitness.com` → `https://buildwithwitness.com`.
+6. Configure and test `buildwithwitness.com` (apex) → `https://www.buildwithwitness.com`.
 7. Confirm rollback identifiers and Cloudflare cache invalidation behaviour.
 8. Only after content, trust and operational review, explicitly enable production indexing.
 
@@ -114,21 +114,25 @@ environment values or indexing as part of MKT-01D.
 
 ## WWW / canonical host policy
 
-The canonical public domain is `https://buildwithwitness.com`. `www.buildwithwitness.com` is not a
-second canonical site; after an approved Cloudflare change it must return a permanent 301/308 redirect
-to the equivalent HTTPS apex path while preserving the query string. The future rule must cover both
-HTTP and HTTPS, run before origin routing, avoid apex matches and prevent loops. Confirm proxied DNS,
-Universal SSL/custom certificate coverage, rule precedence, propagation and rollback in Cloudflare.
+**Updated 2026-09-28 (CW-034, `docs/commercial-website/DECISIONS.md`) — supersedes the prior
+apex-canonical policy below this note.** The canonical public domain is now
+`https://www.buildwithwitness.com`. The apex `buildwithwitness.com` is not a second canonical site;
+after an approved Cloudflare change it must return a permanent 301/308 redirect to the equivalent
+HTTPS `www` path while preserving the query string. The rule must cover both HTTP and HTTPS, run
+before origin routing, avoid `www` matches and prevent loops. Confirm proxied DNS, Universal SSL/
+custom certificate coverage (now needed for `www`, not the apex redirect target), rule precedence,
+propagation and rollback in Cloudflare.
 
-The intended topology is apex → marketing, `app.` → authenticated product, `api.` → API and `id.` →
-Keycloak. Current effective DNS, Tunnel routes, certificate coverage and Redirect Rules require human
-Cloudflare verification; repository templates are not proof of live state. See
-[`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md) for the dry run, auth/API/cookie checklist and rollback.
+The intended topology is `www.` → marketing, `app.` → authenticated product, `api.` → API, `id.` →
+Keycloak, and apex → permanent redirect to `www.`. Current effective DNS, Tunnel routes, certificate
+coverage and Redirect Rules require human Cloudflare verification; repository templates are not proof
+of live state. See [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md)'s "Cloudflare apex→`www` plan" for the
+dry run, auth/API/cookie checklist and rollback.
 
 Initial production deployment values are review-only:
 
 ```text
-WITNESS_MARKETING_SITE_URL=https://buildwithwitness.com
+WITNESS_MARKETING_SITE_URL=https://www.buildwithwitness.com
 WITNESS_MARKETING_ENV=production
 WITNESS_MARKETING_INDEXABLE=false
 ```
