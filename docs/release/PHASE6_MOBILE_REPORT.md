@@ -11,6 +11,16 @@ purpose (see §5). Built on `phase6/customer-learning`, commits `1fd7ed5`..`c95e
 > verified/physical-pending, and `docs/testing/MOBILE_ACCEPTANCE.md`'s "Track E — live workshop
 > flow" table (rows 23-47) for the physical steps themselves. Nothing in §1-6 below was invalidated
 > by that work; the audio-recorder/offline-queue/OIDC-`returnTo` fixes it documents are unchanged.
+>
+> **Physical-device addendum (2026-09-26):** §4's "No physical iOS or Android device has touched
+> any part of this work" was accurate when written and is now **superseded** — a real iPhone 13
+> (iOS 26.6.1, Safari) has since run the browser/PWA journey (`docs/testing/MOBILE_ACCEPTANCE.md`
+> Rows 1-4: session load, guest entry, consent). This is genuine physical evidence for the **web/PWA**
+> track this report describes. It is **not** evidence for `apps/participant-mobile`, the separate
+> native iOS/Android app under ADR-0031 (Witness Participate) — that programme's own native-app
+> physical acceptance remains unexecuted; see `docs/mobile/MOBILE_RELEASE_GATES.md` M6 for its
+> current, distinct status. Track E's own physical rows (23-47) remain PHYSICAL PENDING as recorded
+> in `MOBILE_ACCEPTANCE.md`.
 
 ## 1. ADR decision
 

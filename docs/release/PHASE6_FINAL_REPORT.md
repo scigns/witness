@@ -10,6 +10,25 @@ This report rolls up [Marketing](PHASE6_MARKETING_REPORT.md),
 [Customer Learning](PHASE6_CUSTOMER_LEARNING_REPORT.md), and [Mobile](PHASE6_MOBILE_REPORT.md) into
 one honest, evidence-based acceptance judgement.
 
+> **Addendum (2026-09-26), two corrections to the status line above — nothing in D1-D5 below is
+> rewritten, both are superseded by later work:**
+>
+> 1. **"no native mobile development (ADR-0030 did not find it justified now)" is superseded.**
+>    [ADR-0031](../../architecture/decisions/ADR-0031-witness-participate-mobile-runtime.md) later
+>    reversed that finding and a native iOS/Android app (Witness Participate,
+>    `apps/participant-mobile`) is in active development on `feat/mobile/witness-participate`
+>    (PR #254). See `docs/mobile/MOBILE_RELEASE_GATES.md` for that programme's own gate-by-gate
+>    status — it is a distinct workstream from the Track A-E work this report judges, not a
+>    retroactive change to any Phase 6 verdict below.
+> 2. **D1/D3's "zero physical device has touched any of it" / "not proven on physical hardware" are
+>    now partially superseded.** A real iPhone 13 (iOS 26.6.1, Safari) has since run the browser/PWA
+>    journey (`docs/testing/MOBILE_ACCEPTANCE.md` Rows 1-4). This is genuine physical evidence for
+>    the **web/PWA** experience D1/D3 describe. Track E's own physical rows (23-47) remain
+>    **PHYSICAL PENDING**, unchanged — see `MOBILE_ACCEPTANCE.md` for the current row-by-row truth
+>    rather than this report's original snapshot. The native Witness Participate app (point 1) has
+>    its own, entirely separate physical-acceptance status, tracked in
+>    `MOBILE_RELEASE_GATES.md` M6, not here.
+
 ---
 
 ## D1 — Production surfaces, assessed from actual evidence

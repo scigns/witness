@@ -126,9 +126,9 @@ evidence, not speculation) for the complete record.
 |---|---|---|
 | iOS project generated | **PASS** | `cap add ios` completed; real Xcode project at `apps/participant-mobile/ios/App`, bundle id `com.buildwithwitness.participate`, deployment target iOS 15.0, Swift 5.0, `CODE_SIGN_STYLE = Automatic` — read directly from `project.pbxproj` |
 | iOS dependencies resolve | **NOT VERIFIED** | `CapApp-SPM/Package.swift` declares three Swift Package Manager dependencies (`capacitor-swift-pm` from GitHub, plus two local `node_modules` paths for the installed plugins) — no `Package.resolved` file exists anywhere in the project, meaning SPM has never actually run against it. Resolution requires `xcodebuild`/Xcode, which is unavailable (below) |
-| iOS simulator/generic compile | **BLOCKED** | `xcodebuild -project App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator build` fails immediately: `xcode-select: error: tool 'xcodebuild' requires Xcode, but active developer directory '/Library/Developer/CommandLineTools' is a command line tools instance`. This Mac has Command Line Tools only, not the full Xcode.app — CLI tools cannot build an iOS app target against the `iphonesimulator` SDK. **Genuine environment blocker, classified XCODE CONFIGURATION, not an application defect** — installing full Xcode was evaluated and not attempted: this Mac has 11 GB free disk, and Xcode.app alone (before any simulator runtime) typically requires well over that |
+| iOS simulator/generic compile | **BLOCKED** | `xcodebuild -project App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator build` fails immediately: `xcode-select: error: tool 'xcodebuild' requires Xcode, but active developer directory '/Library/Developer/CommandLineTools' is a command line tools instance`. This Mac has Command Line Tools only, not the full Xcode.app — CLI tools cannot build an iOS app target against the `iphonesimulator` SDK. **Genuine environment blocker, classified XCODE CONFIGURATION, not an application defect** — installing full Xcode has not been attempted yet. Disk space was previously a compounding constraint (5.1 GB free at last check); a Docker build-cache cleanup has since freed space back up to ~25 GiB free (`df -h /`, re-verified), which is likely enough for Xcode.app itself — the blocker is now genuinely just "install Xcode," not "no room to install Xcode" |
 | iOS signing | **BLOCKED** | No Apple Developer account, Team ID, certificate, or provisioning profile — see `docs/mobile/STORE_ACCOUNT_SETUP.md` |
-| iOS physical install | **BLOCKED** | No physical iPhone available, and no compiled build to install even if one were |
+| iOS physical install (native app, Level D) | **BLOCKED** | No compiled native build exists to install (no Xcode on this Mac — see the iOS table below), so there is nothing to put on a physical iPhone yet for the *native app*. This is distinct from browser/PWA physical testing, which has already run on a real iPhone — see `docs/testing/MOBILE_ACCEPTANCE.md` Rows 1-4 (iPhone 13, iOS 26.6.1, Safari) and the note below |
 | iOS Universal Link — client config | **PARTIAL** | `App.entitlements` exists with the correct `com.apple.developer.associated-domains` content (`applinks:witness-prod-web.pacificdigitalconsultancy.org`, `applinks:app.buildwithwitness.com`) — **but it is not wired into the Xcode project**: `project.pbxproj` contains no `CODE_SIGN_ENTITLEMENTS` build setting referencing it at all, confirmed by direct `grep`, not assumed. The file has existed since the previous cycle but was never actually attached to a build target — doing so requires Xcode's Signing & Capabilities UI (or careful manual `.pbxproj` editing this session chose not to attempt blind, per that same caution from the prior cycle) |
 | iOS Universal Link — AASA file template | **PASS** (template only) | `apps/web/public/.well-known/apple-app-site-association` exists with the correct `paths`/structure and an explicit `<TEAM_ID>` placeholder |
 | iOS Universal Link — live verified association | **BLOCKED** | Requires a real Team ID, the entitlement actually wired into a signed build, and the AASA file published on a live host — none of which exist |
@@ -141,7 +141,9 @@ unavailable" as before — and the entitlements-not-wired-into-the-project
 gap was found and documented precisely, which the previous cycle's summary
 did not distinguish from "entitlements file doesn't exist." The `xcodebuild`
 failure itself is unchanged and remains a genuine external blocker: no
-Xcode, and no reasonable path to installing it on 11 GB of free disk.
+Xcode is installed. Disk space, previously a second compounding constraint,
+is no longer the limiting factor — ~25 GiB is now free (see the iOS table
+above).
 
 ## M4 — Security
 
@@ -213,12 +215,28 @@ Native-specific, **PARTIAL** — real, but not yet physically proven:
 
 ## M6 — Physical device verification
 
-**Status: BLOCKED** — re-checked this cycle, not carried forward as an
-assumption. `adb devices` (platform-tools already installed from a
-previous cycle — adb/fastboot only, not the Android SDK or Android Studio)
-again returns an empty device list: no physical Android device is
-connected to this Mac. No Xcode and no physical iPhone exist for the iOS
-half either. A freshly-downloaded, independently-checksummed debug APK for
+**This gate is specifically about the native Witness Participate app**
+(`apps/participant-mobile`, ADR-0031) **on real hardware — not about
+physical-device testing in general.** A real iPhone has already run
+extensive browser/PWA acceptance testing (`docs/testing/MOBILE_ACCEPTANCE.md`
+Rows 1-4: iPhone 13, iOS 26.6.1, Safari, real hardware, 2026-09-26) — that
+evidence is genuine, physical, and unrelated to this gate. It proves the
+existing **web** participant journey works on real hardware (Phase 6,
+Track C/E); it says nothing about the native app's own install/launch/deep-
+link/journey, which is what this gate tracks. Do not read a BLOCKED status
+below as "no physical device has ever touched Witness Participate" — see
+`MOBILE_ACCEPTANCE.md`'s own header note for the same distinction, stated
+once and referenced from both documents rather than duplicated.
+
+**Status: BLOCKED (native app only)** — re-checked this cycle, not carried
+forward as an assumption. `adb devices` (platform-tools already installed
+from a previous cycle — adb/fastboot only, not the Android SDK or Android
+Studio) again returns an empty device list: no physical Android device is
+connected to this Mac for native-app testing. No Xcode exists on this Mac
+to produce a native iOS build, and consequently no physical iPhone has run
+the *native app* either — the same iPhone that already passed Rows 1-4
+above remains available and suitable the moment a TestFlight build exists.
+A freshly-downloaded, independently-checksummed debug APK for
 the current branch HEAD
 (`witness-participate-c4f335f-debug-apk`, SHA-256
 `cf3974624e6aa2b9f52e63ffe6e92075116bfdd4a080584a87d78cf4df51c69a`) is
@@ -280,7 +298,7 @@ the same items in summary form.
 | M3 — Native shell | PARTIAL — Android CI build logic PASS (real CI compile, verified debug APK + unsigned release AAB, reproduced across six independent runs including the current HEAD); Android cloud acceptance fully set up and actually executed (five real runs against a live Firebase project) but BLOCKED BY IAM CONSTRAINT — Google documents `roles/editor` as required for this free-tier CI pattern, deliberately not granted; Android signing/physical-device/verified-App-Link and all of iOS (including a confirmed `xcodebuild` environment blocker) remain BLOCKED |
 | M4 — Security | PASS (backend) / PARTIAL (native-specific physical proof — secure-storage plugin now verified from source on both platforms, not just documentation) |
 | M5 — Privacy & compliance prep | PARTIAL (HUMAN/LEGAL REVIEW REQUIRED items open) |
-| M6 — Physical device verification | BLOCKED — re-checked, not assumed: `adb devices` confirms no Android device connected; no Xcode/iPhone for iOS. Cloud Android acceptance (a distinct, non-substitutable evidence level) is BLOCKED BY IAM CONSTRAINT, not by missing setup — see M3 |
+| M6 — Physical device verification | BLOCKED for the **native app** only — re-checked, not assumed: `adb devices` confirms no Android device connected; no Xcode to produce a native iOS build. **Browser/PWA physical iPhone acceptance already passed** (`MOBILE_ACCEPTANCE.md` Rows 1-4, real iPhone 13/iOS 26.6.1) — a separate, non-substitutable evidence track from this native-app gate. Cloud Android acceptance (a distinct, non-substitutable evidence level) is BLOCKED BY IAM CONSTRAINT, not by missing setup — see M3 |
 | M7 — Distribution | BLOCKED (no Apple/Google accounts, signing, or DNS in this environment) |
 
 **STORE SUBMISSION = NO-GO.** M3, M6, and M7 are not PASS, and M4/M5 are not
