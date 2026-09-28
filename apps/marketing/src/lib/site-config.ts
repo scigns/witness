@@ -1,4 +1,12 @@
-const CANONICAL_MARKETING_ORIGIN = 'https://buildwithwitness.com';
+/**
+ * `www` is the canonical public marketing host (2026-09-28 product decision,
+ * superseding the earlier apex-canonical decision in
+ * `docs/commercial-website/DECISIONS.md`) — the apex now redirects here.
+ * This is a code-level/documentation decision only; the actual DNS/Cloudflare
+ * cutover is a separate, human-gated production action (see
+ * `docs/commercial-website/CUTOVER_RUNBOOK.md`).
+ */
+const CANONICAL_MARKETING_ORIGIN = 'https://www.buildwithwitness.com';
 const DEFAULT_DEPLOYMENT_URL = 'http://localhost:3002';
 
 export interface MarketingSiteConfig {
