@@ -1,0 +1,12 @@
+{
+  "_comment": "TEMPLATE — see docs/mobile/DEEP_LINKING.md. HUMAN ACTION REQUIRED: replace <TEAM_ID> with the real Apple Developer Team ID before this file is authoritative. A placeholder Team ID here means Universal Links will not verify — deliberately, rather than publishing a value that looks real but is not. Delete this comment key once real values are filled in (Apple's parser expects no unexpected keys at the top level).",
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "<TEAM_ID>.com.buildwithwitness.participate",
+        "paths": ["/join/*"]
+      }
+    ]
+  }
+}

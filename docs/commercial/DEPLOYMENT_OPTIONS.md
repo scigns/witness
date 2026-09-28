@@ -18,3 +18,18 @@ backup outcome or support commitment.
 
 Every deployment passes [pilot go/no-go](PILOT_GO_NO_GO.md), including identity, data sovereignty,
 consent, backup/restore, migration, incident ownership and success measures.
+
+## Infrastructure cost allocation
+
+Infrastructure is a real, allocable cost against each option above, not an invisible cost the
+founder absorbs by default:
+
+| Option | Infrastructure cost allocation |
+|---|---|
+| Hosted/cloud-managed | Amortised across shared-tenant infrastructure; the licence/hosting component already listed above is expected to cover a proportional share of the shared DigitalOcean/Cloudflare footprint documented in `docs/infrastructure/PRODUCTION_SERVICE_INVENTORY.md` and `docs/infrastructure/LAUNCH_COST_BASELINE.md`. |
+| Dedicated cloud | Infrastructure is its own line item, separate from the licence/implementation fee — a dedicated droplet (or larger, per that inventory's "Recommended" profile if the customer's summarisation/knowledge-graph needs justify it), dedicated backup retention, and any customer-specific Cloudflare configuration are priced, not bundled. |
+| Sovereign/on-premises | The customer owns and pays for the infrastructure directly; Witness's fee covers deployment, configuration, upgrades, and support only — see `docs/infrastructure/DEPLOYMENT_TOPOLOGY.md` for the same GitHub/DigitalOcean/Cloudflare separation of concerns applied to a customer-operated equivalent. |
+
+No dollar figure in this section is invented — see `LAUNCH_COST_BASELINE.md` for exactly which
+costs are already documented/verified versus which still require a live pricing check before being
+quoted in a proposal.

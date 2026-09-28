@@ -26,6 +26,7 @@ import type {
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { MicroSurvey } from '@/components/micro-survey';
 import {
   ActionItemStatusBadge,
   Card,
@@ -264,6 +265,28 @@ export default function SessionRecapPage({
           </Link>
         </div>
       </section>
+
+      <MicroSurvey
+        productArea="facilitation"
+        question="Did Witness help you understand what emerged from this workshop?"
+        submitFeedback={async (rating, comment) => {
+          const result = await api.submitProductFeedback(
+            workspaceId,
+            {
+              productArea: 'facilitation',
+              moment: 'facilitator_recap',
+              rating,
+              comment,
+              sessionId,
+            },
+            user,
+          );
+          return { feedbackId: result.id, offerTestimonial: result.offerTestimonial };
+        }}
+        submitTestimonialConsent={async (feedbackId, request) => {
+          await api.submitTestimonialConsent(workspaceId, feedbackId, request, user);
+        }}
+      />
     </div>
   );
 }

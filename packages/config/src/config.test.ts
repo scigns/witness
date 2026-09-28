@@ -471,6 +471,69 @@ describe('deployed public addresses', () => {
   });
 });
 
+describe('WITNESS_DEV_LAN_ORIGIN (physical-device LAN testing)', () => {
+  it('is not set by default, leaving ordinary development behaviour untouched', () => {
+    const config = loadConfig({ ...base });
+    expect(config.webOrigin).toBe('http://localhost:3000');
+  });
+
+  it('takes over as the web origin when set to a private RFC1918 address in development', () => {
+    const config = loadConfig({ ...base, WITNESS_DEV_LAN_ORIGIN: 'http://192.168.1.42:3000' });
+    expect(config.webOrigin).toBe('http://192.168.1.42:3000');
+    expect(config.webBaseUrl).toBe('http://192.168.1.42:3000/');
+  });
+
+  it('accepts each RFC1918 range (10.x, 172.16-31.x, 192.168.x)', () => {
+    for (const host of ['10.0.0.5', '172.16.0.5', '172.31.255.254', '192.168.0.5']) {
+      const config = loadConfig({ ...base, WITNESS_DEV_LAN_ORIGIN: `http://${host}:3000` });
+      expect(config.webOrigin).toBe(`http://${host}:3000`);
+    }
+  });
+
+  it('takes priority over an explicit WITNESS_WEB_ORIGIN when both are set', () => {
+    const config = loadConfig({
+      ...base,
+      WITNESS_WEB_ORIGIN: 'http://localhost:3000',
+      WITNESS_DEV_LAN_ORIGIN: 'http://192.168.1.42:3000',
+    });
+    expect(config.webOrigin).toBe('http://192.168.1.42:3000');
+  });
+
+  it('refuses a public IP address, even in development', () => {
+    expect(() => loadConfig({ ...base, WITNESS_DEV_LAN_ORIGIN: 'http://8.8.8.8:3000' })).toThrow(
+      /must be a private RFC1918 address/,
+    );
+  });
+
+  it('refuses a public hostname, even in development', () => {
+    expect(() =>
+      loadConfig({ ...base, WITNESS_DEV_LAN_ORIGIN: 'http://example.com:3000' }),
+    ).toThrow(/must be a private RFC1918 address/);
+  });
+
+  it('refuses an address just outside the 172.16.0.0/12 range', () => {
+    expect(() => loadConfig({ ...base, WITNESS_DEV_LAN_ORIGIN: 'http://172.32.0.1:3000' })).toThrow(
+      /must be a private RFC1918 address/,
+    );
+  });
+
+  it('refuses a malformed URL', () => {
+    expect(() => loadConfig({ ...base, WITNESS_DEV_LAN_ORIGIN: 'not-a-url' })).toThrow(
+      /is not a valid absolute URL/,
+    );
+  });
+
+  it('refuses to be set outside the development profile, even with a valid private address', () => {
+    expect(() =>
+      loadConfig({
+        ...oidcBase,
+        WITNESS_DEPLOYMENT_PROFILE: 'sovereign',
+        WITNESS_DEV_LAN_ORIGIN: 'http://192.168.1.42:3000',
+      }),
+    ).toThrow(/must not be set outside the development profile/);
+  });
+});
+
 describe('web base URL', () => {
   it('defaults to the root of the web origin', () => {
     const config = loadConfig({ ...oidcBase, WITNESS_DEPLOYMENT_PROFILE: 'sovereign' });

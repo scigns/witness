@@ -9,9 +9,11 @@
  * directly rather than through the action-grants table, because "may see my
  * own identity" is not a role-gated action.
  *
- * Every redirect target is either the fixed, configured web origin or a
- * fixed error path under it — never a caller-supplied URL — so this
- * controller cannot be used as an open redirect.
+ * Every redirect target is the fixed, configured web origin, a fixed error
+ * path under it, or that same origin plus a caller-supplied `returnTo`
+ * *path* (Track C, ADR-0030) — never a caller-supplied absolute URL, and
+ * `returnTo` is rejected by `isSafeReturnPath` unless it is root-relative
+ * with no scheme — so this controller cannot be used as an open redirect.
  */
 
 import {
@@ -37,6 +39,7 @@ import { WITNESS_CONFIG } from '../tokens.js';
 import {
   AuthenticationDeniedError,
   AuthenticationService,
+  isSafeReturnPath,
   type CurrentUserResult,
 } from './authentication.service.js';
 import { DevelopmentIdentityProviderAdapter } from './development-identity-provider.adapter.js';
@@ -55,6 +58,7 @@ export class AuthenticationController {
   @Get('login')
   async login(
     @Query('prompt') prompt: string | undefined,
+    @Query('returnTo') returnTo: string | undefined,
     @Res() response: Response,
   ): Promise<void> {
     if (prompt !== undefined && prompt !== 'create') {
@@ -62,7 +66,22 @@ export class AuthenticationController {
         error: { code: 'INVALID_PROMPT', message: 'Unsupported sign-in prompt.' },
       });
     }
-    const { redirectUrl } = await this.authentication.startLogin(prompt as 'create' | undefined);
+    // Invalid returnTo degrades to "no return path" (the pre-existing
+    // behaviour), never a rejected sign-in — see isSafeReturnPath's comment.
+    // `typeof returnTo === 'string'`, not `returnTo !== undefined`: Express
+    // parses a repeated query parameter (`?returnTo=a&returnTo=b`) as an
+    // array, and Nest's `@Query()` type annotation is compile-time only —
+    // it does not coerce or reject that at runtime. Without this guard,
+    // `isSafeReturnPath` (typed to accept only `string`) would receive an
+    // array and throw on `.startsWith`, an unauthenticated 500 on this
+    // sign-in entry point. Same guard `authentication.service.ts`'s own
+    // read-back of a stored `returnTo` already uses.
+    const safeReturnTo =
+      typeof returnTo === 'string' && isSafeReturnPath(returnTo) ? returnTo : undefined;
+    const { redirectUrl } = await this.authentication.startLogin(
+      prompt as 'create' | undefined,
+      safeReturnTo,
+    );
     response.redirect(302, redirectUrl);
   }
 
@@ -94,7 +113,17 @@ export class AuthenticationController {
         expires: session.expiresAt,
       });
       // The opaque Witness session never enters a URL or frontend JavaScript.
-      response.redirect(302, this.config.webBaseUrl);
+      // `returnTo` (Track C, ADR-0030) sends a `verified_guest`/
+      // `invited_only` participant back to the specific invitation/session
+      // they signed in from, instead of always the generic app root —
+      // re-validated here even though `handleCallback` already did, since
+      // this file's own header promises no redirect target here is ever
+      // caller-supplied without going through that check.
+      const target =
+        typeof session.returnTo === 'string' && isSafeReturnPath(session.returnTo)
+          ? new URL(session.returnTo, this.config.webBaseUrl)
+          : new URL(this.config.webBaseUrl);
+      response.redirect(302, target.toString());
     } catch (error) {
       const reason = error instanceof AuthenticationDeniedError ? error.reason : 'invalid_callback';
       const target = new URL('auth/error', this.config.webBaseUrl);

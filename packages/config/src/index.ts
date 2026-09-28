@@ -69,6 +69,13 @@ const schema = z.object({
   // application rather than to that something else. Empty means "the root",
   // which is what a dedicated hostname gives you.
   WITNESS_WEB_BASE_URL: z.string().optional().default(''),
+  // Explicit, development-only opt-in for physical-device LAN acceptance
+  // testing (a phone on the same network reaching a developer's machine).
+  // Never a default, refused outside the development profile, and — unlike
+  // WITNESS_WEB_ORIGIN, which development leaves otherwise unvalidated —
+  // restricted below to RFC1918 private addresses. Takes priority over
+  // WITNESS_WEB_ORIGIN when set. See docs/testing/LIVE_WORKSHOP_ACCEPTANCE_RUNBOOK.md.
+  WITNESS_DEV_LAN_ORIGIN: z.string().optional().default(''),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
@@ -261,6 +268,26 @@ function billingFieldProblems(name: string, value: string, max: number): string[
  * one of these has been handed a developer's configuration.
  */
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1', '0.0.0.0']);
+
+/**
+ * RFC1918 private IPv4 ranges only — 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16.
+ * Deliberately narrower than "any non-public-looking address" (excludes
+ * loopback and link-local, which already have their own path): this backs
+ * `WITNESS_DEV_LAN_ORIGIN`, whose entire purpose is "a phone on the same
+ * private network as this machine," never a public hostname or IP even in
+ * development.
+ */
+function isPrivateRfc1918Host(hostname: string): boolean {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(hostname);
+  if (match === null) return false;
+  const octets = match.slice(1, 5).map(Number);
+  if (octets.some((octet) => octet > 255)) return false;
+  const [a, b] = octets as [number, number, number, number];
+  if (a === 10) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
 
 /**
  * Check one URL that a browser or an identity provider has to reach.
@@ -546,8 +573,42 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WitnessConfig 
     );
   }
 
-  const webOrigin =
-    value.WITNESS_WEB_ORIGIN.trim() !== ''
+  // ── Development-only LAN opt-in for physical-device acceptance testing ─────
+  // Kept separate from the general WITNESS_WEB_ORIGIN escape hatch above
+  // (which development leaves otherwise unvalidated) because this one exists
+  // to expose the unverified development auth adapter to a phone on the same
+  // network — a materially different, narrower thing to opt into, and worth
+  // its own explicit variable rather than overloading an existing one.
+  const devLanOrigin = value.WITNESS_DEV_LAN_ORIGIN.trim();
+  let devLanOriginValid = false;
+  if (devLanOrigin !== '') {
+    if (value.WITNESS_DEPLOYMENT_PROFILE !== 'development') {
+      problems.push(
+        'WITNESS_DEV_LAN_ORIGIN is a development-only escape hatch for physical-device LAN ' +
+          'testing and must not be set outside the development profile.',
+      );
+    } else {
+      try {
+        const parsed = new URL(devLanOrigin);
+        if (isPrivateRfc1918Host(parsed.hostname)) {
+          devLanOriginValid = true;
+        } else {
+          problems.push(
+            `WITNESS_DEV_LAN_ORIGIN (${devLanOrigin}) must be a private RFC1918 address ` +
+              '(10.0.0.0/8, 172.16.0.0/12, or 192.168.0.0/16) — refusing a public hostname or ' +
+              'IP even in development, since this opt-in exists specifically to expose the ' +
+              'unverified development auth adapter to a phone on the same network, never further.',
+          );
+        }
+      } catch {
+        problems.push(`WITNESS_DEV_LAN_ORIGIN is not a valid absolute URL: ${devLanOrigin}`);
+      }
+    }
+  }
+
+  const webOrigin = devLanOriginValid
+    ? devLanOrigin
+    : value.WITNESS_WEB_ORIGIN.trim() !== ''
       ? value.WITNESS_WEB_ORIGIN.trim()
       : `http://localhost:${value.WITNESS_WEB_PORT}`;
 

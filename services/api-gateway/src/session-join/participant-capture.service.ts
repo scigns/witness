@@ -33,11 +33,18 @@ import { randomBytes, randomUUID } from 'node:crypto';
 
 import type { EvidenceAttributionMode, ParticipantIdentityMode } from '@witness/domain';
 import type {
+  CaptureParticipantFeedbackRequest,
+  CustomerStoryView,
   EvidenceAttachmentView,
+  FeaturedInsightView,
   ParticipantCaptureConsentRequest,
   ParticipantCaptureContextView,
   ParticipantCaptureEvidenceRequest,
   ParticipantCaptureEvidenceResult,
+  ParticipantPromptView,
+  ProductFeedbackView,
+  SubmitParticipantKnowledgeResponseRequest,
+  SubmitTestimonialConsentRequest,
 } from '@witness/contracts';
 
 import { PrismaService } from '../infrastructure/prisma.service.js';
@@ -49,6 +56,9 @@ import {
   type UploadedAttachmentFile,
 } from '../evidence/evidence-attachment.service.js';
 import { ParticipantConsentRecordsService } from '../participant-consent-records/participant-consent-records.service.js';
+import { ProductFeedbackService } from '../product-feedback/product-feedback.service.js';
+import { CustomerStoriesService } from '../customer-stories/customer-stories.service.js';
+import { SessionFeaturedInsightsService } from '../session-featured-insights/session-featured-insights.service.js';
 
 /** Session-scoped, not tied to the join link's own (often much shorter) expiry. */
 export const CAPTURE_TOKEN_TTL_HOURS = 24;
@@ -109,6 +119,9 @@ export class ParticipantCaptureService {
     private readonly evidence: EvidenceService,
     private readonly participantConsent: ParticipantConsentRecordsService,
     private readonly attachments: EvidenceAttachmentService,
+    private readonly productFeedback: ProductFeedbackService,
+    private readonly customerStories: CustomerStoriesService,
+    private readonly insights: SessionFeaturedInsightsService,
   ) {}
 
   async mint(participantId: string, now: Date): Promise<string> {
@@ -168,6 +181,7 @@ export class ParticipantCaptureService {
         content: request.content,
         language: request.language,
         sessionOffsetSeconds: request.sessionOffsetSeconds,
+        sourceAgendaItemId: request.sourceAgendaItemId,
         // Never client-supplied: this is the entire security property this
         // service exists to guarantee — a forged request body cannot make
         // one participant's token file evidence attributed to another.
@@ -224,7 +238,120 @@ export class ParticipantCaptureService {
     );
   }
 
+  /**
+   * A participant may only ever give feedback tagged
+   * `participant_capture_success`, scoped to their own resolved session and
+   * identity — never client-supplied, the same discipline `captureEvidence`
+   * applies to `sourceParticipantId`.
+   */
+  async captureFeedback(
+    rawToken: string,
+    request: CaptureParticipantFeedbackRequest,
+  ): Promise<ProductFeedbackView> {
+    const resolved = await this.resolveToken(rawToken);
+    const principal = participantPrincipal(resolved.participantId, resolved.displayName);
+
+    return this.productFeedback.submitForParticipant(
+      resolved.workspaceId,
+      resolved.sessionId,
+      resolved.participantId,
+      { rating: request.rating, comment: request.comment ?? null },
+      principal,
+    );
+  }
+
+  /**
+   * `feedbackId` is caller-supplied — `requireOwnFeedback` verifies it
+   * actually belongs to the resolved participant before ever reaching
+   * `CustomerStoriesService`, mirroring `requireOwnEvidence` above, so a
+   * forged `feedbackId` cannot consent to a testimonial on someone else's
+   * feedback.
+   */
+  async captureTestimonialConsent(
+    rawToken: string,
+    feedbackId: string,
+    request: SubmitTestimonialConsentRequest,
+  ): Promise<CustomerStoryView | null> {
+    const resolved = await this.resolveToken(rawToken);
+    await this.requireOwnFeedback(resolved.participantId, feedbackId);
+    const principal = participantPrincipal(resolved.participantId, resolved.displayName);
+
+    return this.customerStories.proposeFromFeedbackForParticipant(
+      resolved.workspaceId,
+      feedbackId,
+      resolved.participantId,
+      request,
+      principal,
+    );
+  }
+
+  /**
+   * The session's current workshop prompt, or `null` for open reflection /
+   * between prompts. `position`/`totalPrompts` come from the same
+   * `sortOrder` sequence `AgendaItemsController` already maintains — no new
+   * ordering concept, just a participant-safe read of it.
+   */
+  async getPrompt(rawToken: string): Promise<ParticipantPromptView | null> {
+    const resolved = await this.resolveToken(rawToken);
+
+    const items = await this.prisma.agendaItem.findMany({
+      where: { sessionId: resolved.sessionId },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, title: true, promptText: true, status: true },
+    });
+    if (items.length === 0) return null;
+
+    const currentIndex = items.findIndex((item) => item.status === 'current');
+    if (currentIndex === -1) return null;
+
+    const current = items[currentIndex]!;
+    return {
+      id: current.id,
+      title: current.title,
+      promptText: current.promptText,
+      position: currentIndex + 1,
+      totalPrompts: items.length,
+      status: current.status as ParticipantPromptView['status'],
+    };
+  }
+
+  async getInsights(rawToken: string): Promise<FeaturedInsightView[]> {
+    const resolved = await this.resolveToken(rawToken);
+    return this.insights.listForParticipant(resolved.sessionId, resolved.participantId);
+  }
+
+  async submitInsightResponse(
+    rawToken: string,
+    insightId: string,
+    request: SubmitParticipantKnowledgeResponseRequest,
+  ): Promise<void> {
+    const resolved = await this.resolveToken(rawToken);
+    const principal = participantPrincipal(resolved.participantId, resolved.displayName);
+    await this.insights.submitResponse(
+      resolved.sessionId,
+      insightId,
+      resolved.participantId,
+      request,
+      principal,
+    );
+  }
+
   // ─── Internals ────────────────────────────────────────────────────────────
+
+  private async requireOwnFeedback(participantId: string, feedbackId: string): Promise<void> {
+    const row = await this.prisma.productFeedback.findUnique({
+      where: { id: feedbackId },
+      select: { sourceParticipantId: true },
+    });
+    if (row === null || row.sourceParticipantId !== participantId) {
+      throw new NotFoundException({
+        error: {
+          code: 'FEEDBACK_NOT_FOUND',
+          message: `No feedback '${feedbackId}' available to this capture token.`,
+        },
+      });
+    }
+  }
 
   private async requireOwnEvidence(participantId: string, evidenceId: string): Promise<void> {
     const row = await this.prisma.evidence.findUnique({

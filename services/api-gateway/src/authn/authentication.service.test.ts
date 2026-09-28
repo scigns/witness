@@ -9,7 +9,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../infrastructure/prisma.service.js';
 import { IdentityProviderPort, type VerifiedIdentity } from './identity-provider.port.js';
-import { AuthenticationDeniedError, AuthenticationService } from './authentication.service.js';
+import {
+  AuthenticationDeniedError,
+  AuthenticationService,
+  isSafeReturnPath,
+} from './authentication.service.js';
 import { SessionService } from './session.service.js';
 
 const REDIRECT_URI = 'http://localhost:3001/api/v1/auth/callback';
@@ -214,13 +218,18 @@ function fakePrisma() {
   };
 }
 
-async function primeLoginAttempt(prisma: PrismaService, state: string) {
+async function primeLoginAttempt(
+  prisma: PrismaService,
+  state: string,
+  returnTo: string | null = null,
+) {
   await prisma.authLoginAttempt.create({
     data: {
       state,
       nonce: 'nonce-1',
       codeVerifier: 'verifier-1',
       redirectUri: REDIRECT_URI,
+      returnTo,
       expiresAt: new Date(Date.now() + 600_000),
     },
   });
@@ -676,6 +685,79 @@ describe('AuthenticationService — sign-in and user mapping', () => {
     const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
 
     expect(await service.getCurrentUser(SUSPENDED_USER)).toEqual({ status: 'suspended' });
+  });
+});
+
+describe('isSafeReturnPath (Track C, ADR-0030)', () => {
+  it('accepts a root-relative path', () => {
+    expect(isSafeReturnPath('/join/abc123')).toBe(true);
+    expect(isSafeReturnPath('/')).toBe(true);
+  });
+
+  it('rejects a protocol-relative path (parsed by browsers as an absolute URL)', () => {
+    expect(isSafeReturnPath('//evil.example')).toBe(false);
+  });
+
+  it('rejects anything carrying a scheme', () => {
+    expect(isSafeReturnPath('https://evil.example/join/abc123')).toBe(false);
+    expect(isSafeReturnPath('javascript://evil.example')).toBe(false);
+  });
+
+  it('rejects a path not starting with a slash', () => {
+    expect(isSafeReturnPath('join/abc123')).toBe(false);
+  });
+
+  it('rejects a backslash trick some URL parsers treat as a slash', () => {
+    expect(isSafeReturnPath('/\\evil.example')).toBe(false);
+  });
+});
+
+describe('AuthenticationService — returnTo (Track C, ADR-0030)', () => {
+  it('carries a valid returnTo path from startLogin through to handleCallback', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    const { redirectUrl } = await service.startLogin(undefined, '/join/abc123');
+    const state = new URL(redirectUrl).searchParams.get('state')!;
+
+    const result = await service.handleCallback('code-1', state);
+    expect(result.returnTo).toBe('/join/abc123');
+  });
+
+  it('drops an unsafe returnTo at startLogin time rather than storing it', async () => {
+    const { prisma, authLoginAttempts } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await service.startLogin(undefined, 'https://evil.example/');
+    expect(authLoginAttempts[0]?.['returnTo']).toBeNull();
+  });
+
+  it('falls back to null when no returnTo was ever recorded', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    await primeLoginAttempt(prisma, 'state-1', null);
+    const result = await service.handleCallback('code-1', 'state-1');
+    expect(result.returnTo).toBeNull();
+  });
+
+  it('re-validates at callback time — a corrupted row can never redirect off-origin', async () => {
+    const { prisma } = fakePrisma();
+    const idp = new StubIdentityProvider();
+    const sessions = new SessionService(prisma);
+    const service = new AuthenticationService(prisma, idp, sessions, REDIRECT_URI, 480);
+
+    // Simulates a row that bypassed startLogin's own validation somehow —
+    // the defense-in-depth re-check this test proves exists.
+    await primeLoginAttempt(prisma, 'state-1', 'https://evil.example/');
+    const result = await service.handleCallback('code-1', 'state-1');
+    expect(result.returnTo).toBeNull();
   });
 });
 

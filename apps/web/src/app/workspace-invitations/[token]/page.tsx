@@ -11,12 +11,9 @@
  * prompt ever appears — never "authenticate first, discover later what you
  * accepted".
  *
- * A known, accepted UX limitation: Witness's sign-in flow does not yet
- * support returning to a specific page after authentication (every sign-in
- * lands on the app root, a pre-existing limitation of the OIDC callback,
- * not something this page works around) — so a signed-out invitee who
- * clicks "Sign in to accept" must return to this same link afterward. The
- * page says so explicitly rather than leaving it a silent surprise.
+ * A signed-out invitee who clicks "Sign in to accept" is returned to this
+ * same invitation after the OIDC round-trip (Track C, ADR-0030's `returnTo`
+ * — this page previously had to warn that this did not happen; it now does).
  */
 
 import Link from 'next/link';
@@ -27,6 +24,11 @@ import type { WorkspaceInvitationContextView } from '@witness/contracts';
 import { api, ApiError, authApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { AffiliationTag, Button, Card, ErrorNotice } from '@/components/ui';
+
+// Manually prefixed, like `manifest.ts`/`service-worker.tsx` — this path is
+// consumed server-side as a plain redirect target after the OIDC round-trip,
+// not routed through Next's own basePath-aware router.
+const BASE_PATH = process.env['NEXT_PUBLIC_WITNESS_BASE_PATH'] ?? '';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -229,13 +231,13 @@ export default function WorkspaceInvitationPage({
       ) : (
         <div className="space-y-3">
           <a
-            href={authApi.loginUrl()}
+            href={authApi.loginUrl(`${BASE_PATH}/workspace-invitations/${token}`)}
             className="inline-flex items-center justify-center rounded bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-accent-contrast)] hover:opacity-90"
           >
             Sign in to accept
           </a>
           <p className="text-xs text-[var(--color-ink-muted)]">
-            After signing in, return to this link to accept.
+            You&rsquo;ll be brought back here automatically after signing in.
           </p>
           <Button variant="secondary" onClick={() => void decline()} disabled={busy}>
             Decline without signing in

@@ -22,6 +22,7 @@ import type { CoDesignSessionSummary, EvidenceSummary, WorkspaceSummary } from '
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useSession } from '@/lib/session';
+import { MicroSurvey } from '@/components/micro-survey';
 import { ProgramNav } from '@/components/program-nav';
 import { Card, EmptyState, ErrorNotice, EvidenceReviewStatusBadge } from '@/components/ui';
 
@@ -134,10 +135,27 @@ export default function ReviewQueuePage({ params }: { params: Promise<{ id: stri
       <ProgramNav workspaceId={id} role={role} />
 
       {items.length === 0 ? (
-        <EmptyState
-          title="Nothing needs review right now"
-          body="Submitted contributions across every session in this program will appear here as soon as there's something to look at."
-        />
+        <>
+          <EmptyState
+            title="Nothing needs review right now"
+            body="Submitted contributions across every session in this program will appear here as soon as there's something to look at."
+          />
+          <MicroSurvey
+            productArea="review"
+            question="Did Witness make the evidence easier to verify?"
+            submitFeedback={async (rating, comment) => {
+              const result = await api.submitProductFeedback(
+                id,
+                { productArea: 'review', moment: 'reviewer_queue_cleared', rating, comment },
+                user,
+              );
+              return { feedbackId: result.id, offerTestimonial: result.offerTestimonial };
+            }}
+            submitTestimonialConsent={async (feedbackId, request) => {
+              await api.submitTestimonialConsent(id, feedbackId, request, user);
+            }}
+          />
+        </>
       ) : (
         <ul className="space-y-3">
           {items.map(({ evidence, session }) => (

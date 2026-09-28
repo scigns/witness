@@ -22,6 +22,7 @@ import { BUILD_INFO } from './build-info.js';
 import { loadRootEnv } from './infrastructure/load-root-env.js';
 import { StructuredLogger } from './observability/structured-logger.js';
 import { csrfOriginProtection } from './authn/csrf-origin.js';
+import { devSignInLoopbackGuard } from './authn/dev-signin-loopback-guard.js';
 
 async function bootstrap(): Promise<void> {
   loadRootEnv();
@@ -81,6 +82,16 @@ async function bootstrap(): Promise<void> {
   // carry the exact configured application Origin. Bearer-only API clients
   // remain a separate mechanism and are not given browser CSRF semantics.
   app.use(csrfOriginProtection(config.webOrigin));
+
+  // Physical-device LAN acceptance testing (Phase 6, Track E) may bind this
+  // API to a LAN-reachable address on purpose, for a phone's participant
+  // traffic — but the unverified development sign-in flow must not become
+  // reachable to every other device on that same network as a result.
+  // Production/hybrid/sovereign never construct the development identity
+  // provider at all, so this is a no-op there regardless.
+  if (config.profile === 'development') {
+    app.use(devSignInLoopbackGuard());
+  }
 
   // Behind the pilot's ingress, every connection Express sees arrives over
   // plaintext HTTP from something on the same machine or the same private

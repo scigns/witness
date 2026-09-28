@@ -48,6 +48,7 @@ import type {
   ParticipantIdentityVisibility,
 } from './session-participant.js';
 import type {
+  AgendaItemId,
   CoDesignSessionId,
   EvidenceId,
   OrganisationId,
@@ -199,6 +200,14 @@ export interface Evidence {
   readonly capturedAt: Date;
   /** Seconds from the session's start, when the facilitator recorded one. */
   readonly sessionOffsetSeconds: number | null;
+  /**
+   * The workshop prompt (`AgendaItem`) this contribution answers, if any —
+   * `null` means open reflection / no active prompt at capture time. Set
+   * once at capture and never changed afterward, same discipline as
+   * `sessionOffsetSeconds`: it records what was true when the contribution
+   * was made, not a live reference the facilitator could later repoint.
+   */
+  readonly sourceAgendaItemId: AgendaItemId | null;
   readonly sourceParticipantId: SessionParticipantId | null;
   readonly attributionMode: EvidenceAttributionMode;
   readonly identityVisibility: ParticipantIdentityVisibility;
@@ -467,6 +476,7 @@ export interface CaptureEvidenceInput {
   content: string;
   language?: string | null | undefined;
   sessionOffsetSeconds?: number | null | undefined;
+  sourceAgendaItemId?: AgendaItemId | null | undefined;
   sourceParticipantId?: SessionParticipantId | null | undefined;
   /** The source participant's identity mode, read by the service — see `assertAttributionCompatibility`. */
   participantIdentityMode?: ParticipantIdentityMode | null | undefined;
@@ -516,6 +526,7 @@ export function captureEvidence(
     language: assertOptional(input.language, LANGUAGE_MAX, 'LANGUAGE'),
     capturedAt: input.at,
     sessionOffsetSeconds: assertSessionOffset(input.sessionOffsetSeconds),
+    sourceAgendaItemId: input.sourceAgendaItemId ?? null,
     sourceParticipantId,
     attributionMode: input.attributionMode,
     identityVisibility: input.identityVisibility ?? 'visible_to_all_participants',

@@ -1,0 +1,156 @@
+# Witness Participate — cloud Android acceptance (Level C evidence).
+#
+# Runs the exact APK mobile-android.yml already built against a Firebase Test
+# Lab virtual device — proving the APK installs and the native application
+# launches, without installing Android Studio, an emulator, or the Android SDK
+# anywhere. See docs/mobile/CLOUD_ANDROID_TESTING.md for the full design
+# rationale, the free-tier verification (Firebase Spark plan: 10 free virtual-
+# device runs/day, no billing account, no payment method), and why this is a
+# distinct evidence level from physical-device acceptance, not a substitute
+# for it.
+#
+# Does NOT rebuild the APK — downloads the artifact from an existing
+# mobile-android.yml run, preserving the provenance chain (source SHA -> CI
+# build -> APK SHA -> cloud test -> result) docs/mobile/MOBILE_RELEASE_GATES.md
+# depends on.
+#
+# workflow_dispatch only, deliberately: with a 10-run/day free quota shared
+# across however often this fires, an automatic trigger on every mobile PR
+# would risk exhausting it on ordinary development churn. This is a
+# controlled, manually-invoked acceptance check, not a per-commit gate.
+#
+# Authenticates via Workload Identity Federation (keyless) once a human has
+# completed the one-time Google Cloud/Firebase setup documented in
+# CLOUD_ANDROID_TESTING.md — no service account JSON key is used or stored
+# anywhere. Until that setup exists, the "Probe Firebase configuration" step
+# below skips the rest of the job loudly rather than failing red, the same
+# pattern security.yml's dependency-review job already uses in this
+# repository for an equivalent "platform feature might not be configured
+# yet" situation.
+
+name: Mobile — Android cloud acceptance
+
+on:
+  # Path-filtered to this file alone: lets a change to this workflow prove
+  # its own probe/skip path in a real run (the only path provable without
+  # completed Firebase setup) without ever touching the 10-run/day quota —
+  # the job's real steps are all gated behind steps.probe.outputs.configured,
+  # so a PR that only touches this file always takes the skip branch.
+  pull_request:
+    paths:
+      - ".github/workflows/mobile-android-cloud.yml"
+  workflow_dispatch:
+    inputs:
+      android_build_run_id:
+        description: "mobile-android.yml run ID to pull the APK from. Leave blank to use the latest successful run on this ref."
+        required: false
+        type: string
+      device_model:
+        description: "Test Lab virtual device model ID. Run `gcloud firebase test android models list` (or check this job's own model-list step output on a prior run) to find a real, currently-available value before filling this in — do not guess."
+        required: true
+        type: string
+      device_version:
+        description: "Android API level for the chosen device model, e.g. 33."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cloud-android:
+    name: Cloud Android acceptance
+    runs-on: ubuntu-latest
+    # Workload Identity Federation needs this to mint the GitHub OIDC token.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Probe Firebase configuration
+        id: probe
+        run: |
+          if [ -z "${{ vars.FIREBASE_PROJECT_ID }}" ] || [ -z "${{ vars.FIREBASE_WORKLOAD_IDENTITY_PROVIDER }}" ] || [ -z "${{ vars.FIREBASE_SERVICE_ACCOUNT }}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Cloud Android acceptance skipped::FIREBASE_PROJECT_ID, FIREBASE_WORKLOAD_IDENTITY_PROVIDER and/or FIREBASE_SERVICE_ACCOUNT repository variables are not set. See docs/mobile/CLOUD_ANDROID_TESTING.md for the one-time Firebase/Workload-Identity-Federation setup this requires. This is NOT a failure — Level C cloud evidence simply does not exist yet."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve Android build run
+        if: steps.probe.outputs.configured == 'true'
+        id: build_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_RUN_ID: ${{ inputs.android_build_run_id }}
+        run: |
+          if [ -n "$INPUT_RUN_ID" ]; then
+            run_id="$INPUT_RUN_ID"
+          else
+            run_id=$(gh run list --repo "${{ github.repository }}" --branch "${{ github.ref_name }}" \
+              --workflow "Mobile — Android" --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          fi
+          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+            echo "::error::No successful Mobile — Android run found for ${{ github.ref_name }}. Run that workflow first."
+            exit 1
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download the debug APK
+        if: steps.probe.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p android-apk
+          gh run download "${{ steps.build_run.outputs.run_id }}" --repo "${{ github.repository }}" \
+            --pattern '*-debug-apk' --dir android-apk
+          apk=$(find android-apk -name '*.apk' | head -1)
+          test -s "$apk"
+          echo "APK_PATH=$apk" >> "$GITHUB_ENV"
+          sha256sum "$apk"
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        if: steps.probe.outputs.configured == 'true'
+        with:
+          project_id: ${{ vars.FIREBASE_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.FIREBASE_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.FIREBASE_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        if: steps.probe.outputs.configured == 'true'
+
+      # Informational — printed to the log so a human can confirm the
+      # device_model/device_version inputs above actually exist before (or
+      # after) the real test run, per "do not hard-code a device that does
+      # not exist."
+      - name: List available Test Lab virtual devices
+        if: steps.probe.outputs.configured == 'true'
+        run: |
+          gcloud firebase test android models list
+          gcloud firebase test android versions list
+
+      # Robo only, for v1 — explores the app automatically. This proves the
+      # APK installs and the app does not crash on launch/basic navigation;
+      # it does NOT prove the governed JOIN -> CONSENT -> CAPTURE ->
+      # SUBMISSION journey. See docs/mobile/CLOUD_ANDROID_TESTING.md's
+      # "Automated participant journey" section for why an instrumentation
+      # suite (the mechanism that could prove that journey) does not exist
+      # yet and is recorded as follow-up work, not built in this pass.
+      - name: Run Firebase Test Lab (Robo)
+        if: steps.probe.outputs.configured == 'true'
+        run: |
+          gcloud firebase test android run \
+            --type robo \
+            --app "$APK_PATH" \
+            --device "model=${{ inputs.device_model }},version=${{ inputs.device_version }},locale=en,orientation=portrait" \
+            --timeout 5m \
+            2>&1 | tee test-lab-output.log
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.probe.outputs.configured == 'true'
+        with:
+          name: cloud-android-test-lab-output-${{ github.run_id }}
+          path: test-lab-output.log
+          retention-days: 14
+          if-no-files-found: warn

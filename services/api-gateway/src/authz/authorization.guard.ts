@@ -21,6 +21,7 @@ import { AuthorizationPort, type Action, type Principal } from './authorization.
 import { PolicyEnforcementService } from './policy-enforcement.service.js';
 import type { ResourceScope } from './role-resolution.service.js';
 import { SessionAuthenticator } from './session-authenticator.js';
+import { isLoopbackAddress } from '../authn/loopback.js';
 
 export const REQUIRED_ACTION = 'witness:required-action';
 
@@ -45,10 +46,6 @@ export interface RequestWithPrincipal {
   body?: Record<string, unknown>;
   principal?: Principal;
   socket?: { remoteAddress?: string };
-}
-
-function isLoopback(address: string | undefined): boolean {
-  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 
 /**
@@ -128,31 +125,41 @@ export class AuthorizationGuard implements CanActivate {
       });
     }
 
+    // Development identity is intentionally unverified — every route this
+    // guard protects is a facilitator/admin surface (participant join and
+    // capture-token flows never reach this guard at all, by construction:
+    // they authenticate via X-Witness-Capture-Token, a separate mechanism
+    // entirely), so a dev-header-resolved principal must never act on any of
+    // them from anywhere but this machine, regardless of which role the
+    // header claims. This used to cover `invoice:*` alone; broadened for
+    // Phase 6 Track E, whose whole point is exposing this API on the LAN for
+    // a phone's participant traffic — which would otherwise let any other
+    // device on that same LAN claim any role for any privileged action
+    // merely by sending the header (see MOBILE_ACCEPTANCE.md's LAN-scope
+    // note). A real, verified session is unaffected by this check no matter
+    // where it connects from — this only ever fires for the unverified path.
+    if (sessionPrincipal === null && !isLoopbackAddress(request.socket?.remoteAddress)) {
+      throw new UnauthorizedException({
+        error: {
+          code: 'DEVELOPMENT_ACCESS_LOCAL_ONLY',
+          message: 'Development-authenticated access is restricted to localhost.',
+        },
+      });
+    }
+
     // Platform authority is never available through the unverified development
     // header, even on localhost. Settlement and platform-role management require
     // a real OIDC-backed session and a platform-scoped role resolved below.
     if (
-      (required === 'payment:settle' || required.startsWith('platform_role:')) &&
+      (required === 'payment:settle' ||
+        required === 'customer_story:publish' ||
+        required.startsWith('platform_role:')) &&
       sessionPrincipal === null
     ) {
       throw new UnauthorizedException({
         error: {
           code: 'VERIFIED_OPERATOR_REQUIRED',
           message: 'Platform authority requires a verified Witness operator session.',
-        },
-      });
-    }
-    // Development identity is intentionally unverified. Keep invoice
-    // surfaces confined to a local socket even when a role header claims admin.
-    if (
-      required.startsWith('invoice:') &&
-      sessionPrincipal === null &&
-      !isLoopback(request.socket?.remoteAddress)
-    ) {
-      throw new UnauthorizedException({
-        error: {
-          code: 'DEVELOPMENT_ACCESS_LOCAL_ONLY',
-          message: 'Development-authenticated invoice access is restricted to localhost.',
         },
       });
     }

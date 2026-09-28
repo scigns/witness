@@ -16,6 +16,7 @@
     "test:live": "vitest run --config vitest.live.config.ts",
     "lint": "eslint src",
     "seed": "prisma generate && tsx prisma/seed.ts",
+    "seed:live-workshop-acceptance": "prisma generate && tsx prisma/seed-live-workshop-acceptance.ts",
     "clean": "rm -rf dist *.tsbuildinfo",
     "bootstrap": "prisma generate && tsx prisma/bootstrap.ts",
     "invite": "prisma generate && tsx prisma/invite.ts",

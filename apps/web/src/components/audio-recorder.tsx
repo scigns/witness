@@ -73,6 +73,26 @@ export function AudioRecorder({
     };
   }, []);
 
+  /**
+   * A recording (in progress, paused, or stopped-but-not-yet-submitted)
+   * exists only in memory — closing the tab, reloading, or navigating away
+   * loses it with no way to recover it, unlike a submitted contribution
+   * (server-persisted) or an offline-queued one (IndexedDB-persisted). The
+   * browser's native confirmation dialog is the only cross-browser way to
+   * warn before that happens; the custom message text is ignored by every
+   * modern browser, but setting `returnValue` is still what triggers the
+   * dialog at all.
+   */
+  useEffect(() => {
+    if (status === 'idle') return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [status]);
+
   const start = async () => {
     setError(null);
     try {

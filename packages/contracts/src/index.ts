@@ -1101,6 +1101,8 @@ export const participantCaptureEvidenceRequestSchema = z.object({
   language: z.string().trim().max(50).optional(),
   sessionOffsetSeconds: z.number().int().min(0).optional(),
   tags: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
+  /** The workshop prompt (`AgendaItem`) this contribution answers, if any — omitted for open reflection. */
+  sourceAgendaItemId: z.string().uuid().optional(),
   /** Same idempotent-retry convention as `captureEvidenceRequestSchema`. */
   clientRequestId: z.string().uuid('A valid client request id is required'),
 });
@@ -1193,6 +1195,8 @@ export const captureEvidenceRequestSchema = z.object({
   language: z.string().trim().max(50).optional(),
   sessionOffsetSeconds: z.number().int().min(0).optional(),
   sourceParticipantId: z.string().uuid().optional(),
+  /** The workshop prompt (`AgendaItem`) this contribution answers, if any — omitted for open reflection. */
+  sourceAgendaItemId: z.string().uuid().optional(),
   attributionMode: z.enum(EVIDENCE_ATTRIBUTION_MODES),
   identityVisibility: z.enum(PARTICIPANT_IDENTITY_VISIBILITIES).optional(),
   tags: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
@@ -2226,6 +2230,8 @@ export interface EvidenceSummary {
   withdrawn: boolean;
   /** Present only when `attributionMode` is `attributed`. */
   sourceParticipantId?: string;
+  /** The workshop prompt this contribution answered, if any — absent for open reflection. */
+  sourceAgendaItemId?: string;
   /** Absent when no file has been attached to this evidence yet. */
   attachmentKind?: EvidenceAttachmentKind;
   /** Absent when the attachment has no transcript (not audio, or never requested). */
@@ -3300,4 +3306,253 @@ export interface KnowledgeProvenanceChainView {
   extractionModelVersion: string | null;
   confirmedByName: string;
   confirmedAt: string;
+}
+
+// ─── Product feedback micro-surveys and governed testimonial publication (Phase 6, Track B) ───
+
+/**
+ * Mirrors @witness/domain's `ProductArea`/`FeedbackMoment`, kept as separate
+ * literals here per this package's deliberate independence from the GPL
+ * domain package (see file header) — cross-checked by contracts-drift.test.ts.
+ */
+export const PRODUCT_AREAS = ['evidence_capture', 'facilitation', 'review', 'reporting'] as const;
+export type ProductArea = (typeof PRODUCT_AREAS)[number];
+
+export const FEEDBACK_MOMENTS = [
+  'participant_capture_success',
+  'facilitator_recap',
+  'reviewer_queue_cleared',
+  'report_export_success',
+] as const;
+export type FeedbackMoment = (typeof FEEDBACK_MOMENTS)[number];
+
+export const submitProductFeedbackRequestSchema = z
+  .object({
+    productArea: z.enum(PRODUCT_AREAS),
+    moment: z.enum(FEEDBACK_MOMENTS),
+    rating: z.number().int().min(1).max(5),
+    comment: z.string().trim().max(2000).nullable().optional(),
+    sessionId: z.string().uuid().nullable().optional(),
+  })
+  .strict();
+export type SubmitProductFeedbackRequest = z.infer<typeof submitProductFeedbackRequestSchema>;
+
+/** The subset a capture-token participant may submit — area/moment/session are always server-derived for that flow. */
+export const captureParticipantFeedbackRequestSchema = z
+  .object({
+    rating: z.number().int().min(1).max(5),
+    comment: z.string().trim().max(2000).nullable().optional(),
+  })
+  .strict();
+export type CaptureParticipantFeedbackRequest = z.infer<
+  typeof captureParticipantFeedbackRequestSchema
+>;
+
+export interface ProductFeedbackView {
+  id: string;
+  productArea: ProductArea;
+  moment: FeedbackMoment;
+  rating: number;
+  comment: string | null;
+  /** Whether this feedback is positive enough to offer a testimonial follow-up. */
+  offerTestimonial: boolean;
+  createdAt: string;
+}
+
+export const CUSTOMER_STORY_CONSENT_CHOICES = ['declined', 'named', 'anonymous'] as const;
+export type CustomerStoryConsentChoice = (typeof CUSTOMER_STORY_CONSENT_CHOICES)[number];
+
+export const submitTestimonialConsentRequestSchema = z
+  .object({
+    consentChoice: z.enum(CUSTOMER_STORY_CONSENT_CHOICES),
+    organisationAttributionConsent: z.boolean().optional(),
+    attributedName: z.string().trim().min(1).max(200).nullable().optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.consentChoice === 'anonymous' && value.attributedName != null) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['attributedName'],
+        message: 'A name cannot be attributed to an anonymous consent choice.',
+      });
+    }
+  });
+export type SubmitTestimonialConsentRequest = z.infer<typeof submitTestimonialConsentRequestSchema>;
+
+export const CUSTOMER_STORY_MODERATION_STATUSES = ['pending', 'approved', 'rejected'] as const;
+export type CustomerStoryModerationStatus = (typeof CUSTOMER_STORY_MODERATION_STATUSES)[number];
+
+export const editCustomerStoryWordingRequestSchema = z
+  .object({
+    quote: z.string().trim().min(1).max(1000),
+    context: z.string().trim().min(1).max(500),
+    organisationLabel: z.string().trim().min(1).max(200).nullable().optional(),
+  })
+  .strict();
+export type EditCustomerStoryWordingRequest = z.infer<typeof editCustomerStoryWordingRequestSchema>;
+
+export const moderateCustomerStoryRequestSchema = z.discriminatedUnion('decision', [
+  z.object({ decision: z.literal('approve') }).strict(),
+  z.object({ decision: z.literal('reject'), reason: z.string().trim().min(1).max(500) }).strict(),
+]);
+export type ModerateCustomerStoryRequest = z.infer<typeof moderateCustomerStoryRequestSchema>;
+
+/** The full internal shape, for the workspace moderation page. */
+export interface CustomerStoryView {
+  id: string;
+  productFeedbackId: string;
+  organisationId: string;
+  workspaceId: string;
+
+  consentChoice: 'named' | 'anonymous';
+  organisationAttributionConsent: boolean;
+  attributedName: string | null;
+  consentGivenAt: string;
+  consentWithdrawnAt: string | null;
+
+  roleLabel: string;
+  rawQuote: string | null;
+
+  quote: string | null;
+  context: string | null;
+  organisationLabel: string | null;
+
+  moderationStatus: CustomerStoryModerationStatus;
+  moderationReason: string | null;
+  moderatedByName: string | null;
+  moderatedAt: string | null;
+
+  publishedAt: string | null;
+  createdAt: string;
+
+  /** Whether the *current* principal holds the platform-scope publish capability — lets the UI hide the button rather than show-then-403. */
+  canPublish: boolean;
+}
+
+/**
+ * The public, unauthenticated shape — `apps/marketing`'s stories page imports
+ * this instead of declaring its own local interface. `attributedName` is
+ * populated only when the story's consent choice was `named`; `organisationLabel`
+ * is populated only when organisation attribution was separately consented to.
+ */
+export interface PublishedStoryCard {
+  organisationLabel: string;
+  quote: string;
+  context: string;
+  role: string;
+  attributedName?: string;
+}
+
+// ─── Live workshop participant experience (Phase 6, Track E) ───────────────────
+
+/**
+ * Mirrors @witness/domain's `ParticipantResponseType`, kept as a separate
+ * literal here per this package's independence from the GPL domain package
+ * — cross-checked by contracts-drift.test.ts. Deliberately preserves
+ * disagreement rather than collapsing to a score: `needs_nuance` and
+ * `sees_differently` are first-class outcomes, never a low rating.
+ */
+export const PARTICIPANT_RESPONSE_TYPES = [
+  'reflects',
+  'needs_nuance',
+  'missing_context',
+  'sees_differently',
+] as const;
+export type ParticipantResponseType = (typeof PARTICIPANT_RESPONSE_TYPES)[number];
+
+export const submitParticipantKnowledgeResponseRequestSchema = z
+  .object({
+    responseType: z.enum(PARTICIPANT_RESPONSE_TYPES),
+    comment: z.string().trim().max(1000).nullable().optional(),
+  })
+  .strict();
+export type SubmitParticipantKnowledgeResponseRequest = z.infer<
+  typeof submitParticipantKnowledgeResponseRequestSchema
+>;
+
+/**
+ * Derived, not stored: `contested`/`under_discussion` come from the
+ * assertion's existing `perspectiveTags`; a confirmed assertion with neither
+ * tag is `community_validated`. There is no `emerging` badge here — v1
+ * deliberately features only *confirmed* assertions, never candidates still
+ * in flux, so nothing surfaced to participants can read as more settled
+ * than it actually is.
+ */
+export const FEATURED_INSIGHT_BADGES = [
+  'under_discussion',
+  'contested',
+  'community_validated',
+] as const;
+export type FeaturedInsightBadge = (typeof FEATURED_INSIGHT_BADGES)[number];
+
+export const featureInsightRequestSchema = z
+  .object({
+    knowledgeAssertionId: z.string().uuid(),
+    displayOrder: z.number().int().min(0).optional(),
+  })
+  .strict();
+export type FeatureInsightRequest = z.infer<typeof featureInsightRequestSchema>;
+
+/**
+ * The participant-safe view of one featured insight — statement text and
+ * anonymised tallies only, never a list of who responded and how.
+ */
+export interface FeaturedInsightView {
+  id: string;
+  knowledgeAssertionId: string;
+  statement: string;
+  badge: FeaturedInsightBadge;
+  displayOrder: number;
+  responseTally: Record<ParticipantResponseType, number>;
+  /** This participant's own prior response, if any — lets the UI show "You said: …" instead of the buttons again. */
+  myResponseType: ParticipantResponseType | null;
+}
+
+/**
+ * A confirmed assertion a facilitator could choose to feature next — the
+ * same statement/badge composition as `FeaturedInsightView`, minus the
+ * fields (`displayOrder`, `responseTally`, `myResponseType`) that only exist
+ * once something is actually featured. Only assertions not already actively
+ * featured for this session are offered, so curating one is never a
+ * confusing duplicate of an item already on the room's screen.
+ */
+export interface FeaturedInsightCandidateView {
+  knowledgeAssertionId: string;
+  statement: string;
+  badge: FeaturedInsightBadge;
+}
+
+/**
+ * The participant-safe view of the session's current workshop prompt — a
+ * deliberately narrow subset of `AgendaItemView`: no `facilitatorId`, no
+ * scheduling fields. `promptText: null` means open reflection, not "no
+ * prompt configured yet" — see ADR-00XX.
+ */
+export interface ParticipantPromptView {
+  id: string;
+  title: string;
+  promptText: string | null;
+  position: number;
+  totalPrompts: number;
+  status: AgendaItemStatus;
+}
+
+/**
+ * The facilitator's minimal live-control aggregate — counts only, no
+ * participant identities (enforced server-side when the session's
+ * governance mode is anonymous, not left to the frontend to hide).
+ */
+export interface SessionRoomView {
+  activeAgendaItem: AgendaItemView | null;
+  participantCount: number;
+  contributedCount: number;
+  totalContributions: number;
+  insights: Array<{
+    insightId: string;
+    knowledgeAssertionId: string;
+    statement: string;
+    badge: FeaturedInsightBadge;
+    responseTally: Record<ParticipantResponseType, number>;
+  }>;
 }

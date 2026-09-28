@@ -128,6 +128,13 @@ import { OperatorService } from './operator/operator.service.js';
 import { PlatformRolesController } from './platform-roles/platform-roles.controller.js';
 import { PlatformRolesService } from './platform-roles/platform-roles.service.js';
 import { MailerService } from './infrastructure/mailer.js';
+import { ProductFeedbackController } from './product-feedback/product-feedback.controller.js';
+import { ProductFeedbackService } from './product-feedback/product-feedback.service.js';
+import { CustomerStoriesController } from './customer-stories/customer-stories.controller.js';
+import { CustomerStoriesService } from './customer-stories/customer-stories.service.js';
+import { StoriesPublicController } from './customer-stories/stories-public.controller.js';
+import { SessionFeaturedInsightsController } from './session-featured-insights/session-featured-insights.controller.js';
+import { SessionFeaturedInsightsService } from './session-featured-insights/session-featured-insights.service.js';
 
 @Module({
   controllers: [
@@ -174,6 +181,10 @@ import { MailerService } from './infrastructure/mailer.js';
     KnowledgeCandidatesController,
     KnowledgeGraphQueryController,
     KnowledgeAssertionsController,
+    ProductFeedbackController,
+    CustomerStoriesController,
+    StoriesPublicController,
+    SessionFeaturedInsightsController,
   ],
   providers: [
     PrismaService,
@@ -200,6 +211,9 @@ import { MailerService } from './infrastructure/mailer.js';
     KnowledgeCandidatesService,
     KnowledgeGraphQueryService,
     MailerService,
+    ProductFeedbackService,
+    CustomerStoriesService,
+    SessionFeaturedInsightsService,
     WorkspacesService,
     UsersService,
     OrganisationInvitationsService,

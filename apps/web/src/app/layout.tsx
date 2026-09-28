@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
 import { Shell } from '@/components/shell';
@@ -38,6 +38,18 @@ export const metadata: Metadata = {
     statusBarStyle: 'black-translucent',
     title: 'Witness',
   },
+};
+
+// Separate from `metadata` per Next's Viewport API — `themeColor` here
+// matches `manifest.ts`'s `theme_color` (Brand Book ink), and `viewportFit:
+// 'cover'` lets the mobile-first participant capture page draw under an
+// iPhone's safe-area insets rather than leaving a dead status-bar-colored
+// strip at the edges of a `min-h-dvh` layout.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#1b1917',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   toActorId,
+  toAgendaItemId,
   toCoDesignSessionId,
   toEvidenceId,
   toOrganisationId,
@@ -104,6 +105,19 @@ describe('captureEvidence', () => {
     expect(() => captureEvidence('open', { ...baseInput(), sessionOffsetSeconds: -5 })).toThrow(
       /negative/i,
     );
+  });
+
+  it('defaults sourceAgendaItemId to null — open reflection, no active prompt', () => {
+    const { evidence } = captureEvidence('open', baseInput());
+    expect(evidence.sourceAgendaItemId).toBeNull();
+  });
+
+  it('records which prompt a contribution answered when supplied', () => {
+    const { evidence } = captureEvidence('open', {
+      ...baseInput(),
+      sourceAgendaItemId: toAgendaItemId('77777777-7777-4777-8777-777777777777'),
+    });
+    expect(evidence.sourceAgendaItemId).toBe('77777777-7777-4777-8777-777777777777');
   });
 });
 

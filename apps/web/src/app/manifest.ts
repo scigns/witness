@@ -20,8 +20,12 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: `${basePath}/`,
     scope: `${basePath}/`,
     display: 'standalone',
-    background_color: '#0a0e14',
-    theme_color: '#2f5fa8',
+    // Witness Brand Book v1.0 tokens (`globals.css`'s `--color-paper`/
+    // `--color-accent`) — not arbitrary colors. Kept as literal hex here
+    // because this file returns a plain object at build/request time, before
+    // any CSS custom property exists to read from.
+    background_color: '#f5f2ed',
+    theme_color: '#1b1917',
     icons: [
       { src: `${basePath}/icon-192.png`, sizes: '192x192', type: 'image/png' },
       { src: `${basePath}/icon-512.png`, sizes: '512x512', type: 'image/png' },

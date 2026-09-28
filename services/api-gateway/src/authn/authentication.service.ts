@@ -48,6 +48,25 @@ import {
   generateState,
 } from './pkce.helper.js';
 
+/**
+ * A root-relative path only — never an absolute URL, never protocol-relative
+ * (`//evil.com` is parsed by browsers as `https://evil.com`), never carrying
+ * a scheme. This is the entire reason `returnTo` cannot become an open
+ * redirect: `new URL(returnTo, webBaseUrl)` only stays on `webBaseUrl`'s own
+ * origin when `returnTo` itself cannot carry a different one. Checked both
+ * where `returnTo` is first accepted (`startLogin`) and again where it is
+ * read back to build a real redirect (`handleCallback`) — defense in depth
+ * against a row ever containing something this check would have rejected.
+ */
+export function isSafeReturnPath(value: string): boolean {
+  return (
+    value.startsWith('/') &&
+    !value.startsWith('//') &&
+    !value.includes('://') &&
+    !value.includes('\\')
+  );
+}
+
 export class AuthenticationDeniedError extends Error {
   constructor(
     message: string,
@@ -101,11 +120,20 @@ export class AuthenticationService {
     private readonly sessionTtlMinutes: number,
   ) {}
 
-  async startLogin(prompt?: 'create'): Promise<{ redirectUrl: string }> {
+  /**
+   * `returnTo` (Track C, ADR-0030) — where the OIDC callback sends this
+   * person after a successful sign-in. Invalid input (anything
+   * `isSafeReturnPath` rejects) is silently dropped to `null` rather than
+   * failing the sign-in attempt over it: a malformed or malicious `returnTo`
+   * should degrade to "land on the generic app root", the pre-existing
+   * behaviour, never block signing in at all.
+   */
+  async startLogin(prompt?: 'create', returnTo?: string): Promise<{ redirectUrl: string }> {
     const state = generateState();
     const nonce = generateNonce();
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = codeChallengeFor(codeVerifier);
+    const safeReturnTo = returnTo !== undefined && isSafeReturnPath(returnTo) ? returnTo : null;
 
     // Opportunistic cleanup: `GET /api/v1/auth/login` is unauthenticated, so
     // this table would otherwise grow without bound from abandoned attempts
@@ -122,6 +150,7 @@ export class AuthenticationService {
         nonce,
         codeVerifier,
         redirectUri: this.redirectUri,
+        returnTo: safeReturnTo,
         expiresAt: new Date(Date.now() + LOGIN_ATTEMPT_TTL_MINUTES * 60_000),
       },
     });
@@ -164,7 +193,10 @@ export class AuthenticationService {
     };
   }
 
-  async handleCallback(code: string, state: string): Promise<IssuedSession> {
+  async handleCallback(
+    code: string,
+    state: string,
+  ): Promise<IssuedSession & { returnTo: string | null }> {
     if (code.trim() === '' || state.trim() === '') {
       throw new AuthenticationDeniedError('Missing code or state.', 'invalid_callback');
     }
@@ -230,7 +262,16 @@ export class AuthenticationService {
       );
     }
 
-    return this.sessions.issue(user.id, this.sessionTtlMinutes);
+    const session = await this.sessions.issue(user.id, this.sessionTtlMinutes);
+    // `typeof ... === 'string'`, not `!== null`: a fake-Prisma test double
+    // (or a pre-migration row) may carry `returnTo: undefined` rather than
+    // an explicit `null` — both mean "no return path", not "the presence
+    // check passed."
+    const returnTo =
+      typeof attempt.returnTo === 'string' && isSafeReturnPath(attempt.returnTo)
+        ? attempt.returnTo
+        : null;
+    return { ...session, returnTo };
   }
 
   /**

@@ -17,6 +17,7 @@ type RequestWithPrincipal = {
   headers: Record<string, string | undefined>;
   params: Record<string, string | undefined>;
   principal?: Principal;
+  socket?: { remoteAddress?: string };
 };
 
 function fakePolicyEnforcement() {
@@ -111,6 +112,12 @@ describe('AuthorizationGuard — session precedence over the development header'
     const request: RequestWithPrincipal = {
       headers: { 'x-witness-dev-user': 'Local Dev|reader' },
       params: {},
+      // A real Express request's remoteAddress is never undefined — this
+      // fake one is deliberately explicit about representing a genuinely
+      // local call, since AuthorizationGuard now fails closed (not open)
+      // when remoteAddress is unknown. See the "LAN containment" describe
+      // block below for the case this guards against.
+      socket: { remoteAddress: '127.0.0.1' },
     };
 
     await guard.canActivate(fakeContext(request));
@@ -165,10 +172,18 @@ describe('AuthorizationGuard — denial response shape', () => {
   });
 });
 
-describe('AuthorizationGuard — development invoice containment', () => {
-  it('rejects unverified development invoice access off localhost', async () => {
-    const guard = new AuthorizationGuard(
-      fakeReflector('invoice:read'),
+describe('AuthorizationGuard — development-header LAN containment (Phase 6, Track E)', () => {
+  /**
+   * Physical-device LAN acceptance testing exposes this API on the LAN on
+   * purpose — but only its participant surface (X-Witness-Capture-Token,
+   * which never reaches this guard) is meant to be reachable from another
+   * device. Every one of these routes requires @Requires(...), i.e. is a
+   * facilitator/admin surface; a dev-header-resolved principal must be
+   * refused on all of them from anywhere but this machine.
+   */
+  function forgedDevHeaderGuard(action: string) {
+    return new AuthorizationGuard(
+      fakeReflector(action),
       {
         authenticate: vi.fn().mockResolvedValue({
           subject: 'dev',
@@ -180,15 +195,83 @@ describe('AuthorizationGuard — development invoice containment', () => {
       { authenticate: vi.fn().mockResolvedValue(null) } as never,
       fakePolicyEnforcement(),
     );
+  }
+
+  it.each(['invoice:read', 'record:read', 'workspace:create', 'organisation:update'])(
+    'rejects a forged X-Witness-Dev-User claiming admin for %s from a LAN address',
+    async (action) => {
+      await expect(
+        forgedDevHeaderGuard(action).canActivate(
+          fakeContext({
+            headers: { 'x-witness-dev-user': 'Dev|admin' },
+            params: {},
+            // A phone or laptop elsewhere on the same private network the
+            // API is now reachable from — not this machine.
+            socket: { remoteAddress: '10.0.0.5' },
+          }),
+        ),
+      ).rejects.toMatchObject({ response: { error: { code: 'DEVELOPMENT_ACCESS_LOCAL_ONLY' } } });
+    },
+  );
+
+  it('rejects the same forged header from an IPv6-mapped non-loopback address too', async () => {
+    await expect(
+      forgedDevHeaderGuard('record:read').canActivate(
+        fakeContext({
+          headers: { 'x-witness-dev-user': 'Dev|admin' },
+          params: {},
+          socket: { remoteAddress: '::ffff:172.20.10.7' },
+        }),
+      ),
+    ).rejects.toMatchObject({ response: { error: { code: 'DEVELOPMENT_ACCESS_LOCAL_ONLY' } } });
+  });
+
+  it('fails closed (rejects) when remoteAddress is unknown, rather than assuming local', async () => {
+    await expect(
+      forgedDevHeaderGuard('record:read').canActivate(
+        fakeContext({ headers: { 'x-witness-dev-user': 'Dev|admin' }, params: {} }),
+      ),
+    ).rejects.toMatchObject({ response: { error: { code: 'DEVELOPMENT_ACCESS_LOCAL_ONLY' } } });
+  });
+
+  it.each(['127.0.0.1', '::1', '::ffff:127.0.0.1'])(
+    'still allows the development header from loopback address %s — ordinary localhost iteration is unaffected',
+    async (loopback) => {
+      const guard = forgedDevHeaderGuard('record:read');
+      await expect(
+        guard.canActivate(
+          fakeContext({
+            headers: { 'x-witness-dev-user': 'Dev|admin' },
+            params: {},
+            socket: { remoteAddress: loopback },
+          }),
+        ),
+      ).resolves.toBe(true);
+    },
+  );
+
+  it('never restricts a real, verified session by location — this check only ever fires for the unverified path', async () => {
+    const sessionPrincipal: Principal = {
+      subject: 'user:real-1',
+      displayName: 'Real Session User',
+      kind: 'human',
+      roles: ['admin'],
+    };
+    const guard = new AuthorizationGuard(
+      fakeReflector('record:read'),
+      { authenticate: vi.fn().mockResolvedValue(null) } as never,
+      { authenticate: vi.fn().mockResolvedValue(sessionPrincipal) } as never,
+      fakePolicyEnforcement(),
+    );
     await expect(
       guard.canActivate(
         fakeContext({
-          headers: { 'x-witness-dev-user': 'Dev|admin' },
+          headers: { authorization: 'Bearer real-session-token' },
           params: {},
           socket: { remoteAddress: '10.0.0.5' },
         }),
       ),
-    ).rejects.toMatchObject({ response: { error: { code: 'DEVELOPMENT_ACCESS_LOCAL_ONLY' } } });
+    ).resolves.toBe(true);
   });
 });
 
@@ -213,9 +296,52 @@ describe('AuthorizationGuard — settlement identity', () => {
         fakeContext({
           headers: { 'x-witness-dev-user': 'Forged Operator|admin' },
           params: { organisationId: 'org-1' },
+          // Deliberately loopback: the point of this test is that platform
+          // authority refuses the dev header even on localhost, distinct
+          // from (and stricter than) the general LAN-containment check.
+          socket: { remoteAddress: '127.0.0.1' },
         }),
       ),
     ).rejects.toMatchObject({ response: { error: { code: 'VERIFIED_OPERATOR_REQUIRED' } } });
+  });
+});
+
+describe('AuthorizationGuard — a capture token grants nothing here', () => {
+  /**
+   * `X-Witness-Capture-Token` is a structurally separate mechanism
+   * (`ParticipantCaptureController` reads it directly, never through this
+   * guard — see the comment above at line ~130). Proving that here, rather
+   * than only by omission in the participant controllers, closes the gap
+   * the governing instruction calls out: "not enforced by hiding
+   * navigation." A request carrying only this header, with no real session
+   * and no dev header, must be treated exactly like a request with no
+   * credential at all — on every kind of route this guard protects,
+   * including facilitator, organisation, billing, and platform actions.
+   */
+  it.each([
+    'record:read',
+    'workspace:create',
+    'organisation:update',
+    'invoice:read',
+    'payment:settle',
+    'platform_role:write',
+  ])('is UNAUTHENTICATED for %s when only a capture token is presented', async (action) => {
+    const guard = new AuthorizationGuard(
+      fakeReflector(action),
+      { authenticate: vi.fn().mockResolvedValue(null) } as never,
+      { authenticate: vi.fn().mockResolvedValue(null) } as never,
+      fakePolicyEnforcement(),
+    );
+
+    await expect(
+      guard.canActivate(
+        fakeContext({
+          headers: { 'x-witness-capture-token': 'a-real-looking-capture-token-value' },
+          params: {},
+          socket: { remoteAddress: '127.0.0.1' },
+        }),
+      ),
+    ).rejects.toMatchObject({ response: { error: { code: 'UNAUTHENTICATED' } } });
   });
 });
 
@@ -239,6 +365,8 @@ describe('AuthorizationGuard — platform authority identity', () => {
         fakeContext({
           headers: { 'x-witness-dev-user': 'Forged Operator|admin' },
           params: {},
+          // Deliberately loopback — see the settlement-identity test above.
+          socket: { remoteAddress: '127.0.0.1' },
         }),
       ),
     ).rejects.toMatchObject({ response: { error: { code: 'VERIFIED_OPERATOR_REQUIRED' } } });
