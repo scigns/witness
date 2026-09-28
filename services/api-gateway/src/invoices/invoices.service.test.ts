@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServiceUnavailableException } from '@nestjs/common';
 import { InvoicesService } from './invoices.service.js';
 
@@ -46,7 +46,21 @@ const row = {
 };
 
 describe('InvoicesService retrieval boundaries', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('issues from server-authoritative facts and is idempotent', async () => {
+    // `InvoicesService.issue` stamps `issuedAt` from the real system clock
+    // (`new Date()`), while `request.dueAt` below is a fixed fixture date —
+    // so once real wall-clock time reaches that fixed due date, `issuedAt`
+    // (today) stops preceding it and `issueInvoice` throws
+    // `INVALID_INVOICE_DATES`. Pin the clock to a fixed instant before the
+    // fixture's due date, consistent with `row.issuedAt` below, so this test
+    // no longer depends on when it happens to run.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-28T00:00:00Z'));
+
     const created = { ...row, issuanceIdempotencyKey: '00000000-0000-4000-8000-000000000099' };
     const actor = {
       id: '00000000-0000-4000-8000-000000000098',

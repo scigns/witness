@@ -1,11 +1,19 @@
 import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  // Mirrors tsconfig.json's own `@/*` -> `./src/*` path — Vite's built-in
-  // alias resolution, not a new plugin/dependency — so a test can import a
-  // real source file (e.g. `src/app/manifest.ts`) without that file needing
-  // to know it's under test.
-  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-  test: { include: ['test/**/*.test.ts'], environment: 'node' },
+  esbuild: { jsx: 'automatic' },
+  resolve: {
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+  },
+  test: {
+    include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
+    environment: 'node',
+    // Existing config/runtime tests stay on the fast `node` environment;
+    // component-behaviour tests (WEB-NEXT-01) opt into `jsdom` by filename
+    // rather than moving every test to jsdom by default.
+    environmentMatchGlobs: [['test/**/*.dom.test.tsx', 'jsdom']],
+    setupFiles: ['./test/setup-dom.ts'],
+  },
 });

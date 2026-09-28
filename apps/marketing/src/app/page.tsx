@@ -18,63 +18,49 @@ const processSources = [
   { kind: 'source' as const, label: 'Consultation' },
 ];
 
-const workingVerbs = [
+const useCases = [
   [
-    'Capture',
-    'Bring together evidence from consultation, research, meetings and institutional work.',
-  ],
-  ['Connect', 'Preserve the relationships between contributors, evidence, findings and decisions.'],
-  [
-    'Govern',
-    'Maintain access, participation and accountability around important organisational records.',
-  ],
-  ['Trace', 'Follow a decision back through the evidence and reasoning that produced it.'],
-  [
-    'Remember',
-    'Preserve institutional knowledge after projects, consultants and staff have moved on.',
-  ],
-] as const;
-
-const audiences = [
-  [
-    'Government',
-    'Make consultation and public decisions accountable.',
-    'Connect public engagement, policy evidence and decisions into a traceable institutional record.',
+    'Co-design & workshops',
+    'Run a workshop or multi-organisation co-design session knowing every contribution stays connected to what it produced.',
+    '/platform/co-design',
   ],
   [
-    'International Development',
-    'Preserve evidence from field engagement through implementation.',
-    'Support programmes where consultation, research, partners and implementation span organisations and countries.',
+    'Consultation & community engagement',
+    'Show participants and communities what changed because they spoke, not just that you listened.',
+    '/solutions/consultation',
   ],
   [
-    'Research',
-    'Maintain the connection between evidence, interpretation and impact.',
-    'Preserve how research evidence contributes to recommendations, policy and programme decisions.',
+    'Government & public decisions',
+    'Connect public consultation, policy evidence and decisions into a traceable institutional record.',
+    '/solutions/government',
   ],
   [
-    'Consultation & Co-design',
-    'Show participants how their contribution influenced the outcome.',
-    'Create a clearer path from participation to findings, recommendations and institutional decisions.',
+    'International development',
+    'Preserve evidence from field engagement through implementation, across partners and countries.',
+    '/solutions/international-development',
   ],
   [
-    'Organisations',
-    'Keep institutional knowledge when people and projects change.',
-    'Reduce knowledge loss when staff, consultants and programmes move on.',
+    'Research & evidence gathering',
+    'Keep the line between what the evidence said and what the programme decided.',
+    '/solutions/research',
   ],
   [
-    'Regulated Environments',
-    'Strengthen traceability and governance.',
-    'Maintain clearer evidence trails around accountable institutional decisions.',
+    'Institutional memory',
+    'Keep the reasoning behind a decision when the people who made it move on.',
+    '/platform/institutional-memory',
   ],
 ] as const;
 
 const trustPillars = [
-  ['Provenance', 'Preserve the traceable history behind decisions.'],
-  ['Access control', 'Govern participation and organisational access.'],
-  ['Portability', 'Maintain organisational control over institutional information.'],
+  ['Provenance', 'Every finding and decision traces back to the evidence that produced it.'],
+  [
+    'Participation & consent',
+    'What can be recorded, quoted or attributed is agreed before capture.',
+  ],
+  ['Access control', 'Roles govern who can contribute, review, decide and administer.'],
   [
     'Deployment choice',
-    'Support institutions with different infrastructure and hosting requirements.',
+    'Cloud-managed or self-hosted, so an institution keeps control of its own record.',
   ],
 ] as const;
 
@@ -85,30 +71,30 @@ export default function MarketingHomepage() {
     <div className="homepage">
       <Section id="hero" className="home-hero">
         <div className="hero-copy">
-          <Eyebrow>For institutions that must show how decisions were made</Eyebrow>
-          <h1>Make important decisions traceable.</h1>
+          <Eyebrow>Governance evidence infrastructure</Eyebrow>
+          <h1>Institutional memory you can prove.</h1>
           <p className="hero-lede">
-            Witness is the evidence layer for work that has to be provable. Turn consultation,
-            research and organisational knowledge into a governed record that connects evidence,
-            decisions and action.
+            Witness captures the evidence behind decisions, not just the decisions themselves — so a
+            workshop, consultation or research programme leaves behind a record that shows how you
+            got there, not just what you decided.
           </p>
           <CTAGroup aria-label="Homepage actions">
-            <LinkButton href={pricingUrl.href}>View plans</LinkButton>
-            <LinkButton href="/demo" variant="secondary">
-              See Witness in action
+            <LinkButton href="/get-started">Start free</LinkButton>
+            <LinkButton href={pricingUrl.href} variant="secondary">
+              View plans
             </LinkButton>
             <LinkButton href={demoUrl.href} variant="tertiary">
-              Discuss a pilot
+              Discuss an organisational deployment
             </LinkButton>
           </CTAGroup>
           <p className="hero-commercial-note">
-            Start free. Team and organisation plans are available in AUD. Institutional deployments
+            Free to start. Team and organisation plans are billed in AUD. Institutional deployments
             are quote-based.
           </p>
           <ul className="hero-assurance" aria-label="Why institutions choose Witness">
-            <li>Trace evidence to decisions</li>
-            <li>Govern roles and access</li>
-            <li>Keep a portable institutional record</li>
+            <li>Use Witness securely in your browser — no installation required</li>
+            <li>Trace every decision back to the evidence behind it</li>
+            <li>Keep a portable institutional record your organisation controls</li>
           </ul>
         </div>
         <div className="hero-art" aria-hidden="true">
@@ -118,30 +104,33 @@ export default function MarketingHomepage() {
 
       <Section id="problem" className="homepage-section">
         <SectionHeading
-          eyebrow="The problem"
+          eyebrow="Why institutional evidence gets lost"
           title="Most organisations remember what they decided. Fewer can show exactly why."
         >
           <p>
-            Institutional evidence often becomes fragmented across meetings, documents, surveys,
-            interviews, workshops, research, consultation and organisational memory.
+            The people who contributed, the evidence they gave, and the reasoning that connected it
+            to a decision usually live in separate places — a workshop's sticky notes, a
+            consultant's report, someone's inbox. Once a project ends or staff move on, that
+            connection is the first thing to disappear.
           </p>
         </SectionHeading>
         <ul className="problem-list">
-          <li>Context gets lost.</li>
-          <li>Consultants and staff move on.</li>
-          <li>Evidence becomes disconnected from decisions.</li>
-          <li>Organisations struggle to reconstruct why something happened.</li>
+          <li>Context gets lost when consultants and staff move on.</li>
+          <li>Evidence becomes disconnected from the decision it informed.</li>
+          <li>Participants never learn what changed because they contributed.</li>
+          <li>Nobody can reconstruct why something happened a year later.</li>
         </ul>
       </Section>
 
       <Section id="how-it-works" className="homepage-section">
         <SectionHeading
           eyebrow="How Witness works"
-          title="Connect the record from source to action."
+          title="A traceable record from people to outcomes."
         >
           <p>
-            Witness keeps the relationships between what people contribute, what organisations
-            learn, and what they decide visible over time.
+            Witness keeps the relationships between what people contributed, what your organisation
+            learned, and what it decided to do about it — visible for as long as you need them, not
+            just for the length of one project.
           </p>
         </SectionHeading>
         <BranchingProvenanceChain
@@ -155,49 +144,63 @@ export default function MarketingHomepage() {
             { kind: 'action', label: 'Action' },
           ]}
         />
-        <div className="feature-grid working-verbs">
-          {workingVerbs.map(([title, description]) => (
+        <p className="how-it-works-summary">
+          In plain terms: you capture what people contributed, it becomes evidence, evidence is
+          weighed and discussed, that deliberation leads to a decision, a decision carries
+          commitments and actions — and every step keeps its link back to the one before it. That
+          chain is the provenance behind the decision, and it&rsquo;s what turns a project record
+          into institutional memory you can still explain a year later.
+        </p>
+        <CTAGroup aria-label="Learn more about how Witness works">
+          <LinkButton href="/get-started" variant="secondary">
+            See the step-by-step path
+          </LinkButton>
+        </CTAGroup>
+      </Section>
+
+      <Section id="product-preview" className="homepage-section">
+        <SectionHeading eyebrow="The product" title="See the real record, not a mockup.">
+          <p>
+            This is a synthetic example built from Witness&rsquo;s actual data model — not a generic
+            SaaS dashboard invented for marketing. Explore a full walkthrough on{' '}
+            <a href="/demo">the demo page</a>.
+          </p>
+        </SectionHeading>
+        <ProductPreview />
+      </Section>
+
+      <Section id="use-cases" className="homepage-section">
+        <SectionHeading
+          eyebrow="Where Witness is useful"
+          title="Built for the work that has to be traceable."
+        >
+          <p>
+            Co-design, consultation, government, international development and research programmes
+            all share the same problem: evidence and decisions drift apart unless something keeps
+            them connected.
+          </p>
+        </SectionHeading>
+        <div className="feature-grid audience-grid">
+          {useCases.map(([title, description, href]) => (
             <FeatureCard key={title} title={title}>
               <p>{description}</p>
+              <p className="feature-card-link">
+                <a href={href}>Learn more →</a>
+              </p>
             </FeatureCard>
           ))}
         </div>
       </Section>
 
-      <Section id="product-preview" className="homepage-section">
-        <SectionHeading eyebrow="The platform" title="A clearer institutional record.">
-          <p>
-            See how evidence, decisions and actions can remain connected in one accountable view.
-          </p>
-        </SectionHeading>
-        <ProductPreview />
-      </Section>
-      <Section id="solutions" className="homepage-section">
-        <SectionHeading
-          eyebrow="Who it is for"
-          title="Designed for organisations carrying important decisions forward."
-        >
-          <p>
-            Witness supports public, research, development, consultation and regulated environments.
-          </p>
-        </SectionHeading>
-        <div className="feature-grid audience-grid">
-          {audiences.map(([title, summary, description]) => (
-            <FeatureCard key={title} title={title}>
-              <p className="audience-summary">{summary}</p>
-              <p>{description}</p>
-            </FeatureCard>
-          ))}
-        </div>
-      </Section>
       <Section id="provenance" className="homepage-section ink-section">
         <SectionHeading
-          eyebrow="Provenance by design"
+          eyebrow="Why traceability matters"
           title="Don't just store the decision. Preserve its story."
         >
           <p>
-            Keep the relationships between contribution, evidence, interpretation, decision and
-            action.
+            Every finding, recommendation and decision in Witness keeps its link back to the
+            contribution and evidence that produced it — so a decision can always be explained by
+            what actually informed it, not by what someone remembers a year later.
           </p>
         </SectionHeading>
         <LinearProvenanceChain
@@ -214,10 +217,15 @@ export default function MarketingHomepage() {
           ]}
         />
       </Section>
+
       <Section id="trust" className="homepage-section">
         <SectionHeading eyebrow="Trust" title="Governance requires more than a database.">
           <p>
-            Traceability, governed participation, information control and deployment choices matter.
+            Traceability only matters if participation, access and information are governed properly
+            around it.{' '}
+            <a href="/trust">
+              See exactly what Witness deploys, configures and does not yet claim.
+            </a>
           </p>
         </SectionHeading>
         <div className="feature-grid trust-grid">
@@ -228,6 +236,7 @@ export default function MarketingHomepage() {
           ))}
         </div>
       </Section>
+
       <Section id="open-infrastructure" className="homepage-section">
         <SectionHeading
           eyebrow="Open infrastructure"
@@ -244,20 +253,21 @@ export default function MarketingHomepage() {
           Witness.
         </p>
       </Section>
+
       <Section id="contact" className="homepage-section homepage-final-cta">
         <SectionHeading title="Choose the right way to begin with Witness.">
           <p>
-            Start with a small team, compare organisational plans, or discuss a controlled
-            institutional pilot.
+            Start free with a small team, compare organisational plans, or discuss a controlled
+            institutional pilot — no installation required, Witness runs in your browser.
           </p>
         </SectionHeading>
         <CTAGroup aria-label="Contact Witness">
-          <LinkButton href={pricingUrl.href}>View plans</LinkButton>
-          <LinkButton href="/demo" variant="secondary">
-            See Witness in action
+          <LinkButton href="/get-started">Start free</LinkButton>
+          <LinkButton href={pricingUrl.href} variant="secondary">
+            View plans
           </LinkButton>
           <LinkButton href={demoUrl.href} variant="tertiary">
-            Discuss a pilot
+            Discuss an organisational deployment
           </LinkButton>
         </CTAGroup>
       </Section>

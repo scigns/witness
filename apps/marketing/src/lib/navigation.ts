@@ -14,6 +14,7 @@ export const marketingNavigation = {
     { label: 'Solutions', href: '/solutions' },
     { label: 'Why Witness', href: '/why-witness' },
     { label: 'Trust', href: '/trust' },
+    { label: 'Get started', href: '/get-started' },
   ],
   footer: [
     {

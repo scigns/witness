@@ -27,7 +27,15 @@ function resolveExecutablePath() {
 
 const executablePath = resolveExecutablePath();
 const widths = [320, 375, 430, 768, 1024, 1440];
-const routes = ['/', '/signin', '/pricing'];
+// WEB-NEXT-01: extended from the original 3 public routes to a representative
+// slice of the authenticated shell — these render fully in the Developer
+// Preview build with no live API required (a data-fetch failure shows an
+// in-page error notice; the surrounding Shell header/main/footer render
+// regardless), so this stays a structural/brand check, not an integration
+// test. `/activate` is deliberately excluded: WEB-NEXT-01 made it a bare
+// route (no header/main/footer), so it fails this check's structural
+// assertions by design, not by regression.
+const routes = ['/', '/signin', '/pricing', '/workspaces', '/records', '/organisations', '/review'];
 
 await mkdir(artifacts, { recursive: true });
 const browser = await chromium.launch({ executablePath, headless: true });
