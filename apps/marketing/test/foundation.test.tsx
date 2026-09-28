@@ -37,6 +37,7 @@ import DataSovereigntyPage, {
 } from '../src/app/trust/data-sovereignty/page';
 import PrivacyPage, { metadata as privacyMetadata } from '../src/app/trust/privacy/page';
 import StoriesPage, { metadata as storiesMetadata } from '../src/app/stories/page';
+import GetStartedPage, { metadata as getStartedMetadata } from '../src/app/get-started/page';
 import robots from '../src/app/robots';
 import sitemap from '../src/app/sitemap';
 import { GET } from '../src/app/health/route';
@@ -95,21 +96,22 @@ describe('independent marketing foundation', () => {
 
     expect(html.match(/<main/g)).toHaveLength(1);
     expect(html.match(/<h1/g)).toHaveLength(1);
-    expect(html).toContain('Make important decisions traceable.');
+    expect(html).toContain('Institutional memory you can prove.');
     expect(html).toContain('id="hero"');
     expect(html).toContain('id="open-infrastructure"');
     expect(html).toContain('Illustrative example');
     expect(html).toContain('Institutional Transformation Programme');
     expect(html).toContain('Adopt revised complaints process');
     expect(html).toContain('Action #21');
-    expect(html).toContain('Discuss a pilot');
+    expect(html).toContain('Discuss an organisational deployment');
+    expect(html).toContain('Start free');
     for (const title of [
-      'Government',
-      'International Development',
-      'Research',
-      'Consultation &amp; Co-design',
-      'Organisations',
-      'Regulated Environments',
+      'Co-design &amp; workshops',
+      'Consultation &amp; community engagement',
+      'Government &amp; public decisions',
+      'International development',
+      'Research &amp; evidence gathering',
+      'Institutional memory',
     ]) {
       expect(html).toContain(title);
     }
@@ -122,7 +124,7 @@ describe('independent marketing foundation', () => {
       'problem',
       'how-it-works',
       'product-preview',
-      'solutions',
+      'use-cases',
       'provenance',
       'trust',
       'open-infrastructure',
@@ -167,12 +169,16 @@ describe('independent marketing foundation', () => {
       'Solutions',
       'Why Witness',
       'Trust',
+      'Get started',
     ]);
     expect(hrefs).toEqual(
       expect.arrayContaining([
         '/',
         '#main-content',
+        '/get-started',
         '/platform',
+        '/platform/co-design',
+        '/platform/institutional-memory',
         '/how-it-works',
         '/solutions',
         '/solutions/government',
@@ -436,6 +442,7 @@ describe('independent marketing foundation', () => {
     it('cross-links only to routes that exist in this app', () => {
       const realRoutes = new Set([
         '/',
+        '/get-started',
         '/platform',
         '/how-it-works',
         '/why-witness',
@@ -523,6 +530,7 @@ describe('independent marketing foundation', () => {
     it('cross-links only to routes that exist in this app', () => {
       const realRoutes = new Set([
         '/',
+        '/get-started',
         '/platform',
         '/how-it-works',
         '/why-witness',
@@ -626,6 +634,7 @@ describe('independent marketing foundation', () => {
     it('cross-links only to routes that exist in this app', () => {
       const realRoutes = new Set([
         '/',
+        '/get-started',
         '/platform',
         '/how-it-works',
         '/why-witness',
@@ -737,6 +746,7 @@ describe('independent marketing foundation', () => {
     it('cross-links only to routes that exist in this app', () => {
       const realRoutes = new Set([
         '/',
+        '/get-started',
         '/platform',
         '/platform/evidence',
         '/platform/decisions',
@@ -836,6 +846,7 @@ describe('independent marketing foundation', () => {
     it('cross-links only to routes that exist in this app', () => {
       const realRoutes = new Set([
         '/',
+        '/get-started',
         '/platform',
         '/platform/evidence',
         '/platform/decisions',
@@ -893,6 +904,70 @@ describe('independent marketing foundation', () => {
       const contents = readFileSync(join(process.cwd(), 'src/app/stories/page.tsx'), 'utf8');
       expect(contents).not.toMatch(/apps\/web|@witness\/web|lib\/auth|lib\/session|lib\/api/);
       expect(contents).not.toMatch(/document\.cookie|credentials:\s*['"]include['"]|fetch\(/);
+    });
+  });
+
+  describe('Get started', () => {
+    it('renders exactly one h1, all three real paths, and safe canonical metadata', () => {
+      const html = renderToStaticMarkup(
+        <MarketingShell>
+          <GetStartedPage />
+        </MarketingShell>,
+      );
+      expect(html.match(/<h1/g)).toHaveLength(1);
+      expect(html).toContain('Start free');
+      expect(html).toContain('View plans');
+      expect(html).toContain('Discuss an organisational deployment');
+      expect(html).toContain('https://app.buildwithwitness.com/signin');
+      expect(html).toContain('https://app.buildwithwitness.com/pricing');
+      expect(html).toContain(
+        'mailto:hello@buildwithwitness.com?subject=Witness%20institutional%20pilot%20enquiry',
+      );
+      expect(getStartedMetadata.alternates?.canonical).toBe(
+        'https://buildwithwitness.com/get-started',
+      );
+      expect(getStartedMetadata.robots).toEqual({ index: false, follow: false });
+    });
+
+    it('cross-links only to routes that exist in this app', () => {
+      const html = renderToStaticMarkup(
+        <MarketingShell>
+          <GetStartedPage />
+        </MarketingShell>,
+      );
+      const hrefs = [...html.matchAll(/href="([^"]+)"/g)].flatMap((match) =>
+        match[1] === undefined ? [] : [match[1]],
+      );
+      const realRoutes = new Set([
+        '/',
+        '/get-started',
+        '/platform',
+        '/platform/evidence',
+        '/platform/decisions',
+        '/platform/institutional-memory',
+        '/platform/co-design',
+        '/platform/knowledge',
+        '/platform/change',
+        '/how-it-works',
+        '/why-witness',
+        '/demo',
+        '/solutions',
+        '/solutions/government',
+        '/solutions/international-development',
+        '/solutions/research',
+        '/solutions/consultation',
+        '/trust',
+        '/trust/security',
+        '/trust/data-sovereignty',
+        '/trust/privacy',
+        '/stories',
+        '/brand/witness-logo-transparent.png',
+      ]);
+      for (const href of hrefs) {
+        if (href.startsWith('/') && href !== '#main-content') {
+          expect(realRoutes.has(href), `${href} is not a real route`).toBe(true);
+        }
+      }
     });
   });
 });

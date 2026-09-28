@@ -13,6 +13,7 @@ const viewports = [320, 375, 430, 768, 1024, 1440];
 const artifacts = process.env.MKT_E2E_ARTIFACT_DIR ?? '/tmp/witness-marketing-e2e';
 const contentPaths = [
   '/',
+  '/get-started',
   '/platform',
   '/how-it-works',
   '/why-witness',

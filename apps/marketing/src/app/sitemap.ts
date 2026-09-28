@@ -11,6 +11,7 @@ import { canonicalUrl, marketingSiteConfig } from '../lib/site-config';
  */
 const CONTENT_ROUTES = [
   '/',
+  '/get-started',
   '/platform',
   '/how-it-works',
   '/why-witness',
