@@ -1,5 +1,8 @@
 /**
- * Organisation — the tenant boundary (BUILD_ROADMAP.md, Release 0.2, item 1).
+ * Organisation — the commercial and governance identity (BUILD_ROADMAP.md,
+ * Release 0.2, item 1). The *technical* isolation boundary is `Tenant`
+ * (`tenant.ts`, ADR-0034) — a distinct, related concept; see that file for
+ * how the two relate and why they are not the same thing.
  *
  * An organisation is the outermost scope everything else in Witness sits inside:
  * workspaces, participants, records. Creation and a narrow storage-quota update
@@ -16,7 +19,7 @@
 import { InvariantViolation } from './errors.js';
 import type { Actor } from './actor.js';
 import type { PendingAuditEvent } from './audit.js';
-import type { OrganisationId } from './ids.js';
+import type { OrganisationId, TenantId } from './ids.js';
 
 /** The maximum length of an organisation name. */
 const NAME_MAX = 200;
@@ -40,6 +43,13 @@ export interface Organisation {
   readonly name: string;
   readonly storageQuotaBytes: number;
   readonly profile: InstitutionalProfile;
+  /**
+   * The explicit technical-isolation `Tenant` this organisation is assigned
+   * to, if any (ADR-0034). `null` means "no explicit assignment" — use
+   * `effectiveTenantId` (`tenant.ts`), never this field directly, to decide
+   * which tenant an organisation is actually on.
+   */
+  readonly tenantId: TenantId | null;
   readonly createdAt: Date;
 }
 
@@ -109,6 +119,7 @@ export function createOrganisation(input: {
     name: assertName(input.name),
     storageQuotaBytes: assertStorageQuota(input.storageQuotaBytes ?? DEFAULT_STORAGE_QUOTA_BYTES),
     profile: assertProfile(input.profile ?? 'general'),
+    tenantId: null,
     createdAt: input.createdAt,
   };
 
