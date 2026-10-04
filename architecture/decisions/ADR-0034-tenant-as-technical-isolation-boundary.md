@@ -1,4 +1,4 @@
-# ADR-0034: Tenant is the technical isolation boundary; Organisation remains the commercial and governance identity
+# ADR-0034: Tenant is the technical isolation boundary; Organisation stays the commercial identity
 
 | | |
 |---|---|
@@ -41,16 +41,17 @@ is unaffected — this ADR changes no persisted table's meaning and renames noth
 isolation, resource allocation, deployment environment, infrastructure/security boundary.
 
 An `Organisation` relates to a `Tenant` through a nullable `Organisation.tenant_id` foreign key.
-**Today, every organisation's effective tenant is itself** — `organisation.tenantId ?? organisation.id`
-is the one place this is resolved, so nothing downstream needs to know whether an explicit `Tenant` row
-exists yet. This preserves the 1:1 reality the reconciliation doc found to be already true in practice,
-while leaving the seam open for it to become N:1 (several organisations sharing one technical
+**Today, every organisation's effective tenant is itself** —
+`organisation.tenantId ?? organisation.id` is the one place this is resolved, so nothing downstream
+needs to know whether an explicit `Tenant` row exists yet. This preserves the 1:1 reality the
+reconciliation doc found to be already true in practice, while leaving the seam open for it to
+become N:1 (several organisations sharing one technical
 environment) or 1:N (one organisation's workspaces split across environments) later, without a
 backfill migration: assigning an explicit `tenantId` to any subset of organisations is additive.
 
 ## Options considered
 
-### Option A — Ratify the 2026-09-01 reconciliation doc's Option B (Organisation is the tenant, full stop)
+### Option A — Ratify the 2026-09-01 reconciliation doc's Option B (Organisation is the tenant)
 
 **Description.** Formally accept that recommendation as-is; no new `Tenant` concept.
 **Pros:** Zero new schema. Matches what's actually enforced today exactly.
@@ -84,23 +85,28 @@ renaming... do not architect the system so this relationship can never evolve."
 ## Consequences
 
 ### Positive
+
 A future dedicated/sovereign deployment for one institutional customer is a data change (assign a
 `Tenant` row, point their `Organisation` at it), not a schema migration.
 
 ### Negative
+
 Two names now exist for what is, in every deployment running today, the same boundary. Until a real
 multi-organisation-per-tenant or split-tenant case exists, `Tenant` is speculative scaffolding.
 
 ### Neutral
+
 No existing API, RBAC decision, or commercial resolution path changes. `organisation:read` /
 `organisation:update` scoping is untouched.
 
 ### Risks accepted
+
 Someone reading the schema before reading this ADR could assume `Tenant` is further along than it is.
 Mitigated by this ADR's own explicit "today, every organisation's effective tenant is itself" statement
 and by keeping `Tenant`'s columns minimal enough that there is nothing to misread.
 
 ## Compliance and enforcement
+
 Enforced by code review and by this ADR's existence, not by a lint rule — there is no persisted
 invariant to violate yet (the FK is nullable; any value or absence is valid). The resolution helper
 (`effectiveTenantId(organisation)` in `packages/domain/src/tenant.ts`) is the single place this
@@ -108,10 +114,12 @@ fallback logic lives; a future reviewer should flag any code that re-derives "wh
 organisation on" independently of that helper.
 
 ## Reversal
+
 If no customer ever needs a non-1:1 mapping, `Tenant` can be dropped and `tenant_id` removed in a
 later migration with zero data loss (nothing other than the FK itself depends on it). Revisit when the
 first real negotiated dedicated-environment contract exists, or at the next deployment-isolation
 architecture review, whichever comes first.
 
 ## References
+
 `docs/architecture/TENANCY_RECONCILIATION_RECOMMENDATION.md`, ADR-0013, ADR-0022, ADR-0023.
