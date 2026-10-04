@@ -19,7 +19,8 @@
     "clean": "rm -rf dist *.tsbuildinfo",
     "bootstrap": "prisma generate && tsx prisma/bootstrap.ts",
     "invite": "prisma generate && tsx prisma/invite.ts",
-    "platform-role": "prisma generate && tsx prisma/platform-role.ts"
+    "platform-role": "prisma generate && tsx prisma/platform-role.ts",
+    "index-documentation": "prisma generate && tsx prisma/index-documentation.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1135.0",

@@ -131,7 +131,13 @@ export type Action =
   | 'knowledge_candidate:validate_community'
   | 'knowledge_entity:steward'
   | 'knowledge_entity:publish'
-  | 'knowledge_governance:configure';
+  | 'knowledge_governance:configure'
+  // Help & Knowledge (ADR-0032). This action gates "may call help search at
+  // all" — any authenticated principal — not which documentation chunks
+  // come back. That second, finer-grained decision (role tier, entitlement)
+  // is enforced inside HelpSearchService's query itself, not here, because
+  // it varies per chunk rather than per route.
+  | 'help_article:read';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;
