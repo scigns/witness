@@ -21,6 +21,7 @@ import {
   toOrganisationId,
   type Actor,
   type InstitutionalProfile,
+  type TenantId,
 } from '@witness/domain';
 import type { OrganisationStorageUsage, OrganisationSummary } from '@witness/contracts';
 
@@ -383,6 +384,7 @@ export class OrganisationsService {
         name: row.name,
         storageQuotaBytes: Number(row.storageQuotaBytes),
         profile: row.profile as InstitutionalProfile,
+        tenantId: row.tenantId as TenantId | null,
         createdAt: row.createdAt,
       },
       quotaBytes,

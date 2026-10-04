@@ -38,6 +38,7 @@ const PLATFORM_ONLY_ACTIONS: ReadonlySet<Action> = new Set([
   'platform_role:write',
   'platform_role:delete',
   'operator:read',
+  'commercial_override:manage',
 ]);
 
 function scopeLabel(scope: ResourceScope): string {
