@@ -21,7 +21,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
+import { open, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { PrismaClient } from '@prisma/client';
@@ -116,12 +116,18 @@ async function main(): Promise<void> {
   let chunkCount = 0;
   for (const source of SOURCES) {
     const fullPath = join(REPO_ROOT, source.path);
-    const fileStat = await stat(fullPath).catch(() => null);
-    if (fileStat === null) {
+    // Opened once and read through the same handle, rather than a separate
+    // stat() followed by a path-based readFile(): two path resolutions
+    // leave a window for the filesystem to change what that path points to
+    // between the check and the read (CodeQL: potential TOCTOU race).
+    const handle = await open(fullPath, 'r').catch(() => null);
+    if (handle === null) {
       console.warn(`Skipping missing documentation source: ${source.path}`);
       continue;
     }
-    const markdown = await readFile(fullPath, 'utf8');
+    const fileStat = await handle.stat();
+    const markdown = await handle.readFile('utf8');
+    await handle.close();
     const fallbackTitle = source.path.split('/').pop() ?? source.path;
     const chunks = chunkMarkdown(markdown, fallbackTitle);
 
