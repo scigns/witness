@@ -30,6 +30,19 @@ const TIER_RANK: Readonly<Record<string, number>> = Object.freeze({
 
 const DEFAULT_TIER = 'reader';
 
+/**
+ * Mirrors `PolicyEnforcementService`'s own check. A real signed-in session's
+ * `principal.subject` is `user:<uuid>` (`SessionAuthenticator`) and only
+ * that raw uuid, never the prefixed subject, is a valid `RoleAssignment.userId`
+ * — passing the prefixed form through to a `WHERE user_id = $1` query throws
+ * a Postgres UUID-parse error for every real request. A `dev:`-prefixed
+ * (`X-Witness-Dev-User`) principal has no `RoleAssignment` row to look up at
+ * all; its tier was already resolved once, into `principal.roles`, by
+ * `DevelopmentAuthorizationAdapter` — this must reuse that, not query the
+ * database with an unverified header value.
+ */
+const SESSION_SUBJECT_PREFIX = 'user:';
+
 export interface HelpSearchResult {
   readonly chunkId: string;
   readonly title: string;
@@ -78,7 +91,11 @@ export class HelpSearchService {
     const query = rawQuery.trim();
     if (query === '') return [];
 
-    const tiers = await this.roleResolution.globalGrantTiers(principal.subject);
+    const tiers = principal.subject.startsWith(SESSION_SUBJECT_PREFIX)
+      ? await this.roleResolution.globalGrantTiers(
+          principal.subject.slice(SESSION_SUBJECT_PREFIX.length),
+        )
+      : principal.roles;
     const defaultRank = TIER_RANK[DEFAULT_TIER] ?? 0;
     const ranks = tiers.map((tier) => TIER_RANK[tier] ?? defaultRank);
     const maxRank = ranks.length === 0 ? defaultRank : Math.max(...ranks);
@@ -103,7 +120,7 @@ export class HelpSearchService {
         -- default bold match-highlighting markup to be misused as.
         ts_headline(
           'english', c.body, q.tsq,
-          'MaxFragments=1, MaxWords=35, MinWords=15, ShortWord=3, StartSel=, StopSel='
+          'MaxFragments=1, MaxWords=35, MinWords=15, ShortWord=3, StartSel="", StopSel=""'
         ) AS snippet,
         c.source_path,
         c.source_anchor,

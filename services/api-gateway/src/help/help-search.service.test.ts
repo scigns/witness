@@ -7,7 +7,12 @@ import type { PrismaService } from '../infrastructure/prisma.service.js';
 import type { RoleResolutionService } from '../authz/role-resolution.service.js';
 import { HelpSearchService } from './help-search.service.js';
 
-const PRINCIPAL: Principal = { subject: 'user-1', displayName: 'User', kind: 'human', roles: [] };
+const PRINCIPAL: Principal = {
+  subject: 'user:user-1',
+  displayName: 'User',
+  kind: 'human',
+  roles: [],
+};
 
 function harness(tiers: string[]) {
   const row = {
@@ -28,7 +33,7 @@ function harness(tiers: string[]) {
   } as unknown as RoleResolutionService;
 
   const service = new HelpSearchService(prisma, roleResolution);
-  return { service, queryRaw, row };
+  return { service, queryRaw, row, roleResolution };
 }
 
 function entitlements(grants: Record<string, boolean>): ResolvedEntitlements {
@@ -56,6 +61,22 @@ describe('HelpSearchService', () => {
     expect(sqlValues).not.toContain('admin');
     expect(sqlValues).not.toContain('reviewer');
     expect(sqlValues).not.toContain('contributor');
+  });
+
+  it("for a dev-header principal (subject not prefixed 'user:'), uses principal.roles directly rather than querying RoleResolutionService", async () => {
+    const { service, queryRaw, roleResolution } = harness(['reader']);
+    const devPrincipal: Principal = {
+      subject: 'dev:Some Developer',
+      displayName: 'Some Developer',
+      kind: 'human',
+      roles: ['admin'],
+    };
+
+    await service.search('anything', devPrincipal, '0.1.0', null);
+
+    expect(roleResolution.globalGrantTiers).not.toHaveBeenCalled();
+    const sqlValues = (queryRaw.mock.calls[0]![0] as { values: unknown[] }).values;
+    expect(sqlValues).toContain('admin');
   });
 
   it("includes every tier at or below an admin caller's rank", async () => {
