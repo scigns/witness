@@ -2897,3 +2897,56 @@ model Outbox {
   @@index([destination, status])
   @@map("outbox")
 }
+
+/// Help & Knowledge (ADR-0032). One activated documentation build for one
+/// deployed application version — "Application Release → Documentation
+/// Snapshot → Search Index Version" from the ADR. Exactly one snapshot is
+/// `ACTIVE` per `appVersion` at a time; activating a new one marks the prior
+/// snapshot for that version `SUPERSEDED` rather than deleting it, so a
+/// request mid-flight against the old snapshot still resolves consistently
+/// and the provenance trail (what a user was shown and when) is never lost.
+/// `indexVersion` increments when chunks are regenerated for the same
+/// app/doc version (a re-chunking or indexing-quality change), without that
+/// alone implying a new documentation version.
+model DocumentationSnapshot {
+  id           String   @id @db.Uuid
+  appVersion   String   @map("app_version") @db.VarChar(32)
+  docVersion   String   @map("doc_version") @db.VarChar(32)
+  indexVersion Int      @default(1) @map("index_version")
+  status       String   @default("ACTIVE") @db.VarChar(16)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  chunks DocumentationChunk[]
+
+  @@unique([appVersion, docVersion, indexVersion])
+  @@index([appVersion, status])
+  @@map("documentation_snapshot")
+}
+
+/// One searchable unit of documentation within a snapshot. `minRoleTier` is
+/// the server-side authorisation floor enforced inside the search query
+/// itself (ADR-0032, ADR-0018's equivalent rule for evidence) — never a
+/// post-filter on fetched rows, because a post-filter still leaks existence
+/// through result counts and timing. `searchVector` is a generated column
+/// (see the matching migration SQL); Prisma Client cannot read or write it
+/// directly, so every query against it goes through `$queryRaw`.
+model DocumentationChunk {
+  id         String                 @id @db.Uuid
+  snapshotId String                 @map("snapshot_id") @db.Uuid
+  snapshot   DocumentationSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  sourcePath   String  @map("source_path") @db.VarChar(500)
+  sourceAnchor String? @map("source_anchor") @db.VarChar(200)
+  title        String  @db.VarChar(300)
+  body         String
+
+  minRoleTier       String  @default("reader") @map("min_role_tier") @db.VarChar(16)
+  minEntitlementKey String? @map("min_entitlement_key") @db.VarChar(100)
+
+  lastUpdatedAt DateTime                 @map("last_updated_at") @db.Timestamptz(6)
+  indexedAt     DateTime                 @default(now()) @map("indexed_at") @db.Timestamptz(6)
+  searchVector  Unsupported("tsvector")?
+
+  @@index([snapshotId])
+  @@map("documentation_chunk")
+}

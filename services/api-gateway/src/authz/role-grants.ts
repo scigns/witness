@@ -17,6 +17,7 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
   // membership and role-*assignment* management, which stay admin-only
   // below for the same "administrative by definition" reasoning as ever.
   reader: [
+    'help_article:read',
     'record:read',
     'organisation:read',
     'invoice:read',
@@ -88,6 +89,7 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
   // consent-basis provenance) is granted at this same tier, mirroring
   // `participant:manage_restricted`/`participant_consent:manage_restricted`.
   contributor: [
+    'help_article:read',
     'record:read',
     'record:create',
     'organisation:read',
@@ -208,6 +210,7 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
   // the approval gate meaningless while making the product annoying. The
   // export path still redacts server-side against the reader's own scope.
   reviewer: [
+    'help_article:read',
     'record:read',
     'record:create',
     'record:review',
@@ -269,6 +272,7 @@ export const ROLE_GRANTS: Readonly<Record<string, readonly Action[]>> = Object.f
   // define how a real identity legitimately becomes a platform
   // administrator, and this table must not guess at that in the meantime.
   admin: [
+    'help_article:read',
     'record:read',
     'record:create',
     'record:review',

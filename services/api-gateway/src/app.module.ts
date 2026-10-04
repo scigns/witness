@@ -33,6 +33,8 @@ import {
   PublicCommercialController,
 } from './commercial/commercial.controller.js';
 import { CommercialCatalogueService } from './commercial/commercial-catalogue.service.js';
+import { HelpController } from './help/help.controller.js';
+import { HelpSearchService } from './help/help-search.service.js';
 import { ConsentTemplatesController } from './consent-templates/consent-templates.controller.js';
 import { ConsentTemplatesService } from './consent-templates/consent-templates.service.js';
 import { EvidenceController } from './evidence/evidence.controller.js';
@@ -174,6 +176,7 @@ import { MailerService } from './infrastructure/mailer.js';
     KnowledgeCandidatesController,
     KnowledgeGraphQueryController,
     KnowledgeAssertionsController,
+    HelpController,
   ],
   providers: [
     PrismaService,
@@ -190,6 +193,7 @@ import { MailerService } from './infrastructure/mailer.js';
     OrganisationUsageService,
     CommercialEntitlementService,
     CommercialCatalogueService,
+    HelpSearchService,
     InvoicesService,
     ManualSettlementService,
     AgreementsService,

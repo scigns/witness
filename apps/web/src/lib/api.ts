@@ -55,6 +55,7 @@ import type {
   EvidenceSummary,
   EvidenceTransitionRequest,
   HealthResponse,
+  HelpSearchResponse,
   InviteOrganisationUserRequest,
   MembershipAction,
   OrganisationInvitationView,
@@ -359,6 +360,16 @@ export const api = {
   health: (): Promise<HealthResponse> => request<HealthResponse>('/ready', null),
 
   getPlanCatalogue: (): Promise<PublicPlanCatalogue> => request('/api/v1/plans', null),
+
+  searchHelp: (
+    query: string,
+    user: ActingUser,
+    organisationId?: string,
+  ): Promise<HelpSearchResponse> => {
+    const params = new URLSearchParams({ q: query });
+    if (organisationId !== undefined) params.set('organisationId', organisationId);
+    return request(`/api/v1/help/search?${params.toString()}`, user);
+  },
 
   getBillingOverview: (organisationId: string, user: ActingUser): Promise<BillingOverview> =>
     request(`/api/v1/organisations/${encodeURIComponent(organisationId)}/billing`, user),

@@ -3301,3 +3301,27 @@ export interface KnowledgeProvenanceChainView {
   confirmedByName: string;
   confirmedAt: string;
 }
+
+/**
+ * Help & Knowledge (ADR-0032). Every field here is already permission- and
+ * version-filtered server-side before the response is built — the web
+ * client renders exactly what it is given and performs no further
+ * filtering of its own.
+ */
+export interface HelpSearchResultView {
+  chunkId: string;
+  title: string;
+  snippet: string;
+  sourcePath: string;
+  sourceAnchor: string | null;
+  appVersion: string;
+  docVersion: string;
+  lastUpdatedAt: string;
+  indexedAt: string;
+}
+
+export interface HelpSearchResponse {
+  query: string;
+  appVersion: string;
+  results: HelpSearchResultView[];
+}

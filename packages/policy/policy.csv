@@ -453,3 +453,12 @@ p, admin, knowledge_candidate:validate_community
 p, admin, knowledge_entity:steward
 p, admin, knowledge_entity:publish
 p, admin, knowledge_governance:configure
+
+# help_article:read (ADR-0032) — granted to every tier, same reasoning as
+# role:read above: any authenticated principal may search help, because the
+# per-chunk role/entitlement floor is enforced inside the query itself, not
+# by withholding this route-level action from a lower tier.
+p, reader, help_article:read
+p, contributor, help_article:read
+p, reviewer, help_article:read
+p, admin, help_article:read

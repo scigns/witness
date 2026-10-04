@@ -45,6 +45,8 @@ record of having been wrong is part of the value.
 | [0027](ADR-0027-canonical-merge-and-governance-projection.md) | Canonical merge resolution and governance-state projection | Accepted | **P3**, P5, P6 |
 | [0028](ADR-0028-organisation-workspace-session-participant-model.md) | Organisation → Workspace → Session → Participant model, and external collaboration | Accepted | P1, P3, P6 |
 | [0029](ADR-0029-development-environment-strategy.md) | Development environment strategy — Codespaces-first, CI-verified, local-optional | Accepted | P1, P6 |
+| [0032](ADR-0032-version-aware-help-and-knowledge-search.md) | Version-aware help and knowledge search — permission-filtered Postgres full-text search over versioned documentation snapshots | Proposed | P1, P2, P6, P7 |
+| [0033](ADR-0033-provider-neutral-meeting-evidence-import.md) | Provider-neutral meeting evidence import — domain model and port for Zoom/Teams-class sources, no vendor code in core | Proposed | P2, P3, P4 |
 
 Bold principles indicate an ADR that is a primary expression of that principle. Changing one of
 those requires Steering Committee approval, and where consent, provenance or Indigenous data
