@@ -93,3 +93,17 @@ Production acceptance hardening continuation (Node 22)
 - Production SSH witness-prod-claude rejected publickey authentication. Host, current backups,
   environment, restore, production deployment and synthetic production journey remain blocked.
 - No production deployment/merge/tag made; full gate matrix records FAIL for unproven conditions.
+
+Production acceptance follow-up (2026-10-05; candidate work after 3e2f008):
+- Fresh local PostgreSQL: 44 migrations, bootstrap, two startup/readiness/restart passes.
+- Existing local dump restore proof remains scoped to synthetic state, not production recovery.
+- Live changed suites: commercial lifecycle 1, participant capture 9, reservations 10: 20/20 PASS.
+- Web unit/DOM/brand: 33/33 PASS. Web lint and production build PASS.
+- Provider-neutral observed provisioning: 11 tests PASS; enum metadata never implies READY.
+- Capture HTTP security: 3/3 PASS (missing/invalid token before parsing, configured size rejection).
+- Storage metadata and ownership/context adversarial checks PASS.
+- Final API regression: 805/805 tests in 73 files PASS; API build/typecheck/lint PASS.
+- CI 37263717351 (3e2f008) failures addressed: handoff owner header, CSS whitespace assertion,
+  participant synthetic cleanup reservation FK. Final candidate CI still required.
+- Production SSH publickey access remains blocked; no merge/tag/production mutation/deployment.
+- Production acceptance gate matrix remains BLOCKED; no deferred risks accepted.

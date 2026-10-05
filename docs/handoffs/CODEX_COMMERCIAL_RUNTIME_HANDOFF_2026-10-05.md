@@ -1,5 +1,9 @@
 # Witness — Commercial Runtime & Market Readiness Handoff
 
+**Owner:** Engineering
+
+**Status:** Checkpoint; superseded by production acceptance evidence
+
 Date: 5 October 2026
 
 Repository:

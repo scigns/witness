@@ -144,6 +144,16 @@ describe('CommercialCatalogueService commercial intent invariants', () => {
     expect(h.rows).toHaveLength(1);
   });
 
+  it('rejects changed commercial terms under a reused request key', async () => {
+    const h = harness();
+    const request = paid('aaaaaaaa-0000-4000-8000-000000000010');
+    await h.service.requestChange(ORG, request, PRINCIPAL);
+    await expect(
+      h.service.requestChange(ORG, { ...request, paymentMethod: 'INVOICE' }, PRINCIPAL),
+    ).rejects.toMatchObject({ response: { error: { code: 'IDEMPOTENCY_CONFLICT' } } });
+    expect(h.rows).toHaveLength(1);
+  });
+
   it('supersedes the previous pending request', async () => {
     const h = harness();
     await h.service.requestChange(ORG, paid('aaaaaaaa-0000-4000-8000-000000000005'), PRINCIPAL);

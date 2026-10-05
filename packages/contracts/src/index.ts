@@ -3382,3 +3382,25 @@ export const createSubscriptionEntitlementOverrideRequestSchema = z
 export type CreateSubscriptionEntitlementOverrideRequest = z.infer<
   typeof createSubscriptionEntitlementOverrideRequestSchema
 >;
+
+/** Desired commercial allocation is separate from provider-verified observed infrastructure. */
+export interface TenantProvisioningView {
+  organisationId: string;
+  tenantId: string;
+  tenantAssignment: string;
+  desired: {
+    deploymentIsolation: 'SHARED' | 'ISOLATED_DATA' | 'DEDICATED' | 'SOVEREIGN';
+    resourceProfileCode: string;
+    storageQuotaBytes: string;
+    configurationFingerprint: string;
+  };
+  observed: {
+    state: 'NOT_PROVISIONED' | 'PENDING' | 'READY' | 'DEGRADED' | 'FAILED';
+    deploymentIsolation: 'SHARED' | 'ISOLATED_DATA' | 'DEDICATED' | 'SOVEREIGN' | null;
+    resourceProfileCode: string | null;
+    configurationFingerprint: string | null;
+    verifiedAt: string | null;
+    detail: string;
+    evidenceReference?: string | null;
+  };
+}

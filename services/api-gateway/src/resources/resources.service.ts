@@ -42,8 +42,9 @@ import type {
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
+import { validateUploadMetadata } from '../storage/upload-metadata.js';
 import { StoragePort } from '../storage/storage.port.js';
-import { resolveStoredContent } from '../storage/storage.service.js';
+import { assertStorageOwnership, resolveStoredContent } from '../storage/storage.service.js';
 import { StorageQuotaService } from '../organisations/storage-quota.service.js';
 import type { StorageReservation } from '@prisma/client';
 import type { Principal } from '../authz/authorization.port.js';
@@ -94,6 +95,7 @@ export class ResourcesService {
     principal: Principal,
   ): Promise<ResourceView> {
     await this.requireWorkspace(workspaceId);
+    await this.requireResourceContext(workspaceId, request);
     const actor = await resolveActor(this.prisma, principal);
     const userId = await this.requirePrincipalUserId(principal);
     const now = new Date();
@@ -147,7 +149,10 @@ export class ResourcesService {
       });
     }
 
+    validateUploadMetadata(file.originalname, file.mimetype);
+
     const workspace = await this.requireWorkspace(workspaceId);
+    await this.requireResourceContext(workspaceId, metadata);
 
     const actor = await resolveActor(this.prisma, principal);
     const userId = await this.requirePrincipalUserId(principal);
@@ -252,7 +257,12 @@ export class ResourcesService {
 
     let content: Buffer;
     try {
-      content = await resolveStoredContent(this.storage, row);
+      const workspace = await this.requireWorkspace(workspaceId);
+      content = await resolveStoredContent(this.storage, row, {
+        organisationId: workspace.organisationId,
+        kind: 'resource',
+        id: row.id,
+      });
     } catch (error) {
       throw new NotFoundException({
         error: {
@@ -281,6 +291,12 @@ export class ResourcesService {
     // the object silently survives in R2 forever — the orphan this file
     // shipped with until a live pilot upload proved it (see PR history).
     if (row.storageKey !== null && this.storage !== null) {
+      const workspace = await this.requireWorkspace(workspaceId);
+      assertStorageOwnership(row.storageKey, {
+        organisationId: workspace.organisationId,
+        kind: 'resource',
+        id: row.id,
+      });
       await this.storage.delete(row.storageKey);
     }
 
@@ -343,6 +359,42 @@ export class ResourcesService {
     }
 
     return user.id;
+  }
+
+  private async requireResourceContext(
+    workspaceId: string,
+    context: { sessionId?: string | null | undefined; agendaItemId?: string | null | undefined },
+  ): Promise<void> {
+    if (context.sessionId) {
+      const session = await this.prisma.coDesignSession.findUnique({
+        where: { id: context.sessionId },
+        select: { workspaceId: true },
+      });
+      if (session === null || session.workspaceId !== workspaceId)
+        throw new NotFoundException({
+          error: {
+            code: 'RESOURCE_CONTEXT_NOT_FOUND',
+            message: 'Resource context is unavailable in this workspace.',
+          },
+        });
+    }
+    if (context.agendaItemId) {
+      const agenda = await this.prisma.agendaItem.findUnique({
+        where: { id: context.agendaItemId },
+        select: { workspaceId: true, sessionId: true },
+      });
+      if (
+        agenda === null ||
+        agenda.workspaceId !== workspaceId ||
+        (context.sessionId && agenda.sessionId !== null && agenda.sessionId !== context.sessionId)
+      )
+        throw new NotFoundException({
+          error: {
+            code: 'RESOURCE_CONTEXT_NOT_FOUND',
+            message: 'Resource context is unavailable in this workspace.',
+          },
+        });
+    }
   }
 
   private async requireWorkspace(workspaceId: string): Promise<{ organisationId: string }> {

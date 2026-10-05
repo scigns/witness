@@ -9,11 +9,13 @@
  */
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 import type {
   OperatorFailureGroup,
   OperatorFailureItem,
   OperatorHealthView,
+  OrganisationSummary,
 } from '@witness/contracts';
 
 import { api, ApiError } from '@/lib/api';
@@ -90,6 +92,7 @@ function FailureSection({ title, group }: { title: string; group: OperatorFailur
 
 export default function OperatorPage() {
   const { user, ready } = useSession();
+  const [organisations, setOrganisations] = useState<OrganisationSummary[]>([]);
   const [health, setHealth] = useState<OperatorHealthView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,9 +103,13 @@ export default function OperatorPage() {
     void (async () => {
       setLoading(true);
       try {
-        const result = await api.getOperatorHealth(user);
+        const [result, customers] = await Promise.all([
+          api.getOperatorHealth(user),
+          api.listOperatorOrganisations(user),
+        ]);
         if (cancelled) return;
         setHealth(result);
+        setOrganisations(customers.organisations);
         setError(null);
       } catch (caught) {
         if (cancelled) return;
@@ -130,6 +137,36 @@ export default function OperatorPage() {
 
       {loading && !health && <p role="status">Loading…</p>}
 
+      {!loading && !error && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Customer organisations</h2>
+          <Link href="/organisations/new" className="underline">
+            Create organisation
+          </Link>
+          <p className="text-sm text-[var(--color-ink-muted)]">
+            Up to 200 most recently created organisations.
+          </p>
+          <ul className="space-y-3">
+            {organisations.map((organisation) => (
+              <li key={organisation.id} className="flex flex-wrap gap-3">
+                <span className="font-medium">{organisation.name}</span>
+                <Link
+                  href={`/operations/organisations/${organisation.id}/commercial-configuration`}
+                  className="underline"
+                >
+                  Allocation and usage
+                </Link>
+                <Link
+                  href={`/operations/organisations/${organisation.id}/origination`}
+                  className="underline"
+                >
+                  Commercial onboarding
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {health && (
         <>
           <p className="text-xs text-[var(--color-ink-muted)]">

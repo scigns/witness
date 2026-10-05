@@ -1,17 +1,21 @@
 # Client Onboarding Runbook
 
-**Status:** Active
+**Status:** Legacy initial-deployment/bootstrap procedure
 **Owner:** Infrastructure Lead
 
-How to bring on a new client, start to finish, without SQL, Prisma, or
+For current multi-organisation commercial onboarding, use
+[FIRST_CLIENT_ONBOARDING.md](FIRST_CLIENT_ONBOARDING.md). The bootstrap commands below are restricted
+to initial platform setup, not client creation, and grant platform authority to the initial operator.
+
+Historical deployment procedure without SQL, Prisma, or
 direct database changes. Pair with
 [`../release/CLIENT_ROLLOUT_PROFILES.md`](../release/CLIENT_ROLLOUT_PROFILES.md)
 for profile-specific defaults (SPC/FTA/MOJ/Church), and
 [`PILOT_OPERATIONS.md`](PILOT_OPERATIONS.md) for the underlying commands
 this runbook sequences.
 
-Every real institutional client gets its own deployment (see
-`PILOT_OPERATIONS.md`'s "Data portability" section for why). This runbook
+Deployment isolation is resolved from effective commercial configuration and verified provisioning.
+A dedicated deployment must not be assumed for every organisation. The bootstrap example below
 assumes a freshly deployed, freshly migrated instance with no organisation
 yet — the state `docker compose … run --rm api pnpm --filter @witness/api
 exec prisma migrate deploy` leaves it in.
@@ -138,8 +142,8 @@ sessions:
 
 - [ ] Steps 5–7 above passed.
 - [ ] Backup is scheduled (`crontab -l` shows the daily `scripts/pilot/backup.sh`
-  entry — see `PILOT_OPERATIONS.md`'s "Backup" section) and
-  `scripts/ops/backup-status.sh` reports `STATUS: OK`.
+      entry — see `PILOT_OPERATIONS.md`'s "Backup" section) and
+      `scripts/ops/backup-status.sh` reports `STATUS: OK`.
 - [ ] The institutional profile matches what was agreed with the client (SPC/FTA/MOJ/Church).
 - [ ] For MOJ specifically: legal/compliance sign-off on the consent basis is on file — see `CLIENT_ROLLOUT_PROFILES.md`.
 - [ ] The client knows this is now real institutional memory, not a sandbox.

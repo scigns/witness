@@ -1,3 +1,4 @@
+import { downloadDisposition } from '../storage/upload-metadata.js';
 /**
  * HTTP adapter for structured live evidence capture (BUILD_ROADMAP.md
  * Milestone 5).
@@ -33,7 +34,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { AttachmentUploadInterceptor } from '../storage/attachment-upload.interceptor.js';
 import type { Response } from 'express';
 
 import {
@@ -60,14 +61,6 @@ import { EvidenceService } from './evidence.service.js';
 import { EvidenceAttachmentService } from './evidence-attachment.service.js';
 import { EvidenceLinkService } from './evidence-link.service.js';
 import { TranscriptService } from './transcript.service.js';
-
-/**
- * A memory-safety backstop, not the product limit — `EvidenceAttachmentService`
- * enforces the real, configurable `WITNESS_MAX_EVIDENCE_ATTACHMENT_MB` cap
- * once it can see the file's actual size. This just stops multer from
- * buffering something absurd into process memory before that check runs.
- */
-const MULTER_HARD_CEILING_BYTES = 500 * 1024 * 1024;
 
 @Controller('api/v1/workspaces/:workspaceId/sessions/:sessionId/evidence')
 @UseGuards(AuthorizationGuard)
@@ -252,7 +245,7 @@ export class EvidenceController {
    */
   @Post(':evidenceId/attachment')
   @Requires('evidence:update')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MULTER_HARD_CEILING_BYTES } }))
+  @UseInterceptors(AttachmentUploadInterceptor)
   async uploadAttachment(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
@@ -283,9 +276,7 @@ export class EvidenceController {
     const file = await this.attachments.content(workspaceId, sessionId, evidenceId);
     res.set({
       'Content-Type': file.contentType,
-      'Content-Disposition':
-        `attachment; filename="${file.filename.replace(/"/g, '')}"; ` +
-        `filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+      'Content-Disposition': downloadDisposition(file.filename),
       'Content-Length': String(file.content.length),
     });
     res.send(file.content);

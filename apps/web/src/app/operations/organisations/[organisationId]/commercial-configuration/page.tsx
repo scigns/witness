@@ -11,6 +11,7 @@
 import { use, useCallback, useEffect, useState, type FormEvent } from 'react';
 import type {
   EffectiveCommercialConfigurationView,
+  TenantProvisioningView,
   OrganisationStorageUsage,
   OrganisationUsage,
   SubscriptionEntitlementOverrideView,
@@ -26,6 +27,7 @@ export default function OperatorCommercialConfigurationPage({
 }) {
   const { organisationId } = use(params);
   const { user, ready } = useSession();
+  const [provisioning, setProvisioning] = useState<TenantProvisioningView | null>(null);
   const [config, setConfig] = useState<EffectiveCommercialConfigurationView | null>(null);
   const [overrides, setOverrides] = useState<SubscriptionEntitlementOverrideView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,13 +44,16 @@ export default function OperatorCommercialConfigurationPage({
 
   const load = useCallback(async () => {
     try {
-      const [nextConfig, nextOverrides, nextStorage, nextUsage] = await Promise.all([
-        api.getOperatorCommercialConfiguration(organisationId, user),
-        api.listCommercialOverrides(organisationId, user),
-        api.getOperatorOrganisationStorage(organisationId, user),
-        api.getOperatorOrganisationUsage(organisationId, user),
-      ]);
+      const [nextConfig, nextOverrides, nextStorage, nextUsage, nextProvisioning] =
+        await Promise.all([
+          api.getOperatorCommercialConfiguration(organisationId, user),
+          api.listCommercialOverrides(organisationId, user),
+          api.getOperatorOrganisationStorage(organisationId, user),
+          api.getOperatorOrganisationUsage(organisationId, user),
+          api.getOperatorProvisioning(organisationId, user),
+        ]);
       setConfig(nextConfig);
+      setProvisioning(nextProvisioning);
       setStorage(nextStorage);
       setUsage(nextUsage);
       setOverrides(nextOverrides);
@@ -186,6 +191,30 @@ export default function OperatorCommercialConfigurationPage({
         )}
       </Card>
 
+      {provisioning && (
+        <Card>
+          <h2 className="text-xl font-semibold">Tenant provisioning</h2>
+          <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+            <dt>Technical tenant</dt>
+            <dd className="break-all">{provisioning.tenantId}</dd>
+            <dt>Assignment</dt>
+            <dd>{provisioning.tenantAssignment}</dd>
+            <dt>Desired isolation</dt>
+            <dd>{provisioning.desired.deploymentIsolation}</dd>
+            <dt>Desired profile</dt>
+            <dd>{provisioning.desired.resourceProfileCode}</dd>
+            <dt>Observed state</dt>
+            <dd>{provisioning.observed.state}</dd>
+            <dt>Observed isolation</dt>
+            <dd>{provisioning.observed.deploymentIsolation ?? 'Unverified'}</dd>
+            <dt>Observed profile</dt>
+            <dd>{provisioning.observed.resourceProfileCode ?? 'Unverified'}</dd>
+            <dt>Last verified</dt>
+            <dd>{provisioning.observed.verifiedAt ?? 'Not verified'}</dd>
+          </dl>
+          <p className="mt-3 text-sm">{provisioning.observed.detail}</p>
+        </Card>
+      )}
       <Card>
         <h2 className="text-xl font-semibold">Storage reconciliation</h2>
         <p className="mt-2 text-sm">

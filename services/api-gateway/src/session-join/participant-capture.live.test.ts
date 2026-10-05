@@ -225,6 +225,7 @@ describe.skipIf(prisma === null)(
       await db.coDesignSession.deleteMany({ where: { workspaceId } });
       await db.consentTemplate.deleteMany({ where: { organisationId } });
       await db.workspace.deleteMany({ where: { id: workspaceId } });
+      await db.storageReservation.deleteMany({ where: { organisationId } });
       await db.organisation.deleteMany({ where: { id: organisationId } });
       // Scoped to this file's own facilitator, never a shared `.example`
       // filter — that broad filter races other live-test files' fixtures

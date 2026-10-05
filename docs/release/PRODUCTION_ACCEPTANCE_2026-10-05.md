@@ -12,30 +12,30 @@ dependency was merged or flattened. Existing verification is retained in
 PASS applies only to the scope explicitly described. Missing production proof is FAIL, not an
 accepted risk. No deferred risk has been accepted by the release manager.
 
-| Gate              | Status | Evidence / remaining condition                                                                                                       |
-| ----------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| BUILD             | PASS   | Node 22 API and web production builds pass locally; deployed artifact remains older.                                                 |
-| TEST              | FAIL   | API 779 pass; reservation live tests pass. Required CI must pass at final candidate SHA.                                             |
-| SECURITY          | FAIL   | Full-history gitleaks: 465 commits, no leaks. Full production attack journey outstanding.                                            |
-| DATABASE          | FAIL   | Isolated PostgreSQL checks pass; current production data/integrity inspection blocked.                                               |
-| MIGRATION         | FAIL   | Additive reservation migration applied locally (44 total); fresh seed and production-compatible upgrade rehearsal outstanding.       |
-| BACKUP            | FAIL   | Local protected dump verified. Current production database, identity and object protection evidence required.                        |
-| RESTORE           | FAIL   | Local dump restored into separate database: 44 migration records, 74 tables. Production backup restore and object recovery unproven. |
-| AUTH              | FAIL   | Existing authentication unit evidence retained; real-session expiry/recovery/deep-link acceptance outstanding.                       |
-| RBAC              | FAIL   | Existing API boundary tests pass; complete browser/direct-API client acceptance outstanding.                                         |
-| TENANT ISOLATION  | FAIL   | Existing adversarial evidence retained; controlled production cross-organisation acceptance outstanding.                             |
-| STORAGE           | FAIL   | Bounded object/inline reconciliation implemented; configured production transport and recovery unverified.                           |
-| QUOTA             | FAIL   | Live contention, idempotency, commit/rollback and conservative expiry pass. Provider/crash end-to-end acceptance outstanding.        |
-| COMMERCIAL        | FAIL   | Institutional operator origination is incomplete, especially negotiated invoice terms.                                               |
-| PAYMENTS          | FAIL   | Existing transactional manual settlement retained; full operator-issued invoice journey outstanding.                                 |
-| PROVISIONING      | FAIL   | Desired isolation exists; verified observed allocation/provider boundary remains incomplete.                                         |
-| OBSERVABILITY     | FAIL   | Public readiness reports build identity. Reservation/reconciliation failure signals added; host logs and alert delivery unverified.  |
-| EMAIL             | FAIL   | Production transport and controlled invite/recovery delivery not verified in this acceptance.                                        |
-| FRONTEND          | FAIL   | Build/lint pass; work-oriented shell and full viewport/browser states outstanding.                                                   |
-| ACCESSIBILITY     | FAIL   | Keyboard/axe/browser acceptance of final shell outstanding.                                                                          |
-| PUBLIC WEBSITE    | FAIL   | Claims, links and browser acceptance outstanding.                                                                                    |
-| CLIENT ACCEPTANCE | FAIL   | Mandatory complete synthetic paying-client journey has not completed.                                                                |
-| ROLLBACK          | FAIL   | Existing script inspected; current production rollback images/backups not verified.                                                  |
+| Gate              | Status | Evidence / remaining condition                                                                                                                             |
+| ----------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BUILD             | PASS   | Node 22 API and web production builds pass locally; deployed artifact remains older.                                                                       |
+| TEST              | FAIL   | API regression and targeted live tests pass; see checkpoint. Required CI must pass at final candidate SHA.                                                 |
+| SECURITY          | FAIL   | Full-history gitleaks: 465 commits, no leaks. Full production attack journey outstanding.                                                                  |
+| DATABASE          | FAIL   | Isolated PostgreSQL checks pass; current production data/integrity inspection blocked.                                                                     |
+| MIGRATION         | FAIL   | Additive reservation migration applied locally (44 total); fresh bootstrap/restart pass; production-compatible data rehearsal outstanding.                 |
+| BACKUP            | FAIL   | Local protected dump verified. Current production database, identity and object protection evidence required.                                              |
+| RESTORE           | FAIL   | Local dump restored into separate database: 44 migration records, 74 tables. Production backup restore and object recovery unproven.                       |
+| AUTH              | FAIL   | Existing authentication unit evidence retained; real-session expiry/recovery/deep-link acceptance outstanding.                                             |
+| RBAC              | FAIL   | Existing API boundary tests pass; complete browser/direct-API client acceptance outstanding.                                                               |
+| TENANT ISOLATION  | FAIL   | Existing adversarial evidence retained; controlled production cross-organisation acceptance outstanding.                                                   |
+| STORAGE           | FAIL   | Bounded object/inline reconciliation implemented; configured production transport and recovery unverified.                                                 |
+| QUOTA             | FAIL   | Live contention, idempotency, commit/rollback and conservative expiry pass. Provider/crash end-to-end acceptance outstanding.                              |
+| COMMERCIAL        | FAIL   | Catalogue-priced operator origination implemented; quoted/negotiated pricing and browser acceptance outstanding.                                           |
+| PAYMENTS          | FAIL   | Existing transactional manual settlement retained; Live operator-issued invoice/settlement journey passes; production transport/browser proof outstanding. |
+| PROVISIONING      | FAIL   | Desired isolation exists; Provider-neutral observed boundary implemented; actual infrastructure fulfilment unverified.                                     |
+| OBSERVABILITY     | FAIL   | Public readiness reports build identity. Reservation/reconciliation failure signals added; host logs and alert delivery unverified.                        |
+| EMAIL             | FAIL   | Production transport and controlled invite/recovery delivery not verified in this acceptance.                                                              |
+| FRONTEND          | FAIL   | Build/lint pass; work-oriented shell and full viewport/browser states outstanding.                                                                         |
+| ACCESSIBILITY     | FAIL   | Keyboard/axe/browser acceptance of final shell outstanding.                                                                                                |
+| PUBLIC WEBSITE    | FAIL   | Claims, links and browser acceptance outstanding.                                                                                                          |
+| CLIENT ACCEPTANCE | FAIL   | Mandatory complete synthetic paying-client journey has not completed.                                                                                      |
+| ROLLBACK          | FAIL   | Existing script inspected; current production rollback images/backups not verified.                                                                        |
 
 ## Engineering changes and verified scope
 
@@ -97,3 +97,35 @@ and public claims audit; automate the full synthetic operator/admin/member journ
 host, restore protected production backups in non-production, verify email and alerts, obtain
 release approval, record immutable artifact identity and rollback commands, deploy and repeat the
 synthetic production smoke.
+
+## Additional acceptance evidence
+
+An empty local database `codex_fresh_20261005` accepted all 44 migrations and initial platform
+bootstrap. Bootstrap now resolves allocation from ResourceProfile rather than a fixed legacy quota.
+The application started twice against that database, returned healthy status and retained its
+organisation. This proves local fresh install/restart, not production identity-provider integration.
+
+The synthetic PostgreSQL client journey creates two organisations, applies authorised resource
+configuration, issues a catalogue-priced invoice, rejects amount tampering, settles/replays one
+payment and receipt, activates entitlements, creates a workspace, uploads content and enforces its
+quota. Organisation administrators fail platform settlement/override/operator permissions and
+cross-organisation resource access. Synthetic financial history is retained in the disposable
+acceptance database. The browser, invite, OIDC and production transport portions remain FAIL.
+
+Operator origination uses the existing commercial request, invoice and settlement services. The
+[first-client runbook](../operations/FIRST_CLIENT_ONBOARDING.md) documents the supported path and
+explicitly blocks quoted prices and unverified infrastructure promises. Observed provisioning
+requires matching isolation, profile and complete configuration fingerprint plus provider evidence
+before READY. Existing tenant metadata alone cannot satisfy this check.
+
+Storage hardening rejects foreign session/agenda associations before reserving bytes. Every object
+reader, including background transcription, verifies the exact organisation/kind/record key; deletion
+checks the same ownership. Upload filenames reject traversal/control characters and download headers
+encode Unicode safely. Public capture authorisation now precedes multipart buffering. Configured
+attachment limits and bounded field/part counts apply at the parser.
+
+CI run 37263717351 at `3e2f008` failed documentation headers, a whitespace-sensitive brand assertion,
+and live participant cleanup missing the reservation FK. These have been corrected and targeted
+checks pass; final candidate CI remains required. GitHub environment `pilot` currently reports no
+protection rules. An explicit release-manager go/no-go is required by repository governance; do not
+merge into the automatic deployment path before enforcing that approval and verifying rollback.

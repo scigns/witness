@@ -190,6 +190,11 @@ export class ParticipantCaptureService {
    * (`requireOwnEvidence`) before ever reaching `EvidenceAttachmentService`,
    * so a forged `evidenceId` cannot attach a file to someone else's evidence.
    */
+  async authorizeAttachment(rawToken: string, evidenceId: string): Promise<void> {
+    const resolved = await this.resolveToken(rawToken);
+    await this.requireOwnEvidence(resolved.participantId, evidenceId);
+  }
+
   async uploadAttachment(
     rawToken: string,
     evidenceId: string,

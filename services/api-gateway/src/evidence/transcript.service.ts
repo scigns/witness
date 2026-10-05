@@ -247,7 +247,16 @@ export class TranscriptService {
     await this.persist(transcriptId, processing.transcript, processing.event, startedAt);
 
     try {
-      const content = await resolveStoredContent(this.storage, attachment);
+      const evidence = await this.prisma.evidence.findUnique({
+        where: { id: evidenceId },
+        select: { organisationId: true },
+      });
+      if (evidence === null) throw new Error('Attachment evidence is unavailable.');
+      const content = await resolveStoredContent(this.storage, attachment, {
+        organisationId: evidence.organisationId,
+        kind: 'evidence-attachment',
+        id: attachment.id,
+      });
       const result = await this.localInference.run(() =>
         this.transcription.transcribe(content, attachment.contentType),
       );

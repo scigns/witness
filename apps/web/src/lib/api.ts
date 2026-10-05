@@ -41,6 +41,7 @@ import type {
   CreateOrganisationRequest,
   CreateSubscriptionEntitlementOverrideRequest,
   EffectiveCommercialConfigurationView,
+  TenantProvisioningView,
   SubscriptionEntitlementOverrideView,
   UpdateStorageQuotaRequest,
   CreateRecordRequest,
@@ -127,6 +128,8 @@ import type {
   UpdateCommitmentRequest,
   UpdateDecisionRequest,
   BillingOverview,
+  IssueInvoiceRequest,
+  InvoiceView,
   CommercialChangeRequest,
   CommercialChangeView,
   PublicPlanCatalogue,
@@ -363,6 +366,34 @@ export const api = {
 
   getPlanCatalogue: (): Promise<PublicPlanCatalogue> => request('/api/v1/plans', null),
 
+  listOperatorOrganisations: (
+    user: ActingUser,
+  ): Promise<{ organisations: OrganisationSummary[] }> =>
+    request('/api/v1/operator/organisations', user),
+
+  getOperatorOrigination: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<{
+    organisation: { id: string; name: string };
+    billingAccount: { id: string; currency: string };
+    billing: BillingOverview;
+  }> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/origination`,
+      user,
+    ),
+
+  issueInvoice: (
+    organisationId: string,
+    body: IssueInvoiceRequest,
+    user: ActingUser,
+  ): Promise<InvoiceView> =>
+    request(`/api/v1/organisations/${encodeURIComponent(organisationId)}/invoices`, user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   getBillingOverview: (organisationId: string, user: ActingUser): Promise<BillingOverview> =>
     request(`/api/v1/organisations/${encodeURIComponent(organisationId)}/billing`, user),
 
@@ -383,6 +414,24 @@ export const api = {
   ): Promise<EffectiveCommercialConfigurationView> =>
     request(
       `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration`,
+      user,
+    ),
+
+  getOperatorProvisioning: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<TenantProvisioningView> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/provisioning`,
+      user,
+    ),
+
+  getOrganisationProvisioning: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<TenantProvisioningView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/provisioning`,
       user,
     ),
 

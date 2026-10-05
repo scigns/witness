@@ -51,6 +51,7 @@ import { PrismaService } from '../infrastructure/prisma.service.js';
 import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
+import { validateUploadMetadata } from '../storage/upload-metadata.js';
 import { StoragePort } from '../storage/storage.port.js';
 import { resolveStoredContent } from '../storage/storage.service.js';
 import { StorageQuotaService } from '../organisations/storage-quota.service.js';
@@ -114,6 +115,8 @@ export class EvidenceAttachmentService {
         },
       });
     }
+
+    validateUploadMetadata(file.originalname, file.mimetype);
 
     const kind = inferAttachmentKind(file.mimetype);
     if (kind === null) {
@@ -309,7 +312,7 @@ export class EvidenceAttachmentService {
     sessionId: string,
     evidenceId: string,
   ): Promise<EvidenceAttachmentContent> {
-    await this.requireEvidenceRow(workspaceId, sessionId, evidenceId);
+    const evidence = await this.requireEvidenceRow(workspaceId, sessionId, evidenceId);
 
     const row = await this.prisma.evidenceAttachment.findUnique({ where: { evidenceId } });
     if (row === null) {
@@ -323,7 +326,11 @@ export class EvidenceAttachmentService {
 
     let content: Buffer;
     try {
-      content = await resolveStoredContent(this.storage, row);
+      content = await resolveStoredContent(this.storage, row, {
+        organisationId: evidence.organisationId,
+        kind: 'evidence-attachment',
+        id: row.id,
+      });
     } catch (error) {
       // Data-integrity states (object storage disabled/missing an object
       // that a record still points at), not "no attachment exists" — but

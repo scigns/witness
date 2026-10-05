@@ -6,7 +6,7 @@
  * evidence-attachment.service.test.ts and resources.service.ts's callers.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { StoragePort } from './storage.port.js';
 import { objectKey, resolveStoredContent } from './storage.service.js';
@@ -36,39 +36,54 @@ function fakeStorage(objects: Record<string, { content: Buffer; contentType: str
   } as unknown as StoragePort;
 }
 
+const OWNER = { organisationId: 'org', kind: 'resource' as const, id: 'id' };
+
 describe('resolveStoredContent', () => {
   it('returns the inline content column when storageKey is null', async () => {
     const content = Buffer.from('inline bytes');
-    const result = await resolveStoredContent(null, { content, storageKey: null });
+    const result = await resolveStoredContent(null, { content, storageKey: null }, OWNER);
     expect(result).toBe(content);
   });
 
   it('fetches from StoragePort when storageKey is set', async () => {
     const content = Buffer.from('object store bytes');
-    const storage = fakeStorage({ 'org/kind/id': { content, contentType: 'audio/wav' } });
-    const result = await resolveStoredContent(storage, {
-      content: null,
-      storageKey: 'org/kind/id',
-    });
+    const storage = fakeStorage({ 'org/resource/id': { content, contentType: 'audio/wav' } });
+    const result = await resolveStoredContent(
+      storage,
+      {
+        content: null,
+        storageKey: 'org/resource/id',
+      },
+      OWNER,
+    );
     expect(result).toBe(content);
   });
 
   it('throws when storageKey is set but StoragePort is not configured', async () => {
     await expect(
-      resolveStoredContent(null, { content: null, storageKey: 'org/kind/id' }),
+      resolveStoredContent(null, { content: null, storageKey: 'org/resource/id' }, OWNER),
     ).rejects.toThrow(/not configured/i);
   });
 
   it('throws when storageKey is set but the object is missing from the store', async () => {
     const storage = fakeStorage({});
     await expect(
-      resolveStoredContent(storage, { content: null, storageKey: 'org/kind/missing' }),
+      resolveStoredContent(storage, { content: null, storageKey: 'org/resource/id' }, OWNER),
     ).rejects.toThrow(/missing from storage/i);
   });
 
   it('throws when neither content nor storageKey is set — a row that should never exist', async () => {
-    await expect(resolveStoredContent(null, { content: null, storageKey: null })).rejects.toThrow(
-      /no content in either storage/i,
-    );
+    await expect(
+      resolveStoredContent(null, { content: null, storageKey: null }, OWNER),
+    ).rejects.toThrow(/no content in either storage/i);
   });
+});
+
+it('rejects a foreign object pointer before contacting storage', async () => {
+  const get = vi.fn();
+  const storage = { get } as unknown as StoragePort;
+  await expect(
+    resolveStoredContent(storage, { content: null, storageKey: 'foreign/resource/id' }, OWNER),
+  ).rejects.toThrow(/ownership/);
+  expect(get).not.toHaveBeenCalled();
 });
