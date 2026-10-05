@@ -217,6 +217,25 @@ export class StorageQuotaService {
     }
   }
 
+  private async requireWritableSubscription(
+    tx: TransactionClient,
+    organisationId: string,
+  ): Promise<void> {
+    // Share-lock the current subscription until this transaction commits.
+    // A concurrent suspension/cancellation UPDATE must serialize with the write decision.
+    const rows = await tx.$queryRaw<Array<{ status: string }>>`
+      SELECT status FROM subscription
+      WHERE organisation_id = ${organisationId}::uuid
+        AND status IN ('FREE', 'TRIALING', 'ACTIVE', 'PAST_DUE', 'SUSPENDED')
+      ORDER BY created_at DESC LIMIT 1 FOR SHARE
+    `;
+    if (rows.length !== 1 || !['FREE', 'TRIALING', 'ACTIVE', 'PAST_DUE'].includes(rows[0]!.status))
+      throw new InvariantViolation(
+        'This organisation subscription does not permit new uploads.',
+        'SUBSCRIPTION_INACTIVE',
+      );
+  }
+
   async reserve(input: {
     organisationId: string;
     requestKey?: string | undefined;
@@ -264,6 +283,7 @@ export class StorageQuotaService {
           },
         });
       }
+      await this.requireWritableSubscription(tx, input.organisationId);
       await this.checkQuotaInTransaction(tx, input.organisationId, input.sizeBytes);
       const targetId = randomUUID();
       const now = new Date();
@@ -301,6 +321,7 @@ export class StorageQuotaService {
   async claim(reservation: StorageReservation): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await this.lockForWrite(tx, reservation.organisationId);
+      await this.requireWritableSubscription(tx, reservation.organisationId);
       const result = await tx.storageReservation.updateMany({
         where: {
           id: reservation.id,
@@ -337,6 +358,7 @@ export class StorageQuotaService {
         'RESERVATION_NOT_WRITABLE',
       );
     }
+    await this.requireWritableSubscription(tx, current.organisationId);
     await this.checkQuotaInTransaction(
       tx,
       current.organisationId,

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { toActorId } from '@witness/domain';
+import { FREE_PLAN_ID, toActorId } from '@witness/domain';
 import type { EffectiveCommercialConfigurationService } from '../commercial/effective-commercial-configuration.service.js';
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { StorageQuotaService } from './storage-quota.service.js';
@@ -51,6 +51,19 @@ describe.skipIf(!process.env.DATABASE_URL)('durable reservations (live PostgreSQ
         storageQuotaBytes: 1000n,
       })),
     });
+    const account = await db.billingAccount.create({
+      data: { id: randomUUID(), organisationId: org },
+    });
+    await db.subscription.create({
+      data: {
+        id: randomUUID(),
+        organisationId: org,
+        billingAccountId: account.id,
+        planId: FREE_PLAN_ID,
+        status: 'FREE',
+        currentPeriodStart: new Date(),
+      },
+    });
     await db.workspace.create({ data: { id: workspace, name: 'Acceptance', organisationId: org } });
     await db.user.create({
       data: {
@@ -62,6 +75,7 @@ describe.skipIf(!process.env.DATABASE_URL)('durable reservations (live PostgreSQ
     });
   });
   beforeEach(async () => {
+    await db.subscription.updateMany({ where: { organisationId: org }, data: { status: 'FREE' } });
     await db.resource.deleteMany({ where: { workspaceId: workspace } });
     await db.storageReservation.deleteMany({ where: { organisationId: org } });
   });
@@ -71,9 +85,61 @@ describe.skipIf(!process.env.DATABASE_URL)('durable reservations (live PostgreSQ
     await db.auditEvent.deleteMany({ where: { actorId: actor.id } });
     await db.workspace.deleteMany({ where: { id: workspace } });
     await db.user.deleteMany({ where: { id: user } });
+    await db.subscription.deleteMany({ where: { organisationId: org } });
+    await db.billingAccount.deleteMany({ where: { organisationId: org } });
     await db.organisation.deleteMany({ where: { id: { in: [org, other] } } });
     await db.actor.delete({ where: { id: actor.id } });
     await db.$disconnect();
+  });
+  it.each(['SUSPENDED', 'CANCELLED'])(
+    'blocks %s uploads despite an explicit quota override',
+    async (status) => {
+      await db.subscription.updateMany({ where: { organisationId: org }, data: { status } });
+      await expect(reserve(1)).rejects.toMatchObject({ code: 'SUBSCRIPTION_INACTIVE' });
+      expect(await db.storageReservation.count({ where: { organisationId: org } })).toBe(0);
+    },
+  );
+  it('blocks allocation when an organisation has no current subscription', async () => {
+    await expect(
+      quota.reserve({
+        organisationId: other,
+        requestFingerprint: 'a'.repeat(64),
+        kind: 'resource',
+        sizeBytes: 1,
+        objectStorage: false,
+        actor,
+      }),
+    ).rejects.toMatchObject({ code: 'SUBSCRIPTION_INACTIVE' });
+  });
+  it('compensates a completed object when subscription suspension occurs during the provider write', async () => {
+    const objects = new Map<string, Buffer>();
+    const storage = {
+      put: async (key: string, content: Buffer) => {
+        objects.set(key, content);
+        await db.subscription.updateMany({
+          where: { organisationId: org },
+          data: { status: 'SUSPENDED' },
+        });
+      },
+      delete: async (key: string) => {
+        objects.delete(key);
+      },
+    } as unknown as StoragePort;
+    const service = new ResourcesService(db, storage, quota);
+    await expect(
+      service.createFile(
+        workspace,
+        { title: 'Suspended in flight' },
+        { originalname: 'file.txt', mimetype: 'text/plain', size: 10, buffer: Buffer.alloc(10) },
+        principal,
+      ),
+    ).rejects.toMatchObject({ response: { error: { code: 'SUBSCRIPTION_INACTIVE' } } });
+    expect(objects.size).toBe(0);
+    expect(await db.resource.count({ where: { workspaceId: workspace } })).toBe(0);
+    expect(await quota.usage(org)).toMatchObject({ reservedBytes: 0n, usedBytes: 0n });
+    expect(await db.storageReservation.findFirst({ where: { organisationId: org } })).toMatchObject(
+      { state: 'RELEASED' },
+    );
   });
   it('serialises simultaneous capacity reservations before any provider write', async () => {
     const results = await Promise.allSettled([reserve(), reserve()]);

@@ -14,6 +14,7 @@
 
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -204,6 +205,8 @@ export class ResourcesService {
         actor,
       });
     } catch (error) {
+      if (error instanceof InvariantViolation && error.code === 'SUBSCRIPTION_INACTIVE')
+        throw new ForbiddenException({ error: { code: error.code, message: error.message } });
       if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED')
         throw new PayloadTooLargeException({ error: { code: error.code, message: error.message } });
       throw error;
@@ -236,6 +239,8 @@ export class ResourcesService {
       } else {
         await this.storageQuota.markUncertain(reservation);
       }
+      if (error instanceof InvariantViolation && error.code === 'SUBSCRIPTION_INACTIVE')
+        throw new ForbiddenException({ error: { code: error.code, message: error.message } });
       if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED')
         throw new PayloadTooLargeException({ error: { code: error.code, message: error.message } });
       throw error;
