@@ -133,7 +133,8 @@ merge into the automatic deployment path before enforcing that approval and veri
 ## Deployment hardening and approval control
 
 The existing pilot workflow accepts successful same-repository main-push CI only, checks out
-that exact SHA, and limits manual dispatch to main. Pull-request/fork workflow runs cannot deploy. The deploy script rejects a dirty tracked checkout or an absent/mismatched
+that exact SHA, and limits manual dispatch to main. Pull-request/fork workflow runs cannot deploy.
+The deploy script rejects a dirty tracked checkout or an absent/mismatched
 `WITNESS_APPROVED_RELEASE_SHA` before host mutation. The release manager must set that environment
 variable to the exact reviewed main release SHA only after the gate matrix and recovery evidence
 pass. Keep the old value until approval; another SHA will fail closed.
@@ -156,3 +157,14 @@ records the go/no-go decision and sets the exact main release SHA on
 [the pilot environment variables page](https://github.com/scigns/witness/settings/environments).
 Expected result: only that reviewed SHA passes deployment preflight. Do not set approval now;
 production acceptance remains blocked.
+
+## Authentication return-path closure
+
+Successful sign-in defaults to `/workspaces`. A validated application-relative `returnTo` is bound
+to the existing one-time server login attempt, consumed with the OIDC state and returned only after
+identity verification. Absolute/protocol-relative URLs, backslashes, control characters and
+sign-in/callback loops are rejected. Application base paths remain contained. Normal authorisation
+still applies after redirect. The additive nullable login return-path migration applied successfully
+to both local acceptance and bootstrapped fresh databases (45 migrations total). Existing in-flight
+login attempts with null return paths retain a safe default. Browser callers and actual identity
+provider acceptance still need verification.

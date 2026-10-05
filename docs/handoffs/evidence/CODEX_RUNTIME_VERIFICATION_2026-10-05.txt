@@ -112,3 +112,8 @@ Production acceptance follow-up (2026-10-05; candidate work after 3e2f008):
   invariants/adversarial, build, unit, documentation, security, governance and zero-egress.
 - Deployment safety follow-up: fake-infrastructure tests 6/6 PASS; backup freshness/checksum
   tests 4/4 PASS; shellcheck PASS. Production execution remains blocked and untouched.
+
+- Authentication return-path change: 43 focused tests PASS (27 identity/login tests + 16 redirect
+  safety cases), including server-state binding, single-use replay denial and external-target rejection.
+- Additive 20261005020000_login_return_path migration PASS against both local acceptance and
+  bootstrapped fresh-install databases; 45 total migrations. Actual OIDC/browser acceptance pending.

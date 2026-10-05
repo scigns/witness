@@ -818,6 +818,7 @@ model AuthLoginAttempt {
   nonce        String @db.VarChar(64)
   codeVerifier String @map("code_verifier") @db.VarChar(128)
   redirectUri  String @map("redirect_uri") @db.VarChar(500)
+  returnPath   String? @map("return_path") @db.VarChar(2048)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   expiresAt DateTime @map("expires_at") @db.Timestamptz(6)

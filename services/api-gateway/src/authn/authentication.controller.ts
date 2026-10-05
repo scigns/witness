@@ -1,3 +1,4 @@
+import { applicationReturnUrl } from './application-return-path.js';
 /**
  * HTTP adapter for sign-in, sign-out, and the current-user endpoint.
  *
@@ -9,9 +10,9 @@
  * directly rather than through the action-grants table, because "may see my
  * own identity" is not a role-gated action.
  *
- * Every redirect target is either the fixed, configured web origin or a
- * fixed error path under it — never a caller-supplied URL — so this
- * controller cannot be used as an open redirect.
+ * Return paths are validated application-relative paths bound to one-time
+ * server login state. Redirects remain beneath the configured web base;
+ * caller-supplied external URLs are rejected.
  */
 
 import {
@@ -55,6 +56,7 @@ export class AuthenticationController {
   @Get('login')
   async login(
     @Query('prompt') prompt: string | undefined,
+    @Query('returnTo') returnTo: string | undefined,
     @Res() response: Response,
   ): Promise<void> {
     if (prompt !== undefined && prompt !== 'create') {
@@ -62,7 +64,10 @@ export class AuthenticationController {
         error: { code: 'INVALID_PROMPT', message: 'Unsupported sign-in prompt.' },
       });
     }
-    const { redirectUrl } = await this.authentication.startLogin(prompt as 'create' | undefined);
+    const { redirectUrl } = await this.authentication.startLogin(
+      prompt as 'create' | undefined,
+      returnTo,
+    );
     response.redirect(302, redirectUrl);
   }
 
@@ -94,7 +99,7 @@ export class AuthenticationController {
         expires: session.expiresAt,
       });
       // The opaque Witness session never enters a URL or frontend JavaScript.
-      response.redirect(302, this.config.webBaseUrl);
+      response.redirect(302, applicationReturnUrl(this.config.webBaseUrl, session.returnPath));
     } catch (error) {
       const reason = error instanceof AuthenticationDeniedError ? error.reason : 'invalid_callback';
       const target = new URL('auth/error', this.config.webBaseUrl);
