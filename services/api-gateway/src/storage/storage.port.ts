@@ -34,7 +34,18 @@ export interface StoredObject {
   readonly contentType: string;
 }
 
+export interface StoredObjectMetadata {
+  readonly key: string;
+  readonly sizeBytes: number;
+}
+export interface StorageInventoryPage {
+  readonly objects: readonly StoredObjectMetadata[];
+  readonly cursor: string | null;
+}
+
 export abstract class StoragePort {
+  abstract head(key: string): Promise<StoredObjectMetadata | null>;
+  abstract list(prefix: string, cursor?: string): Promise<StorageInventoryPage>;
   abstract put(key: string, content: Buffer, contentType: string): Promise<void>;
   abstract get(key: string): Promise<StoredObject | null>;
   abstract delete(key: string): Promise<void>;

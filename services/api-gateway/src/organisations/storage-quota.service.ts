@@ -1,41 +1,20 @@
-/**
- * Storage quota (commercial-runtime-readiness work, succeeding Flight 1's
- * flat "5 GB included storage per organisation").
- *
- * USED is computed on demand from the two tables that actually hold bytes
- * (`EvidenceAttachment`, `Resource`) rather than maintained as a running
- * counter: a counter can drift from reality (a failed write that partially
- * updated one but not the other, a row deleted outside the normal path), and
- * an aggregate query is cheap enough at the scale one organisation's content
- * reaches that the risk of drift is not worth taking on for the sake of an
- * O(1) read. Includes bytes regardless of which StoragePort adapter holds
- * them (Postgres-inline `content` or an S3-compatible object store,
- * `storage.port.ts`) — `sizeBytes` is recorded at write time either way.
- *
- * ALLOCATED is resolved live: `organisation.storageQuotaBytes`, when an
- * administrator has explicitly set it, takes precedence; otherwise it is
- * the organisation's effective commercial `ResourceProfile`'s
- * `storageQuotaBytes` (Plan default, or a negotiated
- * `SubscriptionEntitlementOverride` on `resource.profile`) — a plan change
- * is reflected immediately, with no data migration. `DEFAULT_STORAGE_QUOTA_BYTES`
- * is the fallback of last resort, used only if an organisation somehow has
- * no resolvable subscription at all.
- *
- * Never deletes content at quota. `checkQuota` is called before a write, not
- * after — the only enforcement is refusing to accept more, which the caller
- * (`EvidenceAttachmentService`, `ResourcesService`) turns into a clean 4xx
- * before anything is written. That call is a fast, non-transactional
- * pre-check (avoids wasting a StoragePort write on an obviously-over-quota
- * request); the authoritative, race-safe check is `checkQuotaInTransaction`,
- * which MUST run inside the same transaction as the row it is guarding,
- * after `lockForWrite` — two simultaneous uploads for the same organisation
- * otherwise both read the same stale USED figure and can jointly exceed the
- * quota (TOCTOU). See `evidence-attachment.service.ts`/`resources.service.ts`
- * for the two call sites.
+/** Customer file accounting plus a durable, per-organisation upload ledger.
+ * RESERVED/WRITING/NEEDS_RECONCILIATION bytes remain charged until a committed
+ * record replaces them or an operator establishes that releasing them is safe.
+ * Expiring a writer is not proof that its storage operation stopped.
  */
 
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import type { Prisma, StorageReservation } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
+import { objectKey, type StorageKind } from '../storage/storage.service.js';
 
 import {
   DEFAULT_STORAGE_QUOTA_BYTES,
@@ -52,6 +31,7 @@ export type StorageQuotaSource = 'ADMIN_OVERRIDE' | 'RESOURCE_PROFILE' | 'FALLBA
 
 export interface StorageUsage {
   readonly usedBytes: bigint;
+  readonly reservedBytes: bigint;
   readonly quotaBytes: bigint;
   readonly availableBytes: bigint;
   readonly percentageUsed: number;
@@ -84,7 +64,7 @@ export class StorageQuotaService {
     }
 
     try {
-      const config = await this.commercialConfiguration.resolveFor(organisationId);
+      const config = await this.commercialConfiguration.resolveFor(organisationId, db);
       if (config.resourceProfile !== null) {
         return {
           allocatedBytes: BigInt(config.resourceProfile.storageQuotaBytes),
@@ -125,20 +105,42 @@ export class StorageQuotaService {
     return this.usageVia(this.prisma, organisationId);
   }
 
+  private async reservedBytes(
+    db: PrismaService | TransactionClient,
+    organisationId: string,
+    excludeId?: string,
+  ): Promise<bigint> {
+    const total = await db.storageReservation.aggregate({
+      where: {
+        organisationId,
+        state: { in: ['RESERVED', 'WRITING', 'NEEDS_RECONCILIATION'] },
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      _sum: { sizeBytes: true },
+    });
+    return total._sum.sizeBytes ?? 0n;
+  }
+
   private async usageVia(
     db: PrismaService | TransactionClient,
     organisationId: string,
+    excludeReservationId?: string,
   ): Promise<StorageUsage> {
-    const [used, { allocatedBytes, source }] = await Promise.all([
+    const [used, reserved, { allocatedBytes, source }] = await Promise.all([
       this.usedBytes(db, organisationId),
+      this.reservedBytes(db, organisationId, excludeReservationId),
       this.resolveAllocatedBytes(db, organisationId),
     ]);
-    const availableBytes = allocatedBytes > used ? allocatedBytes - used : 0n;
+    const consumed = used + reserved;
+    const availableBytes = allocatedBytes > consumed ? allocatedBytes - consumed : 0n;
     const percentageUsed =
-      allocatedBytes === 0n ? 100 : Math.min(100, Number((used * 10000n) / allocatedBytes) / 100);
+      allocatedBytes === 0n
+        ? 100
+        : Math.min(100, Number((consumed * 10000n) / allocatedBytes) / 100);
 
     return {
       usedBytes: used,
+      reservedBytes: reserved,
       quotaBytes: allocatedBytes,
       availableBytes,
       percentageUsed,
@@ -153,8 +155,8 @@ export class StorageQuotaService {
    * boundary; see `checkQuotaInTransaction`.
    */
   async checkQuota(organisationId: string, additionalBytes: number): Promise<void> {
-    const { usedBytes, quotaBytes } = await this.usage(organisationId);
-    assertWithinQuota(usedBytes, quotaBytes, additionalBytes);
+    const { usedBytes, reservedBytes, quotaBytes } = await this.usage(organisationId);
+    assertWithinQuota(usedBytes + reservedBytes, quotaBytes, additionalBytes);
   }
 
   /**
@@ -182,9 +184,14 @@ export class StorageQuotaService {
     additionalBytes: number,
     actor?: Actor,
     at: Date = new Date(),
+    excludeReservationId?: string,
   ): Promise<void> {
-    const { usedBytes, quotaBytes } = await this.usageVia(tx, organisationId);
-    assertWithinQuota(usedBytes, quotaBytes, additionalBytes);
+    const { usedBytes, reservedBytes, quotaBytes } = await this.usageVia(
+      tx,
+      organisationId,
+      excludeReservationId,
+    );
+    assertWithinQuota(usedBytes + reservedBytes, quotaBytes, additionalBytes);
     if (actor !== undefined && quotaBytes > 0n) {
       const projectedBytes = usedBytes + BigInt(additionalBytes);
       for (const threshold of USAGE_WARNING_THRESHOLDS) {
@@ -207,6 +214,194 @@ export class StorageQuotaService {
           );
         }
       }
+    }
+  }
+
+  async reserve(input: {
+    organisationId: string;
+    requestKey?: string | undefined;
+    requestFingerprint: string;
+    kind: StorageKind;
+    sizeBytes: number;
+    objectStorage: boolean;
+    actor: Actor;
+  }): Promise<StorageReservation> {
+    const requestKey = input.requestKey ?? randomUUID();
+    if (!z.string().uuid().safeParse(requestKey).success) {
+      throw new BadRequestException({
+        error: {
+          code: 'INVALID_IDEMPOTENCY_KEY',
+          message: 'Upload Idempotency-Key must be a UUID.',
+        },
+      });
+    }
+    // Validate even when an idempotent result already exists.
+    assertWithinQuota(0n, BigInt(Number.MAX_SAFE_INTEGER), input.sizeBytes);
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockForWrite(tx, input.organisationId);
+      const previous = await tx.storageReservation.findUnique({
+        where: { organisationId_requestKey: { organisationId: input.organisationId, requestKey } },
+      });
+      if (previous !== null) {
+        if (
+          previous.requestFingerprint !== input.requestFingerprint ||
+          previous.storageKind !== input.kind ||
+          previous.sizeBytes !== BigInt(input.sizeBytes)
+        ) {
+          throw new ConflictException({
+            error: {
+              code: 'IDEMPOTENCY_CONFLICT',
+              message: 'The upload key was already used for a different request.',
+            },
+          });
+        }
+        if (previous.state === 'COMMITTED') return previous;
+        throw new ConflictException({
+          error: {
+            code: 'UPLOAD_IN_PROGRESS',
+            message:
+              'This upload is pending or requires reconciliation. Do not submit its bytes again.',
+          },
+        });
+      }
+      await this.checkQuotaInTransaction(tx, input.organisationId, input.sizeBytes);
+      const targetId = randomUUID();
+      const now = new Date();
+      const reservation = await tx.storageReservation.create({
+        data: {
+          id: randomUUID(),
+          organisationId: input.organisationId,
+          requestKey,
+          requestFingerprint: input.requestFingerprint,
+          storageKind: input.kind,
+          targetId,
+          storageKey: input.objectStorage
+            ? objectKey({ organisationId: input.organisationId, kind: input.kind, id: targetId })
+            : null,
+          sizeBytes: BigInt(input.sizeBytes),
+          state: 'RESERVED',
+          expiresAt: new Date(now.getTime() + 15 * 60 * 1000),
+        },
+      });
+      await appendAuditEvent(
+        tx,
+        'organisation',
+        input.organisationId,
+        {
+          action: 'organisation.storage_reserved',
+          actor: input.actor,
+          metadata: { reservationId: reservation.id, sizeBytes: reservation.sizeBytes.toString() },
+        },
+        now,
+      );
+      return reservation;
+    });
+  }
+
+  async claim(reservation: StorageReservation): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.lockForWrite(tx, reservation.organisationId);
+      const result = await tx.storageReservation.updateMany({
+        where: {
+          id: reservation.id,
+          organisationId: reservation.organisationId,
+          state: 'RESERVED',
+          expiresAt: { gt: new Date() },
+        },
+        data: { state: 'WRITING' },
+      });
+      if (result.count !== 1)
+        throw new ConflictException({
+          error: {
+            code: 'RESERVATION_NOT_WRITABLE',
+            message: 'The upload reservation is expired or already claimed.',
+          },
+        });
+    });
+  }
+
+  /** Call before inserting the file record; same transaction must then commit the reservation. */
+  async checkReservation(
+    tx: TransactionClient,
+    reservation: StorageReservation,
+    actor: Actor,
+    at: Date,
+  ): Promise<void> {
+    await this.lockForWrite(tx, reservation.organisationId);
+    const current = await tx.storageReservation.findUniqueOrThrow({
+      where: { id: reservation.id },
+    });
+    if (current.organisationId !== reservation.organisationId || current.state !== 'WRITING') {
+      throw new InvariantViolation(
+        'The upload reservation is no longer writable.',
+        'RESERVATION_NOT_WRITABLE',
+      );
+    }
+    await this.checkQuotaInTransaction(
+      tx,
+      current.organisationId,
+      Number(current.sizeBytes),
+      actor,
+      at,
+      current.id,
+    );
+  }
+
+  async commitReservation(tx: TransactionClient, reservation: StorageReservation): Promise<void> {
+    const updated = await tx.storageReservation.updateMany({
+      where: { id: reservation.id, organisationId: reservation.organisationId, state: 'WRITING' },
+      data: { state: 'COMMITTED' },
+    });
+    if (updated.count !== 1)
+      throw new InvariantViolation(
+        'Upload reservation changed before commit.',
+        'RESERVATION_NOT_WRITABLE',
+      );
+  }
+
+  /** Internal failure path only: caller proved rollback and removed any completed object write. */
+  async releaseKnownFailure(reservation: StorageReservation, actor: Actor): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.lockForWrite(tx, reservation.organisationId);
+      const released = await tx.storageReservation.updateMany({
+        where: { id: reservation.id, state: { in: ['RESERVED', 'WRITING'] } },
+        data: { state: 'RELEASED' },
+      });
+      if (released.count === 1)
+        await appendAuditEvent(
+          tx,
+          'organisation',
+          reservation.organisationId,
+          {
+            action: 'organisation.storage_reconciled',
+            actor,
+            metadata: { reservationId: reservation.id, result: 'known_failed_upload_released' },
+          },
+          new Date(),
+        );
+    });
+  }
+
+  /** Unknown provider/commit outcomes stay charged; never delete their objects here. */
+  async markUncertain(reservation: StorageReservation): Promise<void> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await this.lockForWrite(tx, reservation.organisationId);
+        await tx.storageReservation.updateMany({
+          where: { id: reservation.id, state: { in: ['RESERVED', 'WRITING'] } },
+          data: { state: 'NEEDS_RECONCILIATION' },
+        });
+      });
+      this.logger.warn({
+        event: 'storage.reservation_requires_reconciliation',
+        organisationId: reservation.organisationId,
+        reservationId: reservation.id,
+      });
+    } catch {
+      this.logger.error({
+        event: 'storage.reservation_state_update_failed',
+        reservationId: reservation.id,
+      });
     }
   }
 }

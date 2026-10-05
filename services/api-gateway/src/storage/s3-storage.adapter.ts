@@ -17,6 +17,8 @@ import { Injectable } from '@nestjs/common';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
   NoSuchKey,
   NotFound,
   PutObjectCommand,
@@ -24,7 +26,12 @@ import {
   type ServerSideEncryption,
 } from '@aws-sdk/client-s3';
 
-import { StoragePort, type StoredObject } from './storage.port.js';
+import {
+  StoragePort,
+  type StoredObject,
+  type StoredObjectMetadata,
+  type StorageInventoryPage,
+} from './storage.port.js';
 
 export interface S3StorageConfig {
   readonly endpoint: string;
@@ -95,6 +102,64 @@ export class S3StorageAdapter extends StoragePort {
       if (error instanceof NoSuchKey || error instanceof NotFound) return null;
       throw error;
     }
+  }
+
+  async head(key: string): Promise<StoredObjectMetadata | null> {
+    try {
+      const result = await this.client.send(
+        new HeadObjectCommand({ Bucket: this.bucketFor(key), Key: key }),
+      );
+      if (result.ContentLength === undefined)
+        throw new Error('Storage did not return an object size.');
+      return { key, sizeBytes: result.ContentLength };
+    } catch (error) {
+      if (error instanceof NoSuchKey || error instanceof NotFound) return null;
+      throw error;
+    }
+  }
+
+  async list(prefix: string, cursor?: string): Promise<StorageInventoryPage> {
+    if (!/^[0-9a-f-]{36}\/$/i.test(prefix))
+      throw new Error('Storage inventory requires an organisation prefix.');
+    const buckets = [...new Set([this.config.bucketMedia, this.config.bucketDocuments])];
+    const position =
+      cursor === undefined
+        ? { bucket: 0, token: undefined as string | undefined }
+        : (JSON.parse(Buffer.from(cursor, 'base64url').toString()) as {
+            bucket: number;
+            token?: string;
+          });
+    if (
+      !Number.isInteger(position.bucket) ||
+      position.bucket < 0 ||
+      position.bucket >= buckets.length ||
+      (position.token !== undefined && typeof position.token !== 'string')
+    )
+      throw new Error('Invalid storage inventory cursor.');
+    const result = await this.client.send(
+      new ListObjectsV2Command({
+        Bucket: buckets[position.bucket],
+        Prefix: prefix,
+        MaxKeys: 1000,
+        ...(position.token === undefined ? {} : { ContinuationToken: position.token }),
+      }),
+    );
+    const objects = (result.Contents ?? []).map((object) => {
+      if (object.Key === undefined || object.Size === undefined || !object.Key.startsWith(prefix))
+        throw new Error('Storage returned an invalid inventory item.');
+      return { key: object.Key, sizeBytes: object.Size };
+    });
+    const next = result.IsTruncated
+      ? { bucket: position.bucket, token: result.NextContinuationToken }
+      : position.bucket + 1 < buckets.length
+        ? { bucket: position.bucket + 1 }
+        : null;
+    if (result.IsTruncated && !result.NextContinuationToken)
+      throw new Error('Storage inventory was truncated without a continuation token.');
+    return {
+      objects,
+      cursor: next === null ? null : Buffer.from(JSON.stringify(next)).toString('base64url'),
+    };
   }
 
   async delete(key: string): Promise<void> {

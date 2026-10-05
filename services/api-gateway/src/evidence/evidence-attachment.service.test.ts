@@ -19,6 +19,8 @@ import {
 } from '@nestjs/common';
 import { InvariantViolation } from '@witness/domain';
 import { describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { objectKey } from '../storage/storage.service.js';
 
 import type { PrismaService } from '../infrastructure/prisma.service.js';
 import type { Principal } from '../authz/authorization.port.js';
@@ -188,6 +190,28 @@ function fakeStorage() {
 function fakeStorageQuota(checkQuota: StorageQuotaService['checkQuota'] = async () => {}) {
   return {
     checkQuota,
+    reserve: async (input: Parameters<StorageQuotaService['reserve']>[0]) => {
+      await checkQuota(input.organisationId, input.sizeBytes);
+      const targetId = randomUUID();
+      return {
+        ...input,
+        id: randomUUID(),
+        targetId,
+        sizeBytes: BigInt(input.sizeBytes),
+        state: 'RESERVED',
+        storageKey: input.objectStorage
+          ? objectKey({ organisationId: input.organisationId, kind: input.kind, id: targetId })
+          : null,
+      };
+    },
+    claim: async () => {},
+    checkReservation: async (
+      _tx: unknown,
+      reservation: { organisationId: string; sizeBytes: bigint },
+    ) => checkQuota(reservation.organisationId, Number(reservation.sizeBytes)),
+    commitReservation: async () => {},
+    releaseKnownFailure: async () => {},
+    markUncertain: async () => {},
     lockForWrite: async () => {},
     checkQuotaInTransaction: async (
       _tx: unknown,

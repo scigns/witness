@@ -8,17 +8,20 @@ Repository:
 
 This document is the engineering handoff from the Claude implementation session to Codex.
 
-It records the product intention, architectural decisions, completed work, branch dependencies, current implementation state, known risks, and remaining milestones.
+It records the product intention, architectural decisions, completed work, branch dependencies,
+current implementation state, known risks, and remaining milestones.
 
 Do not restart discovery from zero.
 
-Inspect the repository and verify this handoff against the actual code before making changes, but preserve the decisions recorded here unless the code provides concrete evidence they are incorrect.
+Inspect the repository and verify this handoff against the actual code before making changes, but
+preserve the decisions recorded here unless the code provides concrete evidence they are incorrect.
 
 ---
 
-# 1. PRODUCT INTENTION
+## 1. PRODUCT INTENTION
 
-Witness is an open-source Digital Public Infrastructure platform for turning organisational and community conversations into traceable institutional memory.
+Witness is an open-source Digital Public Infrastructure platform for turning organisational and
+community conversations into traceable institutional memory.
 
 The product is intended to support:
 
@@ -53,13 +56,14 @@ The product being sold is:
 
 ---
 
-# 2. COMMERCIAL OBJECTIVE
+## 2. COMMERCIAL OBJECTIVE
 
 Witness is moving from Developer Preview toward real customer onboarding.
 
 The immediate commercial requirement is:
 
-WE MUST NOT SELL AN ORGANISATION A SUBSCRIPTION THAT WE CANNOT ACTUALLY PROVISION, CONTROL, MEASURE, SECURE AND SUPPORT.
+WE MUST NOT SELL AN ORGANISATION A SUBSCRIPTION THAT WE CANNOT ACTUALLY PROVISION, CONTROL, MEASURE,
+SECURE AND SUPPORT.
 
 For a paying organisation, Witness must be able to:
 
@@ -80,7 +84,7 @@ This is the current P0.
 
 ---
 
-# 3. PUBLIC WEBSITE VS APPLICATION
+## 3. PUBLIC WEBSITE VS APPLICATION
 
 These are deliberately different products/surfaces.
 
@@ -116,17 +120,19 @@ Purpose:
 
 The application must not feel like a duplicate marketing website.
 
-For authenticated returning users, `/workspaces` should become the principal working landing experience unless the repository contains a stronger existing canonical route.
+For authenticated returning users, `/workspaces` should become the principal working landing
+experience unless the repository contains a stronger existing canonical route.
 
 Deep links must remain intact.
 
-Pricing should not remain a primary work-navigation item beside operational features such as Records and Capture.
+Pricing should not remain a primary work-navigation item beside operational features such as Records
+and Capture.
 
 Subscription/plan/usage information belongs under the organisation/account area.
 
 ---
 
-# 4. IMPORTANT DOMAIN DECISION
+## 4. IMPORTANT DOMAIN DECISION
 
 ## Organisation
 
@@ -161,13 +167,14 @@ Do NOT broadly rename Tenant to Organisation.
 
 They are separate concepts.
 
-The initial implementation may frequently use a 1:1 Organisation-to-Tenant relationship, but the domain must not permanently assume that is the only possible relationship.
+The initial implementation may frequently use a 1:1 Organisation-to-Tenant relationship, but the
+domain must not permanently assume that is the only possible relationship.
 
 This distinction is captured in ADR-0034 / the commercial-entitlements work.
 
 ---
 
-# 5. BILLING ARCHITECTURE DECISION
+## 5. BILLING ARCHITECTURE DECISION
 
 Do not introduce Lago.
 
@@ -188,9 +195,7 @@ External payment processors are adapters.
 
 Architecture:
 
-Witness commercial domain
-→ PaymentProviderPort
-→ Stripe or another future processor
+Witness commercial domain → PaymentProviderPort → Stripe or another future processor
 
 The external processor moves money.
 
@@ -202,17 +207,14 @@ Do not store raw card credentials.
 
 ---
 
-# 6. EXISTING PAYMENT CAPABILITY
+## 6. EXISTING PAYMENT CAPABILITY
 
 A Claude audit established that the manual settlement flow is substantially already implemented.
 
 Existing behaviour reportedly includes:
 
-payment settlement
-→ invoice becomes paid
-→ subscription is activated
-→ entitlements become active
-→ audit event/state update
+payment settlement → invoice becomes paid → subscription is activated → entitlements become active →
+audit event/state update
 
 and this occurs transactionally.
 
@@ -220,25 +222,19 @@ Verify this against the implementation before modifying it.
 
 The important known gap is NOT the settlement engine.
 
-The known gap is the operator workflow for originating/assigning commercial changes for organisations that cannot self-serve.
+The known gap is the operator workflow for originating/assigning commercial changes for
+organisations that cannot self-serve.
 
 We must support a real institutional onboarding path even before Stripe exists:
 
-Platform operator
-→ organisation
-→ plan/subscription
-→ invoice
-→ external/manual payment
-→ authorised payment settlement
-→ subscription ACTIVE
-→ entitlements active
-→ resource profile active
+Platform operator → organisation → plan/subscription → invoice → external/manual payment →
+authorised payment settlement → subscription ACTIVE → entitlements active → resource profile active
 
 This allows Witness to sell institutional subscriptions before online checkout is finished.
 
 ---
 
-# 7. HELP & KNOWLEDGE
+## 7. HELP & KNOWLEDGE
 
 PR #262:
 
@@ -254,11 +250,10 @@ Provide authenticated, version-aware application documentation searchable from i
 
 Important design:
 
-Application Release
-→ Documentation Snapshot
-→ Search Index Version
+Application Release → Documentation Snapshot → Search Index Version
 
-Implementation deliberately uses PostgreSQL full-text search rather than adding Meilisearch/OpenSearch.
+Implementation deliberately uses PostgreSQL full-text search rather than adding
+Meilisearch/OpenSearch.
 
 Reasons include:
 
@@ -295,7 +290,7 @@ Future AI help must sit on top of the authorised/version-aware documentation sub
 
 ---
 
-# 8. COMMERCIAL ENTITLEMENTS
+## 8. COMMERCIAL ENTITLEMENTS
 
 PR #264:
 
@@ -305,12 +300,7 @@ This PR introduces the commercial configuration required for market rollout.
 
 The intended chain is:
 
-Organisation
-→ Subscription
-→ Plan
-→ Effective Entitlements
-→ ResourceProfile
-→ DeploymentIsolation
+Organisation → Subscription → Plan → Effective Entitlements → ResourceProfile → DeploymentIsolation
 → SupportLevel
 
 Important invariant:
@@ -325,7 +315,7 @@ Instead resolve capabilities through the entitlement/commercial configuration sy
 
 ---
 
-# 9. RESOURCE PROFILE
+## 9. RESOURCE PROFILE
 
 ResourceProfile represents desired customer capacity.
 
@@ -357,7 +347,7 @@ Do not hard-code marketing-plan assumptions throughout the application.
 
 ---
 
-# 10. DEPLOYMENT ISOLATION
+## 10. DEPLOYMENT ISOLATION
 
 Current commercial-entitlements work introduces/supports:
 
@@ -378,27 +368,24 @@ Organisation-specific negotiated overrides must remain possible.
 
 ---
 
-# 11. SUPPORT LEVEL
+## 11. SUPPORT LEVEL
 
 Support level already exists in the domain.
 
-Commercial-entitlements work uses the existing `support.level` concept/vocabulary rather than inventing another parallel model.
+Commercial-entitlements work uses the existing `support.level` concept/vocabulary rather than
+inventing another parallel model.
 
 Preserve existing conventions.
 
 ---
 
-# 12. COMMERCIAL OVERRIDES
+## 12. COMMERCIAL OVERRIDES
 
 Institutional contracts need negotiated overrides.
 
 The implementation should allow:
 
-Plan defaults
-+
-authorised organisation override
-=
-effective commercial configuration
+Plan defaults + authorised organisation override = effective commercial configuration
 
 Example:
 
@@ -417,11 +404,12 @@ Overrides must:
 
 PR #264 reportedly verifies `commercial_override:manage` as platform-only.
 
-Organisation administrators must not be allowed to increase their own commercial resource allocations.
+Organisation administrators must not be allowed to increase their own commercial resource
+allocations.
 
 ---
 
-# 13. CURRENT ACTIVE WORK
+## 13. CURRENT ACTIVE WORK
 
 Claude started the next commercial runtime branch from:
 
@@ -429,7 +417,8 @@ Claude started the next commercial runtime branch from:
 
 rather than `main`.
 
-This is intentional because runtime work structurally depends on ResourceProfile / DeploymentIsolation / SupportLevel introduced by PR #264.
+This is intentional because runtime work structurally depends on ResourceProfile /
+DeploymentIsolation / SupportLevel introduced by PR #264.
 
 This is a STACKED branch.
 
@@ -445,7 +434,7 @@ Once PR #264 merges, rebase/retarget the runtime branch appropriately.
 
 ---
 
-# 14. CURRENT COMMERCIAL RUNTIME MILESTONE
+## 14. CURRENT COMMERCIAL RUNTIME MILESTONE
 
 Working concept/name:
 
@@ -455,14 +444,8 @@ The goal is to connect the commercial domain to real runtime controls.
 
 Required chain:
 
-Organisation
-→ Subscription
-→ Effective Commercial Configuration
-→ Tenant
-→ Resource Allocation
-→ Usage
-→ Enforcement
-→ Operational Visibility
+Organisation → Subscription → Effective Commercial Configuration → Tenant → Resource Allocation →
+Usage → Enforcement → Operational Visibility
 
 A subscription record alone is not sufficient.
 
@@ -470,9 +453,10 @@ Paid/active must not mean unlimited infrastructure.
 
 ---
 
-# 15. STORAGE AND RESOURCE AUDIT
+## 15. STORAGE AND RESOURCE AUDIT
 
-Claude attempted a storage/quota/usage audit but the background agent was terminated because the Claude session limit was reached.
+Claude attempted a storage/quota/usage audit but the background agent was terminated because the
+Claude session limit was reached.
 
 Therefore THIS AUDIT IS NOT COMPLETE.
 
@@ -513,15 +497,13 @@ OPERATIONAL INFRASTRUCTURE USAGE.
 
 ---
 
-# 16. P0 — STORAGE QUOTA ENFORCEMENT
+## 16. P0 — STORAGE QUOTA ENFORCEMENT
 
 Implement real storage allocation.
 
 We need:
 
-ALLOCATED
-USED
-AVAILABLE
+ALLOCATED USED AVAILABLE
 
 per organisation/tenant.
 
@@ -545,14 +527,8 @@ Quota enforcement must occur server-side.
 
 Required flow:
 
-request
-→ authenticate
-→ resolve organisation
-→ resolve effective commercial configuration
-→ evaluate resource allowance
-→ reserve/check capacity
-→ persist upload/resource
-→ account usage
+request → authenticate → resolve organisation → resolve effective commercial configuration →
+evaluate resource allowance → reserve/check capacity → persist upload/resource → account usage
 
 The frontend is not an enforcement boundary.
 
@@ -560,7 +536,7 @@ Account for simultaneous upload/race scenarios.
 
 ---
 
-# 17. USAGE METERING
+## 17. USAGE METERING
 
 Implement one authoritative usage service.
 
@@ -571,22 +547,27 @@ Conceptually:
 Possible output:
 
 storage:
+
 - allocated
 - used
 - available
 - percentage
 
 database:
+
 - observed usage
 
 backups:
+
 - observed usage
 
 users:
+
 - allowed
 - active
 
 other bounded resources:
+
 - relevant allocation/usage
 
 Also include measurement timestamp/source where useful.
@@ -595,7 +576,7 @@ Do not represent guessed infrastructure values as exact billing truth.
 
 ---
 
-# 18. CAPACITY THRESHOLDS
+## 18. CAPACITY THRESHOLDS
 
 Add configurable threshold behaviour.
 
@@ -614,7 +595,7 @@ Do not build a large notification framework solely for this.
 
 ---
 
-# 19. INFRASTRUCTURE PROVISIONING BOUNDARY
+## 19. INFRASTRUCTURE PROVISIONING BOUNDARY
 
 DeploymentIsolation cannot remain a label forever.
 
@@ -650,7 +631,7 @@ Do not make irreversible production infrastructure changes without explicit appr
 
 ---
 
-# 20. FINANCE / UNIT ECONOMICS REQUIREMENT
+## 20. FINANCE / UNIT ECONOMICS REQUIREMENT
 
 Engineering controls must allow the business to understand the economics of each customer.
 
@@ -673,7 +654,8 @@ contribution margin.
 
 Do NOT build a full accounting platform.
 
-But make resource profiles and actual usage sufficiently observable that costs can later be assigned or estimated.
+But make resource profiles and actual usage sufficiently observable that costs can later be assigned
+or estimated.
 
 A platform administrator should eventually be able to inspect an organisation and understand:
 
@@ -690,7 +672,7 @@ A platform administrator should eventually be able to inspect an organisation an
 
 ---
 
-# 21. MANUAL INVOICE / ACTIVATION
+## 21. MANUAL INVOICE / ACTIVATION
 
 Claude's payment audit completed successfully before the session limit.
 
@@ -702,15 +684,9 @@ Remaining work should focus on operator commercial origination/onboarding.
 
 We need a usable workflow for:
 
-Create/select organisation
-→ assign plan
-→ establish subscription
-→ create/associate invoice
-→ receive external payment
-→ authorised operator settles payment
-→ subscription activates
-→ entitlements become effective
-→ resource profile becomes effective
+Create/select organisation → assign plan → establish subscription → create/associate invoice →
+receive external payment → authorised operator settles payment → subscription activates →
+entitlements become effective → resource profile becomes effective
 
 Do not invent a duplicate payment model.
 
@@ -718,15 +694,14 @@ Reuse the existing commercial aggregates/services.
 
 ---
 
-# 22. STRIPE / AUTOMATIC PAYMENT
+## 22. STRIPE / AUTOMATIC PAYMENT
 
-Automated payment-provider integration remains deferred from the current P0, but Witness should remain ready for it.
+Automated payment-provider integration remains deferred from the current P0, but Witness should
+remain ready for it.
 
 Payment architecture:
 
-Witness
-→ PaymentProviderPort
-→ future Stripe adapter
+Witness → PaymentProviderPort → future Stripe adapter
 
 Do not block institutional market rollout solely on Stripe.
 
@@ -745,9 +720,10 @@ are required.
 
 ---
 
-# 23. AUTHENTICATED APP UX
+## 23. AUTHENTICATED APP UX
 
-Claude attempted an authenticated-app shell audit but the background agent was terminated due to Claude's usage limit.
+Claude attempted an authenticated-app shell audit but the background agent was terminated due to
+Claude's usage limit.
 
 Therefore THIS AUDIT IS NOT COMPLETE.
 
@@ -755,11 +731,9 @@ Codex should continue it.
 
 The intended product separation is:
 
-`www.buildwithwitness.com`
-= public/commercial website
+`www.buildwithwitness.com` = public/commercial website
 
-`app.buildwithwitness.com`
-= signed-in operational product
+`app.buildwithwitness.com` = signed-in operational product
 
 The current live app has historically mixed marketing and product navigation.
 
@@ -767,9 +741,10 @@ Clean this up.
 
 ---
 
-# 24. `/workspaces` AS RETURNING-USER LANDING
+## 24. `/workspaces` AS RETURNING-USER LANDING
 
-For existing authenticated users, `/workspaces` should become the primary working destination unless repository/domain inspection reveals a stronger established route.
+For existing authenticated users, `/workspaces` should become the primary working destination unless
+repository/domain inspection reveals a stronger established route.
 
 The page should immediately answer:
 
@@ -789,7 +764,7 @@ Do not build speculative dashboards without useful real data.
 
 ---
 
-# 25. AUTHENTICATED APP INFORMATION ARCHITECTURE
+## 25. AUTHENTICATED APP INFORMATION ARCHITECTURE
 
 Audit current routes/components first.
 
@@ -797,22 +772,11 @@ Use existing design system and domain terminology.
 
 A likely hierarchy is approximately:
 
-Workspaces / Programs
-Sessions
-Evidence / Records
-Decisions
-Actions
-Reports
-Help & Knowledge
+Workspaces / Programs Sessions Evidence / Records Decisions Actions Reports Help & Knowledge
 
 Administration/account area may contain:
 
-Organisation
-People
-Billing / Subscription
-Usage
-Governance
-Settings
+Organisation People Billing / Subscription Usage Governance Settings
 
 Do not blindly rename working domain concepts.
 
@@ -822,14 +786,13 @@ The goal is clarity, not cosmetic churn.
 
 ---
 
-# 26. PRICING INSIDE THE APP
+## 26. PRICING INSIDE THE APP
 
 Pricing should not be a top-level everyday work-navigation item.
 
 For signed-in customers, commercial information belongs under:
 
-Organisation
-→ Subscription / Plan / Usage
+Organisation → Subscription / Plan / Usage
 
 The public website may continue to expose pricing for customer acquisition.
 
@@ -837,7 +800,7 @@ The signed-in app should focus on work.
 
 ---
 
-# 27. FIRST-TIME / EMPTY EXPERIENCE
+## 27. FIRST-TIME / EMPTY EXPERIENCE
 
 An authenticated user with no accessible workspace/program must not see an unexplained blank page.
 
@@ -852,7 +815,7 @@ Do not expose administrator-only controls.
 
 ---
 
-# 28. SECURITY REQUIREMENTS
+## 28. SECURITY REQUIREMENTS
 
 This market-readiness work is security-sensitive.
 
@@ -881,7 +844,7 @@ Organisation administrators may inspect only their own permitted commercial/usag
 
 ---
 
-# 29. OBSERVABILITY
+## 29. OBSERVABILITY
 
 Add appropriate operational signals for:
 
@@ -898,7 +861,7 @@ Do not put customer evidence/content into telemetry unnecessarily.
 
 ---
 
-# 30. CURRENT TASK LIST WHEN CLAUDE STOPPED
+## 30. CURRENT TASK LIST WHEN CLAUDE STOPPED
 
 Claude reported:
 
@@ -913,21 +876,25 @@ Claude reported:
 The visible work included:
 
 IN PROGRESS:
+
 - Implement ResourceProfile runtime resolution + storage quota enforcement
 
 OPEN:
+
 - Implement usage metering API (`getOrganisationUsage`)
 - Implement threshold events (70/85/95/100%) as configuration
 - Platform admin resource/usage dashboard + organisation self-service usage view
 - Implement manual/invoiced subscription activation flow
 
-Additional tasks were present in Claude's task list but were not visible in the final terminal output because the session ended.
+Additional tasks were present in Claude's task list but were not visible in the final terminal
+output because the session ended.
 
-Reconstruct the remaining tasks from this handoff and repository state rather than inventing unrelated work.
+Reconstruct the remaining tasks from this handoff and repository state rather than inventing
+unrelated work.
 
 ---
 
-# 31. COMPLETED MILESTONES
+## 31. COMPLETED MILESTONES
 
 Relevant completed/advanced milestones include:
 
@@ -971,7 +938,7 @@ Do not duplicate these.
 
 ---
 
-# 32. OPEN / DEFERRED FEATURES
+## 32. OPEN / DEFERRED FEATURES
 
 These are not current P0 unless required by dependencies.
 
@@ -985,13 +952,7 @@ Imported meeting material must remain source material, not automatically institu
 
 Potential future domain:
 
-MeetingProvider
-Meeting
-Participant
-TranscriptSource
-MeetingArtifact
-EvidenceImport
-ConsentRecord
+MeetingProvider Meeting Participant TranscriptSource MeetingArtifact EvidenceImport ConsentRecord
 ExternalSourceReference
 
 Do not implement this before commercial runtime readiness.
@@ -1016,11 +977,12 @@ Do not let it derail current runtime work unless actual implementation requires 
 
 Governance process may continue separately.
 
-Do not block safe reversible implementation merely for ceremony unless the repository's constitution explicitly requires approval.
+Do not block safe reversible implementation merely for ceremony unless the repository's constitution
+explicitly requires approval.
 
 ---
 
-# 33. KNOWN REPOSITORY / CI ISSUES
+## 33. KNOWN REPOSITORY / CI ISSUES
 
 There are previously identified unrelated repository-wide CI problems tracked separately.
 
@@ -1034,8 +996,7 @@ Do not contaminate feature PRs merely to fix unrelated main/repository failures.
 
 First establish whether a failing check:
 
-A. was introduced by current work; or
-B. reproduces on the appropriate base branch.
+A. was introduced by current work; or B. reproduces on the appropriate base branch.
 
 Fix A in the current branch.
 
@@ -1045,25 +1006,21 @@ Never silently bypass required security gates.
 
 ---
 
-# 34. BRANCH / PR DISCIPLINE
+## 34. BRANCH / PR DISCIPLINE
 
 Do not lose the stacked relationship.
 
 Current relevant stack:
 
-main
-│
-├── PR #262 — feat/help-knowledge-search
-│
-└── PR #264 — feat/commercial-entitlements
-       │
-       └── current commercial-runtime branch
+main │ ├── PR #262 — feat/help-knowledge-search │ └── PR #264 — feat/commercial-entitlements │ └──
+current commercial-runtime branch
 
 PR #262 and #264 are separate feature concerns.
 
 The commercial-runtime branch was intentionally based on `feat/commercial-entitlements`.
 
-Do not accidentally merge Help & Knowledge into the commercial runtime branch unless Git history legitimately contains it.
+Do not accidentally merge Help & Knowledge into the commercial runtime branch unless Git history
+legitimately contains it.
 
 Before changing anything:
 
@@ -1077,7 +1034,7 @@ Do not rewrite or force-push established branches without a concrete reason.
 
 ---
 
-# 35. BUILD ORDER FROM HERE
+## 35. BUILD ORDER FROM HERE
 
 Codex should proceed in this order:
 
@@ -1093,7 +1050,8 @@ Codex should proceed in this order:
 10. Implement configurable threshold events.
 11. Add platform admin resource/usage visibility.
 12. Add organisation-appropriate self-service usage visibility.
-13. Implement missing operator commercial origination/activation workflow using existing settlement domain.
+13. Implement missing operator commercial origination/activation workflow using existing settlement
+    domain.
 14. Verify subscription lifecycle behaviour.
 15. Establish provider-neutral deployment/provisioning boundary.
 16. Add observability.
@@ -1118,26 +1076,15 @@ Domain/API contracts should come first.
 
 ---
 
-# 36. DEFINITION OF COMMERCIAL RUNTIME DONE
+## 36. DEFINITION OF COMMERCIAL RUNTIME DONE
 
 A real organisation should be able to:
 
-Create organisation
-→ assign subscription
-→ resolve entitlements
-→ assign effective resource profile
-→ establish tenant
-→ activate subscription
-→ users sign in
-→ users access purchased capabilities
-→ users land in their working environment
-→ usage is measured
-→ storage limits are enforced
-→ one organisation cannot access another's resources
-→ operator can inspect usage
-→ organisation can inspect appropriate plan/usage
-→ negotiated override works
-→ commercial changes are audited
+Create organisation → assign subscription → resolve entitlements → assign effective resource profile
+→ establish tenant → activate subscription → users sign in → users access purchased capabilities →
+users land in their working environment → usage is measured → storage limits are enforced → one
+organisation cannot access another's resources → operator can inspect usage → organisation can
+inspect appropriate plan/usage → negotiated override works → commercial changes are audited
 
 That is the release criterion.
 
@@ -1145,7 +1092,7 @@ Not another architecture document.
 
 ---
 
-# 37. DEFINITION OF MARKET-READY NEXT STAGE
+## 37. DEFINITION OF MARKET-READY NEXT STAGE
 
 Before broad paid rollout we should be able to confidently answer:
 
@@ -1165,7 +1112,7 @@ If any answer is unknown, that is a market-readiness gap.
 
 ---
 
-# 38. CODEX OPERATING INSTRUCTIONS
+## 38. CODEX OPERATING INSTRUCTIONS
 
 Act as the senior engineering team responsible for finishing Witness for real market use.
 
@@ -1183,7 +1130,8 @@ Make the smallest complete vertical slice.
 
 Run tests throughout implementation.
 
-Treat tenant isolation, authorisation, provenance, payment settlement and resource enforcement as security boundaries.
+Treat tenant isolation, authorisation, provenance, payment settlement and resource enforcement as
+security boundaries.
 
 Do not make destructive production changes without explicit human approval.
 

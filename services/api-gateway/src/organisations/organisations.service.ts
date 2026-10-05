@@ -359,6 +359,7 @@ export class OrganisationsService {
     const usage = await this.storageQuota.usage(organisationId);
     return {
       usedBytes: usage.usedBytes.toString(),
+      reservedBytes: usage.reservedBytes.toString(),
       quotaBytes: usage.quotaBytes.toString(),
       availableBytes: usage.availableBytes.toString(),
       percentageUsed: usage.percentageUsed,

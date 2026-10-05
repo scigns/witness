@@ -33,6 +33,7 @@ export default function OperatorCommercialConfigurationPage({
   const [busy, setBusy] = useState(false);
   const [storage, setStorage] = useState<OrganisationStorageUsage | null>(null);
   const [usage, setUsage] = useState<OrganisationUsage | null>(null);
+  const [reconciliation, setReconciliation] = useState<Record<string, unknown> | null>(null);
   const [quotaInput, setQuotaInput] = useState('');
 
   const [entitlementKey, setEntitlementKey] = useState('');
@@ -62,6 +63,20 @@ export default function OperatorCommercialConfigurationPage({
   useEffect(() => {
     if (ready) void load();
   }, [ready, load]);
+
+  const inspectStorage = async (cleanExpired = false) => {
+    setBusy(true);
+    setFormError(null);
+    try {
+      if (cleanExpired) await api.cleanExpiredStorageReservations(organisationId, user);
+      setReconciliation(await api.reconcileOrganisationStorage(organisationId, user));
+      await load();
+    } catch (caught) {
+      setFormError(caught instanceof ApiError ? caught.message : 'Storage inspection failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submitOverride = async (event: FormEvent) => {
     event.preventDefault();
@@ -171,6 +186,30 @@ export default function OperatorCommercialConfigurationPage({
         )}
       </Card>
 
+      <Card>
+        <h2 className="text-xl font-semibold">Storage reconciliation</h2>
+        <p className="mt-2 text-sm">
+          Inspect persistent bytes and accounting. Reports preserve evidence. Cleanup releases
+          expired uploads that never started; uncertain writes remain reserved.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <Button disabled={busy} onClick={() => void inspectStorage()}>
+            Inspect storage
+          </Button>
+          <Button disabled={busy} onClick={() => void inspectStorage(true)}>
+            Clean expired reservations
+          </Button>
+        </div>
+        {reconciliation && (
+          <pre
+            tabIndex={0}
+            aria-label="Storage reconciliation report"
+            className="mt-3 overflow-auto whitespace-pre-wrap break-all text-sm"
+          >
+            {JSON.stringify(reconciliation, null, 2)}
+          </pre>
+        )}
+      </Card>
       {storage && (
         <Card>
           <h2 className="text-xl font-semibold">Storage allocation and usage</h2>
@@ -178,9 +217,11 @@ export default function OperatorCommercialConfigurationPage({
             <dt>Allocated</dt>
             <dd>{(Number(storage.quotaBytes) / 1073741824).toFixed(2)} GiB</dd>
             <dt>Used</dt>
-            <dd>
-              {(Number(storage.usedBytes) / 1073741824).toFixed(2)} GiB ({storage.percentageUsed}%)
-            </dd>
+            <dd>{(Number(storage.usedBytes) / 1073741824).toFixed(2)} GiB</dd>
+            <dt>Reserved for uploads</dt>
+            <dd>{(Number(storage.reservedBytes) / 1073741824).toFixed(2)} GiB</dd>
+            <dt>Capacity occupied</dt>
+            <dd>{storage.percentageUsed}% (committed and reserved)</dd>
             <dt>Available</dt>
             <dd>{(Number(storage.availableBytes) / 1073741824).toFixed(2)} GiB</dd>
             <dt>Allocation source</dt>

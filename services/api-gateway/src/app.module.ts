@@ -68,6 +68,7 @@ import { OrganisationRoleAssignmentsController } from './organisation-role-assig
 import { OrganisationRoleAssignmentsService } from './organisation-role-assignments/organisation-role-assignments.service.js';
 import { OrganisationsController } from './organisations/organisations.controller.js';
 import { OrganisationsService } from './organisations/organisations.service.js';
+import { StorageReconciliationService } from './organisations/storage-reconciliation.service.js';
 import { StorageQuotaService } from './organisations/storage-quota.service.js';
 import { OrganisationUsageService } from './organisations/organisation-usage.service.js';
 import { OutcomesController } from './outcomes/outcomes.controller.js';
@@ -193,6 +194,7 @@ import { MailerService } from './infrastructure/mailer.js';
     RecordsService,
     OrganisationsService,
     StorageQuotaService,
+    StorageReconciliationService,
     OrganisationUsageService,
     CommercialEntitlementService,
     CommercialCatalogueService,

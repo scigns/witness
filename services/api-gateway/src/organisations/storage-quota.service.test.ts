@@ -20,6 +20,7 @@ function fakePrisma(options: {
     evidenceAttachment: {
       aggregate: async () => ({ _sum: { sizeBytes: options.attachmentBytesSum } }),
     },
+    storageReservation: { aggregate: async () => ({ _sum: { sizeBytes: 0n } }) },
     resource: {
       aggregate: async () => ({ _sum: { sizeBytes: options.resourceBytesSum } }),
     },
@@ -131,7 +132,7 @@ describe('commercial allocation resolution', () => {
       resolveFor,
     } as unknown as EffectiveCommercialConfigurationService);
     const usage = await service.usage(ORG_1);
-    expect(resolveFor).toHaveBeenCalledWith(ORG_1);
+    expect(resolveFor).toHaveBeenCalledWith(ORG_1, prisma);
     expect(usage).toMatchObject({
       quotaBytes: 2000n,
       usedBytes: 500n,

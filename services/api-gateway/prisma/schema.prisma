@@ -144,6 +144,7 @@ model Organisation {
   tenant            Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  storageReservations          StorageReservation[]
   workspaces                   Workspace[]
   memberships                  OrganisationMembership[]
   roleAssignments              RoleAssignment[]
@@ -2951,4 +2952,29 @@ model Outbox {
 
   @@index([destination, status])
   @@map("outbox")
+}
+
+
+/// Durable capacity and upload identity. Uncertain writes continue consuming
+/// capacity until reconciled; expiration alone never releases a WRITING upload.
+model StorageReservation {
+  id                 String @id @db.Uuid
+  organisationId     String @map("organisation_id") @db.Uuid
+  organisation       Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  requestKey         String @map("request_key") @db.Uuid
+  requestFingerprint String @map("request_fingerprint") @db.VarChar(64)
+  storageKind        String @map("storage_kind") @db.VarChar(32)
+  targetId           String @map("target_id") @db.Uuid
+  storageKey         String? @unique @map("storage_key") @db.VarChar(500)
+  sizeBytes          BigInt @map("size_bytes")
+  state              String @default("RESERVED") @db.VarChar(32)
+  expiresAt          DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organisationId, requestKey])
+  @@unique([storageKind, targetId])
+  @@index([organisationId, state])
+  @@index([state, expiresAt])
+  @@map("storage_reservation")
 }

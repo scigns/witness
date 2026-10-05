@@ -16,6 +16,7 @@
  * full declarative capacity bundle it names.
  */
 
+import type { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import {
@@ -75,8 +76,11 @@ export class EffectiveCommercialConfigurationService {
     private readonly entitlements: CommercialEntitlementService,
   ) {}
 
-  async resolveFor(organisationId: string): Promise<EffectiveCommercialConfigurationView> {
-    const subscription = await this.prisma.subscription.findFirst({
+  async resolveFor(
+    organisationId: string,
+    db: PrismaService | Prisma.TransactionClient = this.prisma,
+  ): Promise<EffectiveCommercialConfigurationView> {
+    const subscription = await db.subscription.findFirst({
       where: {
         organisationId,
         status: { in: ['FREE', 'TRIALING', 'ACTIVE', 'PAST_DUE', 'SUSPENDED'] },
@@ -93,7 +97,7 @@ export class EffectiveCommercialConfigurationService {
       });
     }
 
-    const resolvedEntitlements = await this.entitlements.forOrganisation(organisationId);
+    const resolvedEntitlements = await this.entitlements.forOrganisation(organisationId, db);
     const config = resolveEffectiveCommercialConfiguration({
       organisationId: toOrganisationId(organisationId),
       subscriptionStatus:
@@ -102,7 +106,7 @@ export class EffectiveCommercialConfigurationService {
       entitlements: resolvedEntitlements,
     });
 
-    const resourceProfile = await this.prisma.resourceProfile.findUnique({
+    const resourceProfile = await db.resourceProfile.findUnique({
       where: { code: config.resourceProfileCode ?? FALLBACK_RESOURCE_PROFILE_CODE },
     });
 

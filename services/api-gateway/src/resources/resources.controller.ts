@@ -94,7 +94,13 @@ export class ResourcesController {
     }
 
     return this.translateDomainErrors(() =>
-      this.resources.createFile(workspaceId, parsed.data, file, request.principal!),
+      this.resources.createFile(
+        workspaceId,
+        parsed.data,
+        file,
+        request.principal!,
+        request.headers['idempotency-key'] as string | undefined,
+      ),
     );
   }
 

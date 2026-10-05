@@ -26,6 +26,7 @@ const DEFAULT_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
 
 function fakeStorageQuota(
   usage: StorageQuotaService['usage'] = async () => ({
+    reservedBytes: 0n,
     usedBytes: 0n,
     quotaBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
     availableBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
@@ -471,6 +472,7 @@ describe('OrganisationsService.storage', () => {
   it('returns usage and quota as decimal strings — bigint does not survive JSON.stringify', async () => {
     const { prisma } = fakePrisma({ organisations: [{ id: ORG_1, name: 'Org One' }] });
     const storageQuota = fakeStorageQuota(async () => ({
+      reservedBytes: 0n,
       usedBytes: 2_147_483_648n,
       quotaBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
       availableBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES) - 2_147_483_648n,
@@ -483,6 +485,7 @@ describe('OrganisationsService.storage', () => {
     const result = await service.storage(ORG_1);
 
     expect(result).toMatchObject({
+      reservedBytes: '0',
       usedBytes: '2147483648',
       quotaBytes: String(DEFAULT_STORAGE_QUOTA_BYTES),
     });
@@ -497,6 +500,7 @@ describe('OrganisationsService.setStorageQuota', () => {
     // production it re-reads the row this method just updated in the same
     // database, so the fake needs to reflect that instead of a fixed value.
     const storageQuota = fakeStorageQuota(async () => ({
+      reservedBytes: 0n,
       usedBytes: 0n,
       quotaBytes: state.organisations[0]!.storageQuotaBytes,
       availableBytes: state.organisations[0]!.storageQuotaBytes,

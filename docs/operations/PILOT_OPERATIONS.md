@@ -205,16 +205,15 @@ bytes; it does not itself contain those bytes. Restoring the dump onto a
 fresh instance without also having the original bucket (or a copy of it)
 available leaves every evidence attachment 404ing.
 
-R2 itself is redundant across multiple facilities as part of the service
-Cloudflare provides — this is not the same failure mode a self-hosted disk
-has, and is why this pilot has not needed its own object-level backup job.
-The operator action that remains, and needs a human with Cloudflare account
-access (the same access already needed for tunnel-credential rotation,
-above): turn on **bucket versioning** (or Object Lock, if the compliance
-posture of a given client — MOJ in particular — calls for it) on the
-production bucket before onboarding real institutional data, so a
-credential compromise or an operator mistake that deletes or overwrites an
-object is recoverable rather than final.
+R2 redundancy does not protect against deletion or overwrite by a compromised credential or
+operator. R2 does not implement S3 bucket versioning or S3 Object Lock; see
+[Cloudflare's compatibility reference](https://developers.cloudflare.com/r2/api/s3/api/). Do not use
+those features as an onboarding prerequisite that an operator cannot execute. Before accepting real
+institutional evidence, verify an independent recoverable object copy, its retention and
+restricted/encrypted access, and a non-production restore with checksum verification. R2 bucket
+locks are a separate retention control and must be reviewed against governance/deletion
+requirements; they are not a substitute for a tested backup. Current proof is required in the
+[production acceptance gates](../release/PRODUCTION_ACCEPTANCE_2026-10-05.md).
 
 **Schedule it daily**, registered as a standing job on the pilot host's own
 crontab. Call the script directly rather than through `make` — a minimal

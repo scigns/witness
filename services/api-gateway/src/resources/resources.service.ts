@@ -16,11 +16,10 @@ import {
   BadRequestException,
   Inject,
   Injectable,
-  Logger,
   NotFoundException,
   PayloadTooLargeException,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import {
   createResource,
@@ -44,8 +43,9 @@ import { PrismaService } from '../infrastructure/prisma.service.js';
 import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { StoragePort } from '../storage/storage.port.js';
-import { objectKey, resolveStoredContent } from '../storage/storage.service.js';
+import { resolveStoredContent } from '../storage/storage.service.js';
 import { StorageQuotaService } from '../organisations/storage-quota.service.js';
+import type { StorageReservation } from '@prisma/client';
 import type { Principal } from '../authz/authorization.port.js';
 
 /** Matches `EvidenceAttachmentService`'s own default cap. */
@@ -70,7 +70,6 @@ type ResourceRow = Awaited<ReturnType<PrismaService['resource']['findFirstOrThro
 
 @Injectable()
 export class ResourcesService {
-  private readonly logger = new Logger(ResourcesService.name);
   constructor(
     private readonly prisma: PrismaService,
     @Inject(StoragePort) private readonly storage: StoragePort | null,
@@ -121,6 +120,7 @@ export class ResourcesService {
     metadata: CreateFileResourceMetadata,
     file: UploadedResourceFile | undefined,
     principal: Principal,
+    requestKey?: string,
   ): Promise<ResourceView> {
     if (file === undefined) {
       throw new PayloadTooLargeException({
@@ -149,17 +149,6 @@ export class ResourcesService {
 
     const workspace = await this.requireWorkspace(workspaceId);
 
-    try {
-      await this.storageQuota.checkQuota(workspace.organisationId, file.size);
-    } catch (error) {
-      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
-        throw new PayloadTooLargeException({
-          error: { code: error.code, message: error.message },
-        });
-      }
-      throw error;
-    }
-
     const actor = await resolveActor(this.prisma, principal);
     const userId = await this.requirePrincipalUserId(principal);
     const now = new Date();
@@ -184,42 +173,69 @@ export class ResourcesService {
       createdAt: now,
     });
 
-    // Same ordering as EvidenceAttachmentService: written before the
-    // transaction, so a failed put never leaves a committed row pointing at
-    // an object that does not exist.
-    let storageKey: string | null = null;
-    if (this.storage !== null) {
-      storageKey = objectKey({ organisationId: workspace.organisationId, kind: 'resource', id });
-      await this.storage.put(storageKey, file.buffer, file.mimetype);
-    }
-
+    let reservation;
     try {
+      reservation = await this.storageQuota.reserve({
+        organisationId: workspace.organisationId,
+        requestKey,
+        requestFingerprint: createHash('sha256')
+          .update(
+            JSON.stringify([
+              principal.subject,
+              workspaceId,
+              metadata.title,
+              metadata.description ?? null,
+              metadata.sessionId ?? null,
+              metadata.agendaItemId ?? null,
+              file.originalname,
+              file.mimetype,
+              createHash('sha256').update(file.buffer).digest('hex'),
+            ]),
+          )
+          .digest('hex'),
+        kind: 'resource',
+        sizeBytes: file.size,
+        objectStorage: this.storage !== null,
+        actor,
+      });
+    } catch (error) {
+      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED')
+        throw new PayloadTooLargeException({ error: { code: error.code, message: error.message } });
+      throw error;
+    }
+    if (reservation.state === 'COMMITTED')
+      return toView(await this.requireRow(workspaceId, reservation.targetId));
+    const resource = { ...outcome.resource, id: toResourceId(reservation.targetId) };
+    const storageKey = reservation.storageKey;
+    let putCompleted = false;
+    try {
+      await this.storageQuota.claim(reservation);
+      if (storageKey !== null && this.storage !== null)
+        await this.storage.put(storageKey, file.buffer, file.mimetype);
+      putCompleted = true;
       await this.persist(
-        outcome.resource,
+        resource,
         outcome.event,
         now,
         { content: storageKey === null ? file.buffer : null, storageKey },
-        { organisationId: workspace.organisationId, additionalBytes: file.size },
+        reservation,
       );
     } catch (error) {
-      // A domain rejection inside the callback rolls back the transaction.
-      // Other failures can have an uncertain commit outcome: retain their
-      // object for reconciliation rather than risk deleting committed data.
-      if (error instanceof InvariantViolation && storageKey !== null && this.storage !== null) {
+      if (error instanceof InvariantViolation && putCompleted) {
         try {
-          await this.storage.delete(storageKey);
+          if (storageKey !== null && this.storage !== null) await this.storage.delete(storageKey);
+          await this.storageQuota.releaseKnownFailure(reservation, actor);
         } catch {
-          this.logger.error({ event: 'storage.upload_cleanup_failed', storageKey });
+          await this.storageQuota.markUncertain(reservation);
         }
+      } else {
+        await this.storageQuota.markUncertain(reservation);
       }
-      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
-        throw new PayloadTooLargeException({
-          error: { code: error.code, message: error.message },
-        });
-      }
+      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED')
+        throw new PayloadTooLargeException({ error: { code: error.code, message: error.message } });
       throw error;
     }
-    return toView(await this.requireRow(workspaceId, outcome.resource.id));
+    return toView(await this.requireRow(workspaceId, resource.id));
   }
 
   async content(workspaceId: string, resourceId: string): Promise<ResourceContent> {
@@ -279,22 +295,11 @@ export class ResourcesService {
     event: PendingAuditEvent,
     at: Date,
     storage?: { content: Buffer | null; storageKey: string | null },
-    quota?: { organisationId: string; additionalBytes: number },
+    reservation?: StorageReservation,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      // Authoritative, race-safe re-check inside the same transaction as the
-      // row it guards — see storage-quota.service.ts's own doc comment. Only
-      // relevant for file resources; link resources carry no bytes.
-      if (quota !== undefined) {
-        await this.storageQuota.lockForWrite(tx, quota.organisationId);
-        await this.storageQuota.checkQuotaInTransaction(
-          tx,
-          quota.organisationId,
-          quota.additionalBytes,
-          event.actor,
-          at,
-        );
-      }
+      if (reservation !== undefined)
+        await this.storageQuota.checkReservation(tx, reservation, event.actor, at);
 
       await tx.resource.create({
         data: {
@@ -315,6 +320,7 @@ export class ResourcesService {
           createdAt: resource.createdAt,
         },
       });
+      if (reservation !== undefined) await this.storageQuota.commitReservation(tx, reservation);
       await appendAuditEvent(tx, 'resource', resource.id, event, at);
     });
   }

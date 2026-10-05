@@ -69,7 +69,23 @@ function fakeStorage(): StoragePort & {
   } as unknown as StoragePort & { put: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> };
 }
 
-const NOOP_QUOTA = {} as StorageQuotaService;
+const NOOP_QUOTA = {
+  reserve: async (input: Parameters<StorageQuotaService['reserve']>[0]) => {
+    const targetId = crypto.randomUUID();
+    return {
+      ...input,
+      targetId,
+      id: crypto.randomUUID(),
+      state: 'RESERVED',
+      storageKey: input.objectStorage ? `${input.organisationId}/resource/${targetId}` : null,
+    };
+  },
+  claim: async () => {},
+  checkReservation: async () => {},
+  commitReservation: async () => {},
+  releaseKnownFailure: async () => {},
+  markUncertain: async () => {},
+} as unknown as StorageQuotaService;
 
 function baseRow(id: string, overrides: Record<string, unknown>) {
   return {

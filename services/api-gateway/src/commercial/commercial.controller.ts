@@ -26,6 +26,7 @@ import { CommercialCatalogueService } from './commercial-catalogue.service.js';
 import { CommercialOverrideService } from './commercial-override.service.js';
 import { EffectiveCommercialConfigurationService } from './effective-commercial-configuration.service.js';
 import { OrganisationsService } from '../organisations/organisations.service.js';
+import { StorageReconciliationService } from '../organisations/storage-reconciliation.service.js';
 import { OrganisationUsageService } from '../organisations/organisation-usage.service.js';
 
 @Controller('api/v1/plans')
@@ -104,7 +105,23 @@ export class OperatorCommercialConfigurationController {
     private readonly overrides: CommercialOverrideService,
     private readonly organisations: OrganisationsService,
     private readonly organisationUsage: OrganisationUsageService,
+    private readonly reconciliation: StorageReconciliationService,
   ) {}
+
+  @Post('reconciliation')
+  @Requires('operator:read')
+  reconcile(@Param('organisationId') organisationId: string, @Req() request: RequestWithPrincipal) {
+    return this.reconciliation.inspect(organisationId, request.principal!);
+  }
+
+  @Post('reconciliation/expired-reservations')
+  @Requires('commercial_override:manage')
+  cleanExpired(
+    @Param('organisationId') organisationId: string,
+    @Req() request: RequestWithPrincipal,
+  ) {
+    return this.reconciliation.cleanExpired(organisationId, request.principal!);
+  }
 
   @Get('storage')
   @Requires('operator:read')

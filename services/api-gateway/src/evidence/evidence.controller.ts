@@ -261,7 +261,14 @@ export class EvidenceController {
     @Req() request: RequestWithPrincipal,
   ): Promise<EvidenceAttachmentView> {
     return this.translateDomainErrors(() =>
-      this.attachments.upload(workspaceId, sessionId, evidenceId, file, request.principal!),
+      this.attachments.upload(
+        workspaceId,
+        sessionId,
+        evidenceId,
+        file,
+        request.principal!,
+        request.headers['idempotency-key'] as string | undefined,
+      ),
     );
   }
 

@@ -1743,6 +1743,7 @@ export const STORAGE_QUOTA_SOURCES = [
 export type StorageQuotaSource = (typeof STORAGE_QUOTA_SOURCES)[number];
 
 export interface OrganisationStorageUsage {
+  readonly reservedBytes: string;
   usedBytes: string;
   /** Allocated. */
   quotaBytes: string;

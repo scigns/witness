@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import {
@@ -36,8 +37,11 @@ function entitlementValue(value: unknown, expected: string, key: string): Entitl
 export class CommercialEntitlementService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async forOrganisation(organisationId: string): Promise<ResolvedEntitlements> {
-    const subscription = await this.prisma.subscription.findFirst({
+  async forOrganisation(
+    organisationId: string,
+    db: PrismaService | Prisma.TransactionClient = this.prisma,
+  ): Promise<ResolvedEntitlements> {
+    const subscription = await db.subscription.findFirst({
       where: {
         organisationId,
         status: { in: ['FREE', 'TRIALING', 'ACTIVE', 'PAST_DUE', 'SUSPENDED'] },

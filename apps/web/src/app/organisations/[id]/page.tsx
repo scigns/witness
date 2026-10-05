@@ -205,6 +205,8 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
                     </p>
                     <p className="text-sm text-[var(--color-ink-muted)]">
                       {(Number(storage.availableBytes) / 1073741824).toFixed(2)} GiB available.
+                      {Number(storage.reservedBytes) > 0 &&
+                        ` ${(Number(storage.reservedBytes) / 1073741824).toFixed(2)} GiB reserved for uploads.`}
                       {storage.thresholdCrossed !== null &&
                         ` Storage has reached the ${storage.thresholdCrossed}% threshold.`}
                     </p>

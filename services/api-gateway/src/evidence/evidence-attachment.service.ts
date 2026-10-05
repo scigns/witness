@@ -31,11 +31,10 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
-  Logger,
   NotFoundException,
   PayloadTooLargeException,
 } from '@nestjs/common';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 
 import {
   captureEvidenceAttachment,
@@ -53,7 +52,7 @@ import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
 import { StoragePort } from '../storage/storage.port.js';
-import { objectKey, resolveStoredContent } from '../storage/storage.service.js';
+import { resolveStoredContent } from '../storage/storage.service.js';
 import { StorageQuotaService } from '../organisations/storage-quota.service.js';
 import { WITNESS_CONFIG } from '../tokens.js';
 import type { Principal } from '../authz/authorization.port.js';
@@ -73,7 +72,6 @@ export interface EvidenceAttachmentContent {
 
 @Injectable()
 export class EvidenceAttachmentService {
-  private readonly logger = new Logger(EvidenceAttachmentService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly consentPolicy: ConsentPolicyService,
@@ -88,6 +86,7 @@ export class EvidenceAttachmentService {
     evidenceId: string,
     file: UploadedAttachmentFile | undefined,
     principal: Principal,
+    requestKey?: string,
   ): Promise<EvidenceAttachmentView> {
     if (file === undefined) {
       throw new BadRequestException({
@@ -138,7 +137,7 @@ export class EvidenceAttachmentService {
     const evidenceRow = await this.requireEvidenceRow(workspaceId, sessionId, evidenceId);
 
     const existing = await this.prisma.evidenceAttachment.findUnique({ where: { evidenceId } });
-    if (existing !== null) {
+    if (existing !== null && requestKey === undefined) {
       throw new ConflictException({
         error: {
           code: 'ATTACHMENT_EXISTS',
@@ -171,22 +170,64 @@ export class EvidenceAttachmentService {
       }
     }
 
-    try {
-      await this.storageQuota.checkQuota(evidenceRow.organisationId, file.size);
-    } catch (error) {
-      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
-        throw new PayloadTooLargeException({
-          error: { code: error.code, message: error.message },
-        });
-      }
-      throw error;
-    }
-
     const actor = await resolveActor(this.prisma, principal);
     const checksumSha256 = createHash('sha256').update(file.buffer).digest('hex');
+    let reservation;
+    try {
+      reservation = await this.storageQuota.reserve({
+        organisationId: evidenceRow.organisationId,
+        requestKey,
+        requestFingerprint: createHash('sha256')
+          .update(
+            JSON.stringify([
+              principal.subject,
+              workspaceId,
+              sessionId,
+              evidenceId,
+              file.originalname,
+              file.mimetype,
+              checksumSha256,
+            ]),
+          )
+          .digest('hex'),
+        kind: 'evidence-attachment',
+        sizeBytes: file.size,
+        objectStorage: this.storage !== null,
+        actor,
+      });
+    } catch (error) {
+      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED')
+        throw new PayloadTooLargeException({ error: { code: error.code, message: error.message } });
+      throw error;
+    }
+    if (reservation.state === 'COMMITTED') {
+      if (existing === null || existing.id !== reservation.targetId)
+        throw new ConflictException({
+          error: {
+            code: 'UPLOAD_REPLAY_UNAVAILABLE',
+            message: 'The original upload record is no longer available.',
+          },
+        });
+      return {
+        id: existing.id,
+        evidenceId: existing.evidenceId,
+        kind: existing.kind as EvidenceAttachmentView['kind'],
+        originalFilename: existing.originalFilename,
+        contentType: existing.contentType,
+        sizeBytes: existing.sizeBytes,
+        checksumSha256: existing.checksumSha256,
+        createdAt: existing.createdAt.toISOString(),
+      };
+    }
+    if (existing !== null) {
+      await this.storageQuota.releaseKnownFailure(reservation, actor);
+      throw new ConflictException({
+        error: { code: 'ATTACHMENT_EXISTS', message: 'This evidence already has an attachment.' },
+      });
+    }
 
     const outcome = captureEvidenceAttachment({
-      id: toEvidenceAttachmentId(randomUUID()),
+      id: toEvidenceAttachmentId(reservation.targetId),
       evidenceId: toEvidenceId(evidenceId),
       kind,
       originalFilename: file.originalname,
@@ -197,35 +238,16 @@ export class EvidenceAttachmentService {
       at: now,
     });
 
-    // Written before the transaction, not after: if this put fails, nothing
-    // has touched the database and the request simply fails. The reverse
-    // order risks a committed row pointing at an object that was never
-    // written, which is a broken reference rather than wasted storage.
-    let storageKey: string | null = null;
-    if (this.storage !== null) {
-      storageKey = objectKey({
-        organisationId: evidenceRow.organisationId,
-        kind: 'evidence-attachment',
-        id: outcome.attachment.id,
-      });
-      await this.storage.put(storageKey, file.buffer, file.mimetype);
-    }
-
+    const storageKey = reservation.storageKey;
+    let putCompleted = false;
     try {
+      await this.storageQuota.claim(reservation);
+      if (storageKey !== null && this.storage !== null) {
+        await this.storage.put(storageKey, file.buffer, file.mimetype);
+      }
+      putCompleted = true;
       await this.prisma.$transaction(async (tx) => {
-        // Authoritative, race-safe re-check: the plain checkQuota() above is
-        // only a fast pre-write filter. Two concurrent uploads for the same
-        // organisation both pass that stale-read check and would otherwise
-        // jointly exceed the quota; the lock serialises them so the second
-        // one's check here sees the first one's already-committed row.
-        await this.storageQuota.lockForWrite(tx, evidenceRow.organisationId);
-        await this.storageQuota.checkQuotaInTransaction(
-          tx,
-          evidenceRow.organisationId,
-          file.size,
-          actor,
-          now,
-        );
+        await this.storageQuota.checkReservation(tx, reservation, actor, now);
 
         await tx.evidenceAttachment.create({
           data: {
@@ -242,6 +264,7 @@ export class EvidenceAttachmentService {
           },
         });
 
+        await this.storageQuota.commitReservation(tx, reservation);
         await appendAuditEvent(
           tx,
           'evidence_attachment',
@@ -251,15 +274,15 @@ export class EvidenceAttachmentService {
         );
       });
     } catch (error) {
-      // A domain rejection inside the callback rolls back the transaction.
-      // Other failures can have an uncertain commit outcome: retain their
-      // object for reconciliation rather than risk deleting committed data.
-      if (error instanceof InvariantViolation && storageKey !== null && this.storage !== null) {
+      if (error instanceof InvariantViolation && putCompleted) {
         try {
-          await this.storage.delete(storageKey);
+          if (storageKey !== null && this.storage !== null) await this.storage.delete(storageKey);
+          await this.storageQuota.releaseKnownFailure(reservation, actor);
         } catch {
-          this.logger.error({ event: 'storage.upload_cleanup_failed', storageKey });
+          await this.storageQuota.markUncertain(reservation);
         }
+      } else {
+        await this.storageQuota.markUncertain(reservation);
       }
       if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
         throw new PayloadTooLargeException({

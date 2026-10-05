@@ -395,6 +395,26 @@ export const api = {
       user,
     ),
 
+  reconcileOrganisationStorage: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<Record<string, unknown>> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/reconciliation`,
+      user,
+      { method: 'POST' },
+    ),
+
+  cleanExpiredStorageReservations: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<Record<string, unknown>> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/reconciliation/expired-reservations`,
+      user,
+      { method: 'POST' },
+    ),
+
   getOperatorOrganisationUsage: (
     organisationId: string,
     user: ActingUser,

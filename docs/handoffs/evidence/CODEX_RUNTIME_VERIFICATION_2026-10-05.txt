@@ -69,3 +69,27 @@ Remaining release work — milestone is NOT complete
 - Existing organisations retain historical quota values as overrides under Claude's migration;
   operators must review/reset these to obtain live plan/profile allocations where appropriate.
 - Full browser/accessibility acceptance, pinned Node 22/CI checks, authenticated-shell milestone.
+
+Production acceptance hardening continuation (Node 22)
+- Durable PostgreSQL reservation ledger introduced before object writes; uploads commit file and
+  reservation state together. In-flight duplicate keys conflict, committed keys replay, payload
+  changes conflict. Expired started/uncertain writes retain charged bytes and cannot commit after fencing.
+- Operator reconciliation inspects inline byte lengths and bounded provider HEAD/LIST inventories;
+  no customer objects/records are deleted. Audit chain carries report hash. Safe cleanup only releases
+  expired never-started reservations. Operator/customer views show reserved bytes.
+- API: 779/779 tests, 70 files; lint/typecheck/build passed.
+- Domain: 635/635 tests, 31 files. Corrected stale fixed-allocation assertion identified in CI.
+- Live reservation/upload/reconciliation: 10/10 tests pass, isolated codex_runtime_20261005 schema.
+- Changed effective-commercial resolution live tests: 12/12 pass.
+- Web: lint, typecheck, production build passed; new reconciliation UI was included in build.
+- Documentation CI failure identified in original handoff formatting; markdownlint now passes.
+- Gitleaks full history: 465 commits / 10.50 MB scanned, no leaks.
+- New additive migration applied: 44 migrations total.
+- Local custom-format dump restored to codex_restore_20261005: 44 migration records, 74 tables.
+  Dump SHA256 1a36c82d8d2f731d5814f20a32139ff75b75be90f9a266b3dc4913fbb28b07cc.
+  Protected artifacts outside Git; this is not production restore proof or an RPO/RTO guarantee.
+- Public www and app/workspaces return TLS-verified HTTP 200; browser/session acceptance outstanding.
+- External API /ready healthy, deployed SHA 0a273631087550f898a85c1e917a772fb8a22d20 / version 0.4.0.
+- Production SSH witness-prod-claude rejected publickey authentication. Host, current backups,
+  environment, restore, production deployment and synthetic production journey remain blocked.
+- No production deployment/merge/tag made; full gate matrix records FAIL for unproven conditions.

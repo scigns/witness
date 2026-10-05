@@ -18,7 +18,7 @@ const ACTOR: Actor = {
 const NOW = new Date('2026-08-14T00:00:00Z');
 
 describe('createOrganisation', () => {
-  it('defaults storageQuotaBytes to the Flight 1 included allowance (5 GiB)', () => {
+  it('leaves storageQuotaBytes unset so the effective resource profile controls allocation', () => {
     const outcome = createOrganisation({
       id: toOrganisationId('22222222-2222-4222-8222-222222222222'),
       name: 'Test Institution',
@@ -26,8 +26,7 @@ describe('createOrganisation', () => {
       createdAt: NOW,
     });
 
-    expect(outcome.organisation.storageQuotaBytes).toBe(DEFAULT_STORAGE_QUOTA_BYTES);
-    expect(DEFAULT_STORAGE_QUOTA_BYTES).toBe(5 * 1024 * 1024 * 1024);
+    expect(outcome.organisation.storageQuotaBytes).toBeNull();
   });
 
   it('accepts an explicit storage quota, overriding the default', () => {
