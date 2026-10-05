@@ -352,7 +352,11 @@ export class StorageQuotaService {
     const current = await tx.storageReservation.findUniqueOrThrow({
       where: { id: reservation.id },
     });
-    if (current.organisationId !== reservation.organisationId || current.state !== 'WRITING') {
+    if (
+      current.organisationId !== reservation.organisationId ||
+      current.state !== 'WRITING' ||
+      current.expiresAt <= new Date()
+    ) {
       throw new InvariantViolation(
         'The upload reservation is no longer writable.',
         'RESERVATION_NOT_WRITABLE',

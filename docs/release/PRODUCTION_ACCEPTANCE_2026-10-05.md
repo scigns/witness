@@ -9,6 +9,49 @@ dependency was merged or flattened. Existing verification is retained in
 
 ## Release gates
 
+### Resumed checkpoint — 6 October 2026
+
+Continued from `74892bf` on the same branch/PR. The following separates implementation and
+local test evidence from deployment and production proof. PARTIAL means required work remains;
+UNKNOWN means there is no verified evidence for this candidate. Neither satisfies a release gate.
+
+| Programme gate                                 | IMPLEMENTED                                                            | TESTED                                                                  | DEPLOYED | PRODUCTION VERIFIED |
+| ---------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------- | -------- | ------------------- |
+| Quota/reservation concurrency and recovery     | YES                                                                    | Local PostgreSQL PASS; actual provider crash recovery UNKNOWN           | NO       | UNKNOWN             |
+| Storage reconciliation                         | PARTIAL: bounded reporting and safe lease cleanup                      | Local PostgreSQL PASS; uncertain-writer repair UNKNOWN                  | NO       | UNKNOWN             |
+| Authoritative operational metering             | PARTIAL: customer file ledger; physical database/backup/bandwidth gaps | File accounting PASS; infrastructure UNKNOWN                            | NO       | UNKNOWN             |
+| Commercial origination/onboarding              | PARTIAL: catalogue-priced invoice path                                 | Local synthetic lifecycle PASS; browser/email UNKNOWN                   | NO       | UNKNOWN             |
+| Provisioning desired/observed state            | PARTIAL: verification boundary; provider fulfilment missing            | Boundary unit PASS; actual allocation UNKNOWN                           | NO       | UNKNOWN             |
+| Subscription-to-runtime lifecycle              | PARTIAL: upload suspension/cancellation enforced                       | Local suspension and lifecycle PASS; complete lifecycle UNKNOWN         | NO       | UNKNOWN             |
+| Security/adversarial audit                     | PARTIAL                                                                | Existing boundary tests PASS; full client attack journey UNKNOWN        | NO       | UNKNOWN             |
+| Authenticated application UX                   | PARTIAL: checkpointed shell/activity/access guard                      | Prior build evidence; browser acceptance UNKNOWN                        | NO       | UNKNOWN             |
+| Returning-user `/workspaces`                   | YES: default route                                                     | Callback unit PASS; browser acceptance UNKNOWN                          | NO       | UNKNOWN             |
+| Sign-in/deep-link return                       | YES: one-time server state                                             | Existing safety tests PASS; real OIDC UNKNOWN                           | NO       | UNKNOWN             |
+| Operator/customer usage and subscription views | PARTIAL                                                                | API/local lifecycle PASS; browser acceptance UNKNOWN                    | NO       | UNKNOWN             |
+| Public claims reconciliation                   | PARTIAL                                                                | Final claims/browser audit UNKNOWN                                      | NO       | UNKNOWN             |
+| Migrations/database upgrade                    | YES: additive migrations                                               | Prior fresh/isolated upgrade PASS; production-data rehearsal UNKNOWN    | NO       | UNKNOWN             |
+| Backup/restore                                 | PARTIAL: database script controls                                      | Prior local dump/mock controls PASS; production/object recovery UNKNOWN | NO       | UNKNOWN             |
+| Observability                                  | PARTIAL: failure signals and readiness                                 | Alert delivery/host coverage UNKNOWN                                    | NO       | UNKNOWN             |
+| Synthetic-client acceptance                    | PARTIAL: local API journey                                             | Local commercial journey PASS; browser/production journey UNKNOWN       | NO       | UNKNOWN             |
+| Release gate matrix                            | YES: evidence scopes recorded                                          | Critical gates remain failed/unknown                                    | NO       | UNKNOWN             |
+| Rollback readiness                             | PARTIAL: immutable-image controls                                      | Prior mock safety PASS; production recovery UNKNOWN                     | NO       | UNKNOWN             |
+| Client operator runbook                        | PARTIAL: supported catalogue path                                      | Full operator rehearsal UNKNOWN                                         | NO       | UNKNOWN             |
+| Production rollout                             | NO: gates block rollout                                                | NOT RUN                                                                 | NO       | UNKNOWN             |
+
+New verification closes expired-writer commit before cleanup, exact object-key validation during
+reconciliation, unavailable storage detection for pending objects, and deletion without a configured
+provider. Retained records continue to charge capacity when deletion cannot establish object removal.
+Reports remain observational and do not authorise uncertain-writer capacity release or object deletion.
+
+Latest failed CI test was the callback assertion expecting `/` instead of `/workspaces`; corrected
+to the intended returning-user route. Node 22 API regression passed 826 tests before the added
+deletion case; the updated resource suite passed 8 tests. Quota/reservation/commercial live suites
+passed 20 tests in the existing isolated local schema. API typecheck and lint passed.
+
+Production access was rechecked with the documented read-only SSH command and still returned
+`Permission denied (publickey)`. No production action, migration, deployment, merge or tag occurred.
+The approved production SSH key/access path remains required. **Not client ready.**
+
 PASS applies only to the scope explicitly described. Missing production proof is FAIL, not an
 accepted risk. No deferred risk has been accepted by the release manager.
 

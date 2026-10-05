@@ -117,3 +117,23 @@ Production acceptance follow-up (2026-10-05; candidate work after 3e2f008):
   safety cases), including server-state binding, single-use replay denial and external-target rejection.
 - Additive 20261005020000_login_return_path migration PASS against both local acceptance and
   bootstrapped fresh-install databases; 45 total migrations. Actual OIDC/browser acceptance pending.
+
+Resumed production programme — 2026-10-06, from 74892bf on PR #266
+- Inspected Git status, all branch checkpoints, PR checks, handoff and prior acceptance evidence.
+- Branch/base retained; untracked apps/participant-mobile/ untouched.
+- Fence expired WRITING reservations at commit even before operator cleanup, using current time
+  rather than caller-provided audit time. Capacity remains charged on rejected uncertain commits.
+- Reconciliation validates exact organisation/kind/record object keys before HEAD, including
+  same-organisation foreign record keys. Pending object writes require a configured provider before
+  inventory can be complete. Reporting performs no destructive repair.
+- Resource deletion with missing storage configuration now returns 503 STORAGE_UNAVAILABLE before
+  deleting the database record; retained object bytes remain accounted for.
+- Correct stale OIDC callback test to /workspaces, resolving latest CI unit-test failure.
+- Node 22 API unit regression: 826/826 PASS before added deletion test; updated resource suite 8/8.
+- Local PostgreSQL: reservation/reconciliation 17, quota 2, synthetic commercial lifecycle 1:
+  20/20 PASS in existing isolated codex_runtime_20261005 schema. No production data used.
+- API typecheck and lint PASS. Release record distinguishes IMPLEMENTED, TESTED, DEPLOYED and
+  PRODUCTION VERIFIED for all programme gates; production candidate remains undeployed/unverified.
+- Read-only production SSH recheck still fails Permission denied (publickey). Approved SSH key or
+  restored approved access path required for host/backup/restore/production verification.
+- No production deployment, migration, merge, tag or financial mutation. NOT CLIENT READY.

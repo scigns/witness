@@ -112,6 +112,19 @@ function baseRow(id: string, overrides: Record<string, unknown>) {
 }
 
 describe('ResourcesService.remove', () => {
+  it('retains the row and its accounting when object storage is not configured', async () => {
+    const prisma = fakePrisma([
+      baseRow(RESOURCE_R2, { content: null, storageKey: `org-1/resource/${RESOURCE_R2}` }),
+    ]);
+    const service = new ResourcesService(prisma, null, NOOP_QUOTA);
+    await expect(service.remove(WORKSPACE_1, RESOURCE_R2, UPLOADER)).rejects.toMatchObject({
+      status: 503,
+      response: { error: { code: 'STORAGE_UNAVAILABLE' } },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.resource.delete).not.toHaveBeenCalled();
+  });
+
   it('deletes the R2 object before deleting the row, for a storage-backed resource', async () => {
     const row = baseRow(RESOURCE_R2, {
       content: null,

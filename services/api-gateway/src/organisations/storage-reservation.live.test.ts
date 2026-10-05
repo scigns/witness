@@ -209,6 +209,19 @@ describe.skipIf(!process.env.DATABASE_URL)('durable reservations (live PostgreSQ
     expect(await quota.usage(org)).toMatchObject({ usedBytes: 0n, reservedBytes: 600n });
     await expect(reserve()).rejects.toMatchObject({ code: 'STORAGE_QUOTA_EXCEEDED' });
   });
+  it('fences an expired writer even before operator cleanup runs', async () => {
+    const writing = await reserve(600);
+    await quota.claim(writing);
+    await db.storageReservation.update({
+      where: { id: writing.id },
+      data: { expiresAt: new Date(0) },
+    });
+    await expect(
+      db.$transaction((tx) => quota.checkReservation(tx, writing, actor, new Date(0))),
+    ).rejects.toMatchObject({ code: 'RESERVATION_NOT_WRITABLE' });
+    expect(await quota.usage(org)).toMatchObject({ usedBytes: 0n, reservedBytes: 600n });
+  });
+
   it('releases an expired never-started lease but fences an expired writer without freeing its bytes', async () => {
     const neverStarted = await reserve(400);
     const writing = await reserve(600);
@@ -241,6 +254,53 @@ describe.skipIf(!process.env.DATABASE_URL)('durable reservations (live PostgreSQ
     expect((await quota.usage(org)).reservedBytes).toBe(0n);
     expect(await reserve(1000)).toMatchObject({ sizeBytes: 1000n });
   });
+  it('reports unavailable storage for uncertain object writes even without committed records', async () => {
+    const reservation = await quota.reserve({
+      organisationId: org,
+      requestFingerprint: 'a'.repeat(64),
+      kind: 'resource',
+      sizeBytes: 600,
+      objectStorage: true,
+      actor,
+    });
+    await quota.claim(reservation);
+    await quota.markUncertain(reservation);
+    expect(await reconcile.inspect(org, principal)).toMatchObject({
+      inventoryComplete: false,
+      reservedBytes: '600',
+      objectStorageBytes: null,
+      discrepancies: expect.arrayContaining([{ code: 'STORAGE_UNAVAILABLE', reference: org }]),
+    });
+  });
+
+  it('rejects a same-organisation key belonging to another record without reading it', async () => {
+    const id = randomUUID();
+    const key = `${org}/resource/${randomUUID()}`;
+    await db.resource.create({
+      data: {
+        id,
+        workspaceId: workspace,
+        title: 'Invalid ownership',
+        resourceType: 'file',
+        sizeBytes: 7,
+        storageKey: key,
+        uploadedById: user,
+      },
+    });
+    let heads = 0;
+    const storage = {
+      list: async () => ({ objects: [{ key, sizeBytes: 7 }], cursor: null }),
+      head: async () => {
+        heads++;
+        return { sizeBytes: 7 };
+      },
+    } as unknown as StoragePort;
+    expect(
+      await new StorageReconciliationService(db, storage, quota).inspect(org, principal),
+    ).toMatchObject({ discrepancies: [{ code: 'INVALID_OBJECT_KEY', reference: id }] });
+    expect(heads).toBe(0);
+  });
+
   it('reports orphan objects without deleting customer data', async () => {
     const key = `${org}/resource/${randomUUID()}`;
     let deletes = 0;

@@ -14,6 +14,7 @@ import { StorageQuotaService } from './storage-quota.service.js';
 import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import type { Principal } from '../authz/authorization.port.js';
+import { objectKey } from '../storage/storage.service.js';
 
 export interface StorageDiscrepancy {
   code:
@@ -94,10 +95,16 @@ export class StorageReconciliationService {
           reference: reservation.id,
         });
     }
-    const records = [...attachments, ...resources];
+    const records = [
+      ...attachments.map((row) => ({ ...row, kind: 'evidence-attachment' as const })),
+      ...resources.map((row) => ({ ...row, kind: 'resource' as const })),
+    ];
     let objectBytes: bigint | null = this.storage === null ? null : 0n;
     let inventoryComplete = true;
-    if (this.storage === null && records.length !== 0) {
+    if (
+      this.storage === null &&
+      (records.length !== 0 || reservations.some((row) => row.storageKey !== null))
+    ) {
       discrepancies.push({ code: 'STORAGE_UNAVAILABLE', reference: organisationId });
       inventoryComplete = false;
     }
@@ -124,7 +131,9 @@ export class StorageReconciliationService {
         } while (cursor !== undefined);
         // HEAD each referenced key; do not infer missing bytes from a racing list snapshot.
         for (const record of records) {
-          if (!record.storageKey!.startsWith(`${organisationId}/`)) {
+          if (
+            record.storageKey !== objectKey({ organisationId, kind: record.kind, id: record.id })
+          ) {
             discrepancies.push({ code: 'INVALID_OBJECT_KEY', reference: record.id });
             continue;
           }

@@ -19,6 +19,7 @@ import {
   Injectable,
   NotFoundException,
   PayloadTooLargeException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 
@@ -295,7 +296,14 @@ export class ResourcesService {
     // intact (safe to retry) rather than committing a row-gone state while
     // the object silently survives in R2 forever — the orphan this file
     // shipped with until a live pilot upload proved it (see PR history).
-    if (row.storageKey !== null && this.storage !== null) {
+    if (row.storageKey !== null) {
+      if (this.storage === null)
+        throw new ServiceUnavailableException({
+          error: {
+            code: 'STORAGE_UNAVAILABLE',
+            message: 'Object storage is unavailable; the resource remains retained and charged.',
+          },
+        });
       const workspace = await this.requireWorkspace(workspaceId);
       assertStorageOwnership(row.storageKey, {
         organisationId: workspace.organisationId,
