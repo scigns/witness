@@ -179,9 +179,22 @@ function fakeStorage() {
   return { storage, objects };
 }
 
-/** Allows by default — quota-rejection tests pass a fake that throws instead. */
+/**
+ * Allows by default — quota-rejection tests pass a fake that throws
+ * instead. The same check function backs both the fast pre-write check
+ * and the authoritative in-transaction one, since a rejection test does
+ * not care which of the two call sites threw.
+ */
 function fakeStorageQuota(checkQuota: StorageQuotaService['checkQuota'] = async () => {}) {
-  return { checkQuota } as unknown as StorageQuotaService;
+  return {
+    checkQuota,
+    lockForWrite: async () => {},
+    checkQuotaInTransaction: async (
+      _tx: unknown,
+      organisationId: string,
+      additionalBytes: number,
+    ) => checkQuota(organisationId, additionalBytes),
+  } as unknown as StorageQuotaService;
 }
 
 function service(
@@ -439,7 +452,7 @@ describe('document and image evidence — the evidence_submission consent gate',
     expect(checkQuota).not.toHaveBeenCalled();
   });
 
-  it('a permitted document submission writes exactly one R2 object and checks quota exactly once', async () => {
+  it('a permitted document submission writes exactly one R2 object, and checks quota twice (the fast pre-write filter, then the authoritative in-transaction re-check)', async () => {
     const { storage, objects } = fakeStorage();
     const checkQuota = vi.fn().mockResolvedValue(undefined);
     const { svc } = service({
@@ -451,7 +464,7 @@ describe('document and image evidence — the evidence_submission consent gate',
     await svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_ATTRIBUTED, documentFile(), FACILITATOR);
 
     expect(objects.size).toBe(1);
-    expect(checkQuota).toHaveBeenCalledTimes(1);
+    expect(checkQuota).toHaveBeenCalledTimes(2);
   });
 
   it('a second attempt against the same evidence after a denial still gets ATTACHMENT_EXISTS-free 403 (no partial state to conflict with)', async () => {

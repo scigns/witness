@@ -102,8 +102,15 @@ export class OrganisationsController {
     return this.organisationUsage.usage(organisationId);
   }
 
+  /**
+   * Platform-only (commercial-runtime-readiness work): a storage override
+   * is commercial/resource policy, not organisation self-service -- an
+   * organisation's own admin, however senior, must not be able to raise
+   * (or lower) their own allocation. Was gated on 'organisation:update'
+   * (reachable by an organisation-scoped admin) until this change.
+   */
   @Patch(':organisationId/storage-quota')
-  @Requires('organisation:update')
+  @Requires('commercial_override:manage')
   async updateStorageQuota(
     @Param('organisationId') organisationId: string,
     @Body() body: unknown,

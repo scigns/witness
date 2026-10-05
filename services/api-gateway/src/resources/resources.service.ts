@@ -176,10 +176,22 @@ export class ResourcesService {
       await this.storage.put(storageKey, file.buffer, file.mimetype);
     }
 
-    await this.persist(outcome.resource, outcome.event, now, {
-      content: storageKey === null ? file.buffer : null,
-      storageKey,
-    });
+    try {
+      await this.persist(
+        outcome.resource,
+        outcome.event,
+        now,
+        { content: storageKey === null ? file.buffer : null, storageKey },
+        { organisationId: workspace.organisationId, additionalBytes: file.size },
+      );
+    } catch (error) {
+      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
+        throw new PayloadTooLargeException({
+          error: { code: error.code, message: error.message },
+        });
+      }
+      throw error;
+    }
     return toView(await this.requireRow(workspaceId, outcome.resource.id));
   }
 
@@ -240,8 +252,21 @@ export class ResourcesService {
     event: PendingAuditEvent,
     at: Date,
     storage?: { content: Buffer | null; storageKey: string | null },
+    quota?: { organisationId: string; additionalBytes: number },
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      // Authoritative, race-safe re-check inside the same transaction as the
+      // row it guards — see storage-quota.service.ts's own doc comment. Only
+      // relevant for file resources; link resources carry no bytes.
+      if (quota !== undefined) {
+        await this.storageQuota.lockForWrite(tx, quota.organisationId);
+        await this.storageQuota.checkQuotaInTransaction(
+          tx,
+          quota.organisationId,
+          quota.additionalBytes,
+        );
+      }
+
       await tx.resource.create({
         data: {
           id: resource.id,

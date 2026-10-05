@@ -1735,9 +1735,24 @@ export interface OrganisationSummary {
  * (gigabytes) fit safely in a JS number, but the wire type stays honest
  * about carrying a bigint rather than silently narrowing it.
  */
+export const STORAGE_QUOTA_SOURCES = [
+  'ADMIN_OVERRIDE',
+  'RESOURCE_PROFILE',
+  'FALLBACK_DEFAULT',
+] as const;
+export type StorageQuotaSource = (typeof STORAGE_QUOTA_SOURCES)[number];
+
 export interface OrganisationStorageUsage {
   usedBytes: string;
+  /** Allocated. */
   quotaBytes: string;
+  availableBytes: string;
+  percentageUsed: number;
+  /** Where the allocation figure came from -- see StorageQuotaService's own doc comment. */
+  source: StorageQuotaSource;
+  measuredAt: string;
+  /** The highest 70/85/95/100 threshold `percentageUsed` has reached, or `null`. */
+  thresholdCrossed: 70 | 85 | 95 | 100 | null;
 }
 
 /**
@@ -1770,10 +1785,14 @@ export interface OrganisationUsage {
 }
 
 export const updateStorageQuotaRequestSchema = z.object({
-  quotaBytes: z.coerce
-    .number()
-    .int()
-    .positive('A storage quota must be a positive number of bytes'),
+  /** `null` clears the override, reverting to the plan's live resource-profile default. */
+  quotaBytes: z
+    .union([
+      z.coerce.number().int().positive('A storage quota must be a positive number of bytes'),
+      z.null(),
+    ])
+    .optional()
+    .transform((value) => value ?? null),
 });
 export type UpdateStorageQuotaRequest = z.infer<typeof updateStorageQuotaRequestSchema>;
 

@@ -57,6 +57,7 @@ export * from './tenant.js';
 export * from './deployment-isolation.js';
 export * from './support-level.js';
 export * from './effective-commercial-configuration.js';
+export * from './usage-thresholds.js';
 
 // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
 export * from './relationship-vocabulary.js';

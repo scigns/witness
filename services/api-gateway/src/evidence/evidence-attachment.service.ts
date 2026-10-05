@@ -200,24 +200,47 @@ export class EvidenceAttachmentService {
       await this.storage.put(storageKey, file.buffer, file.mimetype);
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.evidenceAttachment.create({
-        data: {
-          id: outcome.attachment.id,
-          evidenceId: outcome.attachment.evidenceId,
-          kind: outcome.attachment.kind,
-          originalFilename: outcome.attachment.originalFilename,
-          contentType: outcome.attachment.contentType,
-          sizeBytes: outcome.attachment.sizeBytes,
-          checksumSha256: outcome.attachment.checksumSha256,
-          content: storageKey === null ? file.buffer : null,
-          storageKey,
-          createdAt: outcome.attachment.createdAt,
-        },
-      });
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Authoritative, race-safe re-check: the plain checkQuota() above is
+        // only a fast pre-write filter. Two concurrent uploads for the same
+        // organisation both pass that stale-read check and would otherwise
+        // jointly exceed the quota; the lock serialises them so the second
+        // one's check here sees the first one's already-committed row.
+        await this.storageQuota.lockForWrite(tx, evidenceRow.organisationId);
+        await this.storageQuota.checkQuotaInTransaction(tx, evidenceRow.organisationId, file.size);
 
-      await appendAuditEvent(tx, 'evidence_attachment', outcome.attachment.id, outcome.event, now);
-    });
+        await tx.evidenceAttachment.create({
+          data: {
+            id: outcome.attachment.id,
+            evidenceId: outcome.attachment.evidenceId,
+            kind: outcome.attachment.kind,
+            originalFilename: outcome.attachment.originalFilename,
+            contentType: outcome.attachment.contentType,
+            sizeBytes: outcome.attachment.sizeBytes,
+            checksumSha256: outcome.attachment.checksumSha256,
+            content: storageKey === null ? file.buffer : null,
+            storageKey,
+            createdAt: outcome.attachment.createdAt,
+          },
+        });
+
+        await appendAuditEvent(
+          tx,
+          'evidence_attachment',
+          outcome.attachment.id,
+          outcome.event,
+          now,
+        );
+      });
+    } catch (error) {
+      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
+        throw new PayloadTooLargeException({
+          error: { code: error.code, message: error.message },
+        });
+      }
+      throw error;
+    }
 
     return {
       id: outcome.attachment.id,
