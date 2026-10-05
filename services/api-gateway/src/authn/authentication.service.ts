@@ -1,3 +1,4 @@
+import { ROLE_GRANTS } from '../authz/role-grants.js';
 import { validateApplicationReturnPath } from './application-return-path.js';
 /**
  * Authentication orchestration — sign-in, callback, current-user, sign-out.
@@ -410,7 +411,7 @@ export class AuthenticationService {
       // each, so a plain map (not a multi-value structure) is enough.
       this.prisma.roleAssignment.findMany({
         where: { userId },
-        select: { role: true, organisationId: true, workspaceId: true },
+        select: { role: true, scopeType: true, organisationId: true, workspaceId: true },
       }),
     ]);
 
@@ -504,6 +505,13 @@ export class AuthenticationService {
       status: 'ok',
       view: {
         id: user.id,
+        operatorAccess: roleAssignments.some(
+          (assignment) =>
+            assignment.scopeType === 'platform' &&
+            assignment.organisationId === null &&
+            assignment.workspaceId === null &&
+            ROLE_GRANTS[assignment.role]?.includes('operator:read'),
+        ),
         displayName: user.displayName,
         email: user.email,
         bio: user.bio,

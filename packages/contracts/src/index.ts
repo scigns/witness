@@ -1993,6 +1993,8 @@ export interface CurrentUserWorkspaceView extends WorkspaceSummary {
  * accidentally show access the user does not have.
  */
 export interface CurrentUserView {
+  /** Server-computed platform capability; omission means no operator navigation. */
+  operatorAccess?: boolean;
   id: string;
   displayName: string;
   email: string;

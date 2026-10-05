@@ -820,3 +820,27 @@ describe('AuthenticationService return target binding', () => {
     expect(authLoginAttempts).toHaveLength(0);
   });
 });
+
+describe('current user operator capability', () => {
+  it.each([
+    { scopeType: 'organisation', organisationId: 'org-1', workspaceId: null, expected: false },
+    { scopeType: 'platform', organisationId: null, workspaceId: null, expected: true },
+    { scopeType: 'platform', organisationId: 'org-1', workspaceId: null, expected: false },
+  ])(
+    'reports operator standing only for a valid platform assignment: $scopeType/$organisationId',
+    async ({ expected, ...scope }) => {
+      const { prisma, roleAssignments } = fakePrisma();
+      roleAssignments.push({ userId: INVITED_USER, role: 'admin', ...scope });
+      const service = new AuthenticationService(
+        prisma,
+        new StubIdentityProvider(),
+        new SessionService(prisma),
+        REDIRECT_URI,
+        480,
+      );
+      const result = await service.getCurrentUser(INVITED_USER);
+      expect(result.status).toBe('ok');
+      if (result.status === 'ok') expect(result.view.operatorAccess).toBe(expected);
+    },
+  );
+});
