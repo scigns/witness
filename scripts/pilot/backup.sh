@@ -60,6 +60,14 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T --env PGPASSWOR
   --format=custom --no-owner >"${KEYCLOAK_ARCHIVE}.tmp"
 unset PGPASSWORD
 
+# Validate the completed custom-format archives before publishing them. This
+# establishes readable dump structure; only an independent restore proves recovery.
+for archive in "${WITNESS_ARCHIVE}.tmp" "${KEYCLOAK_ARCHIVE}.tmp"; do
+  [[ -s "$archive" ]] || { echo "Backup archive is empty" >&2; exit 1; }
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres \
+    pg_restore --list < "$archive" > /dev/null
+done
+
 mv -- "${WITNESS_ARCHIVE}.tmp" "${WITNESS_ARCHIVE}"
 mv -- "${KEYCLOAK_ARCHIVE}.tmp" "${KEYCLOAK_ARCHIVE}"
 

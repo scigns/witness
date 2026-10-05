@@ -30,7 +30,7 @@ concurrency:
 jobs:
   deploy:
     name: Deploy
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.conclusion == 'success')
     runs-on: [self-hosted, witness-pilot]
     environment: pilot
     timeout-minutes: 20
@@ -45,7 +45,7 @@ jobs:
       # sweep.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           clean: false
 
       - name: Deploy
@@ -53,6 +53,7 @@ jobs:
           WITNESS_PILOT_API_URL: ${{ vars.WITNESS_PILOT_API_URL }}
           WITNESS_PILOT_WEB_URL: ${{ vars.WITNESS_PILOT_WEB_URL }}
           WITNESS_ENV_FILE: /home/witness/witness/.env
+          WITNESS_APPROVED_RELEASE_SHA: ${{ vars.WITNESS_APPROVED_RELEASE_SHA }}
         run: bash scripts/pilot/deploy.sh
 
       # Password recovery is a Keycloak realm capability, not an API health

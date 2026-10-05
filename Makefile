@@ -143,8 +143,13 @@ typecheck: ## Typecheck all workspaces
 	pnpm typecheck
 
 .PHONY: test
-test: ## Run unit and integration tests
+test: test-operations ## Run unit and integration tests
 	pnpm test
+
+.PHONY: test-operations
+test-operations: ## Verify deployment rollback and backup safety without infrastructure
+	python3 scripts/pilot/deploy.test.py
+	python3 scripts/ops/backup-status.test.py
 
 .PHONY: test-e2e
 test-e2e: ## Run end-to-end tests (requires the local stack)

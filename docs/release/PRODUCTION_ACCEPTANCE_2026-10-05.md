@@ -15,7 +15,7 @@ accepted risk. No deferred risk has been accepted by the release manager.
 | Gate              | Status | Evidence / remaining condition                                                                                                                             |
 | ----------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BUILD             | PASS   | Node 22 API and web production builds pass locally; deployed artifact remains older.                                                                       |
-| TEST              | FAIL   | API regression and targeted live tests pass; see checkpoint. Required CI must pass at final candidate SHA.                                                 |
+| TEST              | FAIL   | API regression and targeted live tests pass; see checkpoint. CI 37267179606 passes at 39ba382; later candidate changes require their own CI.               |
 | SECURITY          | FAIL   | Full-history gitleaks: 465 commits, no leaks. Full production attack journey outstanding.                                                                  |
 | DATABASE          | FAIL   | Isolated PostgreSQL checks pass; current production data/integrity inspection blocked.                                                                     |
 | MIGRATION         | FAIL   | Additive reservation migration applied locally (44 total); fresh bootstrap/restart pass; production-compatible data rehearsal outstanding.                 |
@@ -129,3 +129,30 @@ and live participant cleanup missing the reservation FK. These have been correct
 checks pass; final candidate CI remains required. GitHub environment `pilot` currently reports no
 protection rules. An explicit release-manager go/no-go is required by repository governance; do not
 merge into the automatic deployment path before enforcing that approval and verifying rollback.
+
+## Deployment hardening and approval control
+
+The existing pilot workflow accepts successful same-repository main-push CI only, checks out
+that exact SHA, and limits manual dispatch to main. Pull-request/fork workflow runs cannot deploy. The deploy script rejects a dirty tracked checkout or an absent/mismatched
+`WITNESS_APPROVED_RELEASE_SHA` before host mutation. The release manager must set that environment
+variable to the exact reviewed main release SHA only after the gate matrix and recovery evidence
+pass. Keep the old value until approval; another SHA will fail closed.
+
+The script captures healthy production identity and actual running API/web image IDs, builds
+SHA-tagged candidate images, records their immutable IDs, takes immediate Witness and Keycloak
+backups and checks both sets before migration. Recreate uses the recorded IDs. TLS is verified and
+readiness must report the candidate SHA. Rollback uses previous running image IDs and previous build
+metadata, then verifies that SHA. Database migration failure stops before application recreation;
+database rollback remains a human recovery operation. R2/object protection is a separate release
+gate and is not established by these database dumps.
+
+Mock-infrastructure tests prove rejection before mutation without approval, backup-before-migration,
+backup failure stopping migration and wrong-build detection restoring previous images/identity.
+Independent backup-freshness tests prevent a fresh Witness dump hiding stale Keycloak recovery
+state. These checks do not prove actual production recovery or schema compatibility.
+
+**HUMAN ACTION REQUIRED — release approval:** After every critical gate passes, the release manager
+records the go/no-go decision and sets the exact main release SHA on
+[the pilot environment variables page](https://github.com/scigns/witness/settings/environments).
+Expected result: only that reviewed SHA passes deployment preflight. Do not set approval now;
+production acceptance remains blocked.

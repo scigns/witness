@@ -107,3 +107,8 @@ Production acceptance follow-up (2026-10-05; candidate work after 3e2f008):
   participant synthetic cleanup reservation FK. Final candidate CI still required.
 - Production SSH publickey access remains blocked; no merge/tag/production mutation/deployment.
 - Production acceptance gate matrix remains BLOCKED; no deferred risks accepted.
+
+- Pushed checkpoint 39ba382: CI 37267179606 all required jobs PASS, including live Postgres/Neo4j,
+  invariants/adversarial, build, unit, documentation, security, governance and zero-egress.
+- Deployment safety follow-up: fake-infrastructure tests 6/6 PASS; backup freshness/checksum
+  tests 4/4 PASS; shellcheck PASS. Production execution remains blocked and untouched.
