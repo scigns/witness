@@ -31,6 +31,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   PayloadTooLargeException,
 } from '@nestjs/common';
@@ -72,6 +73,7 @@ export interface EvidenceAttachmentContent {
 
 @Injectable()
 export class EvidenceAttachmentService {
+  private readonly logger = new Logger(EvidenceAttachmentService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly consentPolicy: ConsentPolicyService,
@@ -94,13 +96,22 @@ export class EvidenceAttachmentService {
     }
 
     const maxBytes = this.config.maxEvidenceAttachmentMb * 1024 * 1024;
-    if (file.size > maxBytes) {
+    if (file.size > maxBytes || file.buffer.length > maxBytes) {
       throw new PayloadTooLargeException({
         error: {
           code: 'FILE_TOO_LARGE',
           message:
             `This file is ${Math.ceil(file.size / (1024 * 1024))} MB. The limit is ` +
             `${this.config.maxEvidenceAttachmentMb} MB.`,
+        },
+      });
+    }
+
+    if (!Number.isSafeInteger(file.size) || file.size < 0 || file.size !== file.buffer.length) {
+      throw new BadRequestException({
+        error: {
+          code: 'INVALID_STORAGE_SIZE',
+          message: 'The upload byte count does not match its content.',
         },
       });
     }
@@ -208,7 +219,13 @@ export class EvidenceAttachmentService {
         // jointly exceed the quota; the lock serialises them so the second
         // one's check here sees the first one's already-committed row.
         await this.storageQuota.lockForWrite(tx, evidenceRow.organisationId);
-        await this.storageQuota.checkQuotaInTransaction(tx, evidenceRow.organisationId, file.size);
+        await this.storageQuota.checkQuotaInTransaction(
+          tx,
+          evidenceRow.organisationId,
+          file.size,
+          actor,
+          now,
+        );
 
         await tx.evidenceAttachment.create({
           data: {
@@ -234,6 +251,16 @@ export class EvidenceAttachmentService {
         );
       });
     } catch (error) {
+      // A domain rejection inside the callback rolls back the transaction.
+      // Other failures can have an uncertain commit outcome: retain their
+      // object for reconciliation rather than risk deleting committed data.
+      if (error instanceof InvariantViolation && storageKey !== null && this.storage !== null) {
+        try {
+          await this.storage.delete(storageKey);
+        } catch {
+          this.logger.error({ event: 'storage.upload_cleanup_failed', storageKey });
+        }
+      }
       if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
         throw new PayloadTooLargeException({
           error: { code: error.code, message: error.message },

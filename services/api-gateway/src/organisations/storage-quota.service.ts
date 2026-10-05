@@ -37,10 +37,16 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 
-import { DEFAULT_STORAGE_QUOTA_BYTES, InvariantViolation } from '@witness/domain';
+import {
+  DEFAULT_STORAGE_QUOTA_BYTES,
+  InvariantViolation,
+  USAGE_WARNING_THRESHOLDS,
+  type Actor,
+} from '@witness/domain';
 
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { EffectiveCommercialConfigurationService } from '../commercial/effective-commercial-configuration.service.js';
+import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 
 export type StorageQuotaSource = 'ADMIN_OVERRIDE' | 'RESOURCE_PROFILE' | 'FALLBACK_DEFAULT';
 
@@ -174,13 +180,47 @@ export class StorageQuotaService {
     tx: TransactionClient,
     organisationId: string,
     additionalBytes: number,
+    actor?: Actor,
+    at: Date = new Date(),
   ): Promise<void> {
     const { usedBytes, quotaBytes } = await this.usageVia(tx, organisationId);
     assertWithinQuota(usedBytes, quotaBytes, additionalBytes);
+    if (actor !== undefined && quotaBytes > 0n) {
+      const projectedBytes = usedBytes + BigInt(additionalBytes);
+      for (const threshold of USAGE_WARNING_THRESHOLDS) {
+        const boundary = quotaBytes * BigInt(threshold);
+        if (usedBytes * 100n < boundary && projectedBytes * 100n >= boundary) {
+          await appendAuditEvent(
+            tx,
+            'organisation',
+            organisationId,
+            {
+              action: 'organisation.storage_threshold_crossed',
+              actor,
+              metadata: {
+                thresholdPercent: String(threshold),
+                usedBytes: projectedBytes.toString(),
+                allocatedBytes: quotaBytes.toString(),
+              },
+            },
+            at,
+          );
+        }
+      }
+    }
   }
 }
 
 function assertWithinQuota(usedBytes: bigint, quotaBytes: bigint, additionalBytes: number): void {
+  if (!Number.isSafeInteger(additionalBytes) || additionalBytes < 0) {
+    throw new InvariantViolation(
+      'Storage writes must declare a non-negative safe integer byte count.',
+      'INVALID_STORAGE_SIZE',
+    );
+  }
+  if (quotaBytes < 0n) {
+    throw new InvariantViolation('Storage allocation cannot be negative.', 'INVALID_STORAGE_QUOTA');
+  }
   const projected = usedBytes + BigInt(additionalBytes);
   if (projected > quotaBytes) {
     throw new InvariantViolation(

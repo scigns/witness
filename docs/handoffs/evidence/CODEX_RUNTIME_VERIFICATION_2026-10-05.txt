@@ -1,0 +1,71 @@
+Commercial runtime verification checkpoint — 2026-10-05
+
+Git recovery
+- Continued feat/commercial-runtime-readiness at e9b789e.
+- Stacked parent remains feat/commercial-entitlements at 215f350.
+- Remote tips verified with git ls-remote; no branches merged/cherry-picked.
+- Untracked apps/participant-mobile/ excluded from all edits and staging.
+
+Branch reconciliation
+- organisation-usage-metering: HEAD already contains and extends its service/API/UI.
+- organisation-profile-and-quota-at-creation: HEAD already contains its onboarding foundation;
+  runtime changes replace frozen new-organisation quota with a live profile default.
+- manual-settlement-paid-activation and use-authoritative-env: no unique commits against HEAD.
+- resource-delete-orphans-r2-object: unique historical commit, but implementation and tests
+  already present in HEAD. No further copy needed.
+
+Implemented in this checkpoint
+- Reject unsafe, fractional and negative storage byte counts and negative capacity.
+- Validate actual buffer size against declared upload size before quota/storage writes.
+- Reject missing/inactive/negative-capacity resource profiles during runtime resolution
+  and before resource.profile overrides are persisted.
+- Compensate object writes after a known domain rejection in the upload transaction.
+  Cleanup errors emit storage.upload_cleanup_failed. Unknown transaction outcomes retain
+  objects to avoid deleting committed customer data; reconciliation remains required.
+- Audit newly crossed 70/85/95/100 thresholds in the upload transaction. Existing configured
+  thresholds remain authoritative. Rejected/rolled-back writes produce no committed events.
+- Add operator:read storage/usage inspection endpoints under commercial-configuration.
+- Move quota override form to operations; support restoring the profile allocation with null.
+- Show customer allocated/used/available capacity and threshold state without quota controls.
+- Label deployment isolation as contracted, not observed provisioning.
+
+Storage inventory and boundaries (code-backed, not production measurements)
+Customer-enforceable:
+- EvidenceAttachment.content/storageKey and Resource.content/storageKey: counted exactly once
+  from sizeBytes, independent of PostgreSQL-inline versus object-store adapter.
+- Audio/document/image attachments use the same attachment accounting path.
+- Resource links have no retained file bytes.
+Operational infrastructure:
+- PostgreSQL rows/indexes/WAL and derived transcripts/summaries/knowledge/audit data: no
+  authoritative per-organisation physical footprint measurement; excluded from file quota.
+- Report exports: rendered response bytes, not a retained exported file; exports counted as
+  audit events, not retained storage. Stored reports/source rows are database infrastructure.
+- Local Whisper: mkdtemp/writeFile, finally rm; temporary processing storage, not customer quota.
+- PostgreSQL/Keycloak backups: deployment-level recovery storage; backup scripts/status exist,
+  not included in customer quota. Object-storage recovery coverage still needs verification.
+- Docker logs have deployment logging configuration; graph/search/observability volumes and
+  caches are operational, not customer allocation. No inferred per-customer byte figures shown.
+
+Verification
+- Final API unit suite: 779 tests / 70 files passed.
+- Root invariant/adversarial suites: 53 passed.
+- API lint/typecheck/build and web lint/typecheck/build passed during this checkpoint.
+- All 43 migrations applied to isolated local schema codex_runtime_20261005.
+- Live PostgreSQL suite: 50 passed / 6 files; subsequent quota/threshold rollback suite: 2 passed.
+- Concurrent 600-byte writes against a 1000-byte allocation: only one committed, other rejected;
+  another organisation remained at zero. Rollback released locks/capacity and threshold events.
+- Tests used local Node v24.1.0; repository targets Node 22. CI/pinned-runtime check remains.
+- No production data, deployment, payment or infrastructure allocation changed.
+
+Remaining release work — milestone is NOT complete
+- Durable upload reservations and object reconciliation covering crashes/uncertain outcomes.
+- Synchronise commercial resolution with the transaction client for capacity checks.
+- Verify deletion failures/retention/cascades do not abandon unmetered customer objects.
+- Operational database/object-store/backup/bandwidth measurements and recovery coverage.
+- Operator commercial origination for quote-based institutional plans: current self-service
+  CHANGE_PLAN rejects quoteBased; invoice and settlement paths also require non-quote pricing.
+  Existing manual settlement is transactional and tested; do not duplicate it.
+- Provider-neutral provisioning boundary and desired-versus-observed runtime state.
+- Existing organisations retain historical quota values as overrides under Claude's migration;
+  operators must review/reset these to obtain live plan/profile allocations where appropriate.
+- Full browser/accessibility acceptance, pinned Node 22/CI checks, authenticated-shell milestone.

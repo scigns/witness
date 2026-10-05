@@ -130,7 +130,7 @@ function audioFile(overrides: Partial<UploadedAttachmentFile> = {}): UploadedAtt
   return {
     originalname: 'session-recording.mp3',
     mimetype: 'audio/mpeg',
-    size: 1024,
+    size: overrides.size ?? overrides.buffer?.length ?? Buffer.byteLength('fake audio bytes'),
     buffer: Buffer.from('fake audio bytes'),
     ...overrides,
   };
@@ -149,7 +149,7 @@ function documentFile(overrides: Partial<UploadedAttachmentFile> = {}): Uploaded
   return {
     originalname: 'exhibit-a.pdf',
     mimetype: 'application/pdf',
-    size: 1024,
+    size: overrides.size ?? overrides.buffer?.length ?? PDF_SIGNATURE.length,
     buffer: PDF_SIGNATURE,
     ...overrides,
   };
@@ -159,7 +159,7 @@ function imageFile(overrides: Partial<UploadedAttachmentFile> = {}): UploadedAtt
   return {
     originalname: 'poster.jpg',
     mimetype: 'image/jpeg',
-    size: 1024,
+    size: overrides.size ?? overrides.buffer?.length ?? JPEG_SIGNATURE.length,
     buffer: JPEG_SIGNATURE,
     ...overrides,
   };
@@ -547,5 +547,39 @@ describe('document and image evidence — the evidence_submission consent gate',
     await expect(
       svc.upload('does-not-exist', SESSION_1, EVIDENCE_ATTRIBUTED, documentFile(), FACILITATOR),
     ).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('upload transaction compensation', () => {
+  it('removes the object when the locked quota recheck rejects a competing upload', async () => {
+    const { storage, objects } = fakeStorage();
+    const check = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new InvariantViolation('capacity consumed', 'STORAGE_QUOTA_EXCEEDED'));
+    const { svc, attachments } = service({ storage, storageQuota: fakeStorageQuota(check) });
+    await expect(
+      svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_UNATTRIBUTED, audioFile(), FACILITATOR),
+    ).rejects.toThrow(PayloadTooLargeException);
+    expect(objects.size).toBe(0);
+    expect(attachments).toHaveLength(0);
+  });
+});
+
+describe('upload size integrity', () => {
+  it('rejects a declared size smaller than the real bytes before storage writes', async () => {
+    const { storage, objects } = fakeStorage();
+    const { svc, attachments } = service({ storage });
+    await expect(
+      svc.upload(
+        WORKSPACE_1,
+        SESSION_1,
+        EVIDENCE_UNATTRIBUTED,
+        audioFile({ size: 1 }),
+        FACILITATOR,
+      ),
+    ).rejects.toMatchObject({ response: { error: { code: 'INVALID_STORAGE_SIZE' } } });
+    expect(objects.size).toBe(0);
+    expect(attachments).toHaveLength(0);
   });
 });

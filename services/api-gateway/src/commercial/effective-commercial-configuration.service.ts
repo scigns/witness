@@ -19,6 +19,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import {
+  InvariantViolation,
   resolveEffectiveCommercialConfiguration,
   toOrganisationId,
   type EffectiveCommercialConfiguration,
@@ -104,6 +105,20 @@ export class EffectiveCommercialConfigurationService {
     const resourceProfile = await this.prisma.resourceProfile.findUnique({
       where: { code: config.resourceProfileCode ?? FALLBACK_RESOURCE_PROFILE_CODE },
     });
+
+    if (
+      resourceProfile === null ||
+      !resourceProfile.active ||
+      resourceProfile.storageQuotaBytes < 0n ||
+      resourceProfile.concurrencyLimit < 0 ||
+      resourceProfile.workerAllocation < 0 ||
+      resourceProfile.jobLimit < 0
+    ) {
+      throw new InvariantViolation(
+        'The effective resource profile is missing, inactive or has invalid capacity.',
+        'INVALID_RESOURCE_PROFILE',
+      );
+    }
 
     return {
       organisationId,

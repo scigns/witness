@@ -25,6 +25,8 @@ import {
 import { CommercialCatalogueService } from './commercial-catalogue.service.js';
 import { CommercialOverrideService } from './commercial-override.service.js';
 import { EffectiveCommercialConfigurationService } from './effective-commercial-configuration.service.js';
+import { OrganisationsService } from '../organisations/organisations.service.js';
+import { OrganisationUsageService } from '../organisations/organisation-usage.service.js';
 
 @Controller('api/v1/plans')
 export class PublicCommercialController {
@@ -100,7 +102,21 @@ export class OperatorCommercialConfigurationController {
   constructor(
     private readonly configuration: EffectiveCommercialConfigurationService,
     private readonly overrides: CommercialOverrideService,
+    private readonly organisations: OrganisationsService,
+    private readonly organisationUsage: OrganisationUsageService,
   ) {}
+
+  @Get('storage')
+  @Requires('operator:read')
+  storage(@Param('organisationId') organisationId: string) {
+    return this.organisations.storage(organisationId);
+  }
+
+  @Get('usage')
+  @Requires('operator:read')
+  usage(@Param('organisationId') organisationId: string) {
+    return this.organisationUsage.usage(organisationId);
+  }
 
   @Get()
   @Requires('operator:read')

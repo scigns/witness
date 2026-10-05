@@ -12,7 +12,14 @@
  * material, not participant contribution.
  */
 
-import { Inject, Injectable, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  PayloadTooLargeException,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import {
@@ -63,6 +70,7 @@ type ResourceRow = Awaited<ReturnType<PrismaService['resource']['findFirstOrThro
 
 @Injectable()
 export class ResourcesService {
+  private readonly logger = new Logger(ResourcesService.name);
   constructor(
     private readonly prisma: PrismaService,
     @Inject(StoragePort) private readonly storage: StoragePort | null,
@@ -119,13 +127,22 @@ export class ResourcesService {
         error: { code: 'FILE_REQUIRED', message: "No file was received in the 'file' field." },
       });
     }
-    if (file.size > FILE_MAX_BYTES) {
+    if (file.size > FILE_MAX_BYTES || file.buffer.length > FILE_MAX_BYTES) {
       throw new PayloadTooLargeException({
         error: {
           code: 'FILE_TOO_LARGE',
           message:
             `This file is ${Math.ceil(file.size / (1024 * 1024))} MB. The limit is ` +
             `${FILE_MAX_BYTES / (1024 * 1024)} MB.`,
+        },
+      });
+    }
+
+    if (!Number.isSafeInteger(file.size) || file.size < 0 || file.size !== file.buffer.length) {
+      throw new BadRequestException({
+        error: {
+          code: 'INVALID_STORAGE_SIZE',
+          message: 'The upload byte count does not match its content.',
         },
       });
     }
@@ -185,6 +202,16 @@ export class ResourcesService {
         { organisationId: workspace.organisationId, additionalBytes: file.size },
       );
     } catch (error) {
+      // A domain rejection inside the callback rolls back the transaction.
+      // Other failures can have an uncertain commit outcome: retain their
+      // object for reconciliation rather than risk deleting committed data.
+      if (error instanceof InvariantViolation && storageKey !== null && this.storage !== null) {
+        try {
+          await this.storage.delete(storageKey);
+        } catch {
+          this.logger.error({ event: 'storage.upload_cleanup_failed', storageKey });
+        }
+      }
       if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
         throw new PayloadTooLargeException({
           error: { code: error.code, message: error.message },
@@ -264,6 +291,8 @@ export class ResourcesService {
           tx,
           quota.organisationId,
           quota.additionalBytes,
+          event.actor,
+          at,
         );
       }
 

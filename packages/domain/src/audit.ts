@@ -29,6 +29,7 @@ export const AUDIT_ACTIONS = [
   'record.rejected',
   'record.reopened',
   'organisation.created',
+  'organisation.storage_threshold_crossed',
   'organisation.storage_quota_updated',
   'subscription.created',
   'subscription.change_requested',

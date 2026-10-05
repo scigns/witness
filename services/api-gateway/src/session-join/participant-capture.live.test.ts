@@ -1,3 +1,5 @@
+import { EffectiveCommercialConfigurationService } from '../commercial/effective-commercial-configuration.service.js';
+import { CommercialEntitlementService } from '../commercial/commercial-entitlement.service.js';
 /**
  * Real-PostgreSQL suite for participant self-capture (Phase 5, Workstreams
  * 1.1-1.4) — proves the capture-token mechanism end to end against the
@@ -88,7 +90,10 @@ describe.skipIf(prisma === null)(
       consentPolicy,
       { maxEvidenceAttachmentMb: 200 } as never,
       null,
-      new StorageQuotaService(db),
+      new StorageQuotaService(
+        db,
+        new EffectiveCommercialConfigurationService(db, new CommercialEntitlementService(db)),
+      ),
     );
     const capture = new ParticipantCaptureService(
       db,

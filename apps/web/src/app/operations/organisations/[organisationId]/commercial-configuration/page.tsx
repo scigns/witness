@@ -11,6 +11,8 @@
 import { use, useCallback, useEffect, useState, type FormEvent } from 'react';
 import type {
   EffectiveCommercialConfigurationView,
+  OrganisationStorageUsage,
+  OrganisationUsage,
   SubscriptionEntitlementOverrideView,
 } from '@witness/contracts';
 import { api, ApiError } from '@/lib/api';
@@ -29,6 +31,9 @@ export default function OperatorCommercialConfigurationPage({
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [storage, setStorage] = useState<OrganisationStorageUsage | null>(null);
+  const [usage, setUsage] = useState<OrganisationUsage | null>(null);
+  const [quotaInput, setQuotaInput] = useState('');
 
   const [entitlementKey, setEntitlementKey] = useState('');
   const [value, setValue] = useState('');
@@ -36,11 +41,15 @@ export default function OperatorCommercialConfigurationPage({
 
   const load = useCallback(async () => {
     try {
-      const [nextConfig, nextOverrides] = await Promise.all([
+      const [nextConfig, nextOverrides, nextStorage, nextUsage] = await Promise.all([
         api.getOperatorCommercialConfiguration(organisationId, user),
         api.listCommercialOverrides(organisationId, user),
+        api.getOperatorOrganisationStorage(organisationId, user),
+        api.getOperatorOrganisationUsage(organisationId, user),
       ]);
       setConfig(nextConfig);
+      setStorage(nextStorage);
+      setUsage(nextUsage);
       setOverrides(nextOverrides);
       setError(null);
     } catch (caught) {
@@ -91,6 +100,23 @@ export default function OperatorCommercialConfigurationPage({
     }
   };
 
+  const updateQuota = async (event: FormEvent) => {
+    event.preventDefault();
+    const quotaBytes = quotaInput === '' ? null : Math.round(Number(quotaInput) * 1073741824);
+    if (quotaBytes !== null && (!Number.isSafeInteger(quotaBytes) || quotaBytes < 0)) return;
+    setBusy(true);
+    setFormError(null);
+    try {
+      await api.updateStorageQuota(organisationId, { quotaBytes }, user);
+      setQuotaInput('');
+      await load();
+    } catch (caught) {
+      setFormError(caught instanceof ApiError ? caught.message : 'Allocation update failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (error && !config) return <ErrorNotice message={error} />;
   if (!config || !overrides) return <p role="status">Loading commercial configuration…</p>;
 
@@ -110,7 +136,7 @@ export default function OperatorCommercialConfigurationPage({
           <dd>{config.planCode}</dd>
           <dt>Subscription status</dt>
           <dd>{config.subscriptionStatus}</dd>
-          <dt>Deployment isolation</dt>
+          <dt>Contracted deployment isolation</dt>
           <dd>{config.deploymentIsolation}</dd>
           <dt>Support level</dt>
           <dd>{config.supportLevel}</dd>
@@ -144,6 +170,60 @@ export default function OperatorCommercialConfigurationPage({
           </div>
         )}
       </Card>
+
+      {storage && (
+        <Card>
+          <h2 className="text-xl font-semibold">Storage allocation and usage</h2>
+          <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+            <dt>Allocated</dt>
+            <dd>{(Number(storage.quotaBytes) / 1073741824).toFixed(2)} GiB</dd>
+            <dt>Used</dt>
+            <dd>
+              {(Number(storage.usedBytes) / 1073741824).toFixed(2)} GiB ({storage.percentageUsed}%)
+            </dd>
+            <dt>Available</dt>
+            <dd>{(Number(storage.availableBytes) / 1073741824).toFixed(2)} GiB</dd>
+            <dt>Allocation source</dt>
+            <dd>{storage.source}</dd>
+            <dt>Threshold reached</dt>
+            <dd>{storage.thresholdCrossed === null ? 'None' : `${storage.thresholdCrossed}%`}</dd>
+            <dt>Measured</dt>
+            <dd>{new Date(storage.measuredAt).toLocaleString()}</dd>
+            <dt>Active members</dt>
+            <dd>{usage?.userCount ?? 'Unavailable'}</dd>
+          </dl>
+          <p className="mt-3 text-sm text-[var(--color-ink-muted)]">
+            Customer file bytes include evidence attachments and uploaded resources in PostgreSQL or
+            object storage. Database overhead, backups and temporary processing storage are
+            operational usage and are not included here.
+          </p>
+          {formError && <ErrorNotice message={formError} />}
+          <form onSubmit={updateQuota} className="mt-4 space-y-3">
+            <label className="block">
+              Storage override (GiB)
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={quotaInput}
+                onChange={(event) => setQuotaInput(event.target.value)}
+                className="mt-1 block w-full"
+              />
+            </label>
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              Leave blank to restore the effective resource profile allocation. Existing content is
+              preserved when capacity is reduced.
+            </p>
+            <Button type="submit" disabled={busy}>
+              {busy
+                ? 'Saving…'
+                : quotaInput === ''
+                  ? 'Use resource profile allocation'
+                  : 'Set storage override'}
+            </Button>
+          </form>
+        </Card>
+      )}
 
       <Card>
         <h2 className="text-xl font-semibold">Resolved entitlements</h2>

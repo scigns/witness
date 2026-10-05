@@ -130,3 +130,26 @@ describe('ResourcesService.remove', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
+
+describe('ResourcesService upload size integrity', () => {
+  it('refuses understated metadata before writing customer bytes', async () => {
+    const prisma = fakePrisma([]);
+    const storage = fakeStorage();
+    const service = new ResourcesService(prisma, storage, NOOP_QUOTA);
+    await expect(
+      service.createFile(
+        WORKSPACE_1,
+        { title: 'Quota bypass' },
+        {
+          originalname: 'file.txt',
+          mimetype: 'text/plain',
+          size: 1,
+          buffer: Buffer.alloc(100),
+        },
+        UPLOADER,
+      ),
+    ).rejects.toMatchObject({ response: { error: { code: 'INVALID_STORAGE_SIZE' } } });
+    expect(storage.put).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});

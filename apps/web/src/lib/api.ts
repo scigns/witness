@@ -386,6 +386,24 @@ export const api = {
       user,
     ),
 
+  getOperatorOrganisationStorage: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<OrganisationStorageUsage> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/storage`,
+      user,
+    ),
+
+  getOperatorOrganisationUsage: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<OrganisationUsage> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/usage`,
+      user,
+    ),
+
   listCommercialOverrides: (
     organisationId: string,
     user: ActingUser,
