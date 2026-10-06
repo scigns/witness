@@ -256,6 +256,11 @@ services:
     <<: *common
     image: ${WITNESS_WEB_IMAGE:-ghcr.io/scigns/witness-web@sha256:0000000000000000000000000000000000000000000000000000000000000000}
     pull_policy: never
+    # Verification metadata only: Next's compiled public values cannot be changed at runtime.
+    environment:
+      WITNESS_IMAGE_API_URL: ${NEXT_PUBLIC_WITNESS_API_URL:-}
+      WITNESS_IMAGE_PROFILE: ${WITNESS_DEPLOYMENT_PROFILE:-sovereign}
+      WITNESS_IMAGE_BASE_PATH: ${NEXT_PUBLIC_WITNESS_BASE_PATH:-}
     depends_on:
       api: { condition: service_started }
 

@@ -102,6 +102,14 @@ def main():
         for kind in ('api', 'web'):
             item = manifest['images'][kind]
             print(inspect_image(item['repository'] + '@' + item['digest'], manifest, kind))
+    elif command == 'deployment-config':
+        validate(manifest)
+        config = json.load(sys.stdin)
+        env = config['services']['web']['environment']
+        inputs = manifest['build_inputs']['web']
+        for suffix in ('API_URL', 'PROFILE', 'BASE_PATH'):
+            require(env.get('WITNESS_IMAGE_' + suffix) == inputs['NEXT_PUBLIC_WITNESS_' + suffix], 'deployment public build input mismatch: ' + suffix)
+        require(config['services']['api']['environment']['WITNESS_DEPLOYMENT_PROFILE'] == inputs['NEXT_PUBLIC_WITNESS_PROFILE'], 'deployment API/web profile mismatch')
     else:
         raise ValueError('unknown artifact operation')
 

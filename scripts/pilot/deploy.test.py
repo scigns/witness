@@ -46,7 +46,10 @@ elif name == 'docker':
         files = [root/'services/api-gateway/prisma/schema.prisma', root/'services/api-gateway/prisma/migrations/fixture/migration.sql']
         print(json.dumps([{'path':str(p.relative_to(root/'services/api-gateway/prisma')), 'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in files]))
     elif args[:1] == ['compose']:
-        if 'config' in args: print(json.dumps({'services':{'api':{'environment':{'SECRET':'fixture-secret'}}}}))
+        if 'config' in args:
+            print(json.dumps({'services':{'api':{'environment':{'SECRET':'fixture-secret','WITNESS_DEPLOYMENT_PROFILE':'hybrid'}},
+                'web':{'environment':{'WITNESS_IMAGE_API_URL':'https://api.buildwithwitness.com',
+                'WITNESS_IMAGE_PROFILE':'sovereign' if os.environ.get('WRONG_PUBLIC_INPUT') == '1' else 'hybrid','WITNESS_IMAGE_BASE_PATH':''}}}}))
         elif 'ps' in args: print(args[-1] + '-container')
         elif 'exec' in args:
             if 'sh' in args:
@@ -168,7 +171,7 @@ class DeploySafety(unittest.TestCase):
             self.assertFalse(any(name=='docker' for name,_ in calls))
 
     def test_registry_failure_and_wrong_metadata_refuse_before_backup(self):
-        for flag in ['FAIL_PULL', 'WRONG_REVISION', 'WRONG_REPO_DIGEST']:
+        for flag in ['FAIL_PULL', 'WRONG_REVISION', 'WRONG_REPO_DIGEST', 'WRONG_PUBLIC_INPUT']:
             result, calls, _ = self.run_deploy(**{flag:'1'})
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(any(any(action in args for action in ['build','migrate','up','pg_dump']) for _,args in calls))

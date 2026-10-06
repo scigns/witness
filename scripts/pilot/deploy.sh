@@ -134,6 +134,7 @@ CANDIDATE_WEB_ID="$(printf '%s\n' "$CANDIDATE_IDS" | sed -n '2p')"
 write_image_override "$CANDIDATE_API_ID" "$CANDIDATE_WEB_ID"
 cp "$RELEASE_MANIFEST" "$EVIDENCE_DIR/release-manifest.json"
 sha256sum "$EVIDENCE_DIR/release-manifest.json" > "$EVIDENCE_DIR/release-manifest.sha256"
+"${COMPOSE[@]}" config --format json | python3 scripts/release/artifacts.py deployment-config "$RELEASE_MANIFEST"
 printf 'candidate_sha=%s\nprevious_sha=%s\nprevious_version=%s\nprevious_api_image=%s\nprevious_web_image=%s\ncandidate_api_image=%s\ncandidate_web_image=%s\napi_registry_ref=%s\nweb_registry_ref=%s\n' \
   "$COMMIT" "$PREVIOUS_BUILD" "$PREVIOUS_VERSION" "$PREVIOUS_API_IMAGE" "$PREVIOUS_WEB_IMAGE" "$CANDIDATE_API_ID" "$CANDIDATE_WEB_ID" "$CANDIDATE_API_IMAGE" "$CANDIDATE_WEB_IMAGE" > "$EVIDENCE_DIR/manifest.txt"
 
