@@ -8,8 +8,9 @@
 
 ## Principles
 
-1. **CI runs what you run.** Every gate is a `make` target invoked identically locally and in CI.
-   A failure you cannot reproduce locally is a bug in our CI setup, not something to shrug at.
+1. **Remote-first validation.** GitHub-hosted CI is authoritative for full gates. Edit, optionally
+   check changed files, commit, push and inspect Actions; Docker Desktop may stay stopped. Gate
+   commands remain portable for explicit reproduction, not mandatory local execution.
 2. **Fast enough to be used.** Target p95 under 10 minutes for a pull request. Slower than that and
    people batch changes, which makes reviews worse.
 3. **No logic in YAML.** Workflows are thin wrappers around `scripts/` and `Makefile`. This keeps us
@@ -112,33 +113,29 @@ We publish artefacts; **we do not deploy to a customer's infrastructure.** Opera
 themselves. This is a consequence of the sovereignty principle and it means our "CD" for a customer
 deployment ends at a signed, verifiable artefact.
 
-The one exception is our own reference/pilot deployment (`deployments/cloud-managed/`,
-`docs/operations/PILOT_OPERATIONS.md`) — infrastructure we own and operate ourselves, for demos and
-trials, not a customer's box. `deploy.yml` automates build → migrate → health-check → rollback to it,
-the same steps an operator runs by hand on their own infrastructure, run identically here because we
-are the operator of this one instance. It stays synthetic-data-only for the reason below; a real
-institutional engagement gets its own self-hosted instance, not a seat on this one.
+The reference/pilot deployment uses the existing self-hosted deployment runner, independently of
+any developer laptop. That runner is reserved for controlled deployment operations; all general
+CI, disposable Postgres/Neo4j integration, security and CodeQL stay on GitHub-hosted runners.
 
-| Artefact | Published to |
-|---|---|
-| Container images | GitHub Container Registry + an offline OCI bundle |
-| npm packages (SDK, contracts) | npm registry |
-| Python package (SDK) | PyPI |
-| Helm chart | OCI registry |
-| Offline install bundle | Release assets, checksummed and signed |
+Current artifact reality: the deployment script still builds API/web images on the deployment host,
+records exact IDs and deploys those IDs from an approved SHA. CI build validation does not publish
+container images. GHCR/offline publication is not implemented in the current workflows. The
+[execution audit](REMOTE_FIRST_EXECUTION.md) records the smallest migration to remotely built
+SHA-tagged images, immutable registry digests and host pulls. Do not assume it is deployed.
 
-An **offline bundle** ships with every release so air-gapped operators are never second-class.
+Production deployment remains intentionally disabled pending the existing release gates. Neither
+remote CI nor this operating-model change approves a release, migration, recovery or real-client
+acceptance. Exact-SHA and candidate-specific rollback-image controls, immediate backups and
+migration/recovery/acceptance requirements are preserved. No production operations are part of
+routine developer validation. See [release reconciliation](../release/PRODUCTION_RECONCILIATION_2026-10-06.md).
 
 ## Environments
 
 | Environment | Purpose | Data |
 |---|---|---|
-| Local | Development | Synthetic fixtures |
-| CI ephemeral | Test execution | Synthetic, destroyed after |
-| Reference deployment | Validate releases against realistic conditions | **Synthetic only** — we never hold real institutional data |
-
-We do not operate an environment containing real user data, ever. If we did, we would become a target
-and a single point of failure, which would contradict the entire architecture.
+| Local | Editing, optional targeted checks; opt-in debugging | Synthetic fixtures |
+| CI ephemeral | Authoritative full gates on GitHub-hosted runners | Synthetic, destroyed after |
+| Production/pilot | Runtime and approved deployment/operator operations | Governed by release gates |
 
 ## When CI breaks on `main`
 

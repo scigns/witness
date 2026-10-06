@@ -8,37 +8,41 @@
 
 A new contributor should be productive from this document alone — no tribal knowledge required.
 
-## The short version
+## Default: remote-first development
 
-- **Editing, Git, unit tests, browser testing** → your own machine, no Docker required.
-- **Real Postgres/Neo4j/Keycloak, cross-service work** → a GitHub Codespace (`.devcontainer/`), not
-  your own Docker install.
-- **"Does this actually work end to end?"** → GitHub Actions, which runs the live suites against
-  disposable Postgres/Neo4j on every PR.
-- **Production** → never a development target, by any of the above. See "Production separation"
-  below.
-
-## Local lightweight development (dev-lite)
-
-**When to use it:** almost always. Most domain/API/web changes, all unit tests, and most PR review
-need nothing more than this.
+Edit → optional cheap targeted checks → commit explicit paths → push → inspect GitHub Actions.
+Docker Desktop normally stays stopped. GitHub CI continues independently when the laptop shuts
+down after a successful push. See [command classifications](REMOTE_FIRST_EXECUTION.md) and
+[agent instructions](../../AGENTS.md).
 
 ```sh
-make bootstrap   # first time only: prerequisites, pnpm install, prisma generate
-make dev         # starts Postgres only
-make migrate
-make seed        # synthetic fixtures — see "Development data" below
-make app         # pnpm dev — runs the API and web app
-make doctor      # check environment health any time something feels off
+make bootstrap          # optional Node/pnpm dependency setup; no Docker/DB required
+git diff --check         # cheap local check
+# Optionally format/lint explicit changed files, then commit explicit paths and push
+gh pr checks <number>    # full validation is authoritative remotely
 ```
 
-This runs under `WITNESS_DEPLOYMENT_PROFILE=development` (the `.env.example` default), which accepts
-an unverified `X-Witness-Dev-User: <name>|<role>` header instead of real Keycloak auth. That is
-correct and expected for this tier — it is not a security bug, and it is why Keycloak does not need
-to run for most work.
+Git alone is enough for edits; installed hooks/targeted code checks need Node/pnpm. Full workspace
+lint/typecheck/tests/builds, invariant/adversarial suites and infrastructure tests are not local
+prerequisites. Filtered Turbo tasks can still build dependencies. No database is required for
+routine editing. Local full suites remain available for explicit debugging.
 
-**Does not need Docker at all** if you already have a Postgres reachable some other way; `make dev`
-is simply the documented way to get one.
+## Optional local runtime debugging
+
+Choose this only to reproduce infrastructure behaviour with synthetic fixtures:
+
+```sh
+make bootstrap-runtime  # requires Docker; .env, dependencies and Prisma generation
+make dev                # Postgres
+make migrate
+make seed
+make app
+make doctor             # infrastructure diagnostics, not an editing prerequisite
+```
+
+The development profile accepts the development-user header instead of real Keycloak auth.
+Do not use production credentials/services. Existing accessible non-production Postgres can
+replace `make dev`; Docker is needed only for Compose. This is not the default development loop.
 
 ## GitHub Codespaces (dev-integration)
 
@@ -70,9 +74,9 @@ full cost model. Stop your Codespace when you are done (`gh codespace stop`, or 
 30 minutes idle) — a stopped Codespace costs
 only storage, not compute.
 
-## The complete stack (dev-full)
+## Optional complete stack debugging (dev-full)
 
-**When to use it:** release-candidate acceptance, or work that genuinely touches OpenSearch, MinIO,
+**When to use it:** explicitly requested isolated reproduction touching OpenSearch, MinIO,
 NATS, or Ollama — none of which anything in the current codebase calls by default.
 
 ```sh
@@ -98,8 +102,8 @@ Codespace for this too if your local disk is already tight.
 Every job here is also a `make` target — if it works locally (or in a Codespace) it works in CI, and
 if it doesn't, that discrepancy is treated as a bug in the tooling, not the check.
 
-GitHub Actions is validation, not a place to develop interactively — do not treat a workflow run as
-a substitute for `make dev`/a Codespace.
+GitHub Actions is the authoritative full validation layer. Interactive infrastructure debugging
+is optional locally or in a Codespace; it is not required before pushing routine edits.
 
 ## Production separation
 

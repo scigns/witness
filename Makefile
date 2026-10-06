@@ -1,7 +1,7 @@
 ## Witness — developer entry points.
 ##
-## `make` with no target prints this help. Every target here is also what CI runs;
-## if it works locally it works in CI, and if it doesn't, that discrepancy is a bug.
+## `make` with no target prints help. Full gates are CI-authoritative; local stack
+## and full-suite targets are opt-in debugging. See AGENTS.md and REMOTE_FIRST_EXECUTION.md.
 
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
@@ -31,7 +31,7 @@ help: ## Show this help
 	@echo "Created .env from .env.example. Review it before using a real deployment."
 
 .PHONY: doctor
-doctor: ## Check disk, toolchain, Docker, Postgres and ports before starting real work
+doctor: ## Optional infrastructure debugging: check Docker, Postgres and ports
 	@bash scripts/dev/doctor.sh
 
 .PHONY: disk-usage
@@ -39,8 +39,14 @@ disk-usage: ## Show what Witness's own Docker resources are using, and what's sa
 	@bash scripts/dev/disk-usage.sh
 
 .PHONY: bootstrap
-bootstrap: .env ## First-time setup: check prerequisites, install deps, create .env
+bootstrap: ## Docker-free dependency setup for targeted local editing (optional)
 	@bash scripts/dev/check-prerequisites.sh
+	pnpm install
+	@echo "Edit, optionally check changed files, commit, push, then inspect GitHub Actions. Docker may stay off."
+
+.PHONY: bootstrap-runtime
+bootstrap-runtime: .env ## Optional local runtime debugging setup; requires Docker
+	@bash scripts/dev/check-prerequisites.sh --infrastructure
 	pnpm install
 	@# The Prisma client is generated, not installed. `pnpm install` cannot do it —
 	@# the postinstall hook runs before the schema is resolvable and skips with a
@@ -51,12 +57,12 @@ bootstrap: .env ## First-time setup: check prerequisites, install deps, create .
 	@echo "Bootstrap complete. Next:  make dev  &&  make migrate  &&  make seed  &&  make app"
 
 .PHONY: dev
-dev: .env ## dev-lite: start only Postgres — enough for most domain/API/web work
+dev: .env ## Optional local debugging: start Postgres (requires Docker)
 	$(COMPOSE) up -d
 	@bash scripts/dev/wait-for-healthy.sh
 
 .PHONY: dev-integration
-dev-integration: .env ## dev-integration: adds Neo4j and Keycloak — real auth, knowledge graph, cross-service tests
+dev-integration: .env ## Optional debugging: add Neo4j/Keycloak; CI runs integration remotely
 	$(COMPOSE_INTEGRATION) up -d
 	@COMPOSE_FILE=infrastructure/docker/docker-compose.yml bash scripts/dev/wait-for-healthy.sh
 
@@ -106,7 +112,7 @@ reset-data: ## Wipe and re-seed local databases with synthetic fixtures
 	@bash scripts/dev/reset-data.sh
 
 .PHONY: pilot-deploy
-pilot-deploy: ## Build, migrate and recreate the pilot deployment, with rollback on failed health check
+pilot-deploy: ## Deployment-server-only: approved release workflow entrypoint
 	@bash scripts/pilot/deploy.sh
 
 .PHONY: pilot-backup
@@ -124,7 +130,7 @@ pilot-status: ## One view: deployed commit, component health, containers, failed
 # ─── Quality gates ────────────────────────────────────────────────────────────
 
 .PHONY: verify
-verify: format-check lint typecheck test build ## Run every gate CI runs (do this before opening a PR)
+verify: format-check lint typecheck test build ## CI-authoritative full gates; optional local reproduction
 
 .PHONY: lint
 lint: ## Lint all workspaces
@@ -143,7 +149,7 @@ typecheck: ## Typecheck all workspaces
 	pnpm typecheck
 
 .PHONY: test
-test: test-operations ## Run unit and integration tests
+test: test-operations ## CI-authoritative full suite; optional local reproduction
 	pnpm test
 
 .PHONY: test-operations
@@ -156,7 +162,7 @@ test-e2e: ## Run end-to-end tests (requires the local stack)
 	pnpm test:e2e
 
 .PHONY: build
-build: ## Build all workspaces
+build: ## CI-authoritative workspace build; optional local reproduction
 	pnpm build
 
 # ─── Documentation & architecture ─────────────────────────────────────────────
@@ -199,5 +205,5 @@ changeset: ## Record a change for the next release
 	pnpm changeset
 
 .PHONY: release-check
-release-check: ## Run the pre-release checklist
+release-check: ## Full release preflight; optional isolated rehearsal, not routine local validation
 	@bash scripts/release/preflight.sh

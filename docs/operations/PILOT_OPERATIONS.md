@@ -52,14 +52,17 @@ localhost default that is right for a developer and silently wrong for a
 deployment, and the resulting failure surfaces as something else — a CORS error,
 an "invalid redirect_uri" from Keycloak.
 
-## Deployment
+## Deployment — server-only controlled operations
 
-```bash
-docker compose -f deployments/cloud-managed/docker-compose.pilot.yml up -d --build
-docker compose -f deployments/cloud-managed/docker-compose.pilot.yml \
-  run --rm api pnpm --filter @witness/api exec prisma migrate deploy
-curl -fsS https://$WITNESS_API_HOST/ready | jq '.status, .components'
-```
+Routine developer work requires no production connection or local Docker. All full CI runs on
+GitHub-hosted runners; the self-hosted production runner is reserved for approved deployment.
+No laptop service is involved after a push. See [remote-first
+execution](../engineering/REMOTE_FIRST_EXECUTION.md).
+
+For the current release, legacy automatic deployment remains intentionally disabled. Use only the
+repository's authoritative workflow after all release gates pass; do not use ad hoc Compose builds
+or migrations from a developer machine or arbitrary checkout. The existing deployment script still
+builds images on the server; the documented registry migration is a follow-up, not implemented.
 
 `prisma migrate deploy` applies committed migrations and nothing else. Never use
 `prisma db push` against a deployed database: it reshapes the schema to match the
@@ -70,7 +73,8 @@ fixtures that read like real institutional decisions.
 
 ## Continuous deployment
 
-`make pilot-deploy` (`scripts/pilot/deploy.sh`) does the same steps above plus
+On the deployment server, `make pilot-deploy` (`scripts/pilot/deploy.sh`) performs the approved
+sequence plus
 a health check and an automatic rollback of the running containers if it
 fails — it is the one place the deploy sequence is defined, run identically by
 a human or by CI (`docs/engineering/CI_CD.md`'s "no logic in YAML" rule).
@@ -78,8 +82,10 @@ Database migrations are forward-only and are **not** rolled back by this
 script; a failed migration needs manual attention regardless of container
 rollback.
 
-`.github/workflows/deploy.yml` runs it automatically after `CI` passes on
-`main`. It targets a **self-hosted** runner rather than reaching out from a
+`.github/workflows/deploy.yml` declares a trigger after `CI` passes on
+`main`, but is intentionally disabled during the release hold. Exact release/rollback approval
+variables must also pass; a successful CI run alone does not authorise deployment. It targets a
+**self-hosted** runner rather than reaching out from a
 GitHub-hosted one, because the pilot host has no inbound port open — only the
 Cloudflare Tunnel — and a polling runner keeps it that way. To activate it on
 a host that doesn't have the runner yet:
@@ -221,7 +227,8 @@ pilot host has no `make` binary, and cron's own environment is too sparse to
 find one on `$PATH` even where it is installed:
 
 ```cron
-0 3 * * * cd /path/to/witness && /usr/bin/env bash scripts/pilot/backup.sh >> ~/witness-backups/backup.log 2>&1
+0 3 * * * cd /path/to/witness && /usr/bin/env bash scripts/pilot/backup.sh >>
+~/witness-backups/backup.log 2>&1
 ```
 
 Keep a copy off the node it came from, and encrypt it at rest — it contains

@@ -25,7 +25,8 @@ stateDiagram-v2
 
 - [ ] Branch from the correct domain branch ([`BRANCH_STRATEGY.md`](BRANCH_STRATEGY.md))
 - [ ] Linked issue exists and is `in-progress`
-- [ ] `make verify` passes locally — the same gates CI runs
+- [ ] Push and inspect GitHub Actions; all required checks must pass before merge (full local gates
+  optional)
 - [ ] You have read your own diff as a stranger would
 - [ ] Documentation and tests are in **this** PR, not a follow-up
 - [ ] Commits follow Conventional Commits, signed off (`git commit -s`)
@@ -100,8 +101,10 @@ A stacked PR requires all of the following, recorded in the PR description, not 
 - **Named owner** — one person or agent responsible for the retarget actually happening.
 
 This is not theoretical caution. This exact repository lost 84 files for most of a day because PR #2
-was stacked on PR #1's branch and PR #1 merged first, closing the only path PR #2 had to `main` — the
-incident [ADR-0021](../../architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md)
+was stacked on PR #1's branch and PR #1 merged first, closing the only path PR #2 had to `main` —
+the
+incident
+[ADR-0021](../../architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md)
 exists to repair. It then happened *again*, in miniature: PR #11 was deliberately stacked on PR #10
 with an explicit retarget plan written into its description, and was still merged into PR #10's
 branch directly rather than retargeted — the retarget plan existed but nothing enforced it being

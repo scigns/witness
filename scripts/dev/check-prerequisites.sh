@@ -3,6 +3,12 @@
 # first morning by an unhelpful error is a contributor we may not see again.
 set -uo pipefail
 
+mode="${1:-}"
+if [[ -n "$mode" && "$mode" != "--infrastructure" ]]; then
+  echo "usage: $0 [--infrastructure]" >&2
+  exit 2
+fi
+
 fail=0
 need() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -16,7 +22,9 @@ need() {
 echo "Checking prerequisites (see docs/engineering/DEVELOPER_GUIDE.md)"
 need node   "install Node 22 LTS — see .nvmrc"
 need pnpm   "run: corepack enable"
-need docker "install Docker 24+ with Compose v2"
+if [[ "$mode" == "--infrastructure" ]]; then
+  need docker "install Docker 24+ with Compose v2 for opt-in infrastructure debugging"
+fi
 need git    "install git 2.40+"
 
 if command -v node >/dev/null 2>&1; then
@@ -26,7 +34,7 @@ if command -v node >/dev/null 2>&1; then
   fi
 fi
 
-if command -v docker >/dev/null 2>&1; then
+if [[ "$mode" == "--infrastructure" ]] && command -v docker >/dev/null 2>&1; then
   mem=$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)
   if [ "$mem" -gt 0 ] && [ "$mem" -lt 8000000000 ]; then
     echo "  WARNING  Docker has less than 8 GB of memory. Keycloak and OpenSearch will struggle."

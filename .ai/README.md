@@ -14,6 +14,8 @@
    govern AI contribution.
 3. **[`policies/HARD_CONSTRAINTS.md`](policies/HARD_CONSTRAINTS.md)** — things you must never do.
 
+4. **[AGENTS.md](../AGENTS.md)** — remote-first validation and protected work.
+
 Then read the context file for your task area in [`context/`](context/).
 
 ## The governing principle

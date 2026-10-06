@@ -99,7 +99,7 @@ shared with any model.
 
 - [ ] Conventional Commits, signed off (`git commit -s`)
 - [ ] No new technical debt, or logged in `docs/engineering/TECH_DEBT.md` with an owner and a date
-- [ ] `make verify` passes locally
+- [ ] GitHub Actions required checks pass for the current SHA (local full gates optional)
 - [ ] CODEOWNER review requested for every path touched
 
 ---

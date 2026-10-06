@@ -237,9 +237,10 @@ None of the "becomes preferable" conditions hold today (one contributor, pre-rev
 ## Developer workflow
 
 See `DEVELOPMENT_ENVIRONMENTS.md` for the full, example-driven walkthrough. In short:
-`make bootstrap` → `make dev` → `make migrate` → `make seed` → `make app`, with `make doctor`
-available any time, and a GitHub Codespace as the on-ramp to `dev-integration` without touching
-local Docker at all.
+edit → optional cheap targeted checks → commit → push → inspect GitHub Actions.
+Docker Desktop may stay stopped. `make bootstrap` installs optional local tooling without Docker;
+`make bootstrap-runtime` and local infrastructure are explicit debugging choices, as is Codespaces.
+Full gates remain authoritative on GitHub-hosted runners.
 
 ## CI workflow
 

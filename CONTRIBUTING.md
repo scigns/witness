@@ -69,11 +69,14 @@ Code is not the scarcest resource on this project. These are equally valuable, o
 git clone https://github.com/scigns/witness.git
 cd witness
 
-# Prerequisites: Node 22 LTS (see .nvmrc), pnpm 9+, Docker 24+, Docker Compose v2, Make
-pnpm install
-make dev          # brings up Postgres, Neo4j, OpenSearch, Redis, MinIO, Keycloak, NATS
-make verify       # lint, typecheck, test, build — the same gates CI runs
+# Optional local tooling: Node 22 LTS (see .nvmrc), pnpm 9+, Make; Docker is optional
+make bootstrap    # Docker-free dependency setup
+# Edit, optionally check changed files, commit explicit paths and push
+gh pr checks <number>  # GitHub Actions runs the full gates independently
 ```
+
+Remote-first validation is the default; Docker Desktop may stay stopped.
+Full local suites and infrastructure are opt-in debugging tools, not pre-PR requirements.
 
 Full instructions: [`docs/engineering/DEVELOPER_GUIDE.md`](docs/engineering/DEVELOPER_GUIDE.md).
 

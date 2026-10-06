@@ -40,8 +40,10 @@ decided?"
 | 7   | [`DEPARTMENT_ASSIGNMENTS.md`](DEPARTMENT_ASSIGNMENTS.md)                     | Your specific row                                                        |
 | 8   | [`docs/engineering/CODING_STANDARDS.md`](CODING_STANDARDS.md)                | How code is written here                                                 |
 
-If any two of these contradict each other, **stop**. That is a governance defect, and resolving it is
-step 12, not step 1. [ADR-0021](../../architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md)
+If any two of these contradict each other, **stop**. That is a governance defect, and resolving it
+is
+step 12, not step 1.
+[ADR-0021](../../architecture/decisions/ADR-0021-canonical-scope-and-architecture-reconciliation.md)
 exists because exactly this happened and was worked around for a week before anyone noticed.
 
 ## 2. Determining your authority
@@ -65,7 +67,8 @@ The precedence order when sources conflict:
 8. Implementation details     everything else
 ```
 
-Lower never overrides higher. If your task requires overriding something higher, the task is wrong or
+Lower never overrides higher. If your task requires overriding something higher, the task is wrong
+or
 it needs a decision record — go to step 12.
 
 ## 3. Identifying your department
@@ -80,16 +83,19 @@ review from both, and it is usually two pull requests.
 research.**
 
 Work belonging to a later phase is not started early. The roadmap is sequenced by dependency, not by
-appeal — the temptation is always to build the impressive part first, and the retrofit of consent and
+appeal — the temptation is always to build the impressive part first, and the retrofit of consent
+and
 provenance underneath it is impossible rather than merely expensive.
 
 ## 5. Identifying your deliverable
 
-Find your row in [`DEPARTMENT_ASSIGNMENTS.md`](DEPARTMENT_ASSIGNMENTS.md). Note its **Dependencies**,
+Find your row in [`DEPARTMENT_ASSIGNMENTS.md`](DEPARTMENT_ASSIGNMENTS.md). Note its
+**Dependencies**,
 **PR** branch name and **Acceptance gate**.
 
 If there is no row for what you are about to do, **there is no assignment**. Ask before proceeding.
-Unassigned work that appears in a pull request is how scope grows without anyone deciding to grow it.
+Unassigned work that appears in a pull request is how scope grows without anyone deciding to grow
+it.
 
 ## 6. Checking dependencies
 
@@ -112,26 +118,14 @@ Use the branch name in your assignment row. Otherwise:
 Enforced by `scripts/ci/check-branch-name.sh` and the pre-push hook. See
 [`BRANCH_STRATEGY.md`](BRANCH_STRATEGY.md) for the long-lived integration branches.
 
-## 8. Running local validation
+## 8. Remote-first validation
 
-```bash
-make verify          # format, lint, typecheck, test, build — everything CI runs
-```
-
-Individually, when iterating:
-
-```bash
-make lint
-make typecheck
-make test
-pnpm test:invariants      # the promises Witness makes
-pnpm test:adversarial     # attempts to break them
-make docs-lint            # links and document ownership
-bash scripts/ci/check-domain-purity.sh
-```
-
-**Run `make verify` before opening a pull request, not after CI fails.** The gates are the same; the
-only difference is how long the feedback takes.
+Follow [AGENTS.md](../../AGENTS.md): edit, optionally run cheap checks on changed files,
+commit explicit paths, push, then inspect `gh pr checks <number>` / `gh run view <id>`.
+GitHub-hosted CI runs full lint/typecheck/test/build, integration, invariant/adversarial and
+security gates. Do not automatically start Docker or run full workspace gates on a developer
+machine. Local infrastructure and full suites remain available for explicitly requested
+reproduction. Record the exact SHA and remote results; pending is not passing.
 
 ## 9. Updating documentation
 
@@ -241,6 +235,7 @@ software that works and governance that is fiction, and the second one is the pr
 
 ## The shortest version
 
-> Read the canon. Work your assigned row. Change only what your department owns. Run `make verify`.
+> Read the canon. Work your assigned row. Change only what your department owns. Push and inspect
+> GitHub Actions.
 > Update the docs in the same PR. When you find a decision that is not yours, write it down and hand
 > it back — do not make it.
