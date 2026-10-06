@@ -50,30 +50,13 @@ Only `deploy.yml` uses `[self-hosted, witness-pilot]`; no PR CI is assigned to t
 Those workflow files and their gate dependencies are unchanged by this task. Production resources
 retain priority; do not add general CI jobs to that runner.
 
-## Artifact audit and smallest migration
+## Artifact migration follow-up
 
-Current reality: `scripts/pilot/deploy.sh` builds SHA-tagged API/web images **on the deployment
-server**, records exact image IDs, takes backups, migrates and starts by IDs. It is independent of
-the developer laptop but still consumes production-host build resources. No implemented GHCR image
-publish workflow was found among the seven workflow files; `CI_CD.md`'s older publication table is
-a target, not evidence of publishing. The legacy deploy workflow remains intentionally disabled.
-
-Smallest follow-up, before enabling a registry-based release:
-
-1. Add a trusted GitHub-hosted release build job for the exact approved SHA after required gates;
-   never give untrusted PR code registry-write or production-secret access.
-2. Build the existing API/web Dockerfiles with the exact SHA and reviewed non-secret frontend
-   build configuration; publish SHA tags to GHCR using scoped GitHub credentials. Record both
-   registry digests, OCI revisions, platform and CI run in a release manifest. Tags alone are mutable.
-3. Have the existing deployment runner pull `image@sha256:digest`, verify approval/manifest/revision
-   and resolve local image IDs. Remove host compilation, then retain backup → installed Prisma
-   migration → no-build/no-deps startup → exact API/web identity/readiness checks.
-4. Preserve candidate-specific approval of rollback image pairs, prior digests/images/config/ledger
-   and restore gates. Rehearse registry pull/recovery first. Do not enable deployment or claim
-   rollback compatibility because images have moved to a registry.
-
-This task records that migration; it does not replace the held, tested deployment path or publish
-artifacts. No Kubernetes, new service, build server or paid runner is needed.
+The subsequent [registry artifact pipeline](../release/REGISTRY_ARTIFACT_PIPELINE_2026-10-06.md)
+implements the smallest GHCR migration identified here: build/validate once on hosted CI, publish
+retained bytes only from a deliberate trusted exact-SHA tag, then pull approved digests on the
+existing deployment runner without compilation. Production deployment remains disabled and no
+release/recovery gate is satisfied by this migration alone. No general CI moved onto the server.
 
 ## Remaining CI efficiencies
 

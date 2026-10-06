@@ -117,11 +117,10 @@ The reference/pilot deployment uses the existing self-hosted deployment runner, 
 any developer laptop. That runner is reserved for controlled deployment operations; all general
 CI, disposable Postgres/Neo4j integration, security and CodeQL stay on GitHub-hosted runners.
 
-Current artifact reality: the deployment script still builds API/web images on the deployment host,
-records exact IDs and deploys those IDs from an approved SHA. CI build validation does not publish
-container images. GHCR/offline publication is not implemented in the current workflows. The
-[execution audit](REMOTE_FIRST_EXECUTION.md) records the smallest migration to remotely built
-SHA-tagged images, immutable registry digests and host pulls. Do not assume it is deployed.
+The candidate registry pipeline builds API/web once on GitHub-hosted CI and uploads validated
+image bytes. A deliberate exact-SHA artifact tag publishes those same bytes to GHCR; deployment
+pulls approved digests and never compiles. See the [artifact pipeline](../release/REGISTRY_ARTIFACT_PIPELINE_2026-10-06.md)
+for trust, manifest, retention and approval details. Publication is separate from release approval.
 
 Production deployment remains intentionally disabled pending the existing release gates. Neither
 remote CI nor this operating-model change approves a release, migration, recovery or real-client

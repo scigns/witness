@@ -61,8 +61,8 @@ execution](../engineering/REMOTE_FIRST_EXECUTION.md).
 
 For the current release, legacy automatic deployment remains intentionally disabled. Use only the
 repository's authoritative workflow after all release gates pass; do not use ad hoc Compose builds
-or migrations from a developer machine or arbitrary checkout. The existing deployment script still
-builds images on the server; the documented registry migration is a follow-up, not implemented.
+or migrations from a developer machine or arbitrary checkout. The candidate deployment script pulls approved GHCR digests and has no API/web build fallback.
+See the [artifact pipeline](../release/REGISTRY_ARTIFACT_PIPELINE_2026-10-06.md); it is not deployed.
 
 `prisma migrate deploy` applies committed migrations and nothing else. Never use
 `prisma db push` against a deployed database: it reshapes the schema to match the

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deploys the current checkout to the pilot host: build -> migrate -> recreate
+# Deploys the current checkout to the pilot host: pull approved artifacts -> migrate -> recreate
 # -> health check -> smoke test, with an automatic rollback of the running
 # containers if the health check fails after recreation. Database migrations
 # are never reversed automatically. Release approval requires a rehearsal of
@@ -38,6 +38,13 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "Deployment requires a clean tracked checkout" >&2
   exit 1
 fi
+
+RELEASE_MANIFEST="${WITNESS_RELEASE_MANIFEST:?WITNESS_RELEASE_MANIFEST must name approved release evidence}"
+CANDIDATE_REFS="$(python3 scripts/release/artifacts.py validate "$RELEASE_MANIFEST")"
+CANDIDATE_API_IMAGE="$(printf '%s\n' "$CANDIDATE_REFS" | sed -n '1p')"
+CANDIDATE_WEB_IMAGE="$(printf '%s\n' "$CANDIDATE_REFS" | sed -n '2p')"
+export WITNESS_API_IMAGE="$CANDIDATE_API_IMAGE"
+export WITNESS_WEB_IMAGE="$CANDIDATE_WEB_IMAGE"
 
 export WITNESS_VERSION="$VERSION"
 export WITNESS_BUILD_ID="$COMMIT"
@@ -108,7 +115,7 @@ PREVIOUS_WEB_IMAGE="$(capture_running_image web)"
 if [[ "${WITNESS_APPROVED_ROLLBACK_RELEASE_SHA:-}" != "$COMMIT" || \
       "${WITNESS_APPROVED_ROLLBACK_API_IMAGE:-}" != "$PREVIOUS_API_IMAGE" || \
       "${WITNESS_APPROVED_ROLLBACK_WEB_IMAGE:-}" != "$PREVIOUS_WEB_IMAGE" ]]; then
-  log "rollback compatibility approval missing for candidate and running images; refusing build/migration/deployment" >&2
+  log "rollback compatibility approval missing for candidate and running images; refusing pull/migration/deployment" >&2
   exit 1
 fi
 EVIDENCE_DIR="${WITNESS_DEPLOY_EVIDENCE_DIR:-$HOME/witness-backups/releases/$COMMIT}"
@@ -118,16 +125,17 @@ umask 077
 IMAGE_OVERRIDE="$(mktemp)"
 trap 'rm -f -- "$IMAGE_OVERRIDE"' EXIT
 RELEASE_COMPOSE=("${COMPOSE[@]}" -f "$IMAGE_OVERRIDE")
-CANDIDATE_API_IMAGE="witness-release-api:$COMMIT"
-CANDIDATE_WEB_IMAGE="witness-release-web:$COMMIT"
-write_image_override "$CANDIDATE_API_IMAGE" "$CANDIDATE_WEB_IMAGE"
-
-log "building immutable SHA-tagged api and web images"
-"${RELEASE_COMPOSE[@]}" build api web
-CANDIDATE_API_ID="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_API_IMAGE")"
-CANDIDATE_WEB_ID="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_WEB_IMAGE")"
-printf 'candidate_sha=%s\nprevious_sha=%s\nprevious_version=%s\nprevious_api_image=%s\nprevious_web_image=%s\ncandidate_api_image=%s\ncandidate_web_image=%s\n' \
-  "$COMMIT" "$PREVIOUS_BUILD" "$PREVIOUS_VERSION" "$PREVIOUS_API_IMAGE" "$PREVIOUS_WEB_IMAGE" "$CANDIDATE_API_ID" "$CANDIDATE_WEB_ID" > "$EVIDENCE_DIR/manifest.txt"
+log "pulling approved immutable API and web artifacts (never build locally)"
+docker pull --platform linux/amd64 "$CANDIDATE_API_IMAGE"
+docker pull --platform linux/amd64 "$CANDIDATE_WEB_IMAGE"
+CANDIDATE_IDS="$(python3 scripts/release/artifacts.py inspect "$RELEASE_MANIFEST")"
+CANDIDATE_API_ID="$(printf '%s\n' "$CANDIDATE_IDS" | sed -n '1p')"
+CANDIDATE_WEB_ID="$(printf '%s\n' "$CANDIDATE_IDS" | sed -n '2p')"
+write_image_override "$CANDIDATE_API_ID" "$CANDIDATE_WEB_ID"
+cp "$RELEASE_MANIFEST" "$EVIDENCE_DIR/release-manifest.json"
+sha256sum "$EVIDENCE_DIR/release-manifest.json" > "$EVIDENCE_DIR/release-manifest.sha256"
+printf 'candidate_sha=%s\nprevious_sha=%s\nprevious_version=%s\nprevious_api_image=%s\nprevious_web_image=%s\ncandidate_api_image=%s\ncandidate_web_image=%s\napi_registry_ref=%s\nweb_registry_ref=%s\n' \
+  "$COMMIT" "$PREVIOUS_BUILD" "$PREVIOUS_VERSION" "$PREVIOUS_API_IMAGE" "$PREVIOUS_WEB_IMAGE" "$CANDIDATE_API_ID" "$CANDIDATE_WEB_ID" "$CANDIDATE_API_IMAGE" "$CANDIDATE_WEB_IMAGE" > "$EVIDENCE_DIR/manifest.txt"
 
 # Preserve rollback preflight evidence without storing environment secrets.
 "${COMPOSE[@]}" config --format json | python3 -c 'import json,sys; c=json.load(sys.stdin); [(s.update(environment={k:"[REDACTED]" for k in s.get("environment",{})})) for s in c.get("services",{}).values()]; json.dump(c,sys.stdout,indent=2)' > "$EVIDENCE_DIR/compose.redacted.json"

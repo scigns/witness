@@ -54,7 +54,14 @@ RUN pnpm --filter @witness/web... run build
 
 FROM node:22-bookworm-slim AS runtime
 ARG WITNESS_BUILD_ID
-LABEL org.opencontainers.image.revision=${WITNESS_BUILD_ID}
+ARG WITNESS_VERSION
+ARG NEXT_PUBLIC_WITNESS_API_URL
+ARG NEXT_PUBLIC_WITNESS_PROFILE=sovereign
+LABEL org.opencontainers.image.revision=${WITNESS_BUILD_ID} \
+      org.opencontainers.image.version=${WITNESS_VERSION} \
+      org.opencontainers.image.source="https://github.com/scigns/witness" \
+      io.witness.web.api-url=${NEXT_PUBLIC_WITNESS_API_URL} \
+      io.witness.web.profile=${NEXT_PUBLIC_WITNESS_PROFILE}
 
 ARG NEXT_PUBLIC_WITNESS_BASE_PATH=
 ENV NODE_ENV=production

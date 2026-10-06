@@ -187,11 +187,9 @@ services:
   # ── Application ────────────────────────────────────────────────────────────
   api:
     <<: *common
-    build:
-      context: ../..
-      dockerfile: services/api-gateway/Dockerfile
-      args:
-        WITNESS_BUILD_ID: ${WITNESS_BUILD_ID:?WITNESS_BUILD_ID must be set}
+    # No build definition: registry failure must never compile on this host.
+    image: ${WITNESS_API_IMAGE:?WITNESS_API_IMAGE must be an approved immutable image}
+    pull_policy: never
     environment:
       NODE_ENV: production
       WITNESS_VERSION: ${WITNESS_VERSION:?WITNESS_VERSION must be set}
@@ -254,16 +252,8 @@ services:
 
   web:
     <<: *common
-    build:
-      context: ../..
-      dockerfile: apps/web/Dockerfile
-      args:
-        WITNESS_BUILD_ID: ${WITNESS_BUILD_ID:?WITNESS_BUILD_ID must be set}
-        NEXT_PUBLIC_WITNESS_API_URL: ${NEXT_PUBLIC_WITNESS_API_URL:?NEXT_PUBLIC_WITNESS_API_URL must be set}
-        NEXT_PUBLIC_WITNESS_PROFILE: ${WITNESS_DEPLOYMENT_PROFILE:-sovereign}
-        # Empty for a dedicated hostname; `/witness` when the application is
-        # served under a path on a domain whose root belongs to something else.
-        NEXT_PUBLIC_WITNESS_BASE_PATH: ${NEXT_PUBLIC_WITNESS_BASE_PATH:-}
+    image: ${WITNESS_WEB_IMAGE:?WITNESS_WEB_IMAGE must be an approved immutable image}
+    pull_policy: never
     depends_on:
       api: { condition: service_started }
 

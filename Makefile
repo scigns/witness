@@ -156,6 +156,7 @@ test: test-operations ## CI-authoritative full suite; optional local reproductio
 test-operations: ## Verify deployment rollback and backup safety without infrastructure
 	python3 scripts/pilot/deploy.test.py
 	python3 scripts/ops/backup-status.test.py
+	python3 scripts/release/publication.test.py
 
 .PHONY: test-e2e
 test-e2e: ## Run end-to-end tests (requires the local stack)

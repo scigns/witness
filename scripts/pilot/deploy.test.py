@@ -16,7 +16,7 @@ NEW_API = "sha256:" + "3" * 64
 NEW_WEB = "sha256:" + "4" * 64
 
 FAKE = r'''#!/usr/bin/env python3
-import json, os, sys
+import json, os, sys, hashlib
 from pathlib import Path
 root = Path(os.environ['FAKE_ROOT'])
 name = Path(sys.argv[0]).name
@@ -32,7 +32,19 @@ elif name == 'docker':
     if args[:1] == ['inspect']:
         print('sha256:' + ('1' if args[-1] == 'api-container' else '2') * 64)
     elif args[:2] == ['image', 'inspect']:
-        if '--format' in args: print('sha256:' + ('3' if 'api' in args[-1] else '4') * 64)
+        if args[-1].startswith('ghcr.io/'):
+            kind = 'api' if 'witness-api@' in args[-1] else 'web'
+            labels = {'org.opencontainers.image.revision': ('b' if os.environ.get('WRONG_REVISION') == '1' else 'a') * 40,
+                      'org.opencontainers.image.version': '0.4.1', 'org.opencontainers.image.source': 'https://github.com/scigns/witness'}
+            labels.update({'io.witness.web.api-url':'https://api.buildwithwitness.com','io.witness.web.profile':'hybrid'})
+            print(json.dumps([{'Id':'sha256:' + ('3' if kind == 'api' else '4') * 64,
+                'RepoDigests': [] if os.environ.get('WRONG_REPO_DIGEST') == '1' else [args[-1]],
+                'Os':'linux','Architecture':'amd64','Config':{'Labels': labels, 'Env':['WITNESS_BUILD_ID='+'a'*40]}}]))
+    elif args[:1] == ['pull']:
+        if os.environ.get('FAIL_PULL') == '1': sys.exit(11)
+    elif args[:1] == ['run']:
+        files = [root/'services/api-gateway/prisma/schema.prisma', root/'services/api-gateway/prisma/migrations/fixture/migration.sql']
+        print(json.dumps([{'path':str(p.relative_to(root/'services/api-gateway/prisma')), 'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in files]))
     elif args[:1] == ['compose']:
         if 'config' in args: print(json.dumps({'services':{'api':{'environment':{'SECRET':'fixture-secret'}}}}))
         elif 'ps' in args: print(args[-1] + '-container')
@@ -43,7 +55,12 @@ elif name == 'docker':
             if os.environ.get('FAIL_BACKUP') == '1': sys.exit(7)
             if 'pg_restore' in args and os.environ.get('FAIL_ARCHIVE') == '1': sys.exit(9)
             sys.stdout.buffer.write(b'PGDMP synthetic fixture')
+        elif 'run' in args:
+            assert '--no-build' in args
+            files = [args[i + 1] for i, a in enumerate(args[:-1]) if a == '-f']
+            (root/'migration-image.txt').write_text(Path(files[-1]).read_text())
         elif 'up' in args:
+            assert '--no-build' in args
             files = [args[i + 1] for i, a in enumerate(args[:-1]) if a == '-f']
             text = Path(files[-1]).read_text()
             rollback = ('sha256:' + '1' * 64) in text
@@ -73,7 +90,7 @@ class DeploySafety(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(prefix="witness-deploy-test-")
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
-        for relative in ["scripts/pilot/deploy.sh", "scripts/pilot/backup.sh", "scripts/ops/backup-status.sh"]:
+        for relative in ["scripts/pilot/deploy.sh", "scripts/pilot/backup.sh", "scripts/ops/backup-status.sh", "scripts/release/artifacts.py", "scripts/release/image-build.json"]:
             destination = root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(SOURCE / relative, destination)
@@ -89,9 +106,27 @@ class DeploySafety(unittest.TestCase):
             script = binary / name
             script.write_text(FAKE)
             script.chmod(0o700)
+        import hashlib
+        migration_root = root / "services/api-gateway/prisma"
+        manifest = {'schema_version':1, 'published':True, 'git_sha':CANDIDATE, 'version':'0.4.1', 'platform':'linux/amd64',
+                    'created_at':'2026-10-06T00:00:00Z',
+                    'build':{'workflow':'.github/workflows/ci.yml','run_id':'123'},
+                    'publication':{'workflow':'.github/workflows/release-artifacts.yml','run_id':'456'},
+                    'build_inputs':json.loads((root/'scripts/release/image-build.json').read_text()),
+                    'migrations':[{'path':str(p.relative_to(migration_root)), 'sha256':hashlib.sha256(p.read_bytes()).hexdigest()}
+                                  for p in [migration_root/'schema.prisma',migration_root/'migrations/fixture/migration.sql']],
+                    'images':{kind:{'repository':f'ghcr.io/scigns/witness-{kind}','digest':'sha256:'+digit*64,'oci_revision':CANDIDATE}
+                              for kind,digit in [('api','6'),('web','7')]}}
+        patch = flags.pop('MANIFEST_PATCH', None)
+        if patch: patch(manifest)
+        manifest_file = root/'release-manifest.json'
+        manifest_file.write_text(json.dumps(manifest))
         environment = dict(os.environ, PATH=f"{binary}:{os.environ['PATH']}", FAKE_ROOT=str(root),
                            WITNESS_ENV_FILE=str(root / ".env"), WITNESS_DEPLOY_EVIDENCE_DIR=str(root / "evidence"),
                            WITNESS_APPROVED_RELEASE_SHA=CANDIDATE, WITNESS_DEPLOY_HEALTH_TIMEOUT_SECONDS="2",
+                           WITNESS_RELEASE_MANIFEST=str(manifest_file), WITNESS_APPROVED_ARTIFACT_RUN_ID='456',
+                           WITNESS_APPROVED_API_IMAGE='ghcr.io/scigns/witness-api@sha256:'+'6'*64,
+                           WITNESS_APPROVED_WEB_IMAGE='ghcr.io/scigns/witness-web@sha256:'+'7'*64,
                            WITNESS_APPROVED_ROLLBACK_RELEASE_SHA=CANDIDATE,
                            WITNESS_APPROVED_ROLLBACK_API_IMAGE=OLD_API, WITNESS_APPROVED_ROLLBACK_WEB_IMAGE=OLD_WEB,
                            WITNESS_PILOT_API_URL="https://api.fixture.example", WITNESS_PILOT_WEB_URL="https://app.fixture.example")
@@ -115,6 +150,40 @@ class DeploySafety(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse((root / "evidence").exists())
                 self.assertFalse(any(any(action in args for action in ["build", "migrate", "up", "pg_dump"]) for _, args in calls))
+
+    def test_bad_digest_repository_and_sha_refuse_before_pull(self):
+        patches = [lambda m: m['images']['api'].update(digest='latest'),
+                   lambda m: m['images']['web'].update(repository='ghcr.io/attacker/web'),
+                   lambda m: m.update(git_sha=PREVIOUS),
+                   lambda m: m.update(migrations=[])]
+        for patch in patches:
+            result, calls, _ = self.run_deploy(MANIFEST_PATCH=patch)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(any(name=='docker' for name,_ in calls))
+
+    def test_missing_image_and_run_approval_refuse_before_pull(self):
+        for flag in ['WITNESS_APPROVED_API_IMAGE','WITNESS_APPROVED_WEB_IMAGE','WITNESS_APPROVED_ARTIFACT_RUN_ID']:
+            result, calls, _ = self.run_deploy(**{flag:''})
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(any(name=='docker' for name,_ in calls))
+
+    def test_registry_failure_and_wrong_metadata_refuse_before_backup(self):
+        for flag in ['FAIL_PULL', 'WRONG_REVISION', 'WRONG_REPO_DIGEST']:
+            result, calls, _ = self.run_deploy(**{flag:'1'})
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(any(any(action in args for action in ['build','migrate','up','pg_dump']) for _,args in calls))
+
+    def test_no_build_and_migration_uses_verified_artifact(self):
+        result, calls, root = self.run_deploy()
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        self.assertFalse(any('build' in args for _,args in calls))
+        pulls = [args[-1] for name,args in calls if name=='docker' and args[:1]==['pull']]
+        self.assertEqual(pulls,['ghcr.io/scigns/witness-api@sha256:'+'6'*64,'ghcr.io/scigns/witness-web@sha256:'+'7'*64])
+        self.assertIn(NEW_API,(root/'migration-image.txt').read_text())
+        self.assertIn(NEW_WEB,(root/'migration-image.txt').read_text())
+        for _,args in calls:
+            if 'up' in args or 'migrate' in args:
+                self.assertIn('--no-build',args)
 
     def test_success_records_exact_images_and_backs_up_before_migration(self):
         result, calls, root = self.run_deploy()
