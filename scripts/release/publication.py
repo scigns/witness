@@ -38,9 +38,9 @@ def gates():
         output.write(f'ci_run={run["id"]}\nci_attempt={run["run_attempt"]}\n')
 
 
-def release_run():
-    sha = os.environ['WITNESS_APPROVED_RELEASE_SHA']
-    run_id = os.environ['WITNESS_APPROVED_ARTIFACT_RUN_ID']
+def release_run(recovery=False):
+    sha = os.environ['WITNESS_APPROVED_ROLLBACK_SHA' if recovery else 'WITNESS_APPROVED_RELEASE_SHA']
+    run_id = os.environ['WITNESS_APPROVED_ROLLBACK_ARTIFACT_RUN_ID' if recovery else 'WITNESS_APPROVED_ARTIFACT_RUN_ID']
     require(SHA.fullmatch(sha) and run_id.isdigit(), 'invalid release approval')
     run = api(f'repos/scigns/witness/actions/runs/{run_id}')
     workflow = api('repos/scigns/witness/actions/workflows/release-artifacts.yml')
@@ -94,7 +94,8 @@ def publish():
 
 if __name__ == '__main__':
     try:
-        {'gates': gates, 'publish': publish, 'release-run': release_run}[sys.argv[1]]()
+        {'gates': gates, 'publish': publish, 'release-run': release_run,
+         'recovery-run': lambda: release_run(recovery=True)}[sys.argv[1]]()
     except (ValueError, KeyError, subprocess.CalledProcessError) as error:
         print(f'Publication refused: {error}', file=sys.stderr)
         sys.exit(1)

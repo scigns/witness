@@ -34,12 +34,13 @@ elif name == 'docker':
     elif args[:2] == ['image', 'inspect']:
         if args[-1].startswith('ghcr.io/'):
             kind = 'api' if 'witness-api@' in args[-1] else 'web'
-            labels = {'org.opencontainers.image.revision': ('b' if os.environ.get('WRONG_REVISION') == '1' else 'a') * 40,
+            recovery = args[-1].endswith('d'*64) or args[-1].endswith('e'*64)
+            labels = {'org.opencontainers.image.revision': ('c' if recovery else ('b' if os.environ.get('WRONG_REVISION') == '1' else 'a')) * 40,
                       'org.opencontainers.image.version': '0.4.1', 'org.opencontainers.image.source': 'https://github.com/scigns/witness'}
             labels.update({'io.witness.web.api-url':'https://api.buildwithwitness.com','io.witness.web.profile':'hybrid'})
-            print(json.dumps([{'Id':'sha256:' + ('3' if kind == 'api' else '4') * 64,
+            print(json.dumps([{'Id':'sha256:' + (('8' if kind == 'api' else '9') if recovery else ('3' if kind == 'api' else '4')) * 64,
                 'RepoDigests': [] if os.environ.get('WRONG_REPO_DIGEST') == '1' else [args[-1]],
-                'Os':'linux','Architecture':'amd64','Config':{'Labels': labels, 'Env':['WITNESS_BUILD_ID='+'a'*40]}}]))
+                'Os':'linux','Architecture':'amd64','Config':{'Labels': labels, 'Env':['WITNESS_BUILD_ID='+('c' if recovery else 'a')*40]}}]))
     elif args[:1] == ['pull']:
         if os.environ.get('FAIL_PULL') == '1': sys.exit(11)
     elif args[:1] == ['run']:
@@ -66,10 +67,11 @@ elif name == 'docker':
             assert '--no-build' in args
             files = [args[i + 1] for i, a in enumerate(args[:-1]) if a == '-f']
             text = Path(files[-1]).read_text()
-            rollback = ('sha256:' + '1' * 64) in text
+            recovery = ('sha256:' + '8' * 64) in text
+            rollback = ('sha256:' + '1' * 64) in text or recovery
             if not rollback and os.environ.get('FAIL_RECREATE') == '1': sys.exit(10)
-            if rollback and os.environ.get('WITNESS_BUILD_ID') != 'b' * 40: sys.exit(8)
-            (root / 'state').write_text('old' if rollback else 'new')
+            if rollback and os.environ.get('WITNESS_BUILD_ID') != ('c' if recovery else 'b') * 40: sys.exit(8)
+            (root / 'state').write_text('recovery' if recovery else ('old' if rollback else 'new'))
     else: sys.exit(3)
 elif name == 'curl':
     assert not any(a.startswith('-') and 'k' in a for a in args)
@@ -78,7 +80,7 @@ elif name == 'curl':
     if args[-1].endswith('/ready'):
         state = (root / 'state').read_text() if (root / 'state').exists() else 'old'
         wrong = os.environ.get('WRONG_BUILD') == '1'
-        build = 'a' * 40 if state == 'new' and not wrong else 'b' * 40
+        build = 'c' * 40 if state == 'recovery' else ('a' * 40 if state == 'new' and not wrong else 'b' * 40)
         print(json.dumps({'status': 'ok', 'buildId': build, 'version': '0.4.0'}))
 '''
 
@@ -133,10 +135,43 @@ class DeploySafety(unittest.TestCase):
                            WITNESS_APPROVED_ROLLBACK_RELEASE_SHA=CANDIDATE,
                            WITNESS_APPROVED_ROLLBACK_API_IMAGE=OLD_API, WITNESS_APPROVED_ROLLBACK_WEB_IMAGE=OLD_WEB,
                            WITNESS_PILOT_API_URL="https://api.fixture.example", WITNESS_PILOT_WEB_URL="https://app.fixture.example")
+        if flags.pop('WITH_RECOVERY', False):
+            import copy
+            recovery = copy.deepcopy(manifest)
+            recovery['git_sha'] = 'c' * 40
+            recovery['publication']['run_id'] = '789'
+            for kind, digit in [('api', 'd'), ('web', 'e')]:
+                recovery['images'][kind].update(digest='sha256:' + digit * 64, oci_revision='c' * 40)
+            recovery_patch = flags.pop('RECOVERY_PATCH', None)
+            if recovery_patch: recovery_patch(recovery)
+            recovery_file = root / 'recovery-manifest.json'
+            recovery_file.write_text(json.dumps(recovery))
+            environment.update(WITNESS_ROLLBACK_MANIFEST=str(recovery_file),
+                WITNESS_APPROVED_ROLLBACK_SHA='c' * 40,
+                WITNESS_APPROVED_ROLLBACK_ARTIFACT_RUN_ID='789',
+                WITNESS_APPROVED_ROLLBACK_API_REF='ghcr.io/scigns/witness-api@sha256:'+'d'*64,
+                WITNESS_APPROVED_ROLLBACK_WEB_REF='ghcr.io/scigns/witness-web@sha256:'+'e'*64,
+                WITNESS_APPROVED_ROLLBACK_API_IMAGE='sha256:'+'8'*64,
+                WITNESS_APPROVED_ROLLBACK_WEB_IMAGE='sha256:'+'9'*64)
         environment.update(flags)
         result = subprocess.run(["bash", str(root / "scripts/pilot/deploy.sh")], cwd=root, env=environment, capture_output=True, text=True, timeout=30)
         calls = [json.loads(line) for line in (root / "calls").read_text().splitlines()]
         return result, calls, root
+
+    def test_failed_candidate_uses_compatible_recovery_not_legacy_images(self):
+        result, calls, root = self.run_deploy(WITH_RECOVERY=True, WRONG_WEB_BUILD='1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((root / 'state').read_text(), 'recovery')
+        self.assertIn('rollback succeeded', result.stdout)
+        self.assertIn('sha256:'+'8'*64, (root / 'evidence/recovery.txt').read_text())
+        self.assertIn(OLD_API, (root / 'evidence/manifest.txt').read_text())
+        self.assertTrue((root / 'evidence/recovery-manifest.json').exists())
+
+    def test_incompatible_recovery_refuses_before_backup_or_migration(self):
+        result, calls, root = self.run_deploy(WITH_RECOVERY=True,
+            RECOVERY_PATCH=lambda m: m.update(migrations=[]))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any('pg_dump' in args or 'up' in args or 'migrate' in args for _, args in calls))
 
     def test_missing_approval_never_touches_infrastructure(self):
         result, calls, _ = self.run_deploy(WITNESS_APPROVED_RELEASE_SHA="")

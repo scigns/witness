@@ -81,17 +81,17 @@ wait_for_health() {
 }
 
 rollback() {
-  log "health check failed — rolling back api and web containers to the previous image"
-  write_image_override "$PREVIOUS_API_IMAGE" "$PREVIOUS_WEB_IMAGE"
-  export WITNESS_BUILD_ID="$PREVIOUS_BUILD"
-  export WITNESS_VERSION="$PREVIOUS_VERSION"
+  log "health check failed — restoring the rehearsed compatible API/web artifacts"
+  write_image_override "$RECOVERY_API_IMAGE" "$RECOVERY_WEB_IMAGE"
+  export WITNESS_BUILD_ID="$RECOVERY_BUILD"
+  export WITNESS_VERSION="$RECOVERY_VERSION"
   if ! "${RELEASE_COMPOSE[@]}" up -d --no-deps --no-build --force-recreate api web; then
     log "ROLLBACK RECREATION FAILED. Human recovery required."
     record "rollback_failed"
     exit 1
   fi
-  if wait_for_health "$PREVIOUS_BUILD"; then
-    log "rollback succeeded — service recovered on the previous image. The failed deploy was NOT applied. Investigate before retrying."
+  if wait_for_health "$RECOVERY_BUILD"; then
+    log "rollback succeeded — service recovered on the approved recovery artifacts. The failed deploy was NOT applied. Investigate before retrying."
     record "rolled_back"
   else
     log "ROLLBACK ALSO FAILED HEALTH CHECK. Manual intervention required — see docs/operations/PILOT_OPERATIONS.md."
@@ -109,12 +109,31 @@ PREVIOUS_VERSION="$(printf '%s' "$PREVIOUS_IDENTITY" | python3 -c 'import json,s
 log "capturing exact running rollback images"
 PREVIOUS_API_IMAGE="$(capture_running_image api)"
 PREVIOUS_WEB_IMAGE="$(capture_running_image web)"
+RECOVERY_BUILD="$PREVIOUS_BUILD"
+RECOVERY_VERSION="$PREVIOUS_VERSION"
+RECOVERY_API_IMAGE="$PREVIOUS_API_IMAGE"
+RECOVERY_WEB_IMAGE="$PREVIOUS_WEB_IMAGE"
+# The running legacy images may require database restore. A separately
+# published compatible artifact is allowed only with its own provenance,
+# exact digest approvals, identical data model and candidate-specific drill.
+if [[ -n "${WITNESS_ROLLBACK_MANIFEST:-}" ]]; then
+  RECOVERY_REFS="$(python3 scripts/release/artifacts.py validate-recovery "$WITNESS_ROLLBACK_MANIFEST")"
+  RECOVERY_API_REF="$(printf '%s\n' "$RECOVERY_REFS" | sed -n '1p')"
+  RECOVERY_WEB_REF="$(printf '%s\n' "$RECOVERY_REFS" | sed -n '2p')"
+  docker pull --platform linux/amd64 "$RECOVERY_API_REF"
+  docker pull --platform linux/amd64 "$RECOVERY_WEB_REF"
+  RECOVERY_IDS="$(python3 scripts/release/artifacts.py inspect-recovery "$WITNESS_ROLLBACK_MANIFEST")"
+  RECOVERY_API_IMAGE="$(printf '%s\n' "$RECOVERY_IDS" | sed -n '1p')"
+  RECOVERY_WEB_IMAGE="$(printf '%s\n' "$RECOVERY_IDS" | sed -n '2p')"
+  RECOVERY_BUILD="$WITNESS_APPROVED_ROLLBACK_SHA"
+  RECOVERY_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$WITNESS_ROLLBACK_MANIFEST")"
+fi
 # A healthy previous image is not necessarily compatible with the upgraded
 # schema or new writes. Approval is specific to this candidate/image pair and
 # must follow a successful rollback rehearsal; never infer it from /ready.
 if [[ "${WITNESS_APPROVED_ROLLBACK_RELEASE_SHA:-}" != "$COMMIT" || \
-      "${WITNESS_APPROVED_ROLLBACK_API_IMAGE:-}" != "$PREVIOUS_API_IMAGE" || \
-      "${WITNESS_APPROVED_ROLLBACK_WEB_IMAGE:-}" != "$PREVIOUS_WEB_IMAGE" ]]; then
+      "${WITNESS_APPROVED_ROLLBACK_API_IMAGE:-}" != "$RECOVERY_API_IMAGE" || \
+      "${WITNESS_APPROVED_ROLLBACK_WEB_IMAGE:-}" != "$RECOVERY_WEB_IMAGE" ]]; then
   log "rollback compatibility approval missing for candidate and running images; refusing pull/migration/deployment" >&2
   exit 1
 fi
@@ -133,6 +152,11 @@ CANDIDATE_API_ID="$(printf '%s\n' "$CANDIDATE_IDS" | sed -n '1p')"
 CANDIDATE_WEB_ID="$(printf '%s\n' "$CANDIDATE_IDS" | sed -n '2p')"
 write_image_override "$CANDIDATE_API_ID" "$CANDIDATE_WEB_ID"
 cp "$RELEASE_MANIFEST" "$EVIDENCE_DIR/release-manifest.json"
+if [[ -n "${WITNESS_ROLLBACK_MANIFEST:-}" ]]; then
+  cp "$WITNESS_ROLLBACK_MANIFEST" "$EVIDENCE_DIR/recovery-manifest.json"
+fi
+printf 'recovery_sha=%s\nrecovery_api_image=%s\nrecovery_web_image=%s\n' \
+  "$RECOVERY_BUILD" "$RECOVERY_API_IMAGE" "$RECOVERY_WEB_IMAGE" > "$EVIDENCE_DIR/recovery.txt"
 sha256sum "$EVIDENCE_DIR/release-manifest.json" > "$EVIDENCE_DIR/release-manifest.sha256"
 "${COMPOSE[@]}" config --format json | python3 scripts/release/artifacts.py deployment-config "$RELEASE_MANIFEST"
 printf 'candidate_sha=%s\nprevious_sha=%s\nprevious_version=%s\nprevious_api_image=%s\nprevious_web_image=%s\ncandidate_api_image=%s\ncandidate_web_image=%s\napi_registry_ref=%s\nweb_registry_ref=%s\n' \

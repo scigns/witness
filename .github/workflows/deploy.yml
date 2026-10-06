@@ -47,13 +47,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITNESS_APPROVED_RELEASE_SHA: ${{ vars.WITNESS_APPROVED_RELEASE_SHA }}
           WITNESS_APPROVED_ARTIFACT_RUN_ID: ${{ vars.WITNESS_APPROVED_ARTIFACT_RUN_ID }}
-        run: python3 scripts/release/publication.py release-run
+          WITNESS_APPROVED_ROLLBACK_SHA: ${{ vars.WITNESS_APPROVED_ROLLBACK_SHA }}
+          WITNESS_APPROVED_ROLLBACK_ARTIFACT_RUN_ID: ${{ vars.WITNESS_APPROVED_ROLLBACK_ARTIFACT_RUN_ID }}
+        run: |
+          python3 scripts/release/publication.py release-run
+          python3 scripts/release/publication.py recovery-run
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: witness-release-${{ inputs.release_sha }}
           run-id: ${{ inputs.artifact_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: release-input
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: witness-release-${{ vars.WITNESS_APPROVED_ROLLBACK_SHA }}
+          run-id: ${{ vars.WITNESS_APPROVED_ROLLBACK_ARTIFACT_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: recovery-input
       - name: Pull approved artifacts and deploy (no compilation)
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -62,6 +72,7 @@ jobs:
           WITNESS_PILOT_WEB_URL: ${{ vars.WITNESS_PILOT_WEB_URL }}
           WITNESS_ENV_FILE: /home/witness/witness/.env
           WITNESS_RELEASE_MANIFEST: release-input/release-manifest.json
+          WITNESS_ROLLBACK_MANIFEST: recovery-input/release-manifest.json
           WITNESS_APPROVED_RELEASE_SHA: ${{ vars.WITNESS_APPROVED_RELEASE_SHA }}
           WITNESS_APPROVED_ARTIFACT_RUN_ID: ${{ vars.WITNESS_APPROVED_ARTIFACT_RUN_ID }}
           WITNESS_APPROVED_API_IMAGE: ${{ vars.WITNESS_APPROVED_API_IMAGE }}
@@ -69,6 +80,10 @@ jobs:
           WITNESS_APPROVED_ROLLBACK_RELEASE_SHA: ${{ vars.WITNESS_APPROVED_ROLLBACK_RELEASE_SHA }}
           WITNESS_APPROVED_ROLLBACK_API_IMAGE: ${{ vars.WITNESS_APPROVED_ROLLBACK_API_IMAGE }}
           WITNESS_APPROVED_ROLLBACK_WEB_IMAGE: ${{ vars.WITNESS_APPROVED_ROLLBACK_WEB_IMAGE }}
+          WITNESS_APPROVED_ROLLBACK_SHA: ${{ vars.WITNESS_APPROVED_ROLLBACK_SHA }}
+          WITNESS_APPROVED_ROLLBACK_ARTIFACT_RUN_ID: ${{ vars.WITNESS_APPROVED_ROLLBACK_ARTIFACT_RUN_ID }}
+          WITNESS_APPROVED_ROLLBACK_API_REF: ${{ vars.WITNESS_APPROVED_ROLLBACK_API_REF }}
+          WITNESS_APPROVED_ROLLBACK_WEB_REF: ${{ vars.WITNESS_APPROVED_ROLLBACK_WEB_REF }}
         run: |
           export DOCKER_CONFIG="$(mktemp -d)"
           trap 'docker logout ghcr.io >/dev/null; rm -f "$DOCKER_CONFIG/config.json"; rmdir "$DOCKER_CONFIG"' EXIT

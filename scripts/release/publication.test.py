@@ -11,6 +11,24 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class PublicationSafety(unittest.TestCase):
+    def test_recovery_run_requires_successful_trusted_exact_sha_publication(self):
+        env = {'WITNESS_APPROVED_ROLLBACK_SHA': SHA,
+               'WITNESS_APPROVED_ROLLBACK_ARTIFACT_RUN_ID': '456'}
+        run = {'head_sha': SHA, 'conclusion': 'success', 'workflow_id': 789,
+               'head_repository': {'full_name': 'scigns/witness'}, 'event': 'push',
+               'head_branch': 'witness-artifact-' + SHA}
+        def api(path):
+            return {'id': 789} if 'workflows/' in path else run
+        with patch.dict(os.environ, env), patch.object(publication, 'api', side_effect=api):
+            publication.release_run(recovery=True)
+            for key, value in [('head_sha', 'b' * 40), ('conclusion', 'failure'),
+                               ('workflow_id', 123), ('event', 'pull_request')]:
+                old = run[key]
+                run[key] = value
+                with self.subTest(key=key), self.assertRaises(ValueError):
+                    publication.release_run(recovery=True)
+                run[key] = old
+
     def run_gate(self, **overrides):
         with tempfile.TemporaryDirectory() as temp:
             env = {'GITHUB_SHA':SHA, 'GITHUB_EVENT_NAME':'push', 'GITHUB_REPOSITORY':'scigns/witness',

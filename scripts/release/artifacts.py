@@ -75,6 +75,32 @@ def validate(manifest):
     require(manifest.get('build_inputs') == json.loads(Path('scripts/release/image-build.json').read_text()), 'build input contract mismatch')
 
 
+def validate_recovery(manifest):
+    candidate = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+    require(candidate == os.environ.get('WITNESS_APPROVED_ROLLBACK_RELEASE_SHA'), 'recovery approval is not candidate-specific')
+    sha = os.environ.get('WITNESS_APPROVED_ROLLBACK_SHA', '')
+    require(SHA.fullmatch(sha) and manifest.get('git_sha') == sha, 'recovery SHA mismatch')
+    require(manifest.get('schema_version') == 1 and manifest.get('published') is True, 'recovery artifact is not published')
+    require(manifest.get('platform') == 'linux/amd64', 'unsupported recovery platform')
+    require(manifest.get('version') == json.loads(Path('package.json').read_text())['version'], 'recovery version mismatch')
+    # This release supports a separately rehearsed compatible artifact with the
+    # same data model. Different migration inventories require a new recovery plan.
+    require(manifest.get('migrations') == inventory(), 'recovery data model differs from candidate')
+    require(manifest.get('build_inputs') == json.loads(Path('scripts/release/image-build.json').read_text()), 'recovery public inputs differ')
+    build = manifest.get('build', {})
+    require(build.get('workflow') == '.github/workflows/ci.yml' and str(build.get('run_id', '')).isdigit(), 'invalid recovery build evidence')
+    publish = manifest.get('publication', {})
+    require(publish.get('workflow') == '.github/workflows/release-artifacts.yml', 'invalid recovery publication workflow')
+    require(str(publish.get('run_id', '')).isdigit() and str(publish['run_id']) == os.environ.get('WITNESS_APPROVED_ROLLBACK_ARTIFACT_RUN_ID'), 'recovery publication approval mismatch')
+    for kind in ('api', 'web'):
+        item = manifest.get('images', {}).get(kind, {})
+        require(item.get('repository') == REPOSITORIES[kind], 'wrong recovery repository')
+        require(isinstance(item.get('digest'), str) and DIGEST.fullmatch(item['digest']), 'invalid recovery digest')
+        require(item.get('oci_revision') == sha, 'recovery revision mismatch')
+        ref = item['repository'] + '@' + item['digest']
+        require(ref == os.environ.get('WITNESS_APPROVED_ROLLBACK_' + kind.upper() + '_REF'), 'recovery digest approval mismatch')
+
+
 def main():
     command, path = sys.argv[1:3]
     if command == 'create':
@@ -93,6 +119,13 @@ def main():
         Path(path).write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n')
         return
     manifest = json.loads(Path(path).read_text())
+    if command in ('validate-recovery', 'inspect-recovery'):
+        validate_recovery(manifest)
+        for kind in ('api', 'web'):
+            item = manifest['images'][kind]
+            ref = item['repository'] + '@' + item['digest']
+            print(ref if command == 'validate-recovery' else inspect_image(ref, manifest, kind))
+        return
     if command == 'validate':
         validate(manifest)
         for kind in ('api', 'web'):

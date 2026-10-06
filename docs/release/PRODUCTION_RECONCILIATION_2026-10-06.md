@@ -129,37 +129,97 @@ approved DB/object recovery plan with bounded downtime and post-checkpoint data 
 destructive production recovery is authorised here. Readiness can be healthy while old Prisma reads
 fail, so it is not full rollback acceptance.
 
-## Release gate matrix
+## Release gate matrix — continuation
 
-PASS is scoped to its evidence. FAIL includes required proof not performed. No critical unknown is
-accepted implicitly; no ACCEPTED DEFERRED RISK has been approved.
+The following supersedes historical local rehearsal results above. PASS is scoped to
+its evidence; missing required proof is FAIL. No deferred critical risk is accepted.
+Production columns describe the candidate, not the still-running legacy system.
 
-| Gate                               | IMPLEMENTED                                                     | TESTED                                                  | DEPLOYED                                  | PRODUCTION VERIFIED                           |
-| ---------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------- | --------------------------------------------- |
-| Tests                              | PASS                                                            | PASS at ced2461; new CI required                        | FAIL: candidate absent                    | FAIL                                          |
-| Security/adversarial               | PASS                                                            | PASS at ced2461                                         | FAIL                                      | FAIL: full live attack journey pending        |
-| Tenant isolation                   | PASS: API/repository boundaries                                 | PASS: local/CI authority tests                          | FAIL                                      | FAIL: candidate cross-org acceptance pending  |
-| Quota/reservation                  | PASS                                                            | PASS: contention/fencing/recovery                       | FAIL                                      | FAIL                                          |
-| Storage reconciliation             | PASS: bounded reporting and safe lease cleanup                  | PASS: live local tests                                  | FAIL                                      | FAIL                                          |
-| Commercial activation              | PASS: catalogue/manual path                                     | PASS: local synthetic lifecycle                         | FAIL                                      | FAIL                                          |
-| Authentication                     | PASS: one-time return state                                     | PASS: API safety tests                                  | FAIL                                      | FAIL: real OIDC/deep-link pending             |
-| Frontend acceptance                | PASS: shell/landing                                             | PASS: 12 local mocked checks; full journey incomplete   | FAIL                                      | FAIL                                          |
-| Migration audit                    | PASS: ledger/checksum/delta                                     | PASS: restored-data upgrade; incompatibility identified | FAIL: unapplied                           | FAIL: live upgrade not authorised             |
-| Backup checksum                    | PASS                                                            | PASS: both latest checksums/readability/freshness       | PASS: daily DB backups                    | PASS: SSH verification                        |
-| DB restore rehearsal               | PASS                                                            | PASS: both production backups restored                  | PASS: backup path exists; no live restore | PASS for backup restorability only            |
-| Object backup/restore              | FAIL: independent protection unproven                           | FAIL                                                    | FAIL                                      | FAIL: 13 objects excluded from DB dump        |
-| Rollback                           | FAIL: old model incompatible                                    | FAIL: P2032 reproduced                                  | FAIL: no recovery performed               | FAIL                                          |
-| Exact-SHA control                  | PASS: approval/image IDs/web identity; legacy workflow disabled | PASS: mock safety checks                                | FAIL: hardened workflow not on main       | PASS for active release hold only             |
-| Subscription/provisioning          | PASS: contracted/observed distinction, upload state checks      | PASS: local lifecycle/boundaries                        | FAIL                                      | FAIL: fulfilment pending                      |
-| Operational visibility             | PASS: file ledger/operator endpoints                            | PASS: API tests                                         | FAIL                                      | FAIL: candidate console/usage pending         |
-| Email                              | PASS: configured transport                                      | FAIL: delivery pending                                  | PASS: SMTP configured                     | FAIL                                          |
-| Current production health/identity | PASS: API SHA/exact images                                      | PASS: endpoint checks                                   | PASS: old system stable                   | PASS for old API/containers; web Git SHA FAIL |
-| Synthetic client acceptance        | PASS: local journey exists                                      | PASS: API path; browser journey FAIL                    | FAIL                                      | FAIL                                          |
-| Client-ready decision              | FAIL                                                            | FAIL                                                    | FAIL                                      | FAIL — NOT CLIENT READY                       |
+| Gate                              | IMPLEMENTED                                  | TESTED                             | REHEARSED                                                                    | DEPLOYED                                   | PRODUCTION VERIFIED     |
+| --------------------------------- | -------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------ | ----------------------- |
+| CI / release images               | PASS                                         | PASS: 313d185 CI 37417081754       | PASS: immutable images started                                               | FAIL                                       | FAIL                    |
+| Security / tenant isolation       | PASS                                         | PASS: security 37417081725         | PASS: real HTTP cross-org and authority denials                              | FAIL                                       | FAIL                    |
+| Auth                              | PASS                                         | PASS                               | PASS: restored Keycloak, real OIDC, replay denial, browser deep links        | FAIL                                       | FAIL                    |
+| Commercial activation             | PASS                                         | PASS                               | PASS: operator origination, invoice, settlement/replay, ACTIVE, entitlements | FAIL                                       | FAIL                    |
+| Tenant / ResourceProfile          | PASS: logical shared tenant                  | PASS                               | PASS: implicit organisation boundary / standard-small                        | FAIL                                       | FAIL                    |
+| Dedicated provisioning fulfilment | FAIL: recorded adapter only                  | FAIL                               | FAIL: not proved READY                                                       | FAIL                                       | FAIL                    |
+| Storage / quota / reservations    | PASS                                         | PASS                               | PASS: real objects, race, fencing, stale recovery and mismatch handling      | FAIL                                       | FAIL                    |
+| Audit trail                       | PASS                                         | PASS                               | PASS: persisted commercial events and hash-chain links                       | FAIL                                       | FAIL                    |
+| Frontend                          | PASS                                         | PASS                               | PASS: real browser roles, resource, 375/768/1440, accessibility              | FAIL                                       | FAIL                    |
+| Latest DB / Keycloak backups      | PASS                                         | PASS: checksums and readable dumps | PASS: isolated restore and critical records                                  | PASS: existing backup mechanism            | PASS: backup read only  |
+| Independent object recovery       | PASS: bounded protected copy                 | PASS: 13 object checksums          | PASS: isolated S3 restore and byte verification                              | FAIL: continuing retention not established | FAIL                    |
+| Migration path                    | PASS                                         | PASS: ledger and image inventory   | PASS: restored 33 → 45, exact candidate Prisma                               | FAIL                                       | FAIL                    |
+| Legacy rollback                   | PASS: DATABASE RESTORE REQUIRED              | PASS: P2032 incompatibility proved | PASS: restore, exact old images, real login/workspace/upload/read            | FAIL                                       | FAIL                    |
+| Compatible recovery artifact      | PASS: candidate-specific controls            | PASS: targeted fail-closed tests   | FAIL: new candidate-to-recovery drill pending                                | FAIL                                       | FAIL                    |
+| Deployment control                | PASS: digest/provenance/config/backup guards | PASS: targeted script tests        | FAIL: new control candidate not yet validated                                | FAIL: workflow disabled                    | PASS: release hold only |
+| Email delivery                    | PASS: transport exists                       | FAIL: delivery not proved          | FAIL: controlled mailbox/provider evidence required                          | FAIL                                       | FAIL                    |
+| Client acceptance                 | PASS: synthetic harness                      | PASS: HTTP and browser             | PASS: shared commercial client journey; email/dedicated scope unresolved     | FAIL                                       | FAIL                    |
+| Release decision                  | FAIL: NOT READY FOR PRODUCTION               | FAIL                               | FAIL                                                                         | FAIL                                       | FAIL                    |
 
-No main merge, production migration, candidate deploy, OS upgrade, reboot, real-client data or
-financial mutation occurred. Only reversible GitHub release protection changed. Backup copies,
-restore/migration probes and browser work remain isolated locally.
+## Isolated host continuation evidence
+
+Candidate `313d185174062ba4084cdb6973f943b473f57c53` fixed the real operator
+origination failure found during HTTP acceptance. CI including release-image validation
+`37417081754` and security `37417081725` passed. Publication `37417994256` passed;
+creation time `2026-10-06T05:13:35.507731Z`:
+
+- API: `ghcr.io/scigns/witness-api@sha256:a79035d2fd0173fe268b1458d60fc555410b809566ef749ac2badf52fc6a86c3`
+- Web: `ghcr.io/scigns/witness-web@sha256:6f7da70b05aeb872a43b9534021d1e7e14e56beae06dd27e9b2de8bd4f023da3`
+
+Any subsequent control commit is a new candidate and requires its own hosted CI,
+publication and exact-artifact rehearsal. These artifacts are a possible compatible
+recovery pair, not approval to restart the incompatible deployed legacy API.
+
+The existing Phase 3C recovery pattern was used on the host with internal network
+`witness-release-cdfe7fb-private`, separately named containers and fresh database/object
+volumes. No published host ports, production routes, shared DB/Keycloak volumes or
+production Compose mutations were used. Services are resource-capped. Browser transport
+uses loopback SSH and private `.invalid` origins; the compiled API hostname is relayed
+only to the private API. No application responses are mocked. This proves the UI against
+real services, not production DNS/cookie-origin configuration. An empty isolated Ollama
+service proves readiness connectivity, not model inference.
+
+Latest daily backups, `2026-10-06T03:00:01Z`, independently verified:
+
+| Backup   | Bytes  | SHA-256                                                            | Restore time |
+| -------- | ------ | ------------------------------------------------------------------ | ------------ |
+| Witness  | 259825 | `648012aa83331f6d8674fc9d338770dd10576fcbc29cbfe9e189267ea033eb44` | 2.506 s      |
+| Keycloak | 210757 | `d3b3c4584568165a0fe314df6d263f0072f98f3a9221c6ba57d32a413892a09c` | 2.328 s      |
+
+`pg_restore --no-owner --no-acl --exit-on-error` restored Witness's 50 tables,
+4 organisations, 4 subscriptions, 13 attachments, 195 audit events, 37 auth sessions
+and 33 complete migrations. Keycloak restored 87 tables, 2 realms, 12 users,
+14 clients and 12 credentials. A synthetic realm was added only to the restored database.
+A protected independent object copy contains 13 objects / 6,770,941 bytes; SHA-256
+`17a8377ee4dd56d7a4c6331829fa08e908fcd95d224af522db265838c0b67d59`.
+All bytes were restored and re-read with matching checksums in isolated S3 storage.
+Backups, credentials and customer bytes stay outside Git under protected recovery paths.
+
+The same 12 ledger-derived migrations listed above applied in order with installed
+Prisma 5.22, 4.688 s total on the latest candidate. Individual pending migrations took
+4.819–295.821 ms; no failed ledger rows. Before/after schema and complete checksummed
+ledger are retained in protected evidence. Production remains at 33 migrations.
+
+**Rollback classification: DATABASE RESTORE REQUIRED for the exact running legacy
+images.** Nullable quotas reproduce legacy Prisma P2032 after candidate writes. The
+executable drill stopped isolated candidate API/web/Keycloak, preserved the synthetic
+post-candidate dump, recreated only isolated databases, restored verified pre-migration
+Witness and Keycloak dumps, restarted isolated Keycloak and started the exact recorded
+legacy API/web image IDs. Recovery took 83.302 s including identity startup; restored
+ledger count 33, health/readiness PASS. Real OIDC, synthetic workspace creation and
+object upload/download PASS. This restore discards post-backup DB writes and is not
+approved as an automatic image-only rollback.
+
+Protected command/timing records: host
+`/home/witness/witness-backups/release-cdfe7fb-20261006/{restore,rollback,http-acceptance,storage-acceptance}-evidence.json`
+and `latest-migration-evidence.json`; off-host evidence is retained under
+`/private/tmp/witness-release-continuation-20261006`. No secrets or raw customer data
+are attached to this record. Immediate pre-deploy backups remain mandatory.
+
+No merge, live migration, production deployment, OS upgrade or reboot occurred.
+`apps/participant-mobile/` remains untouched. The disabled deployment workflow remains
+the release hold while compatible recovery, final combined candidate and remaining
+critical acceptance requirements are resolved.
 
 Local hybrid-profile browser acceptance passed 12 viewport/role cases at 375, 768 and 1440 px,
 including deep-link query/hash preservation, empty Programs landing, create-program/operator
