@@ -80,6 +80,8 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --prod --filter @witness/api...
 
 FROM node:22-bookworm-slim AS runtime
+ARG WITNESS_BUILD_ID
+LABEL org.opencontainers.image.revision=${WITNESS_BUILD_ID}
 
 # `prisma migrate deploy` runs from this image during a controlled deployment,
 # and pg_isready is what the healthcheck and the runbook use. `ffmpeg` is

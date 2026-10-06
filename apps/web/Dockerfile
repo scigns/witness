@@ -23,6 +23,8 @@
 #     -t witness-web .
 
 FROM node:22-bookworm-slim AS build
+ARG WITNESS_BUILD_ID
+ENV WITNESS_BUILD_ID=${WITNESS_BUILD_ID}
 
 ARG NEXT_PUBLIC_WITNESS_API_URL
 ARG NEXT_PUBLIC_WITNESS_PROFILE=sovereign
@@ -51,6 +53,8 @@ COPY apps/web apps/web
 RUN pnpm --filter @witness/web... run build
 
 FROM node:22-bookworm-slim AS runtime
+ARG WITNESS_BUILD_ID
+LABEL org.opencontainers.image.revision=${WITNESS_BUILD_ID}
 
 ARG NEXT_PUBLIC_WITNESS_BASE_PATH=
 ENV NODE_ENV=production

@@ -34,8 +34,12 @@ elif name == 'docker':
     elif args[:2] == ['image', 'inspect']:
         if '--format' in args: print('sha256:' + ('3' if 'api' in args[-1] else '4') * 64)
     elif args[:1] == ['compose']:
-        if 'ps' in args: print(args[-1] + '-container')
+        if 'config' in args: print(json.dumps({'services':{'api':{'environment':{'SECRET':'fixture-secret'}}}}))
+        elif 'ps' in args: print(args[-1] + '-container')
         elif 'exec' in args:
+            if 'sh' in args:
+                print('migration|checksum|finished|')
+                sys.exit(0)
             if os.environ.get('FAIL_BACKUP') == '1': sys.exit(7)
             if 'pg_restore' in args and os.environ.get('FAIL_ARCHIVE') == '1': sys.exit(9)
             sys.stdout.buffer.write(b'PGDMP synthetic fixture')
@@ -49,6 +53,8 @@ elif name == 'docker':
     else: sys.exit(3)
 elif name == 'curl':
     assert not any(a.startswith('-') and 'k' in a for a in args)
+    if args[-1].endswith('/api/build-identity'):
+        print(json.dumps({'buildId': ('b' if os.environ.get('WRONG_WEB_BUILD') == '1' else 'a') * 40}))
     if args[-1].endswith('/ready'):
         state = (root / 'state').read_text() if (root / 'state').exists() else 'old'
         wrong = os.environ.get('WRONG_BUILD') == '1'
@@ -58,6 +64,11 @@ elif name == 'curl':
 
 
 class DeploySafety(unittest.TestCase):
+    def test_wrong_web_artifact_rolls_back(self):
+        result, calls, root = self.run_deploy(WRONG_WEB_BUILD='1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((root / 'state').read_text(), 'old')
+
     def run_deploy(self, **flags):
         temporary = tempfile.TemporaryDirectory(prefix="witness-deploy-test-")
         self.addCleanup(temporary.cleanup)
@@ -67,6 +78,9 @@ class DeploySafety(unittest.TestCase):
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(SOURCE / relative, destination)
         (root / "deployments/cloud-managed").mkdir(parents=True)
+        (root / "services/api-gateway/prisma/migrations/fixture").mkdir(parents=True)
+        (root / "services/api-gateway/prisma/schema.prisma").write_text('// fixture')
+        (root / "services/api-gateway/prisma/migrations/fixture/migration.sql").write_text('SELECT 1;')
         (root / "package.json").write_text(json.dumps({"version": "0.4.1"}))
         (root / ".env").write_text("POSTGRES_USER=fixture\nPOSTGRES_DB=fixture\nPOSTGRES_PASSWORD=fixture\nKEYCLOAK_DB_USER=fixture\nKEYCLOAK_DB_PASSWORD=fixture\n")
         binary = root / "bin"

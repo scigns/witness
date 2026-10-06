@@ -33,6 +33,7 @@ const nextConfig = {
   // disagree, and the banner flips between "Developer Preview" and "Internal
   // pilot" on hydration. Defaults to `development` so `pnpm dev` needs no setup.
   env: {
+    WITNESS_BUILD_ID: process.env.WITNESS_BUILD_ID ?? 'development',
     WITNESS_BUILD_PROFILE: process.env.NEXT_PUBLIC_WITNESS_PROFILE ?? 'development',
   },
   reactStrictMode: true,

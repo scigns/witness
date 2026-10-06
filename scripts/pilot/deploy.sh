@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Deploys the current checkout to the pilot host: build -> migrate -> recreate
 # -> health check -> smoke test, with an automatic rollback of the running
-# containers (not the database — migrations are additive-only, see
-# docs/architecture/decisions, and are never rolled back automatically) if the
-# health check fails after recreation.
+# containers if the health check fails after recreation. Database migrations
+# are never reversed automatically. Release approval requires a rehearsal of
+# previous-image compatibility with both the upgraded schema and candidate writes.
 #
 # Run identically by a human operator on the pilot host or by
 # .github/workflows/deploy.yml on the self-hosted runner registered there
@@ -78,7 +78,7 @@ rollback() {
   write_image_override "$PREVIOUS_API_IMAGE" "$PREVIOUS_WEB_IMAGE"
   export WITNESS_BUILD_ID="$PREVIOUS_BUILD"
   export WITNESS_VERSION="$PREVIOUS_VERSION"
-  if ! "${RELEASE_COMPOSE[@]}" up -d --no-build --force-recreate api web; then
+  if ! "${RELEASE_COMPOSE[@]}" up -d --no-deps --no-build --force-recreate api web; then
     log "ROLLBACK RECREATION FAILED. Human recovery required."
     record "rollback_failed"
     exit 1
@@ -120,6 +120,13 @@ CANDIDATE_WEB_ID="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_WEB_IMAG
 printf 'candidate_sha=%s\nprevious_sha=%s\nprevious_version=%s\nprevious_api_image=%s\nprevious_web_image=%s\ncandidate_api_image=%s\ncandidate_web_image=%s\n' \
   "$COMMIT" "$PREVIOUS_BUILD" "$PREVIOUS_VERSION" "$PREVIOUS_API_IMAGE" "$PREVIOUS_WEB_IMAGE" "$CANDIDATE_API_ID" "$CANDIDATE_WEB_ID" > "$EVIDENCE_DIR/manifest.txt"
 
+# Preserve rollback preflight evidence without storing environment secrets.
+"${COMPOSE[@]}" config --format json | python3 -c 'import json,sys; c=json.load(sys.stdin); [(s.update(environment={k:"[REDACTED]" for k in s.get("environment",{})})) for s in c.get("services",{}).values()]; json.dump(c,sys.stdout,indent=2)' > "$EVIDENCE_DIR/compose.redacted.json"
+# shellcheck disable=SC2016 # Expand database identity inside the container only.
+"${COMPOSE[@]}" exec -T postgres sh -c 'psql -X -A -t -F "|" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT migration_name,checksum,finished_at,rolled_back_at FROM _prisma_migrations ORDER BY migration_name"' > "$EVIDENCE_DIR/migrations.before.txt"
+cp services/api-gateway/prisma/schema.prisma "$EVIDENCE_DIR/candidate-schema.prisma"
+find services/api-gateway/prisma/migrations -name migration.sql -exec sha256sum {} + > "$EVIDENCE_DIR/candidate-migrations.sha256"
+
 log "taking immediate Witness and identity database backups"
 bash scripts/pilot/backup.sh "$EVIDENCE_DIR"
 bash scripts/ops/backup-status.sh "$EVIDENCE_DIR" 1
@@ -127,17 +134,21 @@ bash scripts/ops/backup-status.sh "$EVIDENCE_DIR" 1
 # WITNESS_APPROVED_RELEASE_SHA is recorded. These dumps do not protect R2.
 
 log "applying database migrations (forward-only)"
-"${RELEASE_COMPOSE[@]}" run --rm --no-build api pnpm --filter @witness/api exec prisma migrate deploy
+"${RELEASE_COMPOSE[@]}" run --rm --no-deps --no-build api node node_modules/prisma/build/index.js migrate deploy
 
 log "recreating api and web containers from the recorded image IDs"
 write_image_override "$CANDIDATE_API_ID" "$CANDIDATE_WEB_ID"
-"${RELEASE_COMPOSE[@]}" up -d --no-build --force-recreate api web || rollback
+"${RELEASE_COMPOSE[@]}" up -d --no-deps --no-build --force-recreate api web || rollback
 
 log "waiting for health (up to ${HEALTH_TIMEOUT_SECONDS}s)"
 wait_for_health "$COMMIT" || rollback
 
 log "running smoke checks against ${API_URL} and ${WEB_URL}"
 curl -fsS --max-time 10 "${API_URL}/ready" >/dev/null || rollback
+if ! curl -fsS --max-time 10 "${WEB_URL}/api/build-identity" | python3 -c 'import json,sys; assert json.load(sys.stdin)["buildId"] == sys.argv[1]' "$COMMIT"; then
+  log "web artifact identity does not match approved SHA"
+  rollback
+fi
 curl -fsS --max-time 10 -o /dev/null -w '' "${WEB_URL}/" || rollback
 
 log "deploy succeeded"
