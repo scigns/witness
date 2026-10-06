@@ -157,6 +157,7 @@ test-operations: ## Verify deployment rollback and backup safety without infrast
 	python3 scripts/pilot/deploy.test.py
 	python3 scripts/ops/backup-status.test.py
 	python3 scripts/release/publication.test.py
+	python3 scripts/release/artifacts.test.py
 
 .PHONY: test-e2e
 test-e2e: ## Run end-to-end tests (requires the local stack)
