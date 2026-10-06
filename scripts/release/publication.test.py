@@ -62,6 +62,7 @@ class PublicationSafety(unittest.TestCase):
             block=re.search(r'^  '+kind+r':\n(.*?)(?=^  \S|\Z)',compose,re.M|re.S).group(1)
             self.assertNotRegex(block,r'(?m)^\s+build:')
             self.assertIn('pull_policy: never',block)
+            self.assertIn('@sha256:'+'0'*64,block)
 
 
 if __name__ == '__main__':

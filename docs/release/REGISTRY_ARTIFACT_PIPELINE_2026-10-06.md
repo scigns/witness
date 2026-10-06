@@ -86,6 +86,8 @@ Migrations run from the verified API image ID using installed Prisma. API/web st
 use `--no-build --no-deps`. The production Compose API/web services have **no `build:` definition**
 and `pull_policy: never`; failure cannot fall back to compilation. Explicit pulls are the sole
 artifact acquisition path. The optional graph worker is unchanged and is not started by deployment.
+Unset image variables use an impossible all-zero digest with pulling disabled, allowing
+Postgres-only backup/status commands to parse without approving or starting an application.
 API `/ready` SHA and web `/api/build-identity` must match approval before success is recorded.
 
 Rollback still requires compatibility with upgraded schema and candidate writes. Healthy old

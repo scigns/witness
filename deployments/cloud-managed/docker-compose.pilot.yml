@@ -188,7 +188,9 @@ services:
   api:
     <<: *common
     # No build definition: registry failure must never compile on this host.
-    image: ${WITNESS_API_IMAGE:?WITNESS_API_IMAGE must be an approved immutable image}
+    # An impossible digest lets Postgres-only backup/status commands parse
+    # before approval exists; it cannot start an unapproved application.
+    image: ${WITNESS_API_IMAGE:-ghcr.io/scigns/witness-api@sha256:0000000000000000000000000000000000000000000000000000000000000000}
     pull_policy: never
     environment:
       NODE_ENV: production
@@ -252,7 +254,7 @@ services:
 
   web:
     <<: *common
-    image: ${WITNESS_WEB_IMAGE:?WITNESS_WEB_IMAGE must be an approved immutable image}
+    image: ${WITNESS_WEB_IMAGE:-ghcr.io/scigns/witness-web@sha256:0000000000000000000000000000000000000000000000000000000000000000}
     pull_policy: never
     depends_on:
       api: { condition: service_started }
