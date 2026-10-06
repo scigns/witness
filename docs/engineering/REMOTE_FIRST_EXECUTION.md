@@ -65,7 +65,8 @@ reduce CI work. Independent job installs provide isolation; merging them is not 
 improvement. Invariants/adversarial each request a workspace build (normally Turbo-cache hits),
 while other jobs also build. Measure cache hit rates before changing this. Path selection currently
 detects an installable workspace, not affected paths; safer affected selection needs coverage proof
-and an always-reporting aggregate gate. No test, security or integration job is skipped for this task.
+and an always-reporting aggregate gate. No test, security or integration job is skipped for this
+task.
 
 ## Completion evidence
 

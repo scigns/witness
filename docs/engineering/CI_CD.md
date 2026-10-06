@@ -16,7 +16,8 @@
 3. **No logic in YAML.** Workflows are thin wrappers around `scripts/` and `Makefile`. This keeps us
    portable off GitHub Actions — a public-infrastructure project that can only be built on one
    commercial platform is not credibly sovereign.
-4. **Gates are not optional.** We do not disable a gate to go green. If a gate is wrong, we change it
+4. **Gates are not optional.** We do not disable a gate to go green. If a gate is wrong, we change
+   it
    deliberately, in its own pull request.
 5. **Supply chain is part of CI**, not a separate concern.
 
@@ -119,14 +120,16 @@ CI, disposable Postgres/Neo4j integration, security and CodeQL stay on GitHub-ho
 
 The candidate registry pipeline builds API/web once on GitHub-hosted CI and uploads validated
 image bytes. A deliberate exact-SHA artifact tag publishes those same bytes to GHCR; deployment
-pulls approved digests and never compiles. See the [artifact pipeline](../release/REGISTRY_ARTIFACT_PIPELINE_2026-10-06.md)
+pulls approved digests and never compiles. See the [artifact
+pipeline](../release/REGISTRY_ARTIFACT_PIPELINE_2026-10-06.md)
 for trust, manifest, retention and approval details. Publication is separate from release approval.
 
 Production deployment remains intentionally disabled pending the existing release gates. Neither
 remote CI nor this operating-model change approves a release, migration, recovery or real-client
 acceptance. Exact-SHA and candidate-specific rollback-image controls, immediate backups and
 migration/recovery/acceptance requirements are preserved. No production operations are part of
-routine developer validation. See [release reconciliation](../release/PRODUCTION_RECONCILIATION_2026-10-06.md).
+routine developer validation. See [release
+reconciliation](../release/PRODUCTION_RECONCILIATION_2026-10-06.md).
 
 ## Environments
 
