@@ -114,7 +114,7 @@ export default function OriginationPage({
       // Only non-quoted paid catalogue plans are offered. The server validates price and state again.
       const change = (current.change ??=
         pending ??
-        (await api.requestCommercialChange(
+        (await api.requestOperatorCommercialChange(
           organisationId,
           {
             action: 'CHANGE_PLAN',
@@ -126,7 +126,7 @@ export default function OriginationPage({
           user,
         )));
       setInvoice(
-        await api.issueInvoice(
+        await api.issueOperatorInvoice(
           organisationId,
           {
             idempotencyKey: current.invoiceKey,

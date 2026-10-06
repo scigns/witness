@@ -9,6 +9,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { REQUIRED_ACTION } from '../authz/authorization.guard.js';
+import { OperatorOriginationController } from './operator-origination.controller.js';
 
 import type { Principal } from '../authz/authorization.port.js';
 import { DevelopmentAuthorizationAdapter } from '../authz/development.adapter.js';
@@ -122,4 +124,43 @@ describe('operator:read is platform-only', () => {
     const decision = await service.decide(ADMIN_PRINCIPAL, 'operator:read', { type: 'global' });
     expect(decision.allowed).toBe(true);
   });
+});
+
+describe('operator financial origination', () => {
+  it.each(['invoice:read', 'invoice:render'] as const)(
+    'allows platform invoice %s without customer membership',
+    async (action) => {
+      const service = await realService(platformAdminPrisma());
+      expect(
+        (
+          await service.decide(ADMIN_PRINCIPAL, action, {
+            type: 'organisation',
+            organisationId: ORGANISATION_A,
+          })
+        ).allowed,
+      ).toBe(true);
+    },
+  );
+  it.each(['requestChange', 'issueInvoice'] as const)(
+    'requires verified platform settlement authority for %s',
+    async (method) => {
+      const action = Reflect.getMetadata(
+        REQUIRED_ACTION,
+        OperatorOriginationController.prototype[method],
+      );
+      expect(action).toBe('payment:settle');
+      const scope = { type: 'organisation' as const, organisationId: ORGANISATION_A };
+      expect(
+        (
+          await (
+            await realService(organisationScopedAdminPrisma())
+          ).decide(ADMIN_PRINCIPAL, action, scope)
+        ).allowed,
+      ).toBe(false);
+      expect(
+        (await (await realService(platformAdminPrisma())).decide(ADMIN_PRINCIPAL, action, scope))
+          .allowed,
+      ).toBe(true);
+    },
+  );
 });

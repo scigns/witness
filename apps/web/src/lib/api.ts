@@ -384,6 +384,28 @@ export const api = {
       user,
     ),
 
+  requestOperatorCommercialChange: (
+    organisationId: string,
+    body: CommercialChangeRequest,
+    user: ActingUser,
+  ): Promise<CommercialChangeView> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/origination/change-requests`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  issueOperatorInvoice: (
+    organisationId: string,
+    body: IssueInvoiceRequest,
+    user: ActingUser,
+  ): Promise<InvoiceView> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/origination/invoices`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   issueInvoice: (
     organisationId: string,
     body: IssueInvoiceRequest,
