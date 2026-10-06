@@ -16,8 +16,8 @@ SSH works through `witness-prod-claude`. Read-only evidence collected around 202
 | Deployed web image       | `sha256:a7bd28eb30fb553b27266b92c25efd42f9f85cdf857cdddde86493b380f10d3c` | Container `.Image`; exported archive passes gzip integrity                          |
 | Deployed web Git SHA     | FAIL: not recoverable from inspected metadata                             | No OCI revision/runtime SHA; Next BUILD_ID `6ii1rcZHTEcfNlzhoRfk8` is not a Git SHA |
 | Current main             | `d2771a29ff90677868993039d0511b8fe9ee028e`                                | Remote main and runner checkout agree                                               |
-| Inspected candidate      | `209f1d2`                                                                 | PR #266; all CI/security checks PASS at this checkpoint; new changes require CI     |
-| PR #264 parent           | `215f3500b542d00ced424de9a23db25fb6c31d2d`                                | Base main; unit/integration checks FAIL                                             |
+| Inspected candidate      | `ced2461e8fa44b612812095a167e845f18f6db33`                                | PR #266; CI/security PASS; subsequent rollback guard changes require CI             |
+| PR #264 parent           | `c1e5cd2517b9733b117938e5078032d28802a2be`                                | Base main; narrow CI repair pushed to existing branch; revalidation pending         |
 | PR #262 parallel feature | `b0688423b79bb410ab1e2823f907ff4c24daff2d`                                | Base main; not an ancestor of #266; excluded from this release scope                |
 | Authoritative checkout   | `/home/witness/actions-runner/_work/witness/witness` at `d2771a2`         | API/web/Postgres/Keycloak Compose labels and Git inspection                         |
 | Environment file         | `/home/witness/witness/.env`                                              | Compose label; secrets not printed/copied to Git                                    |
@@ -49,7 +49,8 @@ no exact-SHA approval variable was found.
    required gates. Historic failures: whitespace-sensitive brand assertion and missing generated
    Prisma client after cached build restoration. Child fixes the assertion; candidate CI explicitly
    generates Prisma independently of Turbo cache. Do not bypass parent failures.
-2. Reconcile/retarget #266 (`feat/commercial-runtime-readiness`, based on #264 `215f350`). Preserve
+2. Reconcile/retarget #266 (`feat/commercial-runtime-readiness`, forked from #264 `215f350`;
+   parent now `c1e5cd2`). Preserve
    parent history and validate the combined tree. Shell work is already in #266 (`2079a9d`, `74892bf`);
    no new shell branch is needed. #262 Help search is a parallel feature excluded from scope; shell
    Help links to support. Do not claim in-app search is included.
@@ -118,6 +119,10 @@ schema in the isolated network rejects a synthetic null-quota organisation with 
 the restored DB upgrade. This is a deployed-schema compatibility check, not a successful exact-image
 rollback drill. The probe exists only locally.
 
+The deployment entrypoint now additionally requires candidate-specific approval of the exact
+running API/web rollback image IDs. Missing or stale approval refuses build/migration/deployment.
+This enforces the release hold; it does not turn a failed compatibility test into a PASS.
+
 **ROLLBACK FAIL:** automatic image rollback cannot protect null quotas or reservation semantics
 after candidate writes. Require a compatible rollback artifact/write rehearsal, or an explicitly
 approved DB/object recovery plan with bounded downtime and post-checkpoint data handling. No
@@ -131,8 +136,8 @@ accepted implicitly; no ACCEPTED DEFERRED RISK has been approved.
 
 | Gate                               | IMPLEMENTED                                                     | TESTED                                                  | DEPLOYED                                  | PRODUCTION VERIFIED                           |
 | ---------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------- | --------------------------------------------- |
-| Tests                              | PASS                                                            | PASS at 209f1d2; new CI required                        | FAIL: candidate absent                    | FAIL                                          |
-| Security/adversarial               | PASS                                                            | PASS at 209f1d2                                         | FAIL                                      | FAIL: full live attack journey pending        |
+| Tests                              | PASS                                                            | PASS at ced2461; new CI required                        | FAIL: candidate absent                    | FAIL                                          |
+| Security/adversarial               | PASS                                                            | PASS at ced2461                                         | FAIL                                      | FAIL: full live attack journey pending        |
 | Tenant isolation                   | PASS: API/repository boundaries                                 | PASS: local/CI authority tests                          | FAIL                                      | FAIL: candidate cross-org acceptance pending  |
 | Quota/reservation                  | PASS                                                            | PASS: contention/fencing/recovery                       | FAIL                                      | FAIL                                          |
 | Storage reconciliation             | PASS: bounded reporting and safe lease cleanup                  | PASS: live local tests                                  | FAIL                                      | FAIL                                          |

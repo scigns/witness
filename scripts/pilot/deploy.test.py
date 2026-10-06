@@ -92,6 +92,8 @@ class DeploySafety(unittest.TestCase):
         environment = dict(os.environ, PATH=f"{binary}:{os.environ['PATH']}", FAKE_ROOT=str(root),
                            WITNESS_ENV_FILE=str(root / ".env"), WITNESS_DEPLOY_EVIDENCE_DIR=str(root / "evidence"),
                            WITNESS_APPROVED_RELEASE_SHA=CANDIDATE, WITNESS_DEPLOY_HEALTH_TIMEOUT_SECONDS="2",
+                           WITNESS_APPROVED_ROLLBACK_RELEASE_SHA=CANDIDATE,
+                           WITNESS_APPROVED_ROLLBACK_API_IMAGE=OLD_API, WITNESS_APPROVED_ROLLBACK_WEB_IMAGE=OLD_WEB,
                            WITNESS_PILOT_API_URL="https://api.fixture.example", WITNESS_PILOT_WEB_URL="https://app.fixture.example")
         environment.update(flags)
         result = subprocess.run(["bash", str(root / "scripts/pilot/deploy.sh")], cwd=root, env=environment, capture_output=True, text=True, timeout=30)
@@ -102,6 +104,17 @@ class DeploySafety(unittest.TestCase):
         result, calls, _ = self.run_deploy(WITNESS_APPROVED_RELEASE_SHA="")
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue(all(name == "git" for name, _ in calls))
+
+    def test_missing_or_stale_rollback_approval_prevents_mutation(self):
+        for flags in [dict(WITNESS_APPROVED_ROLLBACK_RELEASE_SHA=""),
+                      dict(WITNESS_APPROVED_ROLLBACK_RELEASE_SHA=PREVIOUS),
+                      dict(WITNESS_APPROVED_ROLLBACK_API_IMAGE=NEW_API),
+                      dict(WITNESS_APPROVED_ROLLBACK_WEB_IMAGE=NEW_WEB)]:
+            with self.subTest(flags=flags):
+                result, calls, root = self.run_deploy(**flags)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse((root / "evidence").exists())
+                self.assertFalse(any(any(action in args for action in ["build", "migrate", "up", "pg_dump"]) for _, args in calls))
 
     def test_success_records_exact_images_and_backs_up_before_migration(self):
         result, calls, root = self.run_deploy()

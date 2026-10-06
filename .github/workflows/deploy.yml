@@ -54,6 +54,9 @@ jobs:
           WITNESS_PILOT_WEB_URL: ${{ vars.WITNESS_PILOT_WEB_URL }}
           WITNESS_ENV_FILE: /home/witness/witness/.env
           WITNESS_APPROVED_RELEASE_SHA: ${{ vars.WITNESS_APPROVED_RELEASE_SHA }}
+          WITNESS_APPROVED_ROLLBACK_RELEASE_SHA: ${{ vars.WITNESS_APPROVED_ROLLBACK_RELEASE_SHA }}
+          WITNESS_APPROVED_ROLLBACK_API_IMAGE: ${{ vars.WITNESS_APPROVED_ROLLBACK_API_IMAGE }}
+          WITNESS_APPROVED_ROLLBACK_WEB_IMAGE: ${{ vars.WITNESS_APPROVED_ROLLBACK_WEB_IMAGE }}
         run: bash scripts/pilot/deploy.sh
 
       # Password recovery is a Keycloak realm capability, not an API health

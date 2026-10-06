@@ -102,6 +102,15 @@ PREVIOUS_VERSION="$(printf '%s' "$PREVIOUS_IDENTITY" | python3 -c 'import json,s
 log "capturing exact running rollback images"
 PREVIOUS_API_IMAGE="$(capture_running_image api)"
 PREVIOUS_WEB_IMAGE="$(capture_running_image web)"
+# A healthy previous image is not necessarily compatible with the upgraded
+# schema or new writes. Approval is specific to this candidate/image pair and
+# must follow a successful rollback rehearsal; never infer it from /ready.
+if [[ "${WITNESS_APPROVED_ROLLBACK_RELEASE_SHA:-}" != "$COMMIT" || \
+      "${WITNESS_APPROVED_ROLLBACK_API_IMAGE:-}" != "$PREVIOUS_API_IMAGE" || \
+      "${WITNESS_APPROVED_ROLLBACK_WEB_IMAGE:-}" != "$PREVIOUS_WEB_IMAGE" ]]; then
+  log "rollback compatibility approval missing for candidate and running images; refusing build/migration/deployment" >&2
+  exit 1
+fi
 EVIDENCE_DIR="${WITNESS_DEPLOY_EVIDENCE_DIR:-$HOME/witness-backups/releases/$COMMIT}"
 mkdir -p "$EVIDENCE_DIR"
 chmod 700 "$EVIDENCE_DIR"

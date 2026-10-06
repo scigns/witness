@@ -293,17 +293,37 @@ against a new host.
 
 ## Rollback
 
-Roll the application back, not the database. Migrations in this repository are
-additive within a release, so the previous image runs against the current schema:
+An application-only rollback is allowed only after proving the previous images
+work with the upgraded schema **and candidate writes** in isolation. Additive DDL
+does not establish application compatibility. The October 2026 candidate permits
+null storage quotas and introduces durable reservations; the deployed required-quota
+Prisma client rejects a null quota with P2032 and bypasses the reservation protocol.
+Do not approve that image pair for automatic rollback.
+
+The deploy workflow requires `WITNESS_APPROVED_ROLLBACK_RELEASE_SHA` to match the
+approved candidate and `WITNESS_APPROVED_ROLLBACK_API_IMAGE` /
+`WITNESS_APPROVED_ROLLBACK_WEB_IMAGE` to match the exact running image IDs. Set these
+only after a successful compatibility rehearsal. Missing/stale approval fails before
+build, backup or migration. The release hold remains active while recovery is unproven.
+
+For a proven compatible pair, application-only rollback preserves the database:
 
 ```bash
 docker compose … up -d --no-deps api web   # with the previous image tags
 ```
 
-If a release contains a migration that the previous version genuinely cannot
-run against, the rollback is: stop the API, restore the pre-deployment backup,
-deploy the previous images. That is a data-loss window equal to the time since
-the backup, so take one immediately before any deployment that migrates.
+If compatibility fails, prepare a compatible recovery artifact or obtain explicit
+approval for a checkpoint restore. A checkpoint restore requires a maintenance
+window, all writers fenced (including workers), verified DB and independent object
+backups, exact previous images/configuration, a retained post-failure DB/object
+snapshot, a rehearsed recovery duration and an agreed treatment of writes after the
+checkpoint. Restore into an isolated fresh database first; destructive replacement
+of production requires separate approval. The DB restore alone cannot recover
+deleted/overwritten attachments. Do not run candidate migrations on the restored
+old schema before starting the old images. Verify the old ledger, identities,
+authentication and an authenticated data read before reopening writes. No such
+production recovery is currently authorised; see the
+[release reconciliation](../release/PRODUCTION_RECONCILIATION_2026-10-06.md).
 
 ## Logs
 
@@ -332,7 +352,8 @@ Neither exposes a secret. Alert on `/ready` reporting `down`, not on `/health`.
 2. **Is it authentication?** Sign-in failures with a healthy API usually mean
    Keycloak, its database, or a redirect URI that no longer matches the client.
    `/ready` reports the identity provider as a component for exactly this reason.
-3. **Is it a bad release?** Roll the application back first, diagnose second.
+3. **Is it a bad release?** Fence writes and use the rehearsed release-specific
+   recovery plan. Do not downgrade incompatible images against a migrated database.
 4. **Is it data?** Stop writes before restoring. A restore during live use loses
    whatever was written after the dump.
 
