@@ -213,6 +213,24 @@ export default function OperatorCommercialConfigurationPage({
             <dd>{provisioning.observed.verifiedAt ?? 'Not verified'}</dd>
           </dl>
           <p className="mt-3 text-sm">{provisioning.observed.detail}</p>
+          <Button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setFormError(null);
+              try {
+                setProvisioning(await api.verifyOperatorProvisioning(organisationId, user));
+              } catch (caught) {
+                setFormError(
+                  caught instanceof ApiError ? caught.message : 'Provisioning verification failed.',
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Verify allocation and record evidence
+          </Button>
         </Card>
       )}
       <Card>

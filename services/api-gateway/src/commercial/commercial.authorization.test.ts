@@ -125,6 +125,16 @@ function guardForAction(action: string, allowedOrganisation: string | null) {
 }
 
 describe('commercial-configuration route authorisation (ADR-0034)', () => {
+  it('denies customer provisioning attestation without platform management authority', async () => {
+    const target = routeContext(
+      OperatorCommercialConfigurationController,
+      'verifyProvisioning',
+      ORG_A,
+    );
+    await expect(
+      guardForAction('organisation:update', ORG_A).canActivate(target.execution),
+    ).rejects.toMatchObject({ response: { error: { code: 'FORBIDDEN' } } });
+  });
   it("denies the organisation's own self-service resolve() when the guard's decision is false", async () => {
     const target = routeContext(CommercialConfigurationController, 'resolve', ORG_A);
     await expect(

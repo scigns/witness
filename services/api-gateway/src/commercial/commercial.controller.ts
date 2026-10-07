@@ -134,6 +134,15 @@ export class OperatorCommercialConfigurationController {
     return this.reconciliation.inspect(organisationId, request.principal!);
   }
 
+  @Post('provisioning/verify')
+  @Requires('commercial_override:manage')
+  verifyProvisioning(
+    @Param('organisationId') organisationId: string,
+    @Req() request: RequestWithPrincipal,
+  ) {
+    return this.provisioning.verify(organisationId, request.principal!);
+  }
+
   @Post('reconciliation/expired-reservations')
   @Requires('commercial_override:manage')
   cleanExpired(

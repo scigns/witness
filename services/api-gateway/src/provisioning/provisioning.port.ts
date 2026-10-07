@@ -11,9 +11,21 @@ export interface ProvisioningObservation {
   detail: string;
 }
 
+export interface ProvisioningRequest {
+  organisationId: string;
+  deploymentIsolation: DeploymentIsolationTier;
+  resourceProfileCode: string;
+  computeClass: string;
+  memoryClass: string;
+  configurationFingerprint: string;
+}
+
 /** Infrastructure adapters verify actual allocations. No request body can create an observation. */
 export abstract class ProvisioningPort {
-  abstract observe(tenantId: string): Promise<ProvisioningObservation>;
+  abstract observe(
+    tenantId: string,
+    desired?: ProvisioningRequest,
+  ): Promise<ProvisioningObservation>;
 }
 
 export function assessProvisioning(

@@ -69,7 +69,7 @@ import { OrganisationRoleAssignmentsService } from './organisation-role-assignme
 import { OrganisationsController } from './organisations/organisations.controller.js';
 import { OrganisationsService } from './organisations/organisations.service.js';
 import { ProvisioningPort } from './provisioning/provisioning.port.js';
-import { RecordedProvisioningAdapter } from './provisioning/recorded-provisioning.adapter.js';
+import { SharedRuntimeProvisioningAdapter } from './provisioning/shared-runtime-provisioning.adapter.js';
 import { TenantProvisioningService } from './provisioning/tenant-provisioning.service.js';
 import { StorageReconciliationService } from './organisations/storage-reconciliation.service.js';
 import { StorageQuotaService } from './organisations/storage-quota.service.js';
@@ -204,7 +204,7 @@ import { MailerService } from './infrastructure/mailer.js';
     StorageQuotaService,
     StorageReconciliationService,
     TenantProvisioningService,
-    { provide: ProvisioningPort, useClass: RecordedProvisioningAdapter },
+    { provide: ProvisioningPort, useClass: SharedRuntimeProvisioningAdapter },
     OrganisationUsageService,
     CommercialEntitlementService,
     CommercialCatalogueService,

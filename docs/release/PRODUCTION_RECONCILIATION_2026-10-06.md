@@ -197,7 +197,8 @@ Backups, credentials and customer bytes stay outside Git under protected recover
 
 The same 12 ledger-derived migrations listed above applied in order with installed
 Prisma 5.22, 4.686 s total on the latest candidate. Individual pending migrations took
-4.819–295.821 ms on the earlier 313d185 drill; no failed ledger rows. Before/after schema and complete checksummed
+4.819–295.821 ms on the earlier 313d185 drill; no failed ledger rows.
+Before/after schema and complete checksummed
 ledger are retained in protected evidence. Production remains at 33 migrations.
 
 **Rollback classification: DATABASE RESTORE REQUIRED for the exact running legacy

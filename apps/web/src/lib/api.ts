@@ -448,6 +448,16 @@ export const api = {
       user,
     ),
 
+  verifyOperatorProvisioning: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<TenantProvisioningView> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/provisioning/verify`,
+      user,
+      { method: 'POST' },
+    ),
+
   getOrganisationProvisioning: (
     organisationId: string,
     user: ActingUser,

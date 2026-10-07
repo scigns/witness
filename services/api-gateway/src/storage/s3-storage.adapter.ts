@@ -18,6 +18,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  HeadBucketCommand,
   ListObjectsV2Command,
   NoSuchKey,
   NotFound,
@@ -70,6 +71,26 @@ export class S3StorageAdapter extends StoragePort {
   }
 
   /** Every key this adapter writes carries its kind as a path segment (see objectKey()). */
+  async verifyNamespace(prefix: string): Promise<void> {
+    if (!/^[0-9a-f-]{36}\/$/.test(prefix)) throw new Error('Invalid organisation namespace.');
+    await Promise.all(
+      [...new Set([this.config.bucketMedia, this.config.bucketDocuments])].map(async (Bucket) => {
+        await this.client.send(new HeadBucketCommand({ Bucket }), {
+          abortSignal: AbortSignal.timeout(5000),
+        });
+        const response = await this.client.send(
+          new ListObjectsV2Command({ Bucket, Prefix: prefix, MaxKeys: 1 }),
+          { abortSignal: AbortSignal.timeout(5000) },
+        );
+        if ((response.Contents ?? []).some((object) => !object.Key?.startsWith(prefix))) {
+          throw new Error(
+            'Storage provider returned an object outside the organisation namespace.',
+          );
+        }
+      }),
+    );
+  }
+
   private bucketFor(key: string): string {
     return key.includes('/evidence-attachment/')
       ? this.config.bucketMedia

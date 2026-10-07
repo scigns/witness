@@ -33,6 +33,7 @@ export const AUDIT_ACTIONS = [
   'organisation.storage_reserved',
   'organisation.storage_reconciled',
   'organisation.storage_quota_updated',
+  'organisation.provisioning_verified',
   'subscription.created',
   'subscription.change_requested',
   'subscription.entitlement_override_set',
