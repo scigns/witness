@@ -1,0 +1,312 @@
+{
+  "candidate_sha": "ec77a1cdcb4355904976c74fa7ea678ec42b0604",
+  "publication_run_id": "37619002470",
+  "runtime": {
+    "sha": "ec77a1cdcb4355904976c74fa7ea678ec42b0604",
+    "artifacts": {
+      "api": "ghcr.io/scigns/witness-api@sha256:a3e61a4daf1c962fcd52e6e5dfba0470a7a8d7a4dac7ad0e166f05b53c079c9a",
+      "web": "ghcr.io/scigns/witness-web@sha256:a663cdf190f77558c915a698d72e2af97ca1baf6ca03f60780034514d06d5987"
+    },
+    "health": {
+      "api": "healthy",
+      "web": "healthy"
+    },
+    "migrations": 45,
+    "migration_inventory": "UNCHANGED AND VERIFIED",
+    "production": "UNCHANGED"
+  },
+  "observability": {
+    "result": "PASS",
+    "candidate": {
+      "api": {
+        "image": "sha256:a3e61a4daf1c962fcd52e6e5dfba0470a7a8d7a4dac7ad0e166f05b53c079c9a",
+        "revision": "ec77a1cdcb4355904976c74fa7ea678ec42b0604",
+        "health": "healthy",
+        "restarts": 0,
+        "critical_startup_errors": []
+      },
+      "web": {
+        "image": "sha256:a663cdf190f77558c915a698d72e2af97ca1baf6ca03f60780034514d06d5987",
+        "revision": "ec77a1cdcb4355904976c74fa7ea678ec42b0604",
+        "health": "healthy",
+        "restarts": 0,
+        "critical_startup_errors": []
+      }
+    },
+    "production": {
+      "api": {
+        "image": "sha256:994f78c2266c52cd57d11fca42f8ff28643583605026e2ba29f2b6628989426b",
+        "health": "healthy",
+        "restarts": 0
+      },
+      "web": {
+        "image": "sha256:a7bd28eb30fb553b27266b92c25efd42f9f85cdf857cdddde86493b380f10d3c",
+        "health": "healthy",
+        "restarts": 0
+      },
+      "postgres": {
+        "image": "sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b",
+        "health": "healthy",
+        "restarts": 0
+      },
+      "keycloak": {
+        "image": "sha256:09a381c715ab0b111835b70f2905955274843a219c6f27efb348e4d9f4086858",
+        "health": "healthy",
+        "restarts": 0
+      }
+    },
+    "production_ledger": 33
+  },
+  "provisioning": {
+    "result": "PASS",
+    "source": "Successful remote node /tmp/provisioning-delta.mjs invocation; assertions and stdout recorded before rollback removed candidate container",
+    "checks": [
+      {
+        "name": "OIDC login release-operator; callback replay denied",
+        "result": "PASS"
+      },
+      {
+        "name": "OIDC login release-admin; callback replay denied",
+        "result": "PASS"
+      },
+      {
+        "name": "Actual shared runtime/storage provider attests exact candidate",
+        "result": "PASS"
+      },
+      {
+        "name": "Operator attestation audited; duplicate observation idempotent",
+        "result": "PASS"
+      },
+      {
+        "name": "Customer mutation denied; cross-org provisioning denied; provider reference hidden",
+        "result": "PASS"
+      },
+      {
+        "name": "Unsupported ISOLATED_DATA/DEDICATED/SOVEREIGN remains NOT_PROVISIONED",
+        "result": "PASS"
+      }
+    ]
+  },
+  "browser": {
+    "result": "PASS",
+    "candidate_sha": "ec77a1cdcb4355904976c74fa7ea678ec42b0604",
+    "results": [
+      {
+        "name": "real final-artifact OIDC deep-link and workspace landing",
+        "result": "PASS"
+      },
+      {
+        "name": "workspace viewport and accessibility",
+        "result": "PASS",
+        "width": 375
+      },
+      {
+        "name": "workspace viewport and accessibility",
+        "result": "PASS",
+        "width": 768
+      },
+      {
+        "name": "workspace viewport and accessibility",
+        "result": "PASS",
+        "width": 1440
+      },
+      {
+        "name": "customer denied operator provisioning screen",
+        "result": "PASS"
+      },
+      {
+        "name": "operator browser records actual shared-provider attestation and renders desired versus observed",
+        "result": "PASS"
+      }
+    ],
+    "transport": "Remote pinned browser image on isolated internal network; exact application responses; no production routing"
+  },
+  "rollback": {
+    "result": "PASS",
+    "classification": "COMPATIBLE RECOVERY ARTIFACT; NO DATABASE RESTORE",
+    "candidate_sha": "ec77a1cdcb4355904976c74fa7ea678ec42b0604",
+    "recovery_sha": "313d185174062ba4084cdb6973f943b473f57c53",
+    "recovery_refs": {
+      "api": "ghcr.io/scigns/witness-api@sha256:a79035d2fd0173fe268b1458d60fc555410b809566ef749ac2badf52fc6a86c3",
+      "web": "ghcr.io/scigns/witness-web@sha256:6f7da70b05aeb872a43b9534021d1e7e14e56beae06dd27e9b2de8bd4f023da3"
+    },
+    "before_after_counts": "45|7|4|3|2|2|5|252",
+    "duration_seconds": 12.761,
+    "commands": [
+      ["hostname", "-s"],
+      [
+        "docker",
+        "exec",
+        "witness-release-cdfe7fb-postgres",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "witness",
+        "-Atc",
+        "SELECT (SELECT count(*) FROM _prisma_migrations),(SELECT count(*) FROM organisation),(SELECT count(*) FROM workspace),(SELECT count(*) FROM resource),(SELECT count(*) FROM payment),(SELECT count(*) FROM receipt),(SELECT count(*) FROM storage_reservation),(SELECT count(*) FROM audit_event)"
+      ],
+      ["docker", "inspect", "witness-release-cdfe7fb-api"],
+      [
+        "docker",
+        "image",
+        "inspect",
+        "ghcr.io/scigns/witness-api@sha256:a79035d2fd0173fe268b1458d60fc555410b809566ef749ac2badf52fc6a86c3"
+      ],
+      ["docker", "stop", "witness-release-cdfe7fb-api"],
+      ["docker", "rm", "witness-release-cdfe7fb-api"],
+      [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "witness-release-cdfe7fb-api",
+        "--network",
+        "witness-release-cdfe7fb-private",
+        "--network-alias",
+        "api",
+        "--memory",
+        "768m",
+        "--cpus",
+        "0.75",
+        "--env-file",
+        "/home/witness/witness-backups/release-cdfe7fb-20261006/api.env",
+        "--mount",
+        "type=bind,source=/home/witness/witness-backups/release-cdfe7fb-20261006/tls.crt,target=/rehearsal/tls.crt,readonly",
+        "ghcr.io/scigns/witness-api@sha256:a79035d2fd0173fe268b1458d60fc555410b809566ef749ac2badf52fc6a86c3"
+      ],
+      ["docker", "inspect", "witness-release-cdfe7fb-web"],
+      [
+        "docker",
+        "image",
+        "inspect",
+        "ghcr.io/scigns/witness-web@sha256:6f7da70b05aeb872a43b9534021d1e7e14e56beae06dd27e9b2de8bd4f023da3"
+      ],
+      ["docker", "stop", "witness-release-cdfe7fb-web"],
+      ["docker", "rm", "witness-release-cdfe7fb-web"],
+      [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "witness-release-cdfe7fb-web",
+        "--network",
+        "witness-release-cdfe7fb-private",
+        "--network-alias",
+        "web",
+        "--memory",
+        "384m",
+        "--cpus",
+        "0.5",
+        "ghcr.io/scigns/witness-web@sha256:6f7da70b05aeb872a43b9534021d1e7e14e56beae06dd27e9b2de8bd4f023da3"
+      ],
+      [
+        "docker",
+        "exec",
+        "witness-release-cdfe7fb-api",
+        "node",
+        "-e",
+        "Promise.all([fetch('http://127.0.0.1:3001/ready').then(r=>r.json()),fetch('http://web:3000/api/build-identity').then(r=>r.json())]).then(x=>console.log(JSON.stringify(x)))"
+      ],
+      [
+        "docker",
+        "exec",
+        "witness-release-cdfe7fb-api",
+        "node",
+        "-e",
+        "Promise.all([fetch('http://127.0.0.1:3001/ready').then(r=>r.json()),fetch('http://web:3000/api/build-identity').then(r=>r.json())]).then(x=>console.log(JSON.stringify(x)))"
+      ],
+      [
+        "docker",
+        "exec",
+        "witness-release-cdfe7fb-api",
+        "node",
+        "-e",
+        "Promise.all([fetch('http://127.0.0.1:3001/ready').then(r=>r.json()),fetch('http://web:3000/api/build-identity').then(r=>r.json())]).then(x=>console.log(JSON.stringify(x)))"
+      ],
+      [
+        "docker",
+        "exec",
+        "witness-release-cdfe7fb-postgres",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "witness",
+        "-Atc",
+        "SELECT (SELECT count(*) FROM _prisma_migrations),(SELECT count(*) FROM organisation),(SELECT count(*) FROM workspace),(SELECT count(*) FROM resource),(SELECT count(*) FROM payment),(SELECT count(*) FROM receipt),(SELECT count(*) FROM storage_reservation),(SELECT count(*) FROM audit_event)"
+      ],
+      [
+        "docker",
+        "cp",
+        "/home/witness/witness-backups/release-cdfe7fb-20261006/final-rollback-usability.mjs",
+        "witness-release-cdfe7fb-api:/repo/services/api-gateway/compatible-rollback-usability.mjs"
+      ],
+      [
+        "docker",
+        "cp",
+        "/home/witness/witness-backups/release-cdfe7fb-20261006/synthetic-credentials.json",
+        "witness-release-cdfe7fb-api:/tmp/synthetic-credentials.json"
+      ],
+      [
+        "docker",
+        "cp",
+        "/home/witness/witness-backups/release-cdfe7fb-20261006/acceptance-private.json",
+        "witness-release-cdfe7fb-api:/tmp/acceptance-private.json"
+      ],
+      [
+        "docker",
+        "exec",
+        "witness-release-cdfe7fb-api",
+        "node",
+        "compatible-rollback-usability.mjs"
+      ],
+      [
+        "docker",
+        "cp",
+        "witness-release-cdfe7fb-api:/tmp/compatible-rollback-usability.json",
+        "/home/witness/witness-backups/release-cdfe7fb-20261006/compatible-rollback-usability.json"
+      ]
+    ]
+  },
+  "rollback_usability": {
+    "result": "PASS",
+    "results": [
+      {
+        "name": "OIDC login release-operator",
+        "result": "PASS",
+        "one_time_callback": true,
+        "landing": "/workspaces"
+      },
+      {
+        "name": "OIDC login release-admin",
+        "result": "PASS",
+        "one_time_callback": true,
+        "landing": "/workspaces"
+      },
+      {
+        "name": "OIDC login release-member",
+        "result": "PASS",
+        "one_time_callback": true,
+        "landing": "/workspaces"
+      },
+      {
+        "name": "compatible artifact preserves candidate object/accounting/reservations and supports real OIDC plus new writes",
+        "result": "PASS"
+      }
+    ]
+  },
+  "email": {
+    "transport": "SMTP_ACCEPTED: one invitation and one Keycloak recovery message",
+    "external_delivery": "FAIL: neither independently observed through connected Gmail",
+    "provider_log_access": "FAIL: no API credential or authenticated browser available"
+  },
+  "deployment": "NOT PERFORMED",
+  "client_ready": false,
+  "production_supplier_profile": {
+    "result": "FAIL",
+    "required_fields_present": false,
+    "configuration_repair": "prepared; not deployed",
+    "values_recorded": false
+  }
+}

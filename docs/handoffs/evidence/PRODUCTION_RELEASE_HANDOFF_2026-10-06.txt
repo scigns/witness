@@ -1,3 +1,13 @@
+CURRENT CONTINUATION — 2026-10-07
+#264, #266 and narrow publication repair #269 are merged.
+Last fully validated/published/rehearsed SHA: ec77a1cdcb4355904976c74fa7ea678ec42b0604.
+See docs/release/PRODUCTION_RECONCILIATION_2026-10-06.md current decision and
+docs/handoffs/evidence/PRODUCTION_RELEASE_EC77A1C_2026-10-07.json.
+Deployment remains disabled; production application/schema unchanged.
+External delivery and real supplier billing profile are FAIL. Configuration-control repair pending.
+A controlled Keycloak recovery-test identity exists; no real customer records were modified.
+All previous sections below are historical evidence, not the current release decision.
+
 # Witness Production Release Handoff — 2026-10-06
 
 ## Branch

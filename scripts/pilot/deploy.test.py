@@ -44,11 +44,17 @@ elif name == 'docker':
     elif args[:1] == ['pull']:
         if os.environ.get('FAIL_PULL') == '1': sys.exit(11)
     elif args[:1] == ['run']:
+        if '--input-type=module' in args:
+            assert '--network' in args and args[args.index('--network')+1] == 'none'
+            json.load(sys.stdin)
+            sys.exit(1 if os.environ.get('INVALID_RUNTIME') == '1' else 0)
         files = [root/'services/api-gateway/prisma/schema.prisma', root/'services/api-gateway/prisma/migrations/fixture/migration.sql']
         print(json.dumps([{'path':str(p.relative_to(root/'services/api-gateway/prisma')), 'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in files]))
     elif args[:1] == ['compose']:
         if 'config' in args:
-            print(json.dumps({'services':{'api':{'environment':{'SECRET':'fixture-secret','WITNESS_DEPLOYMENT_PROFILE':'hybrid'}},
+            print(json.dumps({'services':{'api':{'environment':{'SECRET':'fixture-secret','WITNESS_DEPLOYMENT_PROFILE':'hybrid',
+                **{key: '' if os.environ.get('MISSING_SUPPLIER') == '1' else 'synthetic fixture' for key in
+                ('BILLING_LEGAL_NAME','BILLING_ADDRESS','BILLING_EMAIL','BILLING_BANK_ACCOUNT_NAME','BILLING_BANK_BSB','BILLING_BANK_ACCOUNT_NUMBER')}}},
                 'web':{'environment':{'WITNESS_IMAGE_API_URL':'https://api.buildwithwitness.com',
                 'WITNESS_IMAGE_PROFILE':'sovereign' if os.environ.get('WRONG_PUBLIC_INPUT') == '1' else 'hybrid','WITNESS_IMAGE_BASE_PATH':''}}}}))
         elif 'ps' in args: print(args[-1] + '-container')
@@ -210,6 +216,14 @@ class DeploySafety(unittest.TestCase):
             result, calls, _ = self.run_deploy(**{flag:'1'})
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(any(any(action in args for action in ['build','migrate','up','pg_dump']) for _,args in calls))
+
+    def test_invalid_commercial_config_refuses_before_backup_migration_or_recreation(self):
+        for flag in ('MISSING_SUPPLIER', 'INVALID_RUNTIME'):
+            with self.subTest(flag=flag):
+                result, calls, _ = self.run_deploy(**{flag: '1'})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(any(any(action in args for action in ('pg_dump', 'migrate', 'up'))
+                                     for _, args in calls))
 
     def test_no_build_and_migration_uses_verified_artifact(self):
         result, calls, root = self.run_deploy()
