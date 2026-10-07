@@ -311,3 +311,35 @@ Protected sanitized evidence: `runtime-verification-evidence.json`, `email-rehea
 Browser results are in off-host `browser-evidence.json`. Dumps, object bytes, sessions, messages
 and credentials remain private, outside Git. Production images/health remain unchanged and
 production ledger remains 33. No production acceptance is represented as completed.
+
+## Release continuation — 2026-10-07
+
+PR #264 landed on main as `0bfdc32bbc627a3d7003fd515968d612811ba739`.
+The existing #266 branch merged that parent as `e1dc549c55066d99b5c69a22983c6aa77e01ba62`
+and is now based on main. The squash merge repeated existing commercial implementation;
+conflicts retained the newer runtime implementation. The only parent changes after the shared
+checkpoint were independent Prisma generation and brand-test whitespace matching, both retained.
+The reconciliation commit introduced no additional source or migration changes.
+
+CI `37564801977` and Security `37564801940` passed at `545b053` including image validation.
+These are historical checkpoint results, not approval of the final combined main SHA.
+CI `37574556217` validates the reconciled checkpoint; final-main artifacts remain pending.
+CodeRabbit is advisory and manually requested, absent from required merge checks. Superseded PR
+Security/CodeQL runs cancel; production required checks and exact-artifact approval remain intact.
+No local Docker validation is required; the unnecessary Mac Postgres container was stopped.
+The prior isolated server recovery infrastructure is retained and will be reused for runtime
+changes invalidated by the final candidate. CI-only changes do not invalidate restore mechanics.
+
+SHARED verification now checks the actual serving database, organisation tenant mapping and
+both provider storage namespaces, and explicitly records changed attestations in the audit trail.
+Unsupported higher isolation modes do not become READY from commercial metadata. New runtime
+fulfilment still requires exact-candidate isolated and live production proof.
+
+The single controlled external invitation-template probe was accepted by production SMTP with
+TLS/authentication, From `hello@buildwithwitness.com`, Reply-To `support@buildwithwitness.com`
+and activation origin `https://app.buildwithwitness.com`. Inbox delivery and recovery link flow
+remain FAIL until independently observed; SMTP acceptance alone is not delivery evidence.
+Keycloak email configuration is present, STARTTLS enabled and password recovery allowed.
+A fresh readable Witness/Keycloak checkpoint was taken before the recovery test attempt.
+No real customer records were changed. Production API/web identities remain unchanged, healthy,
+with zero restarts. No production migration or application deployment has occurred.
