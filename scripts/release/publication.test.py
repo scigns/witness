@@ -56,6 +56,32 @@ class PublicationSafety(unittest.TestCase):
             with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ,{'GITHUB_SHA':SHA,'GITHUB_EVENT_NAME':'push','GITHUB_REPOSITORY':'scigns/witness','GITHUB_REF':'refs/tags/witness-artifact-'+SHA,'GITHUB_OUTPUT':temp+'/out'}), patch.object(publication,'api',return_value={'workflow_runs':[run]}), patch.object(publication.subprocess,'check_output',return_value=SHA+'\n'), self.assertRaises(ValueError):
                 publication.gates()
 
+    def test_scheduled_exact_sha_security_is_valid_but_scheduled_ci_is_not(self):
+        with tempfile.TemporaryDirectory() as temp:
+            env = {'GITHUB_SHA': SHA, 'GITHUB_EVENT_NAME': 'push',
+                   'GITHUB_REPOSITORY': 'scigns/witness',
+                   'GITHUB_REF': 'refs/tags/witness-artifact-' + SHA,
+                   'GITHUB_OUTPUT': temp + '/out'}
+            runs = {workflow: {'head_sha': SHA, 'conclusion': 'success',
+                    'head_repository': {'full_name': 'scigns/witness'},
+                    'event': 'push' if workflow == 'ci.yml' else 'schedule',
+                    'id': 123, 'run_attempt': 1}
+                    for workflow in ('ci.yml', 'security.yml', 'codeql.yml')}
+            def api(path):
+                return {'workflow_runs': [next(run for key, run in runs.items() if key in path)]}
+            with patch.dict(os.environ, env), patch.object(publication, 'api', side_effect=api), \
+                    patch.object(publication.subprocess, 'check_output', return_value=SHA + '\n'):
+                publication.gates()
+                for workflow in ('security.yml', 'codeql.yml'):
+                    for conclusion in ('failure', None, 'cancelled'):
+                        runs[workflow]['conclusion'] = conclusion
+                        with self.subTest(workflow=workflow, conclusion=conclusion), self.assertRaises(ValueError):
+                            publication.gates()
+                    runs[workflow]['conclusion'] = 'success'
+                runs['ci.yml']['event'] = 'schedule'
+                with self.assertRaises(ValueError):
+                    publication.gates()
+
     def test_build_job_has_no_production_secrets_or_registry_write(self):
         ci=(ROOT/'.github/workflows/ci.yml').read_text()
         image_job=ci.split('  images:\n')[1].split('  gate:\n')[0]
