@@ -22,6 +22,8 @@ export type ActorId = Branded<string, 'ActorId'>;
 export type SourceId = Branded<string, 'SourceId'>;
 export type AuditEventId = Branded<string, 'AuditEventId'>;
 export type OrganisationId = Branded<string, 'OrganisationId'>;
+/** The technical isolation boundary (ADR-0034) — distinct from OrganisationId. */
+export type TenantId = Branded<string, 'TenantId'>;
 export type WorkspaceId = Branded<string, 'WorkspaceId'>;
 export type UserId = Branded<string, 'UserId'>;
 export type OrganisationMembershipId = Branded<string, 'OrganisationMembershipId'>;
@@ -116,6 +118,11 @@ export function toOrganisationId(value: string): OrganisationId {
 export function toWorkspaceId(value: string): WorkspaceId {
   assertUuid(value, 'WorkspaceId');
   return value as WorkspaceId;
+}
+
+export function toTenantId(value: string): TenantId {
+  assertUuid(value, 'TenantId');
+  return value as TenantId;
 }
 
 export function toUserId(value: string): UserId {

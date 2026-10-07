@@ -30,9 +30,13 @@ import { ConsentPolicyService } from './consent/consent-policy.service.js';
 import { CommercialEntitlementService } from './commercial/commercial-entitlement.service.js';
 import {
   BillingController,
+  CommercialConfigurationController,
+  OperatorCommercialConfigurationController,
   PublicCommercialController,
 } from './commercial/commercial.controller.js';
 import { CommercialCatalogueService } from './commercial/commercial-catalogue.service.js';
+import { CommercialOverrideService } from './commercial/commercial-override.service.js';
+import { EffectiveCommercialConfigurationService } from './commercial/effective-commercial-configuration.service.js';
 import { ConsentTemplatesController } from './consent-templates/consent-templates.controller.js';
 import { ConsentTemplatesService } from './consent-templates/consent-templates.service.js';
 import { EvidenceController } from './evidence/evidence.controller.js';
@@ -165,6 +169,8 @@ import { MailerService } from './infrastructure/mailer.js';
     CurrentUserController,
     PublicCommercialController,
     BillingController,
+    CommercialConfigurationController,
+    OperatorCommercialConfigurationController,
     InvoicesController,
     AgreementsController,
     OperatorController,
@@ -190,6 +196,8 @@ import { MailerService } from './infrastructure/mailer.js';
     OrganisationUsageService,
     CommercialEntitlementService,
     CommercialCatalogueService,
+    EffectiveCommercialConfigurationService,
+    CommercialOverrideService,
     InvoicesService,
     ManualSettlementService,
     AgreementsService,

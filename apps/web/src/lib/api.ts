@@ -39,6 +39,9 @@ import type {
   CreateConsentTemplateVersionRequest,
   CreateEvidenceLinkRequest,
   CreateOrganisationRequest,
+  CreateSubscriptionEntitlementOverrideRequest,
+  EffectiveCommercialConfigurationView,
+  SubscriptionEntitlementOverrideView,
   UpdateStorageQuotaRequest,
   CreateRecordRequest,
   CreateUserRequest,
@@ -362,6 +365,46 @@ export const api = {
 
   getBillingOverview: (organisationId: string, user: ActingUser): Promise<BillingOverview> =>
     request(`/api/v1/organisations/${encodeURIComponent(organisationId)}/billing`, user),
+
+  // ─── Effective commercial configuration (ADR-0034) ─────────────────────────
+
+  getCommercialConfiguration: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<EffectiveCommercialConfigurationView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/commercial-configuration`,
+      user,
+    ),
+
+  getOperatorCommercialConfiguration: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<EffectiveCommercialConfigurationView> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration`,
+      user,
+    ),
+
+  listCommercialOverrides: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<SubscriptionEntitlementOverrideView[]> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/overrides`,
+      user,
+    ),
+
+  setCommercialOverride: (
+    organisationId: string,
+    body: CreateSubscriptionEntitlementOverrideRequest,
+    user: ActingUser,
+  ): Promise<SubscriptionEntitlementOverrideView> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/overrides`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
 
   requestCommercialChange: (
     organisationId: string,
