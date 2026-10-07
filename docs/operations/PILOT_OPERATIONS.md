@@ -307,18 +307,33 @@ work with the upgraded schema **and candidate writes** in isolation. Additive DD
 does not establish application compatibility. The October 2026 candidate permits
 null storage quotas and introduces durable reservations; the deployed required-quota
 Prisma client rejects a null quota with P2032 and bypasses the reservation protocol.
-Do not approve that image pair for automatic rollback.
+The exact legacy pair is classified **DATABASE RESTORE REQUIRED**. Do not approve
+that image pair for automatic image-only rollback. An isolated restore drill has
+recovered its 33-migration schema, real OIDC and workspace/object usability; this
+does not authorise replacing the live database or discarding subsequent writes.
 
 The deploy workflow requires `WITNESS_APPROVED_ROLLBACK_RELEASE_SHA` to match the
 approved candidate and `WITNESS_APPROVED_ROLLBACK_API_IMAGE` /
-`WITNESS_APPROVED_ROLLBACK_WEB_IMAGE` to match the exact running image IDs. Set these
-only after a successful compatibility rehearsal. Missing/stale approval fails before
-build, backup or migration. The release hold remains active while recovery is unproven.
+`WITNESS_APPROVED_ROLLBACK_WEB_IMAGE` to match the exact rehearsed recovery image IDs.
+Set these only after a successful compatibility rehearsal with candidate writes.
+For a separately published compatible recovery artifact, also approve its SHA,
+publication run and immutable registry references using
+`WITNESS_APPROVED_ROLLBACK_SHA`, `WITNESS_APPROVED_ROLLBACK_ARTIFACT_RUN_ID`,
+`WITNESS_APPROVED_ROLLBACK_API_REF` and `WITNESS_APPROVED_ROLLBACK_WEB_REF`.
+The workflow downloads that manifest, verifies trusted successful publication,
+identical schema/migration inventory and public build inputs, pulls exact digests
+and verifies packaged identity. It records both the actual pre-deploy running
+images and the separately approved recovery pair. Missing/stale approval prevents
+backup, migration and recreation. The release hold remains active while recovery
+is unproven. This is recovery to a compatible validated artifact, not a claim that
+the legacy deployed application is compatible.
 
 For a proven compatible pair, application-only rollback preserves the database:
 
 ```bash
-docker compose … up -d --no-deps api web   # with the previous image tags
+docker compose … up -d --no-deps --no-build api web
+# Use the recorded override containing approved immutable recovery image IDs.
+# Restore WITNESS_BUILD_ID/WITNESS_VERSION to that recovery artifact's identity.
 ```
 
 If compatibility fails, prepare a compatible recovery artifact or obtain explicit

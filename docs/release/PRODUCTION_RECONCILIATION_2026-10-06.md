@@ -135,26 +135,26 @@ The following supersedes historical local rehearsal results above. PASS is scope
 its evidence; missing required proof is FAIL. No deferred critical risk is accepted.
 Production columns describe the candidate, not the still-running legacy system.
 
-| Gate                              | IMPLEMENTED                                  | TESTED                             | REHEARSED                                                                    | DEPLOYED                                   | PRODUCTION VERIFIED     |
-| --------------------------------- | -------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------ | ----------------------- |
-| CI / release images               | PASS                                         | PASS: 313d185 CI 37417081754       | PASS: immutable images started                                               | FAIL                                       | FAIL                    |
-| Security / tenant isolation       | PASS                                         | PASS: security 37417081725         | PASS: real HTTP cross-org and authority denials                              | FAIL                                       | FAIL                    |
-| Auth                              | PASS                                         | PASS                               | PASS: restored Keycloak, real OIDC, replay denial, browser deep links        | FAIL                                       | FAIL                    |
-| Commercial activation             | PASS                                         | PASS                               | PASS: operator origination, invoice, settlement/replay, ACTIVE, entitlements | FAIL                                       | FAIL                    |
-| Tenant / ResourceProfile          | PASS: logical shared tenant                  | PASS                               | PASS: implicit organisation boundary / standard-small                        | FAIL                                       | FAIL                    |
-| Dedicated provisioning fulfilment | FAIL: recorded adapter only                  | FAIL                               | FAIL: not proved READY                                                       | FAIL                                       | FAIL                    |
-| Storage / quota / reservations    | PASS                                         | PASS                               | PASS: real objects, race, fencing, stale recovery and mismatch handling      | FAIL                                       | FAIL                    |
-| Audit trail                       | PASS                                         | PASS                               | PASS: persisted commercial events and hash-chain links                       | FAIL                                       | FAIL                    |
-| Frontend                          | PASS                                         | PASS                               | PASS: real browser roles, resource, 375/768/1440, accessibility              | FAIL                                       | FAIL                    |
-| Latest DB / Keycloak backups      | PASS                                         | PASS: checksums and readable dumps | PASS: isolated restore and critical records                                  | PASS: existing backup mechanism            | PASS: backup read only  |
-| Independent object recovery       | PASS: bounded protected copy                 | PASS: 13 object checksums          | PASS: isolated S3 restore and byte verification                              | FAIL: continuing retention not established | FAIL                    |
-| Migration path                    | PASS                                         | PASS: ledger and image inventory   | PASS: restored 33 → 45, exact candidate Prisma                               | FAIL                                       | FAIL                    |
-| Legacy rollback                   | PASS: DATABASE RESTORE REQUIRED              | PASS: P2032 incompatibility proved | PASS: restore, exact old images, real login/workspace/upload/read            | FAIL                                       | FAIL                    |
-| Compatible recovery artifact      | PASS: candidate-specific controls            | PASS: targeted fail-closed tests   | FAIL: new candidate-to-recovery drill pending                                | FAIL                                       | FAIL                    |
-| Deployment control                | PASS: digest/provenance/config/backup guards | PASS: targeted script tests        | FAIL: new control candidate not yet validated                                | FAIL: workflow disabled                    | PASS: release hold only |
-| Email delivery                    | PASS: transport exists                       | FAIL: delivery not proved          | FAIL: controlled mailbox/provider evidence required                          | FAIL                                       | FAIL                    |
-| Client acceptance                 | PASS: synthetic harness                      | PASS: HTTP and browser             | PASS: shared commercial client journey; email/dedicated scope unresolved     | FAIL                                       | FAIL                    |
-| Release decision                  | FAIL: NOT READY FOR PRODUCTION               | FAIL                               | FAIL                                                                         | FAIL                                       | FAIL                    |
+| Gate                              | IMPLEMENTED                                  | TESTED                                                  | REHEARSED                                                                    | DEPLOYED                                   | PRODUCTION VERIFIED     |
+| --------------------------------- | -------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------ | ----------------------- |
+| CI / release images               | PASS                                         | PASS: 3ffd01c CI 37420418558                            | PASS: immutable images started                                               | FAIL                                       | FAIL                    |
+| Security / tenant isolation       | PASS                                         | PASS: security 37420418615                              | PASS: real HTTP cross-org and authority denials                              | FAIL                                       | FAIL                    |
+| Auth                              | PASS                                         | PASS                                                    | PASS: restored Keycloak, real OIDC, replay denial, browser deep links        | FAIL                                       | FAIL                    |
+| Commercial activation             | PASS                                         | PASS                                                    | PASS: operator origination, invoice, settlement/replay, ACTIVE, entitlements | FAIL                                       | FAIL                    |
+| Tenant / ResourceProfile          | PASS: logical shared tenant                  | PASS                                                    | PASS: implicit organisation boundary / standard-small                        | FAIL                                       | FAIL                    |
+| Dedicated provisioning fulfilment | FAIL: recorded adapter only                  | FAIL                                                    | FAIL: not proved READY                                                       | FAIL                                       | FAIL                    |
+| Storage / quota / reservations    | PASS                                         | PASS                                                    | PASS: real objects, race, fencing, stale recovery and mismatch handling      | FAIL                                       | FAIL                    |
+| Audit trail                       | PASS                                         | PASS                                                    | PASS: persisted commercial events and hash-chain links                       | FAIL                                       | FAIL                    |
+| Frontend                          | PASS                                         | PASS                                                    | PASS: real browser roles, resource, 375/768/1440, accessibility              | FAIL                                       | FAIL                    |
+| Latest DB / Keycloak backups      | PASS                                         | PASS: checksums and readable dumps                      | PASS: isolated restore and critical records                                  | PASS: existing backup mechanism            | PASS: backup read only  |
+| Independent object recovery       | PASS: bounded protected copy                 | PASS: 13 object checksums                               | PASS: isolated S3 restore and byte verification                              | FAIL: continuing retention not established | FAIL                    |
+| Migration path                    | PASS                                         | PASS: ledger and image inventory                        | PASS: restored 33 → 45, exact candidate Prisma                               | FAIL                                       | FAIL                    |
+| Legacy rollback                   | PASS: DATABASE RESTORE REQUIRED              | PASS: P2032 incompatibility proved                      | PASS: restore, exact old images, real login/workspace/upload/read            | FAIL                                       | FAIL                    |
+| Compatible recovery artifact      | PASS: candidate-specific controls            | PASS: targeted fail-closed tests                        | PASS: 3ffd01c → 313d185; retained writes, 11.168 s                           | FAIL                                       | FAIL                    |
+| Deployment control                | PASS: digest/provenance/config/backup guards | PASS: targeted script tests                             | PASS: exact candidate, restore, health and compatible recovery               | FAIL: workflow disabled                    | PASS: release hold only |
+| Email delivery                    | PASS: transport exists                       | PASS: production SMTP TLS/auth; private real invitation | PASS: real invitation in TLS synthetic inbox; external delivery unproved     | FAIL                                       | FAIL                    |
+| Client acceptance                 | PASS: synthetic harness                      | PASS: HTTP and browser                                  | PASS: 24 HTTP + 7 storage + 9 browser checks; fulfilment unresolved          | FAIL                                       | FAIL                    |
+| Release decision                  | FAIL: NOT READY FOR PRODUCTION               | FAIL                                                    | FAIL                                                                         | FAIL                                       | FAIL                    |
 
 ## Isolated host continuation evidence
 
@@ -196,8 +196,8 @@ All bytes were restored and re-read with matching checksums in isolated S3 stora
 Backups, credentials and customer bytes stay outside Git under protected recovery paths.
 
 The same 12 ledger-derived migrations listed above applied in order with installed
-Prisma 5.22, 4.688 s total on the latest candidate. Individual pending migrations took
-4.819–295.821 ms; no failed ledger rows. Before/after schema and complete checksummed
+Prisma 5.22, 4.686 s total on the latest candidate. Individual pending migrations took
+4.819–295.821 ms on the earlier 313d185 drill; no failed ledger rows. Before/after schema and complete checksummed
 ledger are retained in protected evidence. Production remains at 33 migrations.
 
 **Rollback classification: DATABASE RESTORE REQUIRED for the exact running legacy
@@ -227,3 +227,86 @@ visibility, no primary Pricing link, no horizontal overflow and axe WCAG checks.
 `apps/web/test/runtime-readiness.mjs` against a locally built hybrid-profile web using
 `NEXT_PUBLIC_WITNESS_API_URL=https://api.rehearsal.invalid`. This uses mocked API responses and
 proves neither real OIDC nor production authorisation. Production acceptance remains FAIL.
+
+## Latest candidate decision — exact artifact source retained
+
+RELEASE CANDIDATE SHA: `3ffd01c4d9b94e305111562f474d80a57d43aa0c`
+
+API IMAGE DIGEST: `sha256:753be8495b1dbd92b9d4679c940583c63d6a72339fecd41c02deced62f8f4767`
+
+WEB IMAGE DIGEST: `sha256:517055d5c8f4d4d41e1c09f6f7fdfec47ba1f1348e040e39b45252ffc27350ef`
+
+MIGRATION SET: the 12 named migrations above, in ledger order; isolated 33 → 45,
+4.686 s, complete checksums match the immutable candidate manifest. Unapplied live.
+
+BACKUP VERIFIED: PASS — 6 October Witness/Keycloak dumps and independent object copy.
+
+RESTORE REHEARSED: PASS — isolated DB/identity/object restore; no shared live volumes.
+
+ROLLBACK REHEARSED: PASS — exact legacy images with DATABASE RESTORE REQUIRED;
+compatible validated recovery pair 313d185 without DB restore, 11.168 s.
+
+SECURITY: PASS — exact candidate hosted Security 37420418615 and adversarial CI.
+
+TENANT ISOLATION: PASS — cross-org and authority denials against real services.
+
+AUTH: PASS — real OIDC, one-time callback, preserved deep links and restored identity.
+
+QUOTA/RESERVATION: PASS — real uploads, contention, expiry fencing, conservative mismatch accounting.
+
+COMMERCIAL ACTIVATION: PASS — real HTTP and browser invoice/manual settlement → ACTIVE,
+entitlements, Tenant and ResourceProfile. This is not verified infrastructure fulfilment.
+
+FRONTEND ACCEPTANCE: PASS — 9 real browser checks, viewport/axe, invoice/settlement,
+resource visibility, customer denial and deep links. Private transport adaptation is recorded.
+
+RELEASE IMAGE VALIDATION: PASS — exact SHA, CI 37420418558, image job 112129227628.
+Artifact creation `2026-10-06T05:54:57.497881Z`; immutable publication run 37429404905,
+publication time `2026-10-06T07:25:43.474496Z`. API/web identities, health/readiness,
+zero restarts and no critical startup errors independently verified in rehearsal.
+
+DEPLOYMENT CONTROL: PASS for implemented/tested/rehearsed guards and disabled release hold;
+FAIL for deployable final-main approval. No approval variables were populated, workflow enabled,
+PR merged or production mutation performed.
+
+CLIENT ACCEPTANCE: FAIL overall. The synthetic shared commercial/client path passes,
+but verified resource/isolation fulfilment and external production email delivery remain absent.
+
+**NOT READY FOR PRODUCTION**
+
+Exact blockers:
+
+1. `RecordedProvisioningAdapter` is the only bound provider. It reports logical metadata,
+   NOT_PROVISIONED/DEGRADED/PENDING/FAILED, and cannot produce verified READY evidence for
+   the desired configuration fingerprint. A resolved Tenant and ResourceProfile do not prove
+   allocated compute, workers, concurrency, backup/retention or dedicated isolation promises.
+   No critical fulfilment risk has been accepted and no fake READY state was written.
+2. Production SMTP connection, TLS and authentication pass. The candidate's explicit invitation
+   endpoint sent one 1,108-byte message into the protected private TLS inbox. Actual external
+   delivery and identity recovery delivery require a controlled recipient/provider verification;
+   no supplied mailbox, delivery evidence or deferred-risk approval exists. No external mail sent.
+3. #266 remains draft and stacked on #264. Parent checks pass at c1e5cd2, but that commit is not
+   an ancestor of the artifact source. Parent merge, child reconciliation/retargeting and exact
+   combined-main CI/images/rehearsal are still required after critical readiness is established.
+   Current workflow is disabled and no exact final-main/recovery tuple is approved.
+
+Compatible rollback commands and timings are recorded in protected
+`compatible-rollback-evidence.json`: stop only isolated API/web → recreate from recovery
+registry digests with preserved synthetic environment → exact API/web SHA and readiness →
+compare eight ledger/data counts unchanged → real OIDC → retained object/quota/reservation read
+→ nullable quota read → new workspace/upload/download. Counts across the swap were
+`45|6|3|2|2|2|4|246` (migrations, organisations, workspaces, resources, payments, receipts,
+reservations, audit events). No drop/create/restore occurred in this compatible drill.
+Legacy recovery commands remain in `rollback-evidence.json`; its 83.302 s database-restore
+classification is unchanged. Candidate-specific recovery approval must refer to the exact final
+release SHA; these proofs do not authorise an arbitrary later source or mutable tags.
+
+The final evidence/runbook edits are retained in the working tree so that this documentation
+record does not silently create a new application candidate SHA. Source HEAD remains 3ffd01c.
+Protected sanitized evidence: `runtime-verification-evidence.json`, `email-rehearsal-evidence.json`,
+`production-unchanged-evidence.json`, `http-acceptance-evidence.json`,
+`storage-acceptance-evidence.json`, `latest-migration-evidence.json`,
+`compatible-rollback-evidence.json`, `compatible-rollback-usability.json` on the host and off-host.
+Browser results are in off-host `browser-evidence.json`. Dumps, object bytes, sessions, messages
+and credentials remain private, outside Git. Production images/health remain unchanged and
+production ledger remains 33. No production acceptance is represented as completed.
