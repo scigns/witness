@@ -51,3 +51,7 @@ updates:
       prefix: "ci(deps)"
     # Actions are pinned to commit SHAs; Dependabot updates the SHA and the
     # comment together. scripts/security/check-action-pinning.sh enforces this.
+
+    groups:
+      actions-maintenance:
+        patterns: ["*"]

@@ -71,7 +71,7 @@ export class S3StorageAdapter extends StoragePort {
   }
 
   /** Every key this adapter writes carries its kind as a path segment (see objectKey()). */
-  async verifyNamespace(prefix: string): Promise<void> {
+  override async verifyNamespace(prefix: string): Promise<void> {
     if (!/^[0-9a-f-]{36}\/$/.test(prefix)) throw new Error('Invalid organisation namespace.');
     await Promise.all(
       [...new Set([this.config.bucketMedia, this.config.bucketDocuments])].map(async (Bucket) => {

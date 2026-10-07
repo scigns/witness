@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Advisory review is requested deliberately, not on every development push.
+reviews:
+  request_changes_workflow: false
+  review_progress: false
+  commit_status: false
+  auto_review:
+    enabled: false
+    auto_incremental_review: false
+    drafts: false

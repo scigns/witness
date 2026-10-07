@@ -13,6 +13,11 @@ on:
 permissions:
   contents: read
 
+# Cancel obsolete PR validation; preserve evidence for main and scheduled scans.
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   secrets:
     name: Secret scanning

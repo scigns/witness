@@ -5,8 +5,8 @@
 # own machine. That keeps the pipeline portable off GitHub Actions, which matters
 # for a project claiming sovereignty.
 #
-# Witness is pre-implementation, so the code gates are guarded on the presence of
-# workspace source. They activate automatically in Phase 2 without editing this file.
+# Full validation runs on GitHub-hosted runners. The laptop edits and pushes;
+# the production runner is never used for PR validation.
 
 name: CI
 
@@ -276,7 +276,7 @@ jobs:
 
   images:
     name: Release image validation
-    needs: [detect, static, test, integration, invariants]
+    needs: [detect, static, test, integration, invariants, build]
     if: needs.detect.outputs.has_code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -300,7 +300,7 @@ jobs:
   gate:
     name: CI gate
     if: always()
-    needs: [docs, governance, static, test, invariants, integration, build, images]
+    needs: [detect, docs, governance, static, test, invariants, integration, build, images]
     runs-on: ubuntu-latest
     steps:
       - name: Assert no required job failed
