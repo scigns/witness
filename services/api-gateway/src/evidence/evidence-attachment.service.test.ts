@@ -19,6 +19,8 @@ import {
 } from '@nestjs/common';
 import { InvariantViolation } from '@witness/domain';
 import { describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { objectKey } from '../storage/storage.service.js';
 
 import type { PrismaService } from '../infrastructure/prisma.service.js';
 import type { Principal } from '../authz/authorization.port.js';
@@ -130,7 +132,7 @@ function audioFile(overrides: Partial<UploadedAttachmentFile> = {}): UploadedAtt
   return {
     originalname: 'session-recording.mp3',
     mimetype: 'audio/mpeg',
-    size: 1024,
+    size: overrides.size ?? overrides.buffer?.length ?? Buffer.byteLength('fake audio bytes'),
     buffer: Buffer.from('fake audio bytes'),
     ...overrides,
   };
@@ -149,7 +151,7 @@ function documentFile(overrides: Partial<UploadedAttachmentFile> = {}): Uploaded
   return {
     originalname: 'exhibit-a.pdf',
     mimetype: 'application/pdf',
-    size: 1024,
+    size: overrides.size ?? overrides.buffer?.length ?? PDF_SIGNATURE.length,
     buffer: PDF_SIGNATURE,
     ...overrides,
   };
@@ -159,7 +161,7 @@ function imageFile(overrides: Partial<UploadedAttachmentFile> = {}): UploadedAtt
   return {
     originalname: 'poster.jpg',
     mimetype: 'image/jpeg',
-    size: 1024,
+    size: overrides.size ?? overrides.buffer?.length ?? JPEG_SIGNATURE.length,
     buffer: JPEG_SIGNATURE,
     ...overrides,
   };
@@ -179,9 +181,44 @@ function fakeStorage() {
   return { storage, objects };
 }
 
-/** Allows by default — quota-rejection tests pass a fake that throws instead. */
+/**
+ * Allows by default — quota-rejection tests pass a fake that throws
+ * instead. The same check function backs both the fast pre-write check
+ * and the authoritative in-transaction one, since a rejection test does
+ * not care which of the two call sites threw.
+ */
 function fakeStorageQuota(checkQuota: StorageQuotaService['checkQuota'] = async () => {}) {
-  return { checkQuota } as unknown as StorageQuotaService;
+  return {
+    checkQuota,
+    reserve: async (input: Parameters<StorageQuotaService['reserve']>[0]) => {
+      await checkQuota(input.organisationId, input.sizeBytes);
+      const targetId = randomUUID();
+      return {
+        ...input,
+        id: randomUUID(),
+        targetId,
+        sizeBytes: BigInt(input.sizeBytes),
+        state: 'RESERVED',
+        storageKey: input.objectStorage
+          ? objectKey({ organisationId: input.organisationId, kind: input.kind, id: targetId })
+          : null,
+      };
+    },
+    claim: async () => {},
+    checkReservation: async (
+      _tx: unknown,
+      reservation: { organisationId: string; sizeBytes: bigint },
+    ) => checkQuota(reservation.organisationId, Number(reservation.sizeBytes)),
+    commitReservation: async () => {},
+    releaseKnownFailure: async () => {},
+    markUncertain: async () => {},
+    lockForWrite: async () => {},
+    checkQuotaInTransaction: async (
+      _tx: unknown,
+      organisationId: string,
+      additionalBytes: number,
+    ) => checkQuota(organisationId, additionalBytes),
+  } as unknown as StorageQuotaService;
 }
 
 function service(
@@ -439,7 +476,7 @@ describe('document and image evidence — the evidence_submission consent gate',
     expect(checkQuota).not.toHaveBeenCalled();
   });
 
-  it('a permitted document submission writes exactly one R2 object and checks quota exactly once', async () => {
+  it('a permitted document submission writes exactly one R2 object, and checks quota twice (the fast pre-write filter, then the authoritative in-transaction re-check)', async () => {
     const { storage, objects } = fakeStorage();
     const checkQuota = vi.fn().mockResolvedValue(undefined);
     const { svc } = service({
@@ -451,7 +488,7 @@ describe('document and image evidence — the evidence_submission consent gate',
     await svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_ATTRIBUTED, documentFile(), FACILITATOR);
 
     expect(objects.size).toBe(1);
-    expect(checkQuota).toHaveBeenCalledTimes(1);
+    expect(checkQuota).toHaveBeenCalledTimes(2);
   });
 
   it('a second attempt against the same evidence after a denial still gets ATTACHMENT_EXISTS-free 403 (no partial state to conflict with)', async () => {
@@ -534,5 +571,39 @@ describe('document and image evidence — the evidence_submission consent gate',
     await expect(
       svc.upload('does-not-exist', SESSION_1, EVIDENCE_ATTRIBUTED, documentFile(), FACILITATOR),
     ).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('upload transaction compensation', () => {
+  it('removes the object when the locked quota recheck rejects a competing upload', async () => {
+    const { storage, objects } = fakeStorage();
+    const check = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new InvariantViolation('capacity consumed', 'STORAGE_QUOTA_EXCEEDED'));
+    const { svc, attachments } = service({ storage, storageQuota: fakeStorageQuota(check) });
+    await expect(
+      svc.upload(WORKSPACE_1, SESSION_1, EVIDENCE_UNATTRIBUTED, audioFile(), FACILITATOR),
+    ).rejects.toThrow(PayloadTooLargeException);
+    expect(objects.size).toBe(0);
+    expect(attachments).toHaveLength(0);
+  });
+});
+
+describe('upload size integrity', () => {
+  it('rejects a declared size smaller than the real bytes before storage writes', async () => {
+    const { storage, objects } = fakeStorage();
+    const { svc, attachments } = service({ storage });
+    await expect(
+      svc.upload(
+        WORKSPACE_1,
+        SESSION_1,
+        EVIDENCE_UNATTRIBUTED,
+        audioFile({ size: 1 }),
+        FACILITATOR,
+      ),
+    ).rejects.toMatchObject({ response: { error: { code: 'INVALID_STORAGE_SIZE' } } });
+    expect(objects.size).toBe(0);
+    expect(attachments).toHaveLength(0);
   });
 });

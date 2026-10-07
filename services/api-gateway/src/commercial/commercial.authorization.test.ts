@@ -1,3 +1,4 @@
+import { OrganisationsController } from '../organisations/organisations.controller.js';
 import { Reflector } from '@nestjs/core';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -124,6 +125,16 @@ function guardForAction(action: string, allowedOrganisation: string | null) {
 }
 
 describe('commercial-configuration route authorisation (ADR-0034)', () => {
+  it('denies customer provisioning attestation without platform management authority', async () => {
+    const target = routeContext(
+      OperatorCommercialConfigurationController,
+      'verifyProvisioning',
+      ORG_A,
+    );
+    await expect(
+      guardForAction('organisation:update', ORG_A).canActivate(target.execution),
+    ).rejects.toMatchObject({ response: { error: { code: 'FORBIDDEN' } } });
+  });
   it("denies the organisation's own self-service resolve() when the guard's decision is false", async () => {
     const target = routeContext(CommercialConfigurationController, 'resolve', ORG_A);
     await expect(
@@ -138,7 +149,7 @@ describe('commercial-configuration route authorisation (ADR-0034)', () => {
     ).resolves.toBe(true);
   });
 
-  it.each(['resolve', 'listOverrides'] as const)(
+  it.each(['resolve', 'listOverrides', 'storage', 'usage'] as const)(
     'denies operator %s when operator:read is not granted',
     async (handler) => {
       const target = routeContext(OperatorCommercialConfigurationController, handler, ORG_A);
@@ -160,5 +171,23 @@ describe('commercial-configuration route authorisation (ADR-0034)', () => {
     await expect(
       guardForAction('commercial_override:manage', ORG_A).canActivate(target.execution),
     ).resolves.toBe(true);
+  });
+});
+
+describe('organisation resource boundaries', () => {
+  it.each(['storage', 'usage'] as const)(
+    'denies cross-organisation %s inspection',
+    async (handler) => {
+      const target = routeContext(OrganisationsController, handler, ORG_B);
+      await expect(
+        guardForAction('organisation:read', ORG_A).canActivate(target.execution),
+      ).rejects.toMatchObject({ response: { error: { code: 'FORBIDDEN' } } });
+    },
+  );
+  it('does not grant quota overrides through organisation:update', async () => {
+    const target = routeContext(OrganisationsController, 'updateStorageQuota', ORG_A);
+    await expect(
+      guardForAction('organisation:update', ORG_A).canActivate(target.execution),
+    ).rejects.toMatchObject({ response: { error: { code: 'FORBIDDEN' } } });
   });
 });

@@ -1,0 +1,139 @@
+Commercial runtime verification checkpoint — 2026-10-05
+
+Git recovery
+- Continued feat/commercial-runtime-readiness at e9b789e.
+- Stacked parent remains feat/commercial-entitlements at 215f350.
+- Remote tips verified with git ls-remote; no branches merged/cherry-picked.
+- Untracked apps/participant-mobile/ excluded from all edits and staging.
+
+Branch reconciliation
+- organisation-usage-metering: HEAD already contains and extends its service/API/UI.
+- organisation-profile-and-quota-at-creation: HEAD already contains its onboarding foundation;
+  runtime changes replace frozen new-organisation quota with a live profile default.
+- manual-settlement-paid-activation and use-authoritative-env: no unique commits against HEAD.
+- resource-delete-orphans-r2-object: unique historical commit, but implementation and tests
+  already present in HEAD. No further copy needed.
+
+Implemented in this checkpoint
+- Reject unsafe, fractional and negative storage byte counts and negative capacity.
+- Validate actual buffer size against declared upload size before quota/storage writes.
+- Reject missing/inactive/negative-capacity resource profiles during runtime resolution
+  and before resource.profile overrides are persisted.
+- Compensate object writes after a known domain rejection in the upload transaction.
+  Cleanup errors emit storage.upload_cleanup_failed. Unknown transaction outcomes retain
+  objects to avoid deleting committed customer data; reconciliation remains required.
+- Audit newly crossed 70/85/95/100 thresholds in the upload transaction. Existing configured
+  thresholds remain authoritative. Rejected/rolled-back writes produce no committed events.
+- Add operator:read storage/usage inspection endpoints under commercial-configuration.
+- Move quota override form to operations; support restoring the profile allocation with null.
+- Show customer allocated/used/available capacity and threshold state without quota controls.
+- Label deployment isolation as contracted, not observed provisioning.
+
+Storage inventory and boundaries (code-backed, not production measurements)
+Customer-enforceable:
+- EvidenceAttachment.content/storageKey and Resource.content/storageKey: counted exactly once
+  from sizeBytes, independent of PostgreSQL-inline versus object-store adapter.
+- Audio/document/image attachments use the same attachment accounting path.
+- Resource links have no retained file bytes.
+Operational infrastructure:
+- PostgreSQL rows/indexes/WAL and derived transcripts/summaries/knowledge/audit data: no
+  authoritative per-organisation physical footprint measurement; excluded from file quota.
+- Report exports: rendered response bytes, not a retained exported file; exports counted as
+  audit events, not retained storage. Stored reports/source rows are database infrastructure.
+- Local Whisper: mkdtemp/writeFile, finally rm; temporary processing storage, not customer quota.
+- PostgreSQL/Keycloak backups: deployment-level recovery storage; backup scripts/status exist,
+  not included in customer quota. Object-storage recovery coverage still needs verification.
+- Docker logs have deployment logging configuration; graph/search/observability volumes and
+  caches are operational, not customer allocation. No inferred per-customer byte figures shown.
+
+Verification
+- Final API unit suite: 779 tests / 70 files passed.
+- Root invariant/adversarial suites: 53 passed.
+- API lint/typecheck/build and web lint/typecheck/build passed during this checkpoint.
+- All 43 migrations applied to isolated local schema codex_runtime_20261005.
+- Live PostgreSQL suite: 50 passed / 6 files; subsequent quota/threshold rollback suite: 2 passed.
+- Concurrent 600-byte writes against a 1000-byte allocation: only one committed, other rejected;
+  another organisation remained at zero. Rollback released locks/capacity and threshold events.
+- Tests used local Node v24.1.0; repository targets Node 22. CI/pinned-runtime check remains.
+- No production data, deployment, payment or infrastructure allocation changed.
+
+Remaining release work — milestone is NOT complete
+- Durable upload reservations and object reconciliation covering crashes/uncertain outcomes.
+- Synchronise commercial resolution with the transaction client for capacity checks.
+- Verify deletion failures/retention/cascades do not abandon unmetered customer objects.
+- Operational database/object-store/backup/bandwidth measurements and recovery coverage.
+- Operator commercial origination for quote-based institutional plans: current self-service
+  CHANGE_PLAN rejects quoteBased; invoice and settlement paths also require non-quote pricing.
+  Existing manual settlement is transactional and tested; do not duplicate it.
+- Provider-neutral provisioning boundary and desired-versus-observed runtime state.
+- Existing organisations retain historical quota values as overrides under Claude's migration;
+  operators must review/reset these to obtain live plan/profile allocations where appropriate.
+- Full browser/accessibility acceptance, pinned Node 22/CI checks, authenticated-shell milestone.
+
+Production acceptance hardening continuation (Node 22)
+- Durable PostgreSQL reservation ledger introduced before object writes; uploads commit file and
+  reservation state together. In-flight duplicate keys conflict, committed keys replay, payload
+  changes conflict. Expired started/uncertain writes retain charged bytes and cannot commit after fencing.
+- Operator reconciliation inspects inline byte lengths and bounded provider HEAD/LIST inventories;
+  no customer objects/records are deleted. Audit chain carries report hash. Safe cleanup only releases
+  expired never-started reservations. Operator/customer views show reserved bytes.
+- API: 779/779 tests, 70 files; lint/typecheck/build passed.
+- Domain: 635/635 tests, 31 files. Corrected stale fixed-allocation assertion identified in CI.
+- Live reservation/upload/reconciliation: 10/10 tests pass, isolated codex_runtime_20261005 schema.
+- Changed effective-commercial resolution live tests: 12/12 pass.
+- Web: lint, typecheck, production build passed; new reconciliation UI was included in build.
+- Documentation CI failure identified in original handoff formatting; markdownlint now passes.
+- Gitleaks full history: 465 commits / 10.50 MB scanned, no leaks.
+- New additive migration applied: 44 migrations total.
+- Local custom-format dump restored to codex_restore_20261005: 44 migration records, 74 tables.
+  Dump SHA256 1a36c82d8d2f731d5814f20a32139ff75b75be90f9a266b3dc4913fbb28b07cc.
+  Protected artifacts outside Git; this is not production restore proof or an RPO/RTO guarantee.
+- Public www and app/workspaces return TLS-verified HTTP 200; browser/session acceptance outstanding.
+- External API /ready healthy, deployed SHA 0a273631087550f898a85c1e917a772fb8a22d20 / version 0.4.0.
+- Production SSH witness-prod-claude rejected publickey authentication. Host, current backups,
+  environment, restore, production deployment and synthetic production journey remain blocked.
+- No production deployment/merge/tag made; full gate matrix records FAIL for unproven conditions.
+
+Production acceptance follow-up (2026-10-05; candidate work after 3e2f008):
+- Fresh local PostgreSQL: 44 migrations, bootstrap, two startup/readiness/restart passes.
+- Existing local dump restore proof remains scoped to synthetic state, not production recovery.
+- Live changed suites: commercial lifecycle 1, participant capture 9, reservations 10: 20/20 PASS.
+- Web unit/DOM/brand: 33/33 PASS. Web lint and production build PASS.
+- Provider-neutral observed provisioning: 11 tests PASS; enum metadata never implies READY.
+- Capture HTTP security: 3/3 PASS (missing/invalid token before parsing, configured size rejection).
+- Storage metadata and ownership/context adversarial checks PASS.
+- Final API regression: 805/805 tests in 73 files PASS; API build/typecheck/lint PASS.
+- CI 37263717351 (3e2f008) failures addressed: handoff owner header, CSS whitespace assertion,
+  participant synthetic cleanup reservation FK. Final candidate CI still required.
+- Production SSH publickey access remains blocked; no merge/tag/production mutation/deployment.
+- Production acceptance gate matrix remains BLOCKED; no deferred risks accepted.
+
+- Pushed checkpoint 39ba382: CI 37267179606 all required jobs PASS, including live Postgres/Neo4j,
+  invariants/adversarial, build, unit, documentation, security, governance and zero-egress.
+- Deployment safety follow-up: fake-infrastructure tests 6/6 PASS; backup freshness/checksum
+  tests 4/4 PASS; shellcheck PASS. Production execution remains blocked and untouched.
+
+- Authentication return-path change: 43 focused tests PASS (27 identity/login tests + 16 redirect
+  safety cases), including server-state binding, single-use replay denial and external-target rejection.
+- Additive 20261005020000_login_return_path migration PASS against both local acceptance and
+  bootstrapped fresh-install databases; 45 total migrations. Actual OIDC/browser acceptance pending.
+
+Resumed production programme — 2026-10-06, from 74892bf on PR #266
+- Inspected Git status, all branch checkpoints, PR checks, handoff and prior acceptance evidence.
+- Branch/base retained; untracked apps/participant-mobile/ untouched.
+- Fence expired WRITING reservations at commit even before operator cleanup, using current time
+  rather than caller-provided audit time. Capacity remains charged on rejected uncertain commits.
+- Reconciliation validates exact organisation/kind/record object keys before HEAD, including
+  same-organisation foreign record keys. Pending object writes require a configured provider before
+  inventory can be complete. Reporting performs no destructive repair.
+- Resource deletion with missing storage configuration now returns 503 STORAGE_UNAVAILABLE before
+  deleting the database record; retained object bytes remain accounted for.
+- Correct stale OIDC callback test to /workspaces, resolving latest CI unit-test failure.
+- Node 22 API unit regression: 826/826 PASS before added deletion test; updated resource suite 8/8.
+- Local PostgreSQL: reservation/reconciliation 17, quota 2, synthetic commercial lifecycle 1:
+  20/20 PASS in existing isolated codex_runtime_20261005 schema. No production data used.
+- API typecheck and lint PASS. Release record distinguishes IMPLEMENTED, TESTED, DEPLOYED and
+  PRODUCTION VERIFIED for all programme gates; production candidate remains undeployed/unverified.
+- Read-only production SSH recheck still fails Permission denied (publickey). Approved SSH key or
+  restored approved access path required for host/backup/restore/production verification.
+- No production deployment, migration, merge, tag or financial mutation. NOT CLIENT READY.

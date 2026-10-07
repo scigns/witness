@@ -16,9 +16,11 @@
  * full declarative capacity bundle it names.
  */
 
+import type { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import {
+  InvariantViolation,
   resolveEffectiveCommercialConfiguration,
   toOrganisationId,
   type EffectiveCommercialConfiguration,
@@ -74,8 +76,11 @@ export class EffectiveCommercialConfigurationService {
     private readonly entitlements: CommercialEntitlementService,
   ) {}
 
-  async resolveFor(organisationId: string): Promise<EffectiveCommercialConfigurationView> {
-    const subscription = await this.prisma.subscription.findFirst({
+  async resolveFor(
+    organisationId: string,
+    db: PrismaService | Prisma.TransactionClient = this.prisma,
+  ): Promise<EffectiveCommercialConfigurationView> {
+    const subscription = await db.subscription.findFirst({
       where: {
         organisationId,
         status: { in: ['FREE', 'TRIALING', 'ACTIVE', 'PAST_DUE', 'SUSPENDED'] },
@@ -92,7 +97,7 @@ export class EffectiveCommercialConfigurationService {
       });
     }
 
-    const resolvedEntitlements = await this.entitlements.forOrganisation(organisationId);
+    const resolvedEntitlements = await this.entitlements.forOrganisation(organisationId, db);
     const config = resolveEffectiveCommercialConfiguration({
       organisationId: toOrganisationId(organisationId),
       subscriptionStatus:
@@ -101,9 +106,23 @@ export class EffectiveCommercialConfigurationService {
       entitlements: resolvedEntitlements,
     });
 
-    const resourceProfile = await this.prisma.resourceProfile.findUnique({
+    const resourceProfile = await db.resourceProfile.findUnique({
       where: { code: config.resourceProfileCode ?? FALLBACK_RESOURCE_PROFILE_CODE },
     });
+
+    if (
+      resourceProfile === null ||
+      !resourceProfile.active ||
+      resourceProfile.storageQuotaBytes < 0n ||
+      resourceProfile.concurrencyLimit < 0 ||
+      resourceProfile.workerAllocation < 0 ||
+      resourceProfile.jobLimit < 0
+    ) {
+      throw new InvariantViolation(
+        'The effective resource profile is missing, inactive or has invalid capacity.',
+        'INVALID_RESOURCE_PROFILE',
+      );
+    }
 
     return {
       organisationId,

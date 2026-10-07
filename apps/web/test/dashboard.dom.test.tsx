@@ -46,7 +46,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   return { ...actual, api: { ...actual.api, ...mockApi } };
 });
 
-const { default: DashboardPage } = await import('@/app/page');
+const { default: DashboardPage } = await import('@/app/activity/page');
 
 function baseUser(overrides: Partial<CurrentUserView> = {}): CurrentUserView {
   return {

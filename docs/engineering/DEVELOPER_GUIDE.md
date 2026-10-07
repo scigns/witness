@@ -15,7 +15,7 @@
 |---|---|---|
 | Node.js | 22 LTS | See `.nvmrc`; use `nvm`, `fnm` or `mise` |
 | pnpm | 9+ | `corepack enable` — do not install separately |
-| Docker | 24+ | With Compose v2 |
+| Docker | 24+ | Optional infrastructure debugging only; Compose v2 |
 | Make | any | Task entry point |
 | Git | 2.40+ | |
 | Python | 3.11+ | Only for ML workers and the Python SDK |
@@ -30,25 +30,32 @@ development against short fixtures.
 git clone https://github.com/scigns/witness.git
 cd witness
 
-make bootstrap    # checks prerequisites, installs deps, creates .env
-make dev          # starts Postgres, Neo4j, OpenSearch, Valkey, MinIO, Keycloak, NATS
-make verify       # lint, typecheck, test, build — the same gates CI runs
+make bootstrap    # optional Docker-free dependency setup
+# Edit, optionally check changed files, commit explicit paths and push
+gh pr checks <number>   # GitHub runs all full gates; Docker may stay off
 ```
 
 If `make bootstrap` fails, that is a defect in our tooling. Open a `type:bug` issue — do not work
 around it silently, because the next person will hit the same thing.
 
-## Everyday commands
+## Remote-first default and optional commands
+
+Routine work follows edit → optional cheap checks → commit → push → inspect GitHub Actions.
+The laptop may shut down after push. Full suites and the stack below are opt-in debugging tools,
+not prerequisites. See [execution classes](REMOTE_FIRST_EXECUTION.md).
+
+## Command reference
 
 | Command | Does |
 |---|---|
-| `make dev` | Start the local stack |
+| `make bootstrap-runtime` | Optional runtime setup requiring Docker |
+| `make dev` | Optional local Postgres debugging |
 | `make dev-obs` | Stack plus Prometheus, Grafana, Tempo, Loki |
 | `make down` | Stop, keeping data |
 | `make clean` | Stop and **destroy** local data |
 | `make logs` | Tail stack logs |
 | `make reset-data` | Wipe and re-seed synthetic fixtures |
-| `make verify` | **Every gate CI runs.** Do this before opening a PR |
+| `make verify` | Optional full local reproduction; GitHub is authoritative |
 | `make test` | Unit and integration |
 | `make test-e2e` | End-to-end (needs the stack) |
 | `make security` | Secrets, dependencies, licences, containers |
@@ -111,10 +118,10 @@ through NATS, so an async pipeline is one trace from upload to graph.
 |---|---|
 | Port already in use | `make down`, check for a stray container |
 | `pnpm install` fails | `corepack enable`; check Node version against `.nvmrc` |
-| Tests pass locally, fail in CI | Almost always test ordering or a shared fixture. Run `make test` with a clean stack |
-| Turborepo serving a stale build | `pnpm build --force`; check task inputs are declared |
+| Tests fail in CI | Inspect `gh run view <id> --log-failed`; reproduce the failing test only if needed |
+| Turborepo serving a stale build | Inspect task inputs/cache; full rebuild only for explicit reproduction |
 | Keycloak will not start | Usually memory. Give Docker ≥ 8 GB |
-| Out of disk | `make clean`, then `docker system prune` |
+| Out of disk | Inspect usage; do not clean unrelated work or blanket-prune resources |
 
 ## Editor
 

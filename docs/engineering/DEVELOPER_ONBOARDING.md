@@ -6,6 +6,19 @@
 
 ---
 
+## Routine development — start here
+
+Edit → optional cheap checks on changed files → commit explicit paths → push → inspect
+`gh pr checks <number>`. GitHub Actions runs full validation independently; Docker Desktop
+may remain stopped and the laptop may shut down after push. `make bootstrap` installs
+optional local dependencies without Docker. See [remote-first execution](REMOTE_FIRST_EXECUTION.md).
+
+## Optional local runtime walkthrough
+
+The remaining walkthrough reproduces infrastructure locally using synthetic fixtures. It is
+opt-in debugging, not routine onboarding or a prerequisite for a PR. Docker is required only
+when choosing its Compose steps. Use `make bootstrap-runtime` for that path.
+
 ## What you will have at the end
 
 Witness running locally: a web application at `http://localhost:3000`, an API at
@@ -49,7 +62,7 @@ cd witness
 ## 3. Bootstrap
 
 ```bash
-make bootstrap
+make bootstrap-runtime
 ```
 
 This checks prerequisites, creates `.env` from `.env.example` if absent, and installs dependencies.
@@ -181,10 +194,10 @@ scope-relative `admin` role never grants the global admin tier through a session
 deliberate and documented in `services/api-gateway/src/authz/session-authenticator.ts`, pending
 Authorisation hardening.
 
-## 8. Run the checks
+## 8. Optional full local reproduction
 
 ```bash
-make verify              # everything CI runs: format, lint, typecheck, test, build
+make verify              # opt-in full reproduction; normal validation runs in GitHub
 ```
 
 Individually:
@@ -276,6 +289,6 @@ rule live, and everything else is an adapter around it.
    accidentally redesigning something already decided.
 2. Pick an available row in [`DEPARTMENT_ASSIGNMENTS.md`](DEPARTMENT_ASSIGNMENTS.md). Three Phase 1
    rows have no dependencies at all.
-3. Branch, work, `make verify`, open a PR against the template.
+3. Branch, edit, optionally check changed files, commit, push and inspect GitHub Actions.
 
 Welcome.

@@ -20,7 +20,8 @@ to convert standards into tooling.
 
 - Own the toolchain: pnpm, Turborepo, TypeScript configuration, linting, formatting
 - Own the **scaffolding templates** — a generated service should pass every gate on creation
-- Own local development: `make bootstrap`, `make dev`, `make verify`
+- Own remote-first development: Docker-free `make bootstrap`, targeted checks and GitHub CI; local
+  stacks/full gates are opt-in
 - Own build performance and CI duration
 - Own onboarding tooling and its measurement
 - Own the lint rules that enforce architectural constraints
@@ -71,7 +72,7 @@ measured to first merged PR · contributor ergonomics improvements.
 | **`make bootstrap` success on a clean machine** | 100% — a failure here is a defect, not a quirk |
 | Contributor onboarding to first merged PR | < 10 days |
 | CI p95 | < 10 min |
-| Local `make verify` duration | < 5 min |
+| Routine local checks | Targeted and Docker-free; full verification in GitHub CI |
 | Generated service passing all gates on creation | 100% |
 | Architectural constraints enforced by lint vs by review | Increasing lint share |
 | Friction reports resolved | > 80% within a release |

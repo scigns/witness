@@ -14,6 +14,7 @@ import {
   createActor,
   createAuditEvent,
   createOrganisation,
+  crossedThreshold,
   FREE_PLAN_ID,
   updateStorageQuota,
   toActorId,
@@ -134,7 +135,10 @@ export class OrganisationsService {
           data: {
             id: outcome.organisation.id,
             name: outcome.organisation.name,
-            storageQuotaBytes: BigInt(outcome.organisation.storageQuotaBytes),
+            storageQuotaBytes:
+              outcome.organisation.storageQuotaBytes === null
+                ? null
+                : BigInt(outcome.organisation.storageQuotaBytes),
             profile: outcome.organisation.profile,
             createdAt: outcome.organisation.createdAt,
           },
@@ -352,8 +356,17 @@ export class OrganisationsService {
 
   /** "STORAGE — X GB of Y GB included used", for an organisation administrator. */
   async storage(organisationId: string): Promise<OrganisationStorageUsage> {
-    const { usedBytes, quotaBytes } = await this.storageQuota.usage(organisationId);
-    return { usedBytes: usedBytes.toString(), quotaBytes: quotaBytes.toString() };
+    const usage = await this.storageQuota.usage(organisationId);
+    return {
+      usedBytes: usage.usedBytes.toString(),
+      reservedBytes: usage.reservedBytes.toString(),
+      quotaBytes: usage.quotaBytes.toString(),
+      availableBytes: usage.availableBytes.toString(),
+      percentageUsed: usage.percentageUsed,
+      source: usage.source,
+      measuredAt: usage.measuredAt.toISOString(),
+      thresholdCrossed: crossedThreshold(usage.percentageUsed),
+    };
   }
 
   /**
@@ -363,7 +376,7 @@ export class OrganisationsService {
    */
   async setStorageQuota(
     organisationId: string,
-    quotaBytes: number,
+    quotaBytes: number | null,
     principal: Principal,
   ): Promise<OrganisationStorageUsage> {
     const row = await this.prisma.organisation.findUnique({ where: { id: organisationId } });
@@ -382,7 +395,7 @@ export class OrganisationsService {
       {
         id: toOrganisationId(row.id),
         name: row.name,
-        storageQuotaBytes: Number(row.storageQuotaBytes),
+        storageQuotaBytes: row.storageQuotaBytes === null ? null : Number(row.storageQuotaBytes),
         profile: row.profile as InstitutionalProfile,
         tenantId: row.tenantId as TenantId | null,
         createdAt: row.createdAt,
@@ -394,7 +407,12 @@ export class OrganisationsService {
     await this.prisma.$transaction(async (tx) => {
       await tx.organisation.update({
         where: { id: organisationId },
-        data: { storageQuotaBytes: BigInt(outcome.organisation.storageQuotaBytes) },
+        data: {
+          storageQuotaBytes:
+            outcome.organisation.storageQuotaBytes === null
+              ? null
+              : BigInt(outcome.organisation.storageQuotaBytes),
+        },
       });
 
       // The organisation's chain did not start with this event — create()

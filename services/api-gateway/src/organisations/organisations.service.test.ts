@@ -26,8 +26,13 @@ const DEFAULT_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
 
 function fakeStorageQuota(
   usage: StorageQuotaService['usage'] = async () => ({
+    reservedBytes: 0n,
     usedBytes: 0n,
     quotaBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
+    availableBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
+    percentageUsed: 0,
+    source: 'FALLBACK_DEFAULT',
+    measuredAt: new Date('2026-01-01T00:00:00Z'),
   }),
 ) {
   return { usage, checkQuota: async () => {} } as unknown as StorageQuotaService;
@@ -293,7 +298,9 @@ describe('OrganisationsService.create — provisions an administrator', () => {
     expect(state.organisations[0]).toMatchObject({
       id: result.id,
       name: 'New Institution',
-      storageQuotaBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
+      // null (not a frozen default) -- the effective quota now resolves
+      // live from the organisation's commercial ResourceProfile.
+      storageQuotaBytes: null,
     });
     expect(state.users).toHaveLength(1);
     expect(state.users[0]).toMatchObject({
@@ -465,14 +472,20 @@ describe('OrganisationsService.storage', () => {
   it('returns usage and quota as decimal strings — bigint does not survive JSON.stringify', async () => {
     const { prisma } = fakePrisma({ organisations: [{ id: ORG_1, name: 'Org One' }] });
     const storageQuota = fakeStorageQuota(async () => ({
+      reservedBytes: 0n,
       usedBytes: 2_147_483_648n,
       quotaBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES),
+      availableBytes: BigInt(DEFAULT_STORAGE_QUOTA_BYTES) - 2_147_483_648n,
+      percentageUsed: 40,
+      source: 'FALLBACK_DEFAULT',
+      measuredAt: new Date('2026-01-01T00:00:00Z'),
     }));
     const service = new OrganisationsService(prisma, storageQuota, fakeConsentTemplates());
 
     const result = await service.storage(ORG_1);
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
+      reservedBytes: '0',
       usedBytes: '2147483648',
       quotaBytes: String(DEFAULT_STORAGE_QUOTA_BYTES),
     });
@@ -487,8 +500,13 @@ describe('OrganisationsService.setStorageQuota', () => {
     // production it re-reads the row this method just updated in the same
     // database, so the fake needs to reflect that instead of a fixed value.
     const storageQuota = fakeStorageQuota(async () => ({
+      reservedBytes: 0n,
       usedBytes: 0n,
       quotaBytes: state.organisations[0]!.storageQuotaBytes,
+      availableBytes: state.organisations[0]!.storageQuotaBytes,
+      percentageUsed: 0,
+      source: 'ADMIN_OVERRIDE',
+      measuredAt: new Date('2026-01-01T00:00:00Z'),
     }));
     const service = new OrganisationsService(prisma, storageQuota, fakeConsentTemplates());
     const newQuota = 10 * 1024 * 1024 * 1024;

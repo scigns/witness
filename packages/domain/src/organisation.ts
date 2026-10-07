@@ -24,7 +24,15 @@ import type { OrganisationId, TenantId } from './ids.js';
 /** The maximum length of an organisation name. */
 const NAME_MAX = 200;
 
-/** 5 GiB — Flight 1's included storage allowance per organisation. */
+/**
+ * 5 GiB — the fallback of last resort only, used when neither an explicit
+ * override nor a resolvable commercial resource profile exists (e.g. an
+ * organisation with no subscription at all). Not a marketing figure and not
+ * read by any plan-facing code — `services/api-gateway/src/organisations/
+ * storage-quota.service.ts` resolves the real default from the
+ * organisation's effective `ResourceProfile` (commercial-runtime-readiness
+ * work), data-driven per plan rather than hard-coded here.
+ */
 export const DEFAULT_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
 
 /**
@@ -41,7 +49,14 @@ export type InstitutionalProfile = (typeof INSTITUTIONAL_PROFILES)[number];
 export interface Organisation {
   readonly id: OrganisationId;
   readonly name: string;
-  readonly storageQuotaBytes: number;
+  /**
+   * `null` means "no explicit platform-admin override" — the organisation's
+   * effective quota is resolved live from its commercial ResourceProfile
+   * (`StorageQuotaService.usage()`), so a plan change is reflected
+   * immediately. A non-null value is a negotiated override that takes
+   * precedence over the plan default until explicitly cleared.
+   */
+  readonly storageQuotaBytes: number | null;
   readonly profile: InstitutionalProfile;
   /**
    * The explicit technical-isolation `Tenant` this organisation is assigned
@@ -58,7 +73,8 @@ export interface OrganisationOutcome {
   readonly event: PendingAuditEvent;
 }
 
-function assertStorageQuota(bytes: number): number {
+function assertStorageQuota(bytes: number | null): number | null {
+  if (bytes === null) return null;
   if (!Number.isInteger(bytes) || bytes <= 0) {
     throw new InvariantViolation(
       `A storage quota must be a positive whole number of bytes, received ${bytes}.`,
@@ -111,13 +127,19 @@ export function createOrganisation(input: {
   name: string;
   createdBy: Actor;
   createdAt: Date;
-  storageQuotaBytes?: number;
+  /**
+   * Omitted (or explicitly `null`) by default so a new organisation
+   * inherits its plan's live resource-profile quota rather than a figure
+   * frozen at creation time. Pass a number only for an immediate negotiated
+   * override.
+   */
+  storageQuotaBytes?: number | null;
   profile?: string;
 }): OrganisationOutcome {
   const organisation: Organisation = {
     id: input.id,
     name: assertName(input.name),
-    storageQuotaBytes: assertStorageQuota(input.storageQuotaBytes ?? DEFAULT_STORAGE_QUOTA_BYTES),
+    storageQuotaBytes: assertStorageQuota(input.storageQuotaBytes ?? null),
     profile: assertProfile(input.profile ?? 'general'),
     tenantId: null,
     createdAt: input.createdAt,
@@ -134,15 +156,16 @@ export function createOrganisation(input: {
 }
 
 /**
- * The operator override Flight 1 asks for: quota is per-tenant and
- * configurable, not a fixed global constant baked into enforcement. Any
- * positive value is accepted — the domain layer does not second-guess an
- * operator's judgement about what a specific institution needs, only that
- * the number itself is coherent.
+ * The platform-admin override quota is per-tenant and configurable, not a
+ * fixed global constant baked into enforcement. Any positive value is
+ * accepted — the domain layer does not second-guess an administrator's
+ * judgement about what a specific institution needs, only that the number
+ * itself is coherent. Passing `null` clears the override, reverting the
+ * organisation to its plan's live resource-profile default.
  */
 export function updateStorageQuota(
   organisation: Organisation,
-  storageQuotaBytes: number,
+  storageQuotaBytes: number | null,
   updatedBy: Actor,
 ): OrganisationOutcome {
   const validated = assertStorageQuota(storageQuotaBytes);

@@ -41,12 +41,8 @@ import { firstAuditEventFor } from './operator-audit.js';
 
 const prisma = new PrismaClient();
 
-// Matches packages/domain/src/organisation.ts's DEFAULT_STORAGE_QUOTA_BYTES
-// exactly (5 GiB) — duplicated rather than imported for the same reason as
-// operator-audit.ts's canonicalisation: this script runs under `tsx` outside
-// the service's module graph, and packages/domain is GPL-3.0 while this is a
-// build-time operator tool (ADR-0002's licensing boundary).
-const DEFAULT_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
+// An unset allocation resolves through the current effective ResourceProfile.
+// Bootstrap must not freeze the free allowance across later paid activation.
 // Stable catalogue identifier seeded by the commercial-foundation migration.
 const FREE_PLAN_ID = '10000000-0000-4000-8000-000000000001';
 
@@ -101,7 +97,7 @@ async function main(): Promise<void> {
       data: {
         id: organisationId,
         name: organisationName,
-        storageQuotaBytes: DEFAULT_STORAGE_QUOTA_BYTES,
+        storageQuotaBytes: null,
         createdAt: now,
       },
     });

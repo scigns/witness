@@ -206,6 +206,9 @@ importers:
       nodemailer:
         specifier: ^9.1.1
         version: 9.1.1
+      prisma:
+        specifier: ^5.22.0
+        version: 5.22.0
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -228,9 +231,6 @@ importers:
       concurrently:
         specifier: ^9.2.4
         version: 9.2.4
-      prisma:
-        specifier: ^5.22.0
-        version: 5.22.0
       tsx:
         specifier: ^4.23.13
         version: 4.23.13

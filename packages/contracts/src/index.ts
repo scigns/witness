@@ -1735,9 +1735,25 @@ export interface OrganisationSummary {
  * (gigabytes) fit safely in a JS number, but the wire type stays honest
  * about carrying a bigint rather than silently narrowing it.
  */
+export const STORAGE_QUOTA_SOURCES = [
+  'ADMIN_OVERRIDE',
+  'RESOURCE_PROFILE',
+  'FALLBACK_DEFAULT',
+] as const;
+export type StorageQuotaSource = (typeof STORAGE_QUOTA_SOURCES)[number];
+
 export interface OrganisationStorageUsage {
+  readonly reservedBytes: string;
   usedBytes: string;
+  /** Allocated. */
   quotaBytes: string;
+  availableBytes: string;
+  percentageUsed: number;
+  /** Where the allocation figure came from -- see StorageQuotaService's own doc comment. */
+  source: StorageQuotaSource;
+  measuredAt: string;
+  /** The highest 70/85/95/100 threshold `percentageUsed` has reached, or `null`. */
+  thresholdCrossed: 70 | 85 | 95 | 100 | null;
 }
 
 /**
@@ -1770,10 +1786,14 @@ export interface OrganisationUsage {
 }
 
 export const updateStorageQuotaRequestSchema = z.object({
-  quotaBytes: z.coerce
-    .number()
-    .int()
-    .positive('A storage quota must be a positive number of bytes'),
+  /** `null` clears the override, reverting to the plan's live resource-profile default. */
+  quotaBytes: z
+    .union([
+      z.coerce.number().int().positive('A storage quota must be a positive number of bytes'),
+      z.null(),
+    ])
+    .optional()
+    .transform((value) => value ?? null),
 });
 export type UpdateStorageQuotaRequest = z.infer<typeof updateStorageQuotaRequestSchema>;
 
@@ -1973,6 +1993,8 @@ export interface CurrentUserWorkspaceView extends WorkspaceSummary {
  * accidentally show access the user does not have.
  */
 export interface CurrentUserView {
+  /** Server-computed platform capability; omission means no operator navigation. */
+  operatorAccess?: boolean;
   id: string;
   displayName: string;
   email: string;
@@ -3362,3 +3384,25 @@ export const createSubscriptionEntitlementOverrideRequestSchema = z
 export type CreateSubscriptionEntitlementOverrideRequest = z.infer<
   typeof createSubscriptionEntitlementOverrideRequestSchema
 >;
+
+/** Desired commercial allocation is separate from provider-verified observed infrastructure. */
+export interface TenantProvisioningView {
+  organisationId: string;
+  tenantId: string;
+  tenantAssignment: string;
+  desired: {
+    deploymentIsolation: 'SHARED' | 'ISOLATED_DATA' | 'DEDICATED' | 'SOVEREIGN';
+    resourceProfileCode: string;
+    storageQuotaBytes: string;
+    configurationFingerprint: string;
+  };
+  observed: {
+    state: 'NOT_PROVISIONED' | 'PENDING' | 'READY' | 'DEGRADED' | 'FAILED';
+    deploymentIsolation: 'SHARED' | 'ISOLATED_DATA' | 'DEDICATED' | 'SOVEREIGN' | null;
+    resourceProfileCode: string | null;
+    configurationFingerprint: string | null;
+    verifiedAt: string | null;
+    detail: string;
+    evidenceReference?: string | null;
+  };
+}

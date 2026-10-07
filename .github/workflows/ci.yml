@@ -5,8 +5,8 @@
 # own machine. That keeps the pipeline portable off GitHub Actions, which matters
 # for a project claiming sovereignty.
 #
-# Witness is pre-implementation, so the code gates are guarded on the presence of
-# workspace source. They activate automatically in Phase 2 without editing this file.
+# Full validation runs on GitHub-hosted runners. The laptop edits and pushes;
+# the production runner is never used for PR validation.
 
 name: CI
 
@@ -274,10 +274,33 @@ jobs:
       - name: Bundle size budget
         run: bash scripts/ci/check-bundle-size.sh
 
+  images:
+    name: Release image validation
+    needs: [detect, static, test, integration, invariants, build]
+    if: needs.detect.outputs.has_code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Build and validate exact release images without production secrets
+        run: bash scripts/release/build-images.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: witness-images-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: release-artifacts/
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
   gate:
     name: CI gate
     if: always()
-    needs: [docs, governance, static, test, invariants, integration, build]
+    needs: [detect, docs, governance, static, test, invariants, integration, build, images]
     runs-on: ubuntu-latest
     steps:
       - name: Assert no required job failed

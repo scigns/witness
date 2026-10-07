@@ -125,12 +125,12 @@ model Organisation {
   /// Unique so two institutions never collide under one name and an operator
   /// gets a clear "already exists" instead of two indistinguishable tenants.
   name              String   @unique @db.VarChar(200)
-  /// Bytes, not GB — avoids float rounding in a number an operator override
-  /// can set to anything. 5 GiB default (packages/domain/src/organisation.ts's
-  /// DEFAULT_STORAGE_QUOTA_BYTES) applied at creation, not here: a schema
-  /// default would silently diverge from the domain constant if either one
-  /// changed without the other.
-  storageQuotaBytes BigInt   @map("storage_quota_bytes")
+  /// Bytes, not GB — avoids float rounding in a number an administrator
+  /// override can set to anything. NULL (the default at creation) means "no
+  /// override" — the effective quota is resolved live from the
+  /// organisation's commercial ResourceProfile (StorageQuotaService.usage(),
+  /// commercial-runtime-readiness work), not a value frozen at creation.
+  storageQuotaBytes BigInt?  @map("storage_quota_bytes")
   /// One of packages/domain/src/organisation.ts's INSTITUTIONAL_PROFILES —
   /// configures starting defaults only (see organisations.service.ts), never
   /// a different code path.
@@ -144,6 +144,7 @@ model Organisation {
   tenant            Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  storageReservations          StorageReservation[]
   workspaces                   Workspace[]
   memberships                  OrganisationMembership[]
   roleAssignments              RoleAssignment[]
@@ -199,9 +200,15 @@ model Organisation {
 /// future negotiated dedicated environment is recorded against, without a
 /// schema migration at the moment that need first arrives.
 model Tenant {
-  id        String   @id @db.Uuid
-  label     String   @db.VarChar(200)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id    String @id @db.Uuid
+  label String @db.VarChar(200)
+  /// Honest provisioning status (commercial-runtime-readiness work): what
+  /// actually exists, not what a plan name implies. 'SHARED_INFRASTRUCTURE'
+  /// is the only value any Tenant in this deployment can truthfully have
+  /// today — there is no automated provisioning of a dedicated environment
+  /// yet (see DeploymentProvider in packages/domain/src/deployment-provider.ts).
+  provisioningStatus String   @default("SHARED_INFRASTRUCTURE") @map("provisioning_status") @db.VarChar(32)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   organisations Organisation[]
 
@@ -811,6 +818,7 @@ model AuthLoginAttempt {
   nonce        String @db.VarChar(64)
   codeVerifier String @map("code_verifier") @db.VarChar(128)
   redirectUri  String @map("redirect_uri") @db.VarChar(500)
+  returnPath   String? @map("return_path") @db.VarChar(2048)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
@@ -2945,4 +2953,29 @@ model Outbox {
 
   @@index([destination, status])
   @@map("outbox")
+}
+
+
+/// Durable capacity and upload identity. Uncertain writes continue consuming
+/// capacity until reconciled; expiration alone never releases a WRITING upload.
+model StorageReservation {
+  id                 String @id @db.Uuid
+  organisationId     String @map("organisation_id") @db.Uuid
+  organisation       Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  requestKey         String @map("request_key") @db.Uuid
+  requestFingerprint String @map("request_fingerprint") @db.VarChar(64)
+  storageKind        String @map("storage_kind") @db.VarChar(32)
+  targetId           String @map("target_id") @db.Uuid
+  storageKey         String? @unique @map("storage_key") @db.VarChar(500)
+  sizeBytes          BigInt @map("size_bytes")
+  state              String @default("RESERVED") @db.VarChar(32)
+  expiresAt          DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organisationId, requestKey])
+  @@unique([storageKind, targetId])
+  @@index([organisationId, state])
+  @@index([state, expiresAt])
+  @@map("storage_reservation")
 }

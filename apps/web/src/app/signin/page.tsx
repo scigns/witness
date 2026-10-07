@@ -14,11 +14,16 @@ import { useRouter } from 'next/navigation';
 
 import { api, authApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { safeReturnPath } from '@/lib/return-path';
 import { Card } from '@/components/ui';
 
 export default function SignInPage() {
   const { status, currentUser } = useAuth();
   const router = useRouter();
+  const [returnTo, setReturnTo] = useState('/workspaces');
+  useEffect(() => {
+    setReturnTo(safeReturnPath(new URLSearchParams(window.location.search).get('returnTo')));
+  }, []);
   const [developmentProfile, setDevelopmentProfile] = useState(false);
 
   useEffect(() => {
@@ -26,7 +31,7 @@ export default function SignInPage() {
       // The router, not `window.location` — it applies
       // NEXT_PUBLIC_WITNESS_BASE_PATH; a raw href would land at the origin's
       // true root, which under a path deployment is a different site.
-      router.replace('/');
+      router.replace(safeReturnPath(new URLSearchParams(window.location.search).get('returnTo')));
     }
   }, [status, currentUser, router]);
 
@@ -61,7 +66,7 @@ export default function SignInPage() {
           your password.
         </p>
         <a
-          href={authApi.loginUrl()}
+          href={authApi.loginUrl(returnTo)}
           className="inline-flex items-center justify-center rounded bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-accent-contrast)] hover:opacity-90"
         >
           Sign in
@@ -70,7 +75,7 @@ export default function SignInPage() {
           <a href={authApi.forgotPasswordUrl()} className="underline">
             Forgot password?
           </a>
-          <a href={authApi.loginUrl()} className="underline">
+          <a href={authApi.loginUrl(returnTo)} className="underline">
             Have an invitation? Activate your account
           </a>
           <p className="basis-full text-xs text-[var(--color-ink-muted)]">

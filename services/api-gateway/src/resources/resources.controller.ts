@@ -1,3 +1,4 @@
+import { downloadDisposition } from '../storage/upload-metadata.js';
 /**
  * HTTP adapter for program resources. Nested under `:workspaceId`, mirroring
  * `AgendaItemsController`. File upload/download follows
@@ -37,7 +38,7 @@ import {
 import { ResourcesService } from './resources.service.js';
 
 /** Memory-safety backstop, not the product limit — see `ResourcesService`'s own cap. */
-const MULTER_HARD_CEILING_BYTES = 100 * 1024 * 1024;
+const MULTER_HARD_CEILING_BYTES = 50 * 1024 * 1024;
 
 @Controller('api/v1/workspaces/:workspaceId/resources')
 @UseGuards(AuthorizationGuard)
@@ -75,7 +76,17 @@ export class ResourcesController {
 
   @Post('file')
   @Requires('resource:manage')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MULTER_HARD_CEILING_BYTES } }))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: MULTER_HARD_CEILING_BYTES,
+        files: 1,
+        fields: 4,
+        parts: 5,
+        fieldSize: 8192,
+      },
+    }),
+  )
   async createFile(
     @Param('workspaceId') workspaceId: string,
     @Body() body: unknown,
@@ -94,7 +105,13 @@ export class ResourcesController {
     }
 
     return this.translateDomainErrors(() =>
-      this.resources.createFile(workspaceId, parsed.data, file, request.principal!),
+      this.resources.createFile(
+        workspaceId,
+        parsed.data,
+        file,
+        request.principal!,
+        request.headers['idempotency-key'] as string | undefined,
+      ),
     );
   }
 
@@ -108,9 +125,7 @@ export class ResourcesController {
     const file = await this.resources.content(workspaceId, resourceId);
     res.set({
       'Content-Type': file.contentType,
-      'Content-Disposition':
-        `attachment; filename="${file.filename.replace(/"/g, '')}"; ` +
-        `filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+      'Content-Disposition': downloadDisposition(file.filename),
       'Content-Length': String(file.content.length),
     });
     res.send(file.content);

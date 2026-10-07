@@ -52,6 +52,10 @@ function fakePrisma(rows: Record<string, unknown>[]) {
 
   return {
     resource,
+    coDesignSession: { findUnique: vi.fn(async () => ({ workspaceId: 'another-workspace' })) },
+    agendaItem: {
+      findUnique: vi.fn(async () => ({ workspaceId: 'another-workspace', sessionId: null })),
+    },
     workspace: { findUnique: vi.fn(async () => ({ organisationId: 'org-1' })) },
     actor,
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<void>) => fn(tx)),
@@ -69,7 +73,23 @@ function fakeStorage(): StoragePort & {
   } as unknown as StoragePort & { put: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> };
 }
 
-const NOOP_QUOTA = {} as StorageQuotaService;
+const NOOP_QUOTA = {
+  reserve: async (input: Parameters<StorageQuotaService['reserve']>[0]) => {
+    const targetId = crypto.randomUUID();
+    return {
+      ...input,
+      targetId,
+      id: crypto.randomUUID(),
+      state: 'RESERVED',
+      storageKey: input.objectStorage ? `${input.organisationId}/resource/${targetId}` : null,
+    };
+  },
+  claim: async () => {},
+  checkReservation: async () => {},
+  commitReservation: async () => {},
+  releaseKnownFailure: async () => {},
+  markUncertain: async () => {},
+} as unknown as StorageQuotaService;
 
 function baseRow(id: string, overrides: Record<string, unknown>) {
   return {
@@ -92,15 +112,31 @@ function baseRow(id: string, overrides: Record<string, unknown>) {
 }
 
 describe('ResourcesService.remove', () => {
+  it('retains the row and its accounting when object storage is not configured', async () => {
+    const prisma = fakePrisma([
+      baseRow(RESOURCE_R2, { content: null, storageKey: `org-1/resource/${RESOURCE_R2}` }),
+    ]);
+    const service = new ResourcesService(prisma, null, NOOP_QUOTA);
+    await expect(service.remove(WORKSPACE_1, RESOURCE_R2, UPLOADER)).rejects.toMatchObject({
+      status: 503,
+      response: { error: { code: 'STORAGE_UNAVAILABLE' } },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.resource.delete).not.toHaveBeenCalled();
+  });
+
   it('deletes the R2 object before deleting the row, for a storage-backed resource', async () => {
-    const row = baseRow(RESOURCE_R2, { content: null, storageKey: 'org-1/resource/r2-key' });
+    const row = baseRow(RESOURCE_R2, {
+      content: null,
+      storageKey: `org-1/resource/${RESOURCE_R2}`,
+    });
     const prisma = fakePrisma([row]);
     const storage = fakeStorage();
     const service = new ResourcesService(prisma, storage, NOOP_QUOTA);
 
     await service.remove(WORKSPACE_1, RESOURCE_R2, UPLOADER);
 
-    expect(storage.delete).toHaveBeenCalledWith('org-1/resource/r2-key');
+    expect(storage.delete).toHaveBeenCalledWith(`org-1/resource/${RESOURCE_R2}`);
     expect(prisma.$transaction).toHaveBeenCalled();
   });
 
@@ -117,7 +153,10 @@ describe('ResourcesService.remove', () => {
   });
 
   it('leaves the row intact if the storage delete fails, rather than orphaning the object', async () => {
-    const row = baseRow(RESOURCE_R2, { content: null, storageKey: 'org-1/resource/r2-key' });
+    const row = baseRow(RESOURCE_R2, {
+      content: null,
+      storageKey: `org-1/resource/${RESOURCE_R2}`,
+    });
     const prisma = fakePrisma([row]);
     const storage = fakeStorage();
     storage.delete.mockRejectedValueOnce(new Error('R2 unavailable'));
@@ -129,4 +168,78 @@ describe('ResourcesService.remove', () => {
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
+});
+
+describe('ResourcesService upload size integrity', () => {
+  it('refuses understated metadata before writing customer bytes', async () => {
+    const prisma = fakePrisma([]);
+    const storage = fakeStorage();
+    const service = new ResourcesService(prisma, storage, NOOP_QUOTA);
+    await expect(
+      service.createFile(
+        WORKSPACE_1,
+        { title: 'Quota bypass' },
+        {
+          originalname: 'file.txt',
+          mimetype: 'text/plain',
+          size: 1,
+          buffer: Buffer.alloc(100),
+        },
+        UPLOADER,
+      ),
+    ).rejects.toMatchObject({ response: { error: { code: 'INVALID_STORAGE_SIZE' } } });
+    expect(storage.put).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('ResourcesService context isolation', () => {
+  it.each(['sessionId', 'agendaItemId'] as const)(
+    'rejects a foreign %s before reserving or writing',
+    async (field) => {
+      const prisma = fakePrisma([]);
+      const storage = fakeStorage();
+      const quota = { reserve: vi.fn() } as unknown as StorageQuotaService;
+      const service = new ResourcesService(prisma, storage, quota);
+      const context = { [field]: '77777777-7777-4777-8777-777777777777' };
+      await expect(
+        service.createFile(
+          WORKSPACE_1,
+          { title: 'Foreign context', ...context },
+          {
+            originalname: 'file.txt',
+            mimetype: 'text/plain',
+            size: 2,
+            buffer: Buffer.from('hi'),
+          },
+          UPLOADER,
+        ),
+      ).rejects.toMatchObject({ response: { error: { code: 'RESOURCE_CONTEXT_NOT_FOUND' } } });
+      await expect(
+        service.createLink(
+          WORKSPACE_1,
+          { title: 'Foreign context', externalUrl: 'https://example.com', ...context },
+          UPLOADER,
+        ),
+      ).rejects.toMatchObject({ response: { error: { code: 'RESOURCE_CONTEXT_NOT_FOUND' } } });
+      expect(quota.reserve).not.toHaveBeenCalled();
+      expect(storage.put).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    },
+  );
+});
+
+it('refuses to read or delete another organisation object through a corrupted record', async () => {
+  const prisma = fakePrisma([
+    baseRow(RESOURCE_R2, { content: null, storageKey: `foreign/resource/${RESOURCE_R2}` }),
+  ]);
+  const storage = fakeStorage();
+  const service = new ResourcesService(prisma, storage, NOOP_QUOTA);
+  await expect(service.content(WORKSPACE_1, RESOURCE_R2)).rejects.toMatchObject({
+    response: { error: { code: 'RESOURCE_NOT_FOUND' } },
+  });
+  await expect(service.remove(WORKSPACE_1, RESOURCE_R2, UPLOADER)).rejects.toThrow(/ownership/);
+  expect(storage.get).not.toHaveBeenCalled();
+  expect(storage.delete).not.toHaveBeenCalled();
+  expect(prisma.$transaction).not.toHaveBeenCalled();
 });

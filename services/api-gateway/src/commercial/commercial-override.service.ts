@@ -89,6 +89,27 @@ export class CommercialOverrideService {
       });
     }
 
+    if (definition.key === 'resource.profile') {
+      const profile = await this.prisma.resourceProfile.findUnique({
+        where: { code: String(request.value) },
+      });
+      if (
+        profile === null ||
+        !profile.active ||
+        profile.storageQuotaBytes < 0n ||
+        profile.concurrencyLimit < 0 ||
+        profile.workerAllocation < 0 ||
+        profile.jobLimit < 0
+      ) {
+        throw new BadRequestException({
+          error: {
+            code: 'INVALID_RESOURCE_PROFILE',
+            message: 'Choose an active resource profile with valid capacity.',
+          },
+        });
+      }
+    }
+
     const actor = await resolveActor(this.prisma, principal);
     const now = new Date();
     const result = await this.prisma.$transaction(async (tx) => {

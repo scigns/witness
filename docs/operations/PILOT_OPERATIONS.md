@@ -52,14 +52,19 @@ localhost default that is right for a developer and silently wrong for a
 deployment, and the resulting failure surfaces as something else — a CORS error,
 an "invalid redirect_uri" from Keycloak.
 
-## Deployment
+## Deployment — server-only controlled operations
 
-```bash
-docker compose -f deployments/cloud-managed/docker-compose.pilot.yml up -d --build
-docker compose -f deployments/cloud-managed/docker-compose.pilot.yml \
-  run --rm api pnpm --filter @witness/api exec prisma migrate deploy
-curl -fsS https://$WITNESS_API_HOST/ready | jq '.status, .components'
-```
+Routine developer work requires no production connection or local Docker. All full CI runs on
+GitHub-hosted runners; the self-hosted production runner is reserved for approved deployment.
+No laptop service is involved after a push. See [remote-first
+execution](../engineering/REMOTE_FIRST_EXECUTION.md).
+
+For the current release, legacy automatic deployment remains intentionally disabled. Use only the
+repository's authoritative workflow after all release gates pass; do not use ad hoc Compose builds
+or migrations from a developer machine or arbitrary checkout. The candidate deployment script pulls
+approved GHCR digests and has no API/web build fallback.
+See the [artifact pipeline](../release/REGISTRY_ARTIFACT_PIPELINE_2026-10-06.md); it is not
+deployed.
 
 `prisma migrate deploy` applies committed migrations and nothing else. Never use
 `prisma db push` against a deployed database: it reshapes the schema to match the
@@ -70,7 +75,8 @@ fixtures that read like real institutional decisions.
 
 ## Continuous deployment
 
-`make pilot-deploy` (`scripts/pilot/deploy.sh`) does the same steps above plus
+On the deployment server, `make pilot-deploy` (`scripts/pilot/deploy.sh`) performs the approved
+sequence plus
 a health check and an automatic rollback of the running containers if it
 fails — it is the one place the deploy sequence is defined, run identically by
 a human or by CI (`docs/engineering/CI_CD.md`'s "no logic in YAML" rule).
@@ -78,8 +84,10 @@ Database migrations are forward-only and are **not** rolled back by this
 script; a failed migration needs manual attention regardless of container
 rollback.
 
-`.github/workflows/deploy.yml` runs it automatically after `CI` passes on
-`main`. It targets a **self-hosted** runner rather than reaching out from a
+`.github/workflows/deploy.yml` declares a trigger after `CI` passes on
+`main`, but is intentionally disabled during the release hold. Exact release/rollback approval
+variables must also pass; a successful CI run alone does not authorise deployment. It targets a
+**self-hosted** runner rather than reaching out from a
 GitHub-hosted one, because the pilot host has no inbound port open — only the
 Cloudflare Tunnel — and a polling runner keeps it that way. To activate it on
 a host that doesn't have the runner yet:
@@ -205,16 +213,15 @@ bytes; it does not itself contain those bytes. Restoring the dump onto a
 fresh instance without also having the original bucket (or a copy of it)
 available leaves every evidence attachment 404ing.
 
-R2 itself is redundant across multiple facilities as part of the service
-Cloudflare provides — this is not the same failure mode a self-hosted disk
-has, and is why this pilot has not needed its own object-level backup job.
-The operator action that remains, and needs a human with Cloudflare account
-access (the same access already needed for tunnel-credential rotation,
-above): turn on **bucket versioning** (or Object Lock, if the compliance
-posture of a given client — MOJ in particular — calls for it) on the
-production bucket before onboarding real institutional data, so a
-credential compromise or an operator mistake that deletes or overwrites an
-object is recoverable rather than final.
+R2 redundancy does not protect against deletion or overwrite by a compromised credential or
+operator. R2 does not implement S3 bucket versioning or S3 Object Lock; see
+[Cloudflare's compatibility reference](https://developers.cloudflare.com/r2/api/s3/api/). Do not use
+those features as an onboarding prerequisite that an operator cannot execute. Before accepting real
+institutional evidence, verify an independent recoverable object copy, its retention and
+restricted/encrypted access, and a non-production restore with checksum verification. R2 bucket
+locks are a separate retention control and must be reviewed against governance/deletion
+requirements; they are not a substitute for a tested backup. Current proof is required in the
+[production acceptance gates](../release/PRODUCTION_ACCEPTANCE_2026-10-05.md).
 
 **Schedule it daily**, registered as a standing job on the pilot host's own
 crontab. Call the script directly rather than through `make` — a minimal
@@ -222,7 +229,8 @@ pilot host has no `make` binary, and cron's own environment is too sparse to
 find one on `$PATH` even where it is installed:
 
 ```cron
-0 3 * * * cd /path/to/witness && /usr/bin/env bash scripts/pilot/backup.sh >> ~/witness-backups/backup.log 2>&1
+0 3 * * * cd /path/to/witness && /usr/bin/env bash scripts/pilot/backup.sh >>
+~/witness-backups/backup.log 2>&1
 ```
 
 Keep a copy off the node it came from, and encrypt it at rest — it contains
@@ -294,17 +302,52 @@ against a new host.
 
 ## Rollback
 
-Roll the application back, not the database. Migrations in this repository are
-additive within a release, so the previous image runs against the current schema:
+An application-only rollback is allowed only after proving the previous images
+work with the upgraded schema **and candidate writes** in isolation. Additive DDL
+does not establish application compatibility. The October 2026 candidate permits
+null storage quotas and introduces durable reservations; the deployed required-quota
+Prisma client rejects a null quota with P2032 and bypasses the reservation protocol.
+The exact legacy pair is classified **DATABASE RESTORE REQUIRED**. Do not approve
+that image pair for automatic image-only rollback. An isolated restore drill has
+recovered its 33-migration schema, real OIDC and workspace/object usability; this
+does not authorise replacing the live database or discarding subsequent writes.
+
+The deploy workflow requires `WITNESS_APPROVED_ROLLBACK_RELEASE_SHA` to match the
+approved candidate and `WITNESS_APPROVED_ROLLBACK_API_IMAGE` /
+`WITNESS_APPROVED_ROLLBACK_WEB_IMAGE` to match the exact rehearsed recovery image IDs.
+Set these only after a successful compatibility rehearsal with candidate writes.
+For a separately published compatible recovery artifact, also approve its SHA,
+publication run and immutable registry references using
+`WITNESS_APPROVED_ROLLBACK_SHA`, `WITNESS_APPROVED_ROLLBACK_ARTIFACT_RUN_ID`,
+`WITNESS_APPROVED_ROLLBACK_API_REF` and `WITNESS_APPROVED_ROLLBACK_WEB_REF`.
+The workflow downloads that manifest, verifies trusted successful publication,
+identical schema/migration inventory and public build inputs, pulls exact digests
+and verifies packaged identity. It records both the actual pre-deploy running
+images and the separately approved recovery pair. Missing/stale approval prevents
+backup, migration and recreation. The release hold remains active while recovery
+is unproven. This is recovery to a compatible validated artifact, not a claim that
+the legacy deployed application is compatible.
+
+For a proven compatible pair, application-only rollback preserves the database:
 
 ```bash
-docker compose … up -d --no-deps api web   # with the previous image tags
+docker compose … up -d --no-deps --no-build api web
+# Use the recorded override containing approved immutable recovery image IDs.
+# Restore WITNESS_BUILD_ID/WITNESS_VERSION to that recovery artifact's identity.
 ```
 
-If a release contains a migration that the previous version genuinely cannot
-run against, the rollback is: stop the API, restore the pre-deployment backup,
-deploy the previous images. That is a data-loss window equal to the time since
-the backup, so take one immediately before any deployment that migrates.
+If compatibility fails, prepare a compatible recovery artifact or obtain explicit
+approval for a checkpoint restore. A checkpoint restore requires a maintenance
+window, all writers fenced (including workers), verified DB and independent object
+backups, exact previous images/configuration, a retained post-failure DB/object
+snapshot, a rehearsed recovery duration and an agreed treatment of writes after the
+checkpoint. Restore into an isolated fresh database first; destructive replacement
+of production requires separate approval. The DB restore alone cannot recover
+deleted/overwritten attachments. Do not run candidate migrations on the restored
+old schema before starting the old images. Verify the old ledger, identities,
+authentication and an authenticated data read before reopening writes. No such
+production recovery is currently authorised; see the
+[release reconciliation](../release/PRODUCTION_RECONCILIATION_2026-10-06.md).
 
 ## Logs
 
@@ -333,7 +376,8 @@ Neither exposes a secret. Alert on `/ready` reporting `down`, not on `/health`.
 2. **Is it authentication?** Sign-in failures with a healthy API usually mean
    Keycloak, its database, or a redirect URI that no longer matches the client.
    `/ready` reports the identity provider as a component for exactly this reason.
-3. **Is it a bad release?** Roll the application back first, diagnose second.
+3. **Is it a bad release?** Fence writes and use the rehearsed release-specific
+   recovery plan. Do not downgrade incompatible images against a migrated database.
 4. **Is it data?** Stop writes before restoring. A restore during live use loses
    whatever was written after the dump.
 

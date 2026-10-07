@@ -1,3 +1,5 @@
+import { ROLE_GRANTS } from '../authz/role-grants.js';
+import { validateApplicationReturnPath } from './application-return-path.js';
 /**
  * Authentication orchestration — sign-in, callback, current-user, sign-out.
  *
@@ -101,7 +103,8 @@ export class AuthenticationService {
     private readonly sessionTtlMinutes: number,
   ) {}
 
-  async startLogin(prompt?: 'create'): Promise<{ redirectUrl: string }> {
+  async startLogin(prompt?: 'create', returnPath?: string): Promise<{ redirectUrl: string }> {
+    const safeReturnPath = validateApplicationReturnPath(returnPath);
     const state = generateState();
     const nonce = generateNonce();
     const codeVerifier = generateCodeVerifier();
@@ -122,6 +125,7 @@ export class AuthenticationService {
         nonce,
         codeVerifier,
         redirectUri: this.redirectUri,
+        returnPath: safeReturnPath,
         expiresAt: new Date(Date.now() + LOGIN_ATTEMPT_TTL_MINUTES * 60_000),
       },
     });
@@ -164,7 +168,10 @@ export class AuthenticationService {
     };
   }
 
-  async handleCallback(code: string, state: string): Promise<IssuedSession> {
+  async handleCallback(
+    code: string,
+    state: string,
+  ): Promise<IssuedSession & { returnPath: string }> {
     if (code.trim() === '' || state.trim() === '') {
       throw new AuthenticationDeniedError('Missing code or state.', 'invalid_callback');
     }
@@ -230,7 +237,10 @@ export class AuthenticationService {
       );
     }
 
-    return this.sessions.issue(user.id, this.sessionTtlMinutes);
+    return {
+      ...(await this.sessions.issue(user.id, this.sessionTtlMinutes)),
+      returnPath: validateApplicationReturnPath(attempt.returnPath),
+    };
   }
 
   /**
@@ -401,7 +411,7 @@ export class AuthenticationService {
       // each, so a plain map (not a multi-value structure) is enough.
       this.prisma.roleAssignment.findMany({
         where: { userId },
-        select: { role: true, organisationId: true, workspaceId: true },
+        select: { role: true, scopeType: true, organisationId: true, workspaceId: true },
       }),
     ]);
 
@@ -495,6 +505,13 @@ export class AuthenticationService {
       status: 'ok',
       view: {
         id: user.id,
+        operatorAccess: roleAssignments.some(
+          (assignment) =>
+            assignment.scopeType === 'platform' &&
+            assignment.organisationId === null &&
+            assignment.workspaceId === null &&
+            ROLE_GRANTS[assignment.role]?.includes('operator:read'),
+        ),
         displayName: user.displayName,
         email: user.email,
         bio: user.bio,

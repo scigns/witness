@@ -11,7 +11,6 @@
 
 import Link from 'next/link';
 import { use, useCallback, useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
 
 import type {
   OrganisationInvitationView,
@@ -23,7 +22,7 @@ import type {
 
 import { api, ApiError } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { Card, Button, ErrorNotice, LinkButton } from '@/components/ui';
+import { Card, ErrorNotice, LinkButton } from '@/components/ui';
 import { OrganisationNav } from '@/components/organisation-nav';
 
 /** `null` (no completed cycle yet) reads as "—", never a misleading "0h". */
@@ -42,13 +41,11 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
   const [storageUnavailable, setStorageUnavailable] = useState(false);
   const [usage, setUsage] = useState<OrganisationUsage | null>(null);
   const [usageUnavailable, setUsageUnavailable] = useState(false);
-  const [quotaInput, setQuotaInput] = useState('');
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<OrganisationInvitationView[]>([]);
   const [pendingInvitationsUnavailable, setPendingInvitationsUnavailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
 
   const load = useCallback(
     async (cancelledRef: { current: boolean }) => {
@@ -120,27 +117,6 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
       cancelledRef.current = true;
     };
   }, [ready, load]);
-
-  const updateQuota = async (event: FormEvent) => {
-    event.preventDefault();
-    const gib = Number(quotaInput);
-    if (!Number.isFinite(gib) || gib <= 0) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await api.updateStorageQuota(
-        id,
-        { quotaBytes: Math.round(gib * 1024 * 1024 * 1024) },
-        user,
-      );
-      setStorage(result);
-      setQuotaInput('');
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Something went wrong.');
-    } finally {
-      setBusy(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -221,11 +197,18 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
               {(() => {
                 const usedGiB = Number(storage.usedBytes) / (1024 * 1024 * 1024);
                 const quotaGiB = Number(storage.quotaBytes) / (1024 * 1024 * 1024);
-                const fraction = quotaGiB > 0 ? Math.min(1, usedGiB / quotaGiB) : 0;
+                const fraction = storage.percentageUsed / 100;
                 return (
                   <div role="status">
                     <p className="text-sm">
-                      {usedGiB.toFixed(2)} GB of {quotaGiB.toFixed(0)} GB included used
+                      {usedGiB.toFixed(2)} GiB used of {quotaGiB.toFixed(2)} GiB allocated
+                    </p>
+                    <p className="text-sm text-[var(--color-ink-muted)]">
+                      {(Number(storage.availableBytes) / 1073741824).toFixed(2)} GiB available.
+                      {Number(storage.reservedBytes) > 0 &&
+                        ` ${(Number(storage.reservedBytes) / 1073741824).toFixed(2)} GiB reserved for uploads.`}
+                      {storage.thresholdCrossed !== null &&
+                        ` Storage has reached the ${storage.thresholdCrossed}% threshold.`}
                     </p>
                     <div
                       className="mt-2 h-2 w-full overflow-hidden rounded bg-[var(--color-line)]"
@@ -242,32 +225,10 @@ export default function OrganisationPage({ params }: { params: Promise<{ id: str
                   </div>
                 );
               })()}
-              <form
-                onSubmit={(event) => void updateQuota(event)}
-                className="flex flex-wrap items-end gap-2 pt-2"
-              >
-                <div>
-                  <label htmlFor="quotaInput" className="mb-1 block text-sm font-medium">
-                    Set quota (GB) — operator override
-                  </label>
-                  <input
-                    id="quotaInput"
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={quotaInput}
-                    onChange={(event) => setQuotaInput(event.target.value)}
-                    placeholder="5"
-                    className="w-32 rounded border border-[var(--color-line)] bg-[var(--color-paper)] px-3 py-2"
-                  />
-                </div>
-                <Button type="submit" variant="secondary" disabled={busy || quotaInput === ''}>
-                  {busy ? 'Updating…' : 'Update quota'}
-                </Button>
-              </form>
+
               <p className="text-xs text-[var(--color-ink-muted)]">
                 Reaching quota blocks new uploads only — existing content is never removed. Export
-                or remove content to free up space, or increase the quota here.
+                or remove content to free up space, or contact your administrator about capacity.
               </p>
             </>
           )}

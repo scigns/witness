@@ -40,6 +40,13 @@ const PLATFORM_ONLY_ACTIONS: ReadonlySet<Action> = new Set([
   'operator:read',
   'commercial_override:manage',
 ]);
+// Operators must be able to inspect/render the invoices they originate without
+// becoming members of the customer organisation. Customer billing roles remain
+// scoped; platform authority adds only these financial read capabilities.
+const PLATFORM_BILLING_READ_ACTIONS: ReadonlySet<Action> = new Set([
+  'invoice:read',
+  'invoice:render',
+]);
 
 function scopeLabel(scope: ResourceScope): string {
   switch (scope.type) {
@@ -80,6 +87,9 @@ export class PolicyEnforcementService {
         : scope.type === 'global'
           ? await this.roleResolution.globalGrantTiers(userId)
           : await this.roleResolution.scopedGrantTiers(userId, scope);
+      if (PLATFORM_BILLING_READ_ACTIONS.has(action)) {
+        tiers = [...new Set([...tiers, ...(await this.roleResolution.platformGrantTiers(userId))])];
+      }
     } catch (error) {
       this.logger.error(
         `Role resolution failed for ${principal.subject} in ${scopeLabel(scope)}: ` +

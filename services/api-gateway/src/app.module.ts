@@ -68,6 +68,10 @@ import { OrganisationRoleAssignmentsController } from './organisation-role-assig
 import { OrganisationRoleAssignmentsService } from './organisation-role-assignments/organisation-role-assignments.service.js';
 import { OrganisationsController } from './organisations/organisations.controller.js';
 import { OrganisationsService } from './organisations/organisations.service.js';
+import { ProvisioningPort } from './provisioning/provisioning.port.js';
+import { SharedRuntimeProvisioningAdapter } from './provisioning/shared-runtime-provisioning.adapter.js';
+import { TenantProvisioningService } from './provisioning/tenant-provisioning.service.js';
+import { StorageReconciliationService } from './organisations/storage-reconciliation.service.js';
 import { StorageQuotaService } from './organisations/storage-quota.service.js';
 import { OrganisationUsageService } from './organisations/organisation-usage.service.js';
 import { OutcomesController } from './outcomes/outcomes.controller.js';
@@ -95,7 +99,10 @@ import {
   SessionJoinLinksController,
 } from './session-join/session-join.controller.js';
 import { SessionJoinService } from './session-join/session-join.service.js';
-import { ParticipantCaptureController } from './session-join/participant-capture.controller.js';
+import {
+  ParticipantCaptureController,
+  CaptureAttachmentGuard,
+} from './session-join/participant-capture.controller.js';
 import { ParticipantCaptureService } from './session-join/participant-capture.service.js';
 import { WITNESS_CONFIG } from './tokens.js';
 import { UsersController } from './users/users.controller.js';
@@ -128,6 +135,7 @@ import { ManualSettlementService } from './invoices/manual-settlement.service.js
 import { AgreementsController } from './agreements/agreements.controller.js';
 import { AgreementsService } from './agreements/agreements.service.js';
 import { OperatorController } from './operator/operator.controller.js';
+import { OperatorOriginationController } from './operator/operator-origination.controller.js';
 import { OperatorService } from './operator/operator.service.js';
 import { PlatformRolesController } from './platform-roles/platform-roles.controller.js';
 import { PlatformRolesService } from './platform-roles/platform-roles.service.js';
@@ -174,6 +182,7 @@ import { MailerService } from './infrastructure/mailer.js';
     InvoicesController,
     AgreementsController,
     OperatorController,
+    OperatorOriginationController,
     PlatformRolesController,
     KnowledgeDomainsController,
     KnowledgeEntitiesController,
@@ -193,6 +202,9 @@ import { MailerService } from './infrastructure/mailer.js';
     RecordsService,
     OrganisationsService,
     StorageQuotaService,
+    StorageReconciliationService,
+    TenantProvisioningService,
+    { provide: ProvisioningPort, useClass: SharedRuntimeProvisioningAdapter },
     OrganisationUsageService,
     CommercialEntitlementService,
     CommercialCatalogueService,
@@ -220,6 +232,7 @@ import { MailerService } from './infrastructure/mailer.js';
     ParticipantsService,
     SessionJoinService,
     ParticipantCaptureService,
+    CaptureAttachmentGuard,
     ConsentTemplatesService,
     ConsentPolicyService,
     SessionConsentConfigurationService,

@@ -31,11 +31,21 @@ export function objectKey(input: {
  * `failed` transcript with the message as the reason — the same resilience
  * path a corrupt or unsupported recording already takes.
  */
+export function assertStorageOwnership(
+  storageKey: string,
+  owner: { organisationId: string; kind: StorageKind; id: string },
+): void {
+  if (storageKey !== objectKey(owner))
+    throw new Error('Stored object ownership does not match its record.');
+}
+
 export async function resolveStoredContent(
   storage: StoragePort | null,
   row: { content: Buffer | null; storageKey: string | null },
+  owner: { organisationId: string; kind: StorageKind; id: string },
 ): Promise<Buffer> {
   if (row.storageKey !== null) {
+    assertStorageOwnership(row.storageKey, owner);
     if (storage === null) {
       throw new Error(
         'This attachment is in object storage, which is not configured on this deployment.',

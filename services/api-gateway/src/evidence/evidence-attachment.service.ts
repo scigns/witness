@@ -34,7 +34,7 @@ import {
   NotFoundException,
   PayloadTooLargeException,
 } from '@nestjs/common';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 
 import {
   captureEvidenceAttachment,
@@ -51,8 +51,9 @@ import { PrismaService } from '../infrastructure/prisma.service.js';
 import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
 import { ConsentPolicyService } from '../consent/consent-policy.service.js';
+import { validateUploadMetadata } from '../storage/upload-metadata.js';
 import { StoragePort } from '../storage/storage.port.js';
-import { objectKey, resolveStoredContent } from '../storage/storage.service.js';
+import { resolveStoredContent } from '../storage/storage.service.js';
 import { StorageQuotaService } from '../organisations/storage-quota.service.js';
 import { WITNESS_CONFIG } from '../tokens.js';
 import type { Principal } from '../authz/authorization.port.js';
@@ -86,6 +87,7 @@ export class EvidenceAttachmentService {
     evidenceId: string,
     file: UploadedAttachmentFile | undefined,
     principal: Principal,
+    requestKey?: string,
   ): Promise<EvidenceAttachmentView> {
     if (file === undefined) {
       throw new BadRequestException({
@@ -94,7 +96,7 @@ export class EvidenceAttachmentService {
     }
 
     const maxBytes = this.config.maxEvidenceAttachmentMb * 1024 * 1024;
-    if (file.size > maxBytes) {
+    if (file.size > maxBytes || file.buffer.length > maxBytes) {
       throw new PayloadTooLargeException({
         error: {
           code: 'FILE_TOO_LARGE',
@@ -104,6 +106,17 @@ export class EvidenceAttachmentService {
         },
       });
     }
+
+    if (!Number.isSafeInteger(file.size) || file.size < 0 || file.size !== file.buffer.length) {
+      throw new BadRequestException({
+        error: {
+          code: 'INVALID_STORAGE_SIZE',
+          message: 'The upload byte count does not match its content.',
+        },
+      });
+    }
+
+    validateUploadMetadata(file.originalname, file.mimetype);
 
     const kind = inferAttachmentKind(file.mimetype);
     if (kind === null) {
@@ -127,7 +140,7 @@ export class EvidenceAttachmentService {
     const evidenceRow = await this.requireEvidenceRow(workspaceId, sessionId, evidenceId);
 
     const existing = await this.prisma.evidenceAttachment.findUnique({ where: { evidenceId } });
-    if (existing !== null) {
+    if (existing !== null && requestKey === undefined) {
       throw new ConflictException({
         error: {
           code: 'ATTACHMENT_EXISTS',
@@ -160,22 +173,66 @@ export class EvidenceAttachmentService {
       }
     }
 
-    try {
-      await this.storageQuota.checkQuota(evidenceRow.organisationId, file.size);
-    } catch (error) {
-      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
-        throw new PayloadTooLargeException({
-          error: { code: error.code, message: error.message },
-        });
-      }
-      throw error;
-    }
-
     const actor = await resolveActor(this.prisma, principal);
     const checksumSha256 = createHash('sha256').update(file.buffer).digest('hex');
+    let reservation;
+    try {
+      reservation = await this.storageQuota.reserve({
+        organisationId: evidenceRow.organisationId,
+        requestKey,
+        requestFingerprint: createHash('sha256')
+          .update(
+            JSON.stringify([
+              principal.subject,
+              workspaceId,
+              sessionId,
+              evidenceId,
+              file.originalname,
+              file.mimetype,
+              checksumSha256,
+            ]),
+          )
+          .digest('hex'),
+        kind: 'evidence-attachment',
+        sizeBytes: file.size,
+        objectStorage: this.storage !== null,
+        actor,
+      });
+    } catch (error) {
+      if (error instanceof InvariantViolation && error.code === 'SUBSCRIPTION_INACTIVE')
+        throw new ForbiddenException({ error: { code: error.code, message: error.message } });
+      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED')
+        throw new PayloadTooLargeException({ error: { code: error.code, message: error.message } });
+      throw error;
+    }
+    if (reservation.state === 'COMMITTED') {
+      if (existing === null || existing.id !== reservation.targetId)
+        throw new ConflictException({
+          error: {
+            code: 'UPLOAD_REPLAY_UNAVAILABLE',
+            message: 'The original upload record is no longer available.',
+          },
+        });
+      return {
+        id: existing.id,
+        evidenceId: existing.evidenceId,
+        kind: existing.kind as EvidenceAttachmentView['kind'],
+        originalFilename: existing.originalFilename,
+        contentType: existing.contentType,
+        sizeBytes: existing.sizeBytes,
+        checksumSha256: existing.checksumSha256,
+        createdAt: existing.createdAt.toISOString(),
+      };
+    }
+    if (existing !== null) {
+      await this.storageQuota.releaseKnownFailure(reservation, actor);
+      throw new ConflictException({
+        error: { code: 'ATTACHMENT_EXISTS', message: 'This evidence already has an attachment.' },
+      });
+    }
 
     const outcome = captureEvidenceAttachment({
-      id: toEvidenceAttachmentId(randomUUID()),
+      id: toEvidenceAttachmentId(reservation.targetId),
       evidenceId: toEvidenceId(evidenceId),
       kind,
       originalFilename: file.originalname,
@@ -186,38 +243,61 @@ export class EvidenceAttachmentService {
       at: now,
     });
 
-    // Written before the transaction, not after: if this put fails, nothing
-    // has touched the database and the request simply fails. The reverse
-    // order risks a committed row pointing at an object that was never
-    // written, which is a broken reference rather than wasted storage.
-    let storageKey: string | null = null;
-    if (this.storage !== null) {
-      storageKey = objectKey({
-        organisationId: evidenceRow.organisationId,
-        kind: 'evidence-attachment',
-        id: outcome.attachment.id,
+    const storageKey = reservation.storageKey;
+    let putCompleted = false;
+    try {
+      await this.storageQuota.claim(reservation);
+      if (storageKey !== null && this.storage !== null) {
+        await this.storage.put(storageKey, file.buffer, file.mimetype);
+      }
+      putCompleted = true;
+      await this.prisma.$transaction(async (tx) => {
+        await this.storageQuota.checkReservation(tx, reservation, actor, now);
+
+        await tx.evidenceAttachment.create({
+          data: {
+            id: outcome.attachment.id,
+            evidenceId: outcome.attachment.evidenceId,
+            kind: outcome.attachment.kind,
+            originalFilename: outcome.attachment.originalFilename,
+            contentType: outcome.attachment.contentType,
+            sizeBytes: outcome.attachment.sizeBytes,
+            checksumSha256: outcome.attachment.checksumSha256,
+            content: storageKey === null ? file.buffer : null,
+            storageKey,
+            createdAt: outcome.attachment.createdAt,
+          },
+        });
+
+        await this.storageQuota.commitReservation(tx, reservation);
+        await appendAuditEvent(
+          tx,
+          'evidence_attachment',
+          outcome.attachment.id,
+          outcome.event,
+          now,
+        );
       });
-      await this.storage.put(storageKey, file.buffer, file.mimetype);
+    } catch (error) {
+      if (error instanceof InvariantViolation && putCompleted) {
+        try {
+          if (storageKey !== null && this.storage !== null) await this.storage.delete(storageKey);
+          await this.storageQuota.releaseKnownFailure(reservation, actor);
+        } catch {
+          await this.storageQuota.markUncertain(reservation);
+        }
+      } else {
+        await this.storageQuota.markUncertain(reservation);
+      }
+      if (error instanceof InvariantViolation && error.code === 'SUBSCRIPTION_INACTIVE')
+        throw new ForbiddenException({ error: { code: error.code, message: error.message } });
+      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
+        throw new PayloadTooLargeException({
+          error: { code: error.code, message: error.message },
+        });
+      }
+      throw error;
     }
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.evidenceAttachment.create({
-        data: {
-          id: outcome.attachment.id,
-          evidenceId: outcome.attachment.evidenceId,
-          kind: outcome.attachment.kind,
-          originalFilename: outcome.attachment.originalFilename,
-          contentType: outcome.attachment.contentType,
-          sizeBytes: outcome.attachment.sizeBytes,
-          checksumSha256: outcome.attachment.checksumSha256,
-          content: storageKey === null ? file.buffer : null,
-          storageKey,
-          createdAt: outcome.attachment.createdAt,
-        },
-      });
-
-      await appendAuditEvent(tx, 'evidence_attachment', outcome.attachment.id, outcome.event, now);
-    });
 
     return {
       id: outcome.attachment.id,
@@ -236,7 +316,7 @@ export class EvidenceAttachmentService {
     sessionId: string,
     evidenceId: string,
   ): Promise<EvidenceAttachmentContent> {
-    await this.requireEvidenceRow(workspaceId, sessionId, evidenceId);
+    const evidence = await this.requireEvidenceRow(workspaceId, sessionId, evidenceId);
 
     const row = await this.prisma.evidenceAttachment.findUnique({ where: { evidenceId } });
     if (row === null) {
@@ -250,7 +330,11 @@ export class EvidenceAttachmentService {
 
     let content: Buffer;
     try {
-      content = await resolveStoredContent(this.storage, row);
+      content = await resolveStoredContent(this.storage, row, {
+        organisationId: evidence.organisationId,
+        kind: 'evidence-attachment',
+        id: row.id,
+      });
     } catch (error) {
       // Data-integrity states (object storage disabled/missing an object
       // that a record still points at), not "no attachment exists" — but

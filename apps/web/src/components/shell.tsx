@@ -18,14 +18,14 @@ import type { CurrentUserView } from '@witness/contracts';
 
 import { useAuth, type AuthStatus } from '@/lib/auth';
 import { useSession } from '@/lib/session';
+import { ApplicationAccess } from './application-access';
 import { IS_DEVELOPMENT_BUILD, type ActingUser } from '@/lib/api';
 
 const NAV = [
-  { href: '/', label: 'Home' },
   { href: '/workspaces', label: 'Programs' },
   { href: '/records', label: 'Records' },
   { href: '/records/new', label: 'Capture' },
-  { href: '/pricing', label: 'Pricing' },
+  { href: 'mailto:support@buildwithwitness.com', label: 'Help' },
 ] as const;
 
 const ROLES: ReadonlyArray<ActingUser['role']> = [
@@ -97,11 +97,13 @@ export function Shell({ children }: { children: ReactNode }) {
             <strong>Developer Preview</strong> — not production software. Requests are{' '}
             <strong>not authenticated</strong>. Content here is synthetic.
           </>
-        ) : (
+        ) : status === 'authenticated' ? (
           <>
             <strong>Protected workspace</strong> — your work is authenticated, recorded and
             traceable to its source.
           </>
+        ) : (
+          <strong>Witness application</strong>
         )}
       </div>
 
@@ -130,7 +132,10 @@ export function Shell({ children }: { children: ReactNode }) {
 
           <nav aria-label="Primary" className="flex flex-wrap items-center gap-1 lg:ml-auto">
             {navItems.map((item) => {
-              const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+              const active =
+                item.href === '/records'
+                  ? pathname.startsWith('/records') && pathname !== '/records/new'
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
               return (
                 <Link
@@ -170,12 +175,6 @@ export function Shell({ children }: { children: ReactNode }) {
                     >
                       Users
                     </Link>
-                    <Link
-                      href="/operator"
-                      className="block rounded px-3 py-2 text-sm hover:bg-[var(--color-paper)]"
-                    >
-                      Operator health
-                    </Link>
                     {currentUser.organisations
                       .filter((organisation) => organisation.role === 'admin')
                       .map((organisation) => (
@@ -190,6 +189,12 @@ export function Shell({ children }: { children: ReactNode }) {
                   </div>
                 </details>
               )}
+
+            {currentUser?.operatorAccess === true && (
+              <Link href="/operator" className="rounded px-3 py-2 text-sm underline">
+                Operator
+              </Link>
+            )}
 
             <AuthStatusBadge
               status={status}
@@ -269,7 +274,7 @@ export function Shell({ children }: { children: ReactNode }) {
       )}
 
       <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:py-12">
-        {children}
+        <ApplicationAccess>{children}</ApplicationAccess>
       </main>
 
       <Footer />
@@ -365,7 +370,10 @@ function Footer() {
           </span>
         </div>
         <div className="flex flex-wrap gap-4 text-[var(--color-line)]">
-          <a href="https://buildwithwitness.com/platform" className="underline underline-offset-4">
+          <a
+            href="https://www.buildwithwitness.com/platform"
+            className="underline underline-offset-4"
+          >
             Learn about Witness
           </a>
           <span className="witness-machine-fact text-xs">GPL-3.0-or-later</span>

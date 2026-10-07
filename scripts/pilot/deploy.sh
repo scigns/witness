@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deploys the current checkout to the pilot host: build -> migrate -> recreate
+# Deploys the current checkout to the pilot host: pull approved artifacts -> migrate -> recreate
 # -> health check -> smoke test, with an automatic rollback of the running
-# containers (not the database — migrations are additive-only, see
-# docs/architecture/decisions, and are never rolled back automatically) if the
-# health check fails after recreation.
+# containers if the health check fails after recreation. Database migrations
+# are never reversed automatically. Release approval requires a rehearsal of
+# previous-image compatibility with both the upgraded schema and candidate writes.
 #
 # Run identically by a human operator on the pilot host or by
 # .github/workflows/deploy.yml on the self-hosted runner registered there
@@ -28,26 +28,50 @@ HISTORY_FILE="deployments/cloud-managed/.deploy-history.log"
 COMMIT="$(git rev-parse HEAD)"
 VERSION="$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
 
+# Fail closed before any host mutation. The release manager records the exact
+# reviewed SHA in the existing pilot environment after acceptance gates pass.
+if [[ "${WITNESS_APPROVED_RELEASE_SHA:-}" != "$COMMIT" ]]; then
+  echo "Release approval is missing or does not match checkout SHA $COMMIT" >&2
+  exit 1
+fi
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "Deployment requires a clean tracked checkout" >&2
+  exit 1
+fi
+
+RELEASE_MANIFEST="${WITNESS_RELEASE_MANIFEST:?WITNESS_RELEASE_MANIFEST must name approved release evidence}"
+CANDIDATE_REFS="$(python3 scripts/release/artifacts.py validate "$RELEASE_MANIFEST")"
+CANDIDATE_API_IMAGE="$(printf '%s\n' "$CANDIDATE_REFS" | sed -n '1p')"
+CANDIDATE_WEB_IMAGE="$(printf '%s\n' "$CANDIDATE_REFS" | sed -n '2p')"
+export WITNESS_API_IMAGE="$CANDIDATE_API_IMAGE"
+export WITNESS_WEB_IMAGE="$CANDIDATE_WEB_IMAGE"
+
 export WITNESS_VERSION="$VERSION"
 export WITNESS_BUILD_ID="$COMMIT"
 
 log() { echo "[deploy] $*"; }
 record() { echo "$(date -u +%FT%TZ) commit=${COMMIT} result=$1" >>"$HISTORY_FILE"; }
 
-tag_rollback_candidate() {
-  local image="$1"
-  if docker image inspect "${image}:latest" >/dev/null 2>&1; then
-    docker tag "${image}:latest" "${image}:rollback"
-  else
-    log "no existing ${image}:latest — nothing to roll back to if this deploy fails"
-  fi
+capture_running_image() {
+  local service="$1" container image
+  container="$("${COMPOSE[@]}" ps -q "$service")"
+  [[ -n "$container" && "$container" != *$'\n'* ]] || { log "expected one running $service container" >&2; return 1; }
+  image="$(docker inspect --format '{{.Image}}' "$container")"
+  [[ "$image" =~ ^sha256:[0-9a-f]{64}$ ]] || { log "invalid running image for $service" >&2; return 1; }
+  docker image inspect "$image" >/dev/null
+  printf '%s' "$image"
+}
+
+write_image_override() {
+  printf 'services:\n  api:\n    image: "%s"\n  web:\n    image: "%s"\n' "$1" "$2" > "$IMAGE_OVERRIDE"
 }
 
 wait_for_health() {
+  local expected_build="$1"
   local deadline=$((SECONDS + HEALTH_TIMEOUT_SECONDS))
   while [ "$SECONDS" -lt "$deadline" ]; do
     local status
-    status="$(curl -sk --max-time 5 "${API_URL}/ready" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status","error"))' 2>/dev/null || echo error)"
+    status="$(curl -fsS --max-time 5 "${API_URL}/ready" | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r.get("status","error") if r.get("buildId") == sys.argv[1] else "wrong_build")' "$expected_build" 2>/dev/null || echo error)"
     if [ "$status" = "ok" ]; then
       return 0
     fi
@@ -57,15 +81,17 @@ wait_for_health() {
 }
 
 rollback() {
-  log "health check failed — rolling back api and web containers to the previous image"
-  for image in witness-pilot-api witness-pilot-web; do
-    if docker image inspect "${image}:rollback" >/dev/null 2>&1; then
-      docker tag "${image}:rollback" "${image}:latest"
-    fi
-  done
-  "${COMPOSE[@]}" up -d --force-recreate api web
-  if wait_for_health; then
-    log "rollback succeeded — service recovered on the previous image. The failed deploy was NOT applied. Investigate before retrying."
+  log "health check failed — restoring the rehearsed compatible API/web artifacts"
+  write_image_override "$RECOVERY_API_IMAGE" "$RECOVERY_WEB_IMAGE"
+  export WITNESS_BUILD_ID="$RECOVERY_BUILD"
+  export WITNESS_VERSION="$RECOVERY_VERSION"
+  if ! "${RELEASE_COMPOSE[@]}" up -d --no-deps --no-build --force-recreate api web; then
+    log "ROLLBACK RECREATION FAILED. Human recovery required."
+    record "rollback_failed"
+    exit 1
+  fi
+  if wait_for_health "$RECOVERY_BUILD"; then
+    log "rollback succeeded — service recovered on the approved recovery artifacts. The failed deploy was NOT applied. Investigate before retrying."
     record "rolled_back"
   else
     log "ROLLBACK ALSO FAILED HEALTH CHECK. Manual intervention required — see docs/operations/PILOT_OPERATIONS.md."
@@ -74,25 +100,98 @@ rollback() {
   exit 1
 }
 
-log "tagging current images as rollback candidates"
-tag_rollback_candidate witness-pilot-api
-tag_rollback_candidate witness-pilot-web
+log "capturing current healthy build identity"
+PREVIOUS_IDENTITY="$(curl -fsS --max-time 10 "${API_URL}/ready")"
+PREVIOUS_BUILD="$(printf '%s' "$PREVIOUS_IDENTITY" | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["status"] == "ok"; print(r["buildId"])')"
+PREVIOUS_VERSION="$(printf '%s' "$PREVIOUS_IDENTITY" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+[[ "$PREVIOUS_BUILD" =~ ^[0-9a-f]{40}$ ]] || { log "previous deployed SHA is invalid; rollback cannot be verified"; exit 1; }
 
-log "building api and web images"
-"${COMPOSE[@]}" build api web
+log "capturing exact running rollback images"
+PREVIOUS_API_IMAGE="$(capture_running_image api)"
+PREVIOUS_WEB_IMAGE="$(capture_running_image web)"
+RECOVERY_BUILD="$PREVIOUS_BUILD"
+RECOVERY_VERSION="$PREVIOUS_VERSION"
+RECOVERY_API_IMAGE="$PREVIOUS_API_IMAGE"
+RECOVERY_WEB_IMAGE="$PREVIOUS_WEB_IMAGE"
+# The running legacy images may require database restore. A separately
+# published compatible artifact is allowed only with its own provenance,
+# exact digest approvals, identical data model and candidate-specific drill.
+if [[ -n "${WITNESS_ROLLBACK_MANIFEST:-}" ]]; then
+  RECOVERY_REFS="$(python3 scripts/release/artifacts.py validate-recovery "$WITNESS_ROLLBACK_MANIFEST")"
+  RECOVERY_API_REF="$(printf '%s\n' "$RECOVERY_REFS" | sed -n '1p')"
+  RECOVERY_WEB_REF="$(printf '%s\n' "$RECOVERY_REFS" | sed -n '2p')"
+  docker pull --platform linux/amd64 "$RECOVERY_API_REF"
+  docker pull --platform linux/amd64 "$RECOVERY_WEB_REF"
+  RECOVERY_IDS="$(python3 scripts/release/artifacts.py inspect-recovery "$WITNESS_ROLLBACK_MANIFEST")"
+  RECOVERY_API_IMAGE="$(printf '%s\n' "$RECOVERY_IDS" | sed -n '1p')"
+  RECOVERY_WEB_IMAGE="$(printf '%s\n' "$RECOVERY_IDS" | sed -n '2p')"
+  RECOVERY_BUILD="$WITNESS_APPROVED_ROLLBACK_SHA"
+  RECOVERY_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$WITNESS_ROLLBACK_MANIFEST")"
+fi
+# A healthy previous image is not necessarily compatible with the upgraded
+# schema or new writes. Approval is specific to this candidate/image pair and
+# must follow a successful rollback rehearsal; never infer it from /ready.
+if [[ "${WITNESS_APPROVED_ROLLBACK_RELEASE_SHA:-}" != "$COMMIT" || \
+      "${WITNESS_APPROVED_ROLLBACK_API_IMAGE:-}" != "$RECOVERY_API_IMAGE" || \
+      "${WITNESS_APPROVED_ROLLBACK_WEB_IMAGE:-}" != "$RECOVERY_WEB_IMAGE" ]]; then
+  log "rollback compatibility approval missing for candidate and running images; refusing pull/migration/deployment" >&2
+  exit 1
+fi
+EVIDENCE_DIR="${WITNESS_DEPLOY_EVIDENCE_DIR:-$HOME/witness-backups/releases/$COMMIT}"
+mkdir -p "$EVIDENCE_DIR"
+chmod 700 "$EVIDENCE_DIR"
+umask 077
+IMAGE_OVERRIDE="$(mktemp)"
+trap 'rm -f -- "$IMAGE_OVERRIDE"' EXIT
+RELEASE_COMPOSE=("${COMPOSE[@]}" -f "$IMAGE_OVERRIDE")
+log "pulling approved immutable API and web artifacts (never build locally)"
+docker pull --platform linux/amd64 "$CANDIDATE_API_IMAGE"
+docker pull --platform linux/amd64 "$CANDIDATE_WEB_IMAGE"
+CANDIDATE_IDS="$(python3 scripts/release/artifacts.py inspect "$RELEASE_MANIFEST")"
+CANDIDATE_API_ID="$(printf '%s\n' "$CANDIDATE_IDS" | sed -n '1p')"
+CANDIDATE_WEB_ID="$(printf '%s\n' "$CANDIDATE_IDS" | sed -n '2p')"
+write_image_override "$CANDIDATE_API_ID" "$CANDIDATE_WEB_ID"
+cp "$RELEASE_MANIFEST" "$EVIDENCE_DIR/release-manifest.json"
+if [[ -n "${WITNESS_ROLLBACK_MANIFEST:-}" ]]; then
+  cp "$WITNESS_ROLLBACK_MANIFEST" "$EVIDENCE_DIR/recovery-manifest.json"
+fi
+printf 'recovery_sha=%s\nrecovery_api_image=%s\nrecovery_web_image=%s\n' \
+  "$RECOVERY_BUILD" "$RECOVERY_API_IMAGE" "$RECOVERY_WEB_IMAGE" > "$EVIDENCE_DIR/recovery.txt"
+sha256sum "$EVIDENCE_DIR/release-manifest.json" > "$EVIDENCE_DIR/release-manifest.sha256"
+"${COMPOSE[@]}" config --format json | python3 scripts/release/artifacts.py deployment-config "$RELEASE_MANIFEST"
+printf 'candidate_sha=%s\nprevious_sha=%s\nprevious_version=%s\nprevious_api_image=%s\nprevious_web_image=%s\ncandidate_api_image=%s\ncandidate_web_image=%s\napi_registry_ref=%s\nweb_registry_ref=%s\n' \
+  "$COMMIT" "$PREVIOUS_BUILD" "$PREVIOUS_VERSION" "$PREVIOUS_API_IMAGE" "$PREVIOUS_WEB_IMAGE" "$CANDIDATE_API_ID" "$CANDIDATE_WEB_ID" "$CANDIDATE_API_IMAGE" "$CANDIDATE_WEB_IMAGE" > "$EVIDENCE_DIR/manifest.txt"
+
+# Preserve rollback preflight evidence without storing environment secrets.
+"${COMPOSE[@]}" config --format json | python3 -c 'import json,sys; c=json.load(sys.stdin); [(s.update(environment={k:"[REDACTED]" for k in s.get("environment",{})})) for s in c.get("services",{}).values()]; json.dump(c,sys.stdout,indent=2)' > "$EVIDENCE_DIR/compose.redacted.json"
+# shellcheck disable=SC2016 # Expand database identity inside the container only.
+"${COMPOSE[@]}" exec -T postgres sh -c 'psql -X -A -t -F "|" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT migration_name,checksum,finished_at,rolled_back_at FROM _prisma_migrations ORDER BY migration_name"' > "$EVIDENCE_DIR/migrations.before.txt"
+cp services/api-gateway/prisma/schema.prisma "$EVIDENCE_DIR/candidate-schema.prisma"
+find services/api-gateway/prisma/migrations -name migration.sql -exec sha256sum {} + > "$EVIDENCE_DIR/candidate-migrations.sha256"
+
+log "taking immediate Witness and identity database backups"
+bash scripts/pilot/backup.sh "$EVIDENCE_DIR"
+bash scripts/ops/backup-status.sh "$EVIDENCE_DIR" 1
+# Object recovery and database restore proof are release gates required before
+# WITNESS_APPROVED_RELEASE_SHA is recorded. These dumps do not protect R2.
 
 log "applying database migrations (forward-only)"
-"${COMPOSE[@]}" run --rm api pnpm --filter @witness/api exec prisma migrate deploy
+"${RELEASE_COMPOSE[@]}" run --rm --no-deps --no-build api node node_modules/prisma/build/index.js migrate deploy
 
-log "recreating api and web containers"
-"${COMPOSE[@]}" up -d --force-recreate api web
+log "recreating api and web containers from the recorded image IDs"
+write_image_override "$CANDIDATE_API_ID" "$CANDIDATE_WEB_ID"
+"${RELEASE_COMPOSE[@]}" up -d --no-deps --no-build --force-recreate api web || rollback
 
 log "waiting for health (up to ${HEALTH_TIMEOUT_SECONDS}s)"
-wait_for_health || rollback
+wait_for_health "$COMMIT" || rollback
 
 log "running smoke checks against ${API_URL} and ${WEB_URL}"
-curl -skf --max-time 10 "${API_URL}/ready" >/dev/null
-curl -skf --max-time 10 -o /dev/null -w '' "${WEB_URL}/" || rollback
+curl -fsS --max-time 10 "${API_URL}/ready" >/dev/null || rollback
+if ! curl -fsS --max-time 10 "${WEB_URL}/api/build-identity" | python3 -c 'import json,sys; assert json.load(sys.stdin)["buildId"] == sys.argv[1]' "$COMMIT"; then
+  log "web artifact identity does not match approved SHA"
+  rollback
+fi
+curl -fsS --max-time 10 -o /dev/null -w '' "${WEB_URL}/" || rollback
 
 log "deploy succeeded"
 record "success"

@@ -143,9 +143,12 @@ services:
   # ever recreates `api`/`web` (see that script's own `up -d` line).
   neo4j:
     <<: *common
+    profiles: ["knowledge-graph"]
     image: neo4j:5-community
     environment:
-      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?NEO4J_PASSWORD must be set}
+      # Compose interpolates inactive profiles too. Empty credentials keep
+      # the disabled graph optional; Neo4j refuses them if explicitly started.
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-}
       NEO4J_server_memory_heap_max__size: ${NEO4J_HEAP:-2G}
       NEO4J_PLUGINS: '["apoc"]'
     volumes:
@@ -164,6 +167,7 @@ services:
 
   graph-projector:
     <<: *common
+    profiles: ["knowledge-graph"]
     build:
       context: ../..
       dockerfile: workers/graph-projector/Dockerfile
@@ -175,7 +179,7 @@ services:
       # doc comment on why, even though Neo4j Community cannot yet enforce
       # the difference at the database level.
       NEO4J_PROJECTOR_USER: ${NEO4J_PROJECTOR_USER:-${NEO4J_USER:-neo4j}}
-      NEO4J_PROJECTOR_PASSWORD: ${NEO4J_PROJECTOR_PASSWORD:-${NEO4J_PASSWORD:?NEO4J_PASSWORD must be set}}
+      NEO4J_PROJECTOR_PASSWORD: ${NEO4J_PROJECTOR_PASSWORD:-${NEO4J_PASSWORD:-}}
     depends_on:
       postgres: { condition: service_healthy }
       neo4j: { condition: service_healthy }
@@ -183,9 +187,11 @@ services:
   # ── Application ────────────────────────────────────────────────────────────
   api:
     <<: *common
-    build:
-      context: ../..
-      dockerfile: services/api-gateway/Dockerfile
+    # No build definition: registry failure must never compile on this host.
+    # An impossible digest lets Postgres-only backup/status commands parse
+    # before approval exists; it cannot start an unapproved application.
+    image: ${WITNESS_API_IMAGE:-ghcr.io/scigns/witness-api@sha256:0000000000000000000000000000000000000000000000000000000000000000}
+    pull_policy: never
     environment:
       NODE_ENV: production
       WITNESS_VERSION: ${WITNESS_VERSION:?WITNESS_VERSION must be set}
@@ -248,15 +254,13 @@ services:
 
   web:
     <<: *common
-    build:
-      context: ../..
-      dockerfile: apps/web/Dockerfile
-      args:
-        NEXT_PUBLIC_WITNESS_API_URL: ${NEXT_PUBLIC_WITNESS_API_URL:?NEXT_PUBLIC_WITNESS_API_URL must be set}
-        NEXT_PUBLIC_WITNESS_PROFILE: ${WITNESS_DEPLOYMENT_PROFILE:-sovereign}
-        # Empty for a dedicated hostname; `/witness` when the application is
-        # served under a path on a domain whose root belongs to something else.
-        NEXT_PUBLIC_WITNESS_BASE_PATH: ${NEXT_PUBLIC_WITNESS_BASE_PATH:-}
+    image: ${WITNESS_WEB_IMAGE:-ghcr.io/scigns/witness-web@sha256:0000000000000000000000000000000000000000000000000000000000000000}
+    pull_policy: never
+    # Verification metadata only: Next's compiled public values cannot be changed at runtime.
+    environment:
+      WITNESS_IMAGE_API_URL: ${NEXT_PUBLIC_WITNESS_API_URL:-}
+      WITNESS_IMAGE_PROFILE: ${WITNESS_DEPLOYMENT_PROFILE:-sovereign}
+      WITNESS_IMAGE_BASE_PATH: ${NEXT_PUBLIC_WITNESS_BASE_PATH:-}
     depends_on:
       api: { condition: service_started }
 

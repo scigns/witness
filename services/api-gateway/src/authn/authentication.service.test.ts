@@ -784,3 +784,63 @@ describe('AuthenticationService — login-attempt retention', () => {
     expect(remainingStates).toContain('active-1');
   });
 });
+
+describe('AuthenticationService return target binding', () => {
+  it('keeps the deep link in one-time server state and returns it only after verified sign-in', async () => {
+    const { prisma, authLoginAttempts } = fakePrisma();
+    const service = new AuthenticationService(
+      prisma,
+      new StubIdentityProvider(),
+      new SessionService(prisma),
+      REDIRECT_URI,
+      480,
+    );
+    const { redirectUrl } = await service.startLogin(undefined, '/workspaces/123?tab=evidence');
+    const state = new URL(redirectUrl).searchParams.get('state')!;
+    expect(authLoginAttempts[0]).toMatchObject({
+      state,
+      returnPath: '/workspaces/123?tab=evidence',
+    });
+    const session = await service.handleCallback('code', state);
+    expect(session.returnPath).toBe('/workspaces/123?tab=evidence');
+    await expect(service.handleCallback('code', state)).rejects.toBeInstanceOf(
+      AuthenticationDeniedError,
+    );
+  });
+  it('rejects an external target before creating authentication state', async () => {
+    const { prisma, authLoginAttempts } = fakePrisma();
+    const service = new AuthenticationService(
+      prisma,
+      new StubIdentityProvider(),
+      new SessionService(prisma),
+      REDIRECT_URI,
+      480,
+    );
+    await expect(service.startLogin(undefined, '//evil.example')).rejects.toThrow();
+    expect(authLoginAttempts).toHaveLength(0);
+  });
+});
+
+describe('current user operator capability', () => {
+  it.each([
+    { scopeType: 'organisation', organisationId: 'org-1', workspaceId: null, expected: false },
+    { scopeType: 'platform', organisationId: null, workspaceId: null, expected: true },
+    { scopeType: 'platform', organisationId: 'org-1', workspaceId: null, expected: false },
+  ])(
+    'reports operator standing only for a valid platform assignment: $scopeType/$organisationId',
+    async ({ expected, ...scope }) => {
+      const { prisma, roleAssignments } = fakePrisma();
+      roleAssignments.push({ userId: INVITED_USER, role: 'admin', ...scope });
+      const service = new AuthenticationService(
+        prisma,
+        new StubIdentityProvider(),
+        new SessionService(prisma),
+        REDIRECT_URI,
+        480,
+      );
+      const result = await service.getCurrentUser(INVITED_USER);
+      expect(result.status).toBe('ok');
+      if (result.status === 'ok') expect(result.view.operatorAccess).toBe(expected);
+    },
+  );
+});

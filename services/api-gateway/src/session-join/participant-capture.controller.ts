@@ -14,6 +14,11 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Injectable,
+  Inject,
+  UseGuards,
+  type CanActivate,
+  type ExecutionContext,
   Get,
   Headers,
   Param,
@@ -23,7 +28,8 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { AttachmentUploadInterceptor } from '../storage/attachment-upload.interceptor.js';
+import type { Request } from 'express';
 
 import {
   participantCaptureConsentRequestSchema,
@@ -36,10 +42,6 @@ import {
 import { ParticipantCaptureService } from './participant-capture.service.js';
 
 const CAPTURE_TOKEN_HEADER = 'x-witness-capture-token';
-/** Mirrors `evidence.controller.ts`'s own ceiling — Multer's hard cap; the
- * real, configured limit is enforced inside `EvidenceAttachmentService`. */
-const MULTER_HARD_CEILING_BYTES = 500 * 1024 * 1024;
-
 function requireCaptureToken(header: string | string[] | undefined): string {
   const value = Array.isArray(header) ? header[0] : header;
   if (value === undefined || value.trim() === '') {
@@ -53,9 +55,30 @@ function requireCaptureToken(header: string | string[] | undefined): string {
   return value;
 }
 
+@Injectable()
+export class CaptureAttachmentGuard implements CanActivate {
+  constructor(
+    @Inject(ParticipantCaptureService) private readonly capture: ParticipantCaptureService,
+  ) {}
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<Request>();
+    const token = requireCaptureToken(request.headers[CAPTURE_TOKEN_HEADER]);
+    const evidenceId = request.params['evidenceId'];
+    if (
+      typeof evidenceId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(evidenceId)
+    )
+      throw new BadRequestException('A valid evidence identifier is required.');
+    await this.capture.authorizeAttachment(token, evidenceId);
+    return true;
+  }
+}
+
 @Controller('api/v1/participant-capture')
 export class ParticipantCaptureController {
-  constructor(private readonly capture: ParticipantCaptureService) {}
+  constructor(
+    @Inject(ParticipantCaptureService) private readonly capture: ParticipantCaptureService,
+  ) {}
 
   @Get('me')
   async context(
@@ -84,7 +107,8 @@ export class ParticipantCaptureController {
   }
 
   @Post('evidence/:evidenceId/attachment')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MULTER_HARD_CEILING_BYTES } }))
+  @UseGuards(CaptureAttachmentGuard)
+  @UseInterceptors(AttachmentUploadInterceptor)
   async uploadAttachment(
     @Headers(CAPTURE_TOKEN_HEADER) header: string | undefined,
     @Param('evidenceId', ParseUUIDPipe) evidenceId: string,

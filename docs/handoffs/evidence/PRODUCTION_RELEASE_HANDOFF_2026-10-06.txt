@@ -1,0 +1,56 @@
+# Witness Production Release Handoff — 2026-10-06
+
+## Branch
+feat/commercial-runtime-readiness
+
+## HEAD
+d8f93030bab4d0205cd4c7d00a6b022d1fe8c4a5
+
+## Status
+## feat/commercial-runtime-readiness...origin/feat/commercial-runtime-readiness
+?? apps/participant-mobile/
+?? docs/handoffs/evidence/PRODUCTION_RELEASE_HANDOFF_2026-10-06.txt
+
+## Recent commits
+d8f9303 (HEAD -> feat/commercial-runtime-readiness, origin/feat/commercial-runtime-readiness) fix(deploy): reject runtime configuration drift from compiled web inputs
+72fc8bb fix(deploy): preserve database-only operations before image approval
+c7bf917 docs(deploy): wrap artifact pipeline guidance for markdown gates
+607b625 feat(deploy): publish validated image artifacts and deploy approved GHCR digests
+f9a1617 chore(repo): default to remote-first validation without local Docker
+7879897 fix(release): require rehearsed rollback image approval
+ced2461 fix(release): verify artifact identity and rehearse production recovery
+209f1d2 test(release): reconcile production identity and capture subscription fixture
+104bf60 fix(storage): fence expired writers and retain unavailable objects
+74892bf feat(frontend): checkpoint authenticated production shell files
+2079a9d chore(release): checkpoint production acceptance work
+9da2849 (feat/frontend/266-authenticated-production-shell) fix(auth): expose operator navigation from platform standing only
+727c8b0 fix(auth): preserve safe deep links through one-time login state
+f63f941 fix(deploy): pin approved artifacts and verify backup rollback safety
+39ba382 feat(backend): prove operator lifecycle and harden storage boundaries
+
+## Remote
+origin	https://github.com/scigns/witness.git (fetch)
+origin	https://github.com/scigns/witness.git (push)
+
+## Worktrees
+/Users/kqalo/witness                             d2771a2 [main]
+/private/tmp/witness-entitlements-release-check  c1e5cd2 (detached HEAD)
+/Users/kqalo/witness-commercial-front-door       17414da [feat/web/commercial-front-door]
+/Users/kqalo/witness-phase6-learning             d8f9303 [feat/commercial-runtime-readiness]
+/Users/kqalo/witness-website                     88f0038 [feat/web/website-next]
+
+## PR
+PR #266 — commercial runtime / production readiness
+
+## Current production objective
+Complete exact-SHA release validation, migration/backup/restore verification, controlled deployment, production smoke tests, synthetic client acceptance, and client-ready decision.
+
+## Known state
+- Production SSH alias: witness-prod-claude
+- Production host: witness-prod-01
+- Production uses GitHub Actions runner deployment path
+- Do not deploy from stale /home/witness/witness checkout
+- apps/participant-mobile/ is unrelated local work and must remain untouched
+- Main auto-deploy / release guard work is being hardened
+- Candidate must complete its own CI/image validation before publication
+- No production deployment should occur from an arbitrary working tree

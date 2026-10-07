@@ -25,6 +25,10 @@ import {
 import { CommercialCatalogueService } from './commercial-catalogue.service.js';
 import { CommercialOverrideService } from './commercial-override.service.js';
 import { EffectiveCommercialConfigurationService } from './effective-commercial-configuration.service.js';
+import { OrganisationsService } from '../organisations/organisations.service.js';
+import { StorageReconciliationService } from '../organisations/storage-reconciliation.service.js';
+import { TenantProvisioningService } from '../provisioning/tenant-provisioning.service.js';
+import { OrganisationUsageService } from '../organisations/organisation-usage.service.js';
 
 @Controller('api/v1/plans')
 export class PublicCommercialController {
@@ -77,7 +81,19 @@ export class BillingController {
 @Controller('api/v1/organisations/:organisationId/commercial-configuration')
 @UseGuards(AuthorizationGuard)
 export class CommercialConfigurationController {
-  constructor(private readonly configuration: EffectiveCommercialConfigurationService) {}
+  constructor(
+    private readonly configuration: EffectiveCommercialConfigurationService,
+    private readonly provisioning: TenantProvisioningService,
+  ) {}
+
+  @Get('provisioning')
+  @Requires('organisation:read')
+  async provisioningStatus(@Param('organisationId') organisationId: string) {
+    const view = await this.provisioning.status(organisationId);
+    // Provider evidence references remain platform-only.
+    const { evidenceReference: _evidenceReference, ...observed } = view.observed;
+    return { ...view, observed };
+  }
 
   @Get()
   @Requires('organisation:read')
@@ -100,7 +116,53 @@ export class OperatorCommercialConfigurationController {
   constructor(
     private readonly configuration: EffectiveCommercialConfigurationService,
     private readonly overrides: CommercialOverrideService,
+    private readonly organisations: OrganisationsService,
+    private readonly organisationUsage: OrganisationUsageService,
+    private readonly reconciliation: StorageReconciliationService,
+    private readonly provisioning: TenantProvisioningService,
   ) {}
+
+  @Get('provisioning')
+  @Requires('operator:read')
+  provisioningStatus(@Param('organisationId') organisationId: string) {
+    return this.provisioning.status(organisationId);
+  }
+
+  @Post('reconciliation')
+  @Requires('operator:read')
+  reconcile(@Param('organisationId') organisationId: string, @Req() request: RequestWithPrincipal) {
+    return this.reconciliation.inspect(organisationId, request.principal!);
+  }
+
+  @Post('provisioning/verify')
+  @Requires('commercial_override:manage')
+  verifyProvisioning(
+    @Param('organisationId') organisationId: string,
+    @Req() request: RequestWithPrincipal,
+  ) {
+    return this.provisioning.verify(organisationId, request.principal!);
+  }
+
+  @Post('reconciliation/expired-reservations')
+  @Requires('commercial_override:manage')
+  cleanExpired(
+    @Param('organisationId') organisationId: string,
+    @Req() request: RequestWithPrincipal,
+  ) {
+    return this.reconciliation.cleanExpired(organisationId, request.principal!);
+  }
+
+  @Get('storage')
+  @Requires('operator:read')
+  storage(@Param('organisationId') organisationId: string) {
+    return this.organisations.storage(organisationId);
+  }
+
+  @Get('usage')
+  @Requires('operator:read')
+  usage(@Param('organisationId') organisationId: string) {
+    return this.organisationUsage.usage(organisationId);
+  }
 
   @Get()
   @Requires('operator:read')

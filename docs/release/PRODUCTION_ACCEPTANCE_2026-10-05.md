@@ -1,0 +1,213 @@
+# Production acceptance — 2026-10-05
+
+**Status:** BLOCKED — not client ready **Owner:** Engineering and release manager
+
+This is an acceptance record, not deployment approval. Continue PR #266 on
+`feat/commercial-runtime-readiness`, stacked on PR #264 (`feat/commercial-entitlements`). No
+dependency was merged or flattened. Existing verification is retained in
+[the runtime checkpoint](../handoffs/evidence/CODEX_RUNTIME_VERIFICATION_2026-10-05.txt).
+
+## Release gates
+
+### Resumed checkpoint — 6 October 2026
+
+Continued from `74892bf` on the same branch/PR. The following separates implementation and
+local test evidence from deployment and production proof. PARTIAL means required work remains;
+UNKNOWN means there is no verified evidence for this candidate. Neither satisfies a release gate.
+
+| Programme gate                                 | IMPLEMENTED                                                            | TESTED                                                                  | DEPLOYED | PRODUCTION VERIFIED |
+| ---------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------- | -------- | ------------------- |
+| Quota/reservation concurrency and recovery     | YES                                                                    | Local PostgreSQL PASS; actual provider crash recovery UNKNOWN           | NO       | UNKNOWN             |
+| Storage reconciliation                         | PARTIAL: bounded reporting and safe lease cleanup                      | Local PostgreSQL PASS; uncertain-writer repair UNKNOWN                  | NO       | UNKNOWN             |
+| Authoritative operational metering             | PARTIAL: customer file ledger; physical database/backup/bandwidth gaps | File accounting PASS; infrastructure UNKNOWN                            | NO       | UNKNOWN             |
+| Commercial origination/onboarding              | PARTIAL: catalogue-priced invoice path                                 | Local synthetic lifecycle PASS; browser/email UNKNOWN                   | NO       | UNKNOWN             |
+| Provisioning desired/observed state            | PARTIAL: verification boundary; provider fulfilment missing            | Boundary unit PASS; actual allocation UNKNOWN                           | NO       | UNKNOWN             |
+| Subscription-to-runtime lifecycle              | PARTIAL: upload suspension/cancellation enforced                       | Local suspension and lifecycle PASS; complete lifecycle UNKNOWN         | NO       | UNKNOWN             |
+| Security/adversarial audit                     | PARTIAL                                                                | Existing boundary tests PASS; full client attack journey UNKNOWN        | NO       | UNKNOWN             |
+| Authenticated application UX                   | PARTIAL: checkpointed shell/activity/access guard                      | Prior build evidence; browser acceptance UNKNOWN                        | NO       | UNKNOWN             |
+| Returning-user `/workspaces`                   | YES: default route                                                     | Callback unit PASS; browser acceptance UNKNOWN                          | NO       | UNKNOWN             |
+| Sign-in/deep-link return                       | YES: one-time server state                                             | Existing safety tests PASS; real OIDC UNKNOWN                           | NO       | UNKNOWN             |
+| Operator/customer usage and subscription views | PARTIAL                                                                | API/local lifecycle PASS; browser acceptance UNKNOWN                    | NO       | UNKNOWN             |
+| Public claims reconciliation                   | PARTIAL                                                                | Final claims/browser audit UNKNOWN                                      | NO       | UNKNOWN             |
+| Migrations/database upgrade                    | YES: additive migrations                                               | Prior fresh/isolated upgrade PASS; production-data rehearsal UNKNOWN    | NO       | UNKNOWN             |
+| Backup/restore                                 | PARTIAL: database script controls                                      | Prior local dump/mock controls PASS; production/object recovery UNKNOWN | NO       | UNKNOWN             |
+| Observability                                  | PARTIAL: failure signals and readiness                                 | Alert delivery/host coverage UNKNOWN                                    | NO       | UNKNOWN             |
+| Synthetic-client acceptance                    | PARTIAL: local API journey                                             | Local commercial journey PASS; browser/production journey UNKNOWN       | NO       | UNKNOWN             |
+| Release gate matrix                            | YES: evidence scopes recorded                                          | Critical gates remain failed/unknown                                    | NO       | UNKNOWN             |
+| Rollback readiness                             | PARTIAL: immutable-image controls                                      | Prior mock safety PASS; production recovery UNKNOWN                     | NO       | UNKNOWN             |
+| Client operator runbook                        | PARTIAL: supported catalogue path                                      | Full operator rehearsal UNKNOWN                                         | NO       | UNKNOWN             |
+| Production rollout                             | NO: gates block rollout                                                | NOT RUN                                                                 | NO       | UNKNOWN             |
+
+New verification closes expired-writer commit before cleanup, exact object-key validation during
+reconciliation, unavailable storage detection for pending objects, and deletion without a configured
+provider. Retained records continue to charge capacity when deletion cannot establish object removal.
+Reports remain observational and do not authorise uncertain-writer capacity release or object deletion.
+
+Latest failed CI test was the callback assertion expecting `/` instead of `/workspaces`; corrected
+to the intended returning-user route. Node 22 API regression passed 826 tests before the added
+deletion case; the updated resource suite passed 8 tests. Quota/reservation/commercial live suites
+passed 20 tests in the existing isolated local schema. API typecheck and lint passed.
+
+Production access was rechecked with the documented read-only SSH command and still returned
+`Permission denied (publickey)`. No production action, migration, deployment, merge or tag occurred.
+The approved production SSH key/access path remains required. **Not client ready.**
+
+PASS applies only to the scope explicitly described. Missing production proof is FAIL, not an
+accepted risk. No deferred risk has been accepted by the release manager.
+
+| Gate              | Status | Evidence / remaining condition                                                                                                                             |
+| ----------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BUILD             | PASS   | Node 22 API and web production builds pass locally; deployed artifact remains older.                                                                       |
+| TEST              | FAIL   | API regression and targeted live tests pass; see checkpoint. CI 37267179606 passes at 39ba382; later candidate changes require their own CI.               |
+| SECURITY          | FAIL   | Full-history gitleaks: 465 commits, no leaks. Full production attack journey outstanding.                                                                  |
+| DATABASE          | FAIL   | Isolated PostgreSQL checks pass; current production data/integrity inspection blocked.                                                                     |
+| MIGRATION         | FAIL   | Additive reservation migration applied locally (44 total); fresh bootstrap/restart pass; production-compatible data rehearsal outstanding.                 |
+| BACKUP            | FAIL   | Local protected dump verified. Current production database, identity and object protection evidence required.                                              |
+| RESTORE           | FAIL   | Local dump restored into separate database: 44 migration records, 74 tables. Production backup restore and object recovery unproven.                       |
+| AUTH              | FAIL   | Existing authentication unit evidence retained; real-session expiry/recovery/deep-link acceptance outstanding.                                             |
+| RBAC              | FAIL   | Existing API boundary tests pass; complete browser/direct-API client acceptance outstanding.                                                               |
+| TENANT ISOLATION  | FAIL   | Existing adversarial evidence retained; controlled production cross-organisation acceptance outstanding.                                                   |
+| STORAGE           | FAIL   | Bounded object/inline reconciliation implemented; configured production transport and recovery unverified.                                                 |
+| QUOTA             | FAIL   | Live contention, idempotency, commit/rollback and conservative expiry pass. Provider/crash end-to-end acceptance outstanding.                              |
+| COMMERCIAL        | FAIL   | Catalogue-priced operator origination implemented; quoted/negotiated pricing and browser acceptance outstanding.                                           |
+| PAYMENTS          | FAIL   | Existing transactional manual settlement retained; Live operator-issued invoice/settlement journey passes; production transport/browser proof outstanding. |
+| PROVISIONING      | FAIL   | Desired isolation exists; Provider-neutral observed boundary implemented; actual infrastructure fulfilment unverified.                                     |
+| OBSERVABILITY     | FAIL   | Public readiness reports build identity. Reservation/reconciliation failure signals added; host logs and alert delivery unverified.                        |
+| EMAIL             | FAIL   | Production transport and controlled invite/recovery delivery not verified in this acceptance.                                                              |
+| FRONTEND          | FAIL   | Build/lint pass; work-oriented shell and full viewport/browser states outstanding.                                                                         |
+| ACCESSIBILITY     | FAIL   | Keyboard/axe/browser acceptance of final shell outstanding.                                                                                                |
+| PUBLIC WEBSITE    | FAIL   | Claims, links and browser acceptance outstanding.                                                                                                          |
+| CLIENT ACCEPTANCE | FAIL   | Mandatory complete synthetic paying-client journey has not completed.                                                                                      |
+| ROLLBACK          | FAIL   | Existing script inspected; current production rollback images/backups not verified.                                                                        |
+
+## Engineering changes and verified scope
+
+Uploads reserve capacity in PostgreSQL before touching the storage provider. A per-organisation
+transaction advisory lock serialises the decision. Capacity includes committed file bytes plus
+RESERVED, WRITING and NEEDS_RECONCILIATION reservations. A committed file and its reservation state
+change share one transaction. An `Idempotency-Key` UUID identifies a request; changed payloads
+conflict, completed requests replay, and in-flight requests cannot start a second provider write.
+
+Never-started expired leases can be released under the same lock. Expired or uncertain writers
+remain charged and are fenced from committing. A timeout alone cannot establish that a remote write
+stopped. Known domain rejection compensates completed objects; uncertain provider/commit outcomes
+preserve bytes.
+
+Platform operators can inspect accounting and object inventories on the commercial configuration
+page. Reports detect orphan objects, missing objects, size mismatches, invalid organisation keys and
+stuck leases. Inspection is observational and bounded, never deletes evidence, and records a report
+hash in the audit chain. Cleanup releases only expired never-started leases. Customer usage shows
+reserved capacity separately. Database overhead, backups, logs, caches and temporary bytes are
+operational metrics, not included customer file quota.
+
+## Deployment identity and access blocker
+
+External `https://api.buildwithwitness.com/ready` returned healthy PostgreSQL and Keycloak with
+build `0a273631087550f898a85c1e917a772fb8a22d20`, version `0.4.0`. This is the observed production
+version, not this branch. No production change was made.
+
+**HUMAN ACTION REQUIRED:** Load the approved production SSH key or restore the approved access path.
+
+- Why: `witness-prod-claude` rejected authentication with `Permission denied (publickey)`.
+- Command: `ssh -o BatchMode=yes witness-prod-claude true`.
+- Expected: exit 0, allowing read-only host/config/backup inspection first.
+
+Follow existing `scripts/pilot/deploy.sh` and `.github/workflows/deploy.yml` only after all gates
+pass. Release governance requires a clean main release, dependency reviews and explicit
+release-manager go/no-go; see [release strategy](../engineering/RELEASE_STRATEGY.md).
+
+## Backup rehearsal evidence
+
+The local acceptance schema `codex_runtime_20261005` was dumped using PostgreSQL custom format and
+restored with `pg_restore --no-owner --exit-on-error` into `codex_restore_20261005`. Migration/table
+counts were checked after restore. Private artifacts remain outside Git under
+`/private/tmp/witness-acceptance-20261005` (directory 700, dump 600).
+
+Dump SHA-256: `1a36c82d8d2f731d5814f20a32139ff75b75be90f9a266b3dc4913fbb28b07cc`. This is a
+schema/test-data rehearsal, not a production recovery guarantee. Production RPO and RTO are not
+established by this test; no contractual SLA is asserted.
+
+R2 S3 bucket versioning and S3 Object Lock are not supported according to
+[Cloudflare's compatibility documentation](https://developers.cloudflare.com/r2/api/s3/api/). Do not
+count either as a backup. Require an independently recoverable object copy or verified existing
+protection strategy, with retention/access controls and a tested restore, before release.
+
+## Next required acceptance work
+
+Close provider failure/crash and reconciliation integration coverage; finish observed provisioning
+and operator origination; verify supported subscription lifecycle; complete authenticated shell QA
+and public claims audit; automate the full synthetic operator/admin/member journey. Then inspect the
+host, restore protected production backups in non-production, verify email and alerts, obtain
+release approval, record immutable artifact identity and rollback commands, deploy and repeat the
+synthetic production smoke.
+
+## Additional acceptance evidence
+
+An empty local database `codex_fresh_20261005` accepted all 44 migrations and initial platform
+bootstrap. Bootstrap now resolves allocation from ResourceProfile rather than a fixed legacy quota.
+The application started twice against that database, returned healthy status and retained its
+organisation. This proves local fresh install/restart, not production identity-provider integration.
+
+The synthetic PostgreSQL client journey creates two organisations, applies authorised resource
+configuration, issues a catalogue-priced invoice, rejects amount tampering, settles/replays one
+payment and receipt, activates entitlements, creates a workspace, uploads content and enforces its
+quota. Organisation administrators fail platform settlement/override/operator permissions and
+cross-organisation resource access. Synthetic financial history is retained in the disposable
+acceptance database. The browser, invite, OIDC and production transport portions remain FAIL.
+
+Operator origination uses the existing commercial request, invoice and settlement services. The
+[first-client runbook](../operations/FIRST_CLIENT_ONBOARDING.md) documents the supported path and
+explicitly blocks quoted prices and unverified infrastructure promises. Observed provisioning
+requires matching isolation, profile and complete configuration fingerprint plus provider evidence
+before READY. Existing tenant metadata alone cannot satisfy this check.
+
+Storage hardening rejects foreign session/agenda associations before reserving bytes. Every object
+reader, including background transcription, verifies the exact organisation/kind/record key; deletion
+checks the same ownership. Upload filenames reject traversal/control characters and download headers
+encode Unicode safely. Public capture authorisation now precedes multipart buffering. Configured
+attachment limits and bounded field/part counts apply at the parser.
+
+CI run 37263717351 at `3e2f008` failed documentation headers, a whitespace-sensitive brand assertion,
+and live participant cleanup missing the reservation FK. These have been corrected and targeted
+checks pass; final candidate CI remains required. GitHub environment `pilot` currently reports no
+protection rules. An explicit release-manager go/no-go is required by repository governance; do not
+merge into the automatic deployment path before enforcing that approval and verifying rollback.
+
+## Deployment hardening and approval control
+
+The existing pilot workflow accepts successful same-repository main-push CI only, checks out
+that exact SHA, and limits manual dispatch to main. Pull-request/fork workflow runs cannot deploy.
+The deploy script rejects a dirty tracked checkout or an absent/mismatched
+`WITNESS_APPROVED_RELEASE_SHA` before host mutation. The release manager must set that environment
+variable to the exact reviewed main release SHA only after the gate matrix and recovery evidence
+pass. Keep the old value until approval; another SHA will fail closed.
+
+The script captures healthy production identity and actual running API/web image IDs, builds
+SHA-tagged candidate images, records their immutable IDs, takes immediate Witness and Keycloak
+backups and checks both sets before migration. Recreate uses the recorded IDs. TLS is verified and
+readiness must report the candidate SHA. Rollback uses previous running image IDs and previous build
+metadata, then verifies that SHA. Database migration failure stops before application recreation;
+database rollback remains a human recovery operation. R2/object protection is a separate release
+gate and is not established by these database dumps.
+
+Mock-infrastructure tests prove rejection before mutation without approval, backup-before-migration,
+backup failure stopping migration and wrong-build detection restoring previous images/identity.
+Independent backup-freshness tests prevent a fresh Witness dump hiding stale Keycloak recovery
+state. These checks do not prove actual production recovery or schema compatibility.
+
+**HUMAN ACTION REQUIRED — release approval:** After every critical gate passes, the release manager
+records the go/no-go decision and sets the exact main release SHA on
+[the pilot environment variables page](https://github.com/scigns/witness/settings/environments).
+Expected result: only that reviewed SHA passes deployment preflight. Do not set approval now;
+production acceptance remains blocked.
+
+## Authentication return-path closure
+
+Successful sign-in defaults to `/workspaces`. A validated application-relative `returnTo` is bound
+to the existing one-time server login attempt, consumed with the OIDC state and returned only after
+identity verification. Absolute/protocol-relative URLs, backslashes, control characters and
+sign-in/callback loops are rejected. Application base paths remain contained. Normal authorisation
+still applies after redirect. The additive nullable login return-path migration applied successfully
+to both local acceptance and bootstrapped fresh databases (45 migrations total). Existing in-flight
+login attempts with null return paths retain a safe default. Browser callers and actual identity
+provider acceptance still need verification.

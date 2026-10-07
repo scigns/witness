@@ -109,3 +109,7 @@ tmp/
 temp/
 sbom.json
 *.sarif
+
+# CI image handoff and operator manifest downloads (never source).
+release-artifacts/
+release-input/

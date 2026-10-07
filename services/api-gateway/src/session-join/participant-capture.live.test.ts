@@ -1,3 +1,5 @@
+import { EffectiveCommercialConfigurationService } from '../commercial/effective-commercial-configuration.service.js';
+import { CommercialEntitlementService } from '../commercial/commercial-entitlement.service.js';
 /**
  * Real-PostgreSQL suite for participant self-capture (Phase 5, Workstreams
  * 1.1-1.4) — proves the capture-token mechanism end to end against the
@@ -16,6 +18,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { FREE_PLAN_ID } from '@witness/domain';
 
 import type { Principal } from '../authz/authorization.port.js';
 import { DevelopmentAuthorizationAdapter } from '../authz/development.adapter.js';
@@ -88,7 +91,10 @@ describe.skipIf(prisma === null)(
       consentPolicy,
       { maxEvidenceAttachmentMb: 200 } as never,
       null,
-      new StorageQuotaService(db),
+      new StorageQuotaService(
+        db,
+        new EffectiveCommercialConfigurationService(db, new CommercialEntitlementService(db)),
+      ),
     );
     const capture = new ParticipantCaptureService(
       db,
@@ -191,6 +197,19 @@ describe.skipIf(prisma === null)(
           storageQuotaBytes: 5368709120n,
         },
       });
+      const account = await db.billingAccount.create({
+        data: { id: randomUUID(), organisationId },
+      });
+      await db.subscription.create({
+        data: {
+          id: randomUUID(),
+          organisationId,
+          billingAccountId: account.id,
+          planId: FREE_PLAN_ID,
+          status: 'FREE',
+          currentPeriodStart: new Date(),
+        },
+      });
       await db.workspace.create({
         data: { id: workspaceId, name: 'Teacher Voice Co-design', organisationId },
       });
@@ -220,6 +239,9 @@ describe.skipIf(prisma === null)(
       await db.coDesignSession.deleteMany({ where: { workspaceId } });
       await db.consentTemplate.deleteMany({ where: { organisationId } });
       await db.workspace.deleteMany({ where: { id: workspaceId } });
+      await db.storageReservation.deleteMany({ where: { organisationId } });
+      await db.subscription.deleteMany({ where: { organisationId } });
+      await db.billingAccount.deleteMany({ where: { organisationId } });
       await db.organisation.deleteMany({ where: { id: organisationId } });
       // Scoped to this file's own facilitator, never a shared `.example`
       // filter — that broad filter races other live-test files' fixtures

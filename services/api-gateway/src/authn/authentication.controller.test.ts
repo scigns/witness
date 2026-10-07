@@ -231,7 +231,10 @@ describe('AuthenticationController — independent application callback', () => 
       path: '/',
       expires: new Date('2030-01-01T00:00:00Z'),
     });
-    expect(response.redirect).toHaveBeenCalledWith(302, 'https://app.buildwithwitness.com/');
+    expect(response.redirect).toHaveBeenCalledWith(
+      302,
+      'https://app.buildwithwitness.com/workspaces',
+    );
     expect(JSON.stringify(response.redirect.mock.calls)).not.toContain('session-token');
   });
 

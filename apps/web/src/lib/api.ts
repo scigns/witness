@@ -41,6 +41,7 @@ import type {
   CreateOrganisationRequest,
   CreateSubscriptionEntitlementOverrideRequest,
   EffectiveCommercialConfigurationView,
+  TenantProvisioningView,
   SubscriptionEntitlementOverrideView,
   UpdateStorageQuotaRequest,
   CreateRecordRequest,
@@ -127,6 +128,8 @@ import type {
   UpdateCommitmentRequest,
   UpdateDecisionRequest,
   BillingOverview,
+  IssueInvoiceRequest,
+  InvoiceView,
   CommercialChangeRequest,
   CommercialChangeView,
   PublicPlanCatalogue,
@@ -363,6 +366,56 @@ export const api = {
 
   getPlanCatalogue: (): Promise<PublicPlanCatalogue> => request('/api/v1/plans', null),
 
+  listOperatorOrganisations: (
+    user: ActingUser,
+  ): Promise<{ organisations: OrganisationSummary[] }> =>
+    request('/api/v1/operator/organisations', user),
+
+  getOperatorOrigination: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<{
+    organisation: { id: string; name: string };
+    billingAccount: { id: string; currency: string };
+    billing: BillingOverview;
+  }> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/origination`,
+      user,
+    ),
+
+  requestOperatorCommercialChange: (
+    organisationId: string,
+    body: CommercialChangeRequest,
+    user: ActingUser,
+  ): Promise<CommercialChangeView> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/origination/change-requests`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  issueOperatorInvoice: (
+    organisationId: string,
+    body: IssueInvoiceRequest,
+    user: ActingUser,
+  ): Promise<InvoiceView> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/origination/invoices`,
+      user,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  issueInvoice: (
+    organisationId: string,
+    body: IssueInvoiceRequest,
+    user: ActingUser,
+  ): Promise<InvoiceView> =>
+    request(`/api/v1/organisations/${encodeURIComponent(organisationId)}/invoices`, user, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   getBillingOverview: (organisationId: string, user: ActingUser): Promise<BillingOverview> =>
     request(`/api/v1/organisations/${encodeURIComponent(organisationId)}/billing`, user),
 
@@ -383,6 +436,72 @@ export const api = {
   ): Promise<EffectiveCommercialConfigurationView> =>
     request(
       `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration`,
+      user,
+    ),
+
+  getOperatorProvisioning: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<TenantProvisioningView> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/provisioning`,
+      user,
+    ),
+
+  verifyOperatorProvisioning: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<TenantProvisioningView> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/provisioning/verify`,
+      user,
+      { method: 'POST' },
+    ),
+
+  getOrganisationProvisioning: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<TenantProvisioningView> =>
+    request(
+      `/api/v1/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/provisioning`,
+      user,
+    ),
+
+  getOperatorOrganisationStorage: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<OrganisationStorageUsage> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/storage`,
+      user,
+    ),
+
+  reconcileOrganisationStorage: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<Record<string, unknown>> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/reconciliation`,
+      user,
+      { method: 'POST' },
+    ),
+
+  cleanExpiredStorageReservations: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<Record<string, unknown>> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/reconciliation/expired-reservations`,
+      user,
+      { method: 'POST' },
+    ),
+
+  getOperatorOrganisationUsage: (
+    organisationId: string,
+    user: ActingUser,
+  ): Promise<OrganisationUsage> =>
+    request(
+      `/api/v1/operator/organisations/${encodeURIComponent(organisationId)}/commercial-configuration/usage`,
       user,
     ),
 
@@ -2481,7 +2600,8 @@ export const api = {
  */
 export const authApi = {
   /** Where the browser navigates to start a real sign-in. Not a fetch — a full-page redirect. */
-  loginUrl: (): string => `${BASE_URL}/api/v1/auth/login`,
+  loginUrl: (returnTo?: string): string =>
+    `${BASE_URL}/api/v1/auth/login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`,
   registerUrl: (): string => `${BASE_URL}/api/v1/auth/register`,
   forgotPasswordUrl: (): string => `${BASE_URL}/api/v1/auth/forgot-password`,
 

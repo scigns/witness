@@ -1,0 +1,38 @@
+# Witness Git checkpoint — 2026-10-05
+
+## Branch
+feat/commercial-runtime-readiness
+
+## HEAD
+f17cfe4f7780add66be7ff07dde3b340cd7d30f8
+
+## Status
+## feat/commercial-runtime-readiness...origin/feat/commercial-runtime-readiness
+?? apps/participant-mobile/
+?? docs/handoffs/evidence/
+
+## Recent commits
+f17cfe4 (HEAD -> feat/commercial-runtime-readiness, origin/feat/commercial-runtime-readiness) feat(backend): checkpoint commercial quotas and Codex handoff
+215f350 (origin/feat/commercial-entitlements, feat/commercial-entitlements) fix(docs): satisfy markdownlint on ADR-0034 (line length, heading spacing)
+cdad7a7 fix(backend): commit the commercial_override:manage policy.csv grant
+dbc3eb3 feat(frontend): add operator inspection/override UI for commercial configuration
+a18138a test(backend): cover commercial_override:manage RBAC and live-DB resolution/override precedence
+52bc534 feat(backend): expose effective commercial configuration and override admin API
+2ed9da1 feat(backend): add Tenant/ResourceProfile schema and seed five entitlement keys
+f6bea86 feat(backend): add Tenant, DeploymentIsolation and effective commercial configuration domain layer
+ff0441f docs(architecture): record Tenant as the technical isolation boundary (ADR-0034)
+d2771a2 (origin/main, origin/HEAD, main) fix(frontend): homepage title/description matched the pre-rewrite headline (#259)
+e0edf48 Commercial front door: customer-first homepage, www-canonical decision (CW-034) (#258)
+f8153d4 WEB-NEXT-01: reconcile web docs, fix pre-account chrome, close apps/web test gap (#256)
+e081fdd feat(frontend): explain co-design, knowledge, change, trust and stories (#234)
+f707ac1 (origin-local/main) Make Witness development reproducible from Git, not one laptop (#232)
+68887dc fix(frontend): dynamic-import cytoscape on knowledge graph route (#233)
+
+## Worktrees
+/Users/kqalo/witness                        d2771a2 [main]
+/Users/kqalo/witness-commercial-front-door  17414da [feat/web/commercial-front-door]
+/Users/kqalo/witness-phase6-learning        f17cfe4 [feat/commercial-runtime-readiness]
+/Users/kqalo/witness-website                88f0038 [feat/web/website-next]
+
+## Merge base with commercial entitlements
+215f3500b542d00ced424de9a23db25fb6c31d2d

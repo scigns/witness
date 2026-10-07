@@ -1,0 +1,8 @@
+{
+  "platform": "linux/amd64",
+  "web": {
+    "NEXT_PUBLIC_WITNESS_API_URL": "https://api.buildwithwitness.com",
+    "NEXT_PUBLIC_WITNESS_PROFILE": "hybrid",
+    "NEXT_PUBLIC_WITNESS_BASE_PATH": ""
+  }
+}

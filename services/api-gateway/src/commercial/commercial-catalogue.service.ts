@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import type {
@@ -200,7 +205,23 @@ export class CommercialCatalogueService {
           organisationId_idempotencyKey: { organisationId, idempotencyKey: request.idempotencyKey },
         },
       });
-      if (existing) return changeView(existing);
+      if (existing) {
+        if (
+          existing.action !== request.action ||
+          existing.requestedPlanCode !== ('planCode' in request ? request.planCode : null) ||
+          existing.billingInterval !==
+            ('billingInterval' in request ? request.billingInterval : null) ||
+          existing.paymentMethod !== ('paymentMethod' in request ? request.paymentMethod : null)
+        ) {
+          throw new ConflictException({
+            error: {
+              code: 'IDEMPOTENCY_CONFLICT',
+              message: 'This commercial request key was already used for different terms.',
+            },
+          });
+        }
+        return changeView(existing);
+      }
       const account = await tx.billingAccount.findUnique({ where: { organisationId } });
       if (!account)
         throw new NotFoundException({

@@ -66,12 +66,14 @@ COPY packages/domain/package.json packages/domain/
 # workspace package — it has no package.json. It still reaches the image via
 # the full `COPY packages packages` below.
 COPY services/api-gateway/package.json services/api-gateway/
+COPY services/knowledge-graph/package.json services/knowledge-graph/
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter @witness/api...
 
 COPY packages packages
 COPY services/api-gateway services/api-gateway
+COPY services/knowledge-graph services/knowledge-graph
 
 RUN pnpm --filter @witness/api... run build
 
@@ -80,6 +82,13 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --prod --filter @witness/api...
 
 FROM node:22-bookworm-slim AS runtime
+ARG WITNESS_BUILD_ID
+ARG WITNESS_VERSION
+LABEL org.opencontainers.image.revision=${WITNESS_BUILD_ID} \
+      org.opencontainers.image.version=${WITNESS_VERSION} \
+      org.opencontainers.image.source="https://github.com/scigns/witness"
+ENV WITNESS_BUILD_ID=${WITNESS_BUILD_ID}
+ENV WITNESS_VERSION=${WITNESS_VERSION}
 
 # `prisma migrate deploy` runs from this image during a controlled deployment,
 # and pg_isready is what the healthcheck and the runbook use. `ffmpeg` is
@@ -105,6 +114,7 @@ COPY --from=build --chown=node:node /repo/package.json ./package.json
 COPY --from=build --chown=node:node /repo/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=build --chown=node:node /repo/packages ./packages
 COPY --from=build --chown=node:node /repo/services/api-gateway ./services/api-gateway
+COPY --from=build --chown=node:node /repo/services/knowledge-graph ./services/knowledge-graph
 
 COPY --from=whisper --chown=node:node /whisper/build/bin/whisper-cli /usr/local/bin/whisper-cli
 COPY --from=whisper --chown=node:node /whisper/models/ggml-base.bin /opt/whisper/ggml-base.bin

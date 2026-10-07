@@ -62,6 +62,20 @@ for dump in "${dumps[@]}"; do
 done
 
 now="$(date +%s)"
+# Each system of record needs its own recent recovery point. A new Witness
+# dump must not hide stale Keycloak backups (or the reverse).
+for prefix in witness keycloak; do
+  newest=0
+  for dump in "${dumps[@]}"; do
+    [[ "$(basename "$dump")" == "$prefix-"* ]] || continue
+    mtime="$(stat -c %Y "$dump" 2>/dev/null || stat -f %m "$dump")"
+    if [[ "$mtime" -gt "$newest" ]]; then newest="$mtime"; fi
+  done
+  if [[ "$newest" -eq 0 || $((now - newest)) -gt $((MAX_AGE_HOURS * 3600)) ]]; then
+    echo "STATUS: STALE — $prefix backup set has no recovery point within ${MAX_AGE_HOURS}h."
+    overall_exit=1
+  fi
+done
 age_hours=$(( (now - latest_mtime) / 3600 ))
 
 echo

@@ -12,8 +12,16 @@
  * material, not participant contribution.
  */
 
-import { Inject, Injectable, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  PayloadTooLargeException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { createHash, randomUUID } from 'node:crypto';
 
 import {
   createResource,
@@ -36,9 +44,11 @@ import type {
 import { PrismaService } from '../infrastructure/prisma.service.js';
 import { resolveActor } from '../infrastructure/actor.helper.js';
 import { appendAuditEvent } from '../infrastructure/audit.helper.js';
+import { validateUploadMetadata } from '../storage/upload-metadata.js';
 import { StoragePort } from '../storage/storage.port.js';
-import { objectKey, resolveStoredContent } from '../storage/storage.service.js';
+import { assertStorageOwnership, resolveStoredContent } from '../storage/storage.service.js';
 import { StorageQuotaService } from '../organisations/storage-quota.service.js';
+import type { StorageReservation } from '@prisma/client';
 import type { Principal } from '../authz/authorization.port.js';
 
 /** Matches `EvidenceAttachmentService`'s own default cap. */
@@ -87,6 +97,7 @@ export class ResourcesService {
     principal: Principal,
   ): Promise<ResourceView> {
     await this.requireWorkspace(workspaceId);
+    await this.requireResourceContext(workspaceId, request);
     const actor = await resolveActor(this.prisma, principal);
     const userId = await this.requirePrincipalUserId(principal);
     const now = new Date();
@@ -113,13 +124,14 @@ export class ResourcesService {
     metadata: CreateFileResourceMetadata,
     file: UploadedResourceFile | undefined,
     principal: Principal,
+    requestKey?: string,
   ): Promise<ResourceView> {
     if (file === undefined) {
       throw new PayloadTooLargeException({
         error: { code: 'FILE_REQUIRED', message: "No file was received in the 'file' field." },
       });
     }
-    if (file.size > FILE_MAX_BYTES) {
+    if (file.size > FILE_MAX_BYTES || file.buffer.length > FILE_MAX_BYTES) {
       throw new PayloadTooLargeException({
         error: {
           code: 'FILE_TOO_LARGE',
@@ -130,18 +142,19 @@ export class ResourcesService {
       });
     }
 
-    const workspace = await this.requireWorkspace(workspaceId);
-
-    try {
-      await this.storageQuota.checkQuota(workspace.organisationId, file.size);
-    } catch (error) {
-      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED') {
-        throw new PayloadTooLargeException({
-          error: { code: error.code, message: error.message },
-        });
-      }
-      throw error;
+    if (!Number.isSafeInteger(file.size) || file.size < 0 || file.size !== file.buffer.length) {
+      throw new BadRequestException({
+        error: {
+          code: 'INVALID_STORAGE_SIZE',
+          message: 'The upload byte count does not match its content.',
+        },
+      });
     }
+
+    validateUploadMetadata(file.originalname, file.mimetype);
+
+    const workspace = await this.requireWorkspace(workspaceId);
+    await this.requireResourceContext(workspaceId, metadata);
 
     const actor = await resolveActor(this.prisma, principal);
     const userId = await this.requirePrincipalUserId(principal);
@@ -167,20 +180,73 @@ export class ResourcesService {
       createdAt: now,
     });
 
-    // Same ordering as EvidenceAttachmentService: written before the
-    // transaction, so a failed put never leaves a committed row pointing at
-    // an object that does not exist.
-    let storageKey: string | null = null;
-    if (this.storage !== null) {
-      storageKey = objectKey({ organisationId: workspace.organisationId, kind: 'resource', id });
-      await this.storage.put(storageKey, file.buffer, file.mimetype);
+    let reservation;
+    try {
+      reservation = await this.storageQuota.reserve({
+        organisationId: workspace.organisationId,
+        requestKey,
+        requestFingerprint: createHash('sha256')
+          .update(
+            JSON.stringify([
+              principal.subject,
+              workspaceId,
+              metadata.title,
+              metadata.description ?? null,
+              metadata.sessionId ?? null,
+              metadata.agendaItemId ?? null,
+              file.originalname,
+              file.mimetype,
+              createHash('sha256').update(file.buffer).digest('hex'),
+            ]),
+          )
+          .digest('hex'),
+        kind: 'resource',
+        sizeBytes: file.size,
+        objectStorage: this.storage !== null,
+        actor,
+      });
+    } catch (error) {
+      if (error instanceof InvariantViolation && error.code === 'SUBSCRIPTION_INACTIVE')
+        throw new ForbiddenException({ error: { code: error.code, message: error.message } });
+      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED')
+        throw new PayloadTooLargeException({ error: { code: error.code, message: error.message } });
+      throw error;
     }
-
-    await this.persist(outcome.resource, outcome.event, now, {
-      content: storageKey === null ? file.buffer : null,
-      storageKey,
-    });
-    return toView(await this.requireRow(workspaceId, outcome.resource.id));
+    if (reservation.state === 'COMMITTED')
+      return toView(await this.requireRow(workspaceId, reservation.targetId));
+    const resource = { ...outcome.resource, id: toResourceId(reservation.targetId) };
+    const storageKey = reservation.storageKey;
+    let putCompleted = false;
+    try {
+      await this.storageQuota.claim(reservation);
+      if (storageKey !== null && this.storage !== null)
+        await this.storage.put(storageKey, file.buffer, file.mimetype);
+      putCompleted = true;
+      await this.persist(
+        resource,
+        outcome.event,
+        now,
+        { content: storageKey === null ? file.buffer : null, storageKey },
+        reservation,
+      );
+    } catch (error) {
+      if (error instanceof InvariantViolation && putCompleted) {
+        try {
+          if (storageKey !== null && this.storage !== null) await this.storage.delete(storageKey);
+          await this.storageQuota.releaseKnownFailure(reservation, actor);
+        } catch {
+          await this.storageQuota.markUncertain(reservation);
+        }
+      } else {
+        await this.storageQuota.markUncertain(reservation);
+      }
+      if (error instanceof InvariantViolation && error.code === 'SUBSCRIPTION_INACTIVE')
+        throw new ForbiddenException({ error: { code: error.code, message: error.message } });
+      if (error instanceof InvariantViolation && error.code === 'STORAGE_QUOTA_EXCEEDED')
+        throw new PayloadTooLargeException({ error: { code: error.code, message: error.message } });
+      throw error;
+    }
+    return toView(await this.requireRow(workspaceId, resource.id));
   }
 
   async content(workspaceId: string, resourceId: string): Promise<ResourceContent> {
@@ -197,7 +263,12 @@ export class ResourcesService {
 
     let content: Buffer;
     try {
-      content = await resolveStoredContent(this.storage, row);
+      const workspace = await this.requireWorkspace(workspaceId);
+      content = await resolveStoredContent(this.storage, row, {
+        organisationId: workspace.organisationId,
+        kind: 'resource',
+        id: row.id,
+      });
     } catch (error) {
       throw new NotFoundException({
         error: {
@@ -225,7 +296,20 @@ export class ResourcesService {
     // intact (safe to retry) rather than committing a row-gone state while
     // the object silently survives in R2 forever — the orphan this file
     // shipped with until a live pilot upload proved it (see PR history).
-    if (row.storageKey !== null && this.storage !== null) {
+    if (row.storageKey !== null) {
+      if (this.storage === null)
+        throw new ServiceUnavailableException({
+          error: {
+            code: 'STORAGE_UNAVAILABLE',
+            message: 'Object storage is unavailable; the resource remains retained and charged.',
+          },
+        });
+      const workspace = await this.requireWorkspace(workspaceId);
+      assertStorageOwnership(row.storageKey, {
+        organisationId: workspace.organisationId,
+        kind: 'resource',
+        id: row.id,
+      });
       await this.storage.delete(row.storageKey);
     }
 
@@ -240,8 +324,12 @@ export class ResourcesService {
     event: PendingAuditEvent,
     at: Date,
     storage?: { content: Buffer | null; storageKey: string | null },
+    reservation?: StorageReservation,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      if (reservation !== undefined)
+        await this.storageQuota.checkReservation(tx, reservation, event.actor, at);
+
       await tx.resource.create({
         data: {
           id: resource.id,
@@ -261,6 +349,7 @@ export class ResourcesService {
           createdAt: resource.createdAt,
         },
       });
+      if (reservation !== undefined) await this.storageQuota.commitReservation(tx, reservation);
       await appendAuditEvent(tx, 'resource', resource.id, event, at);
     });
   }
@@ -283,6 +372,42 @@ export class ResourcesService {
     }
 
     return user.id;
+  }
+
+  private async requireResourceContext(
+    workspaceId: string,
+    context: { sessionId?: string | null | undefined; agendaItemId?: string | null | undefined },
+  ): Promise<void> {
+    if (context.sessionId) {
+      const session = await this.prisma.coDesignSession.findUnique({
+        where: { id: context.sessionId },
+        select: { workspaceId: true },
+      });
+      if (session === null || session.workspaceId !== workspaceId)
+        throw new NotFoundException({
+          error: {
+            code: 'RESOURCE_CONTEXT_NOT_FOUND',
+            message: 'Resource context is unavailable in this workspace.',
+          },
+        });
+    }
+    if (context.agendaItemId) {
+      const agenda = await this.prisma.agendaItem.findUnique({
+        where: { id: context.agendaItemId },
+        select: { workspaceId: true, sessionId: true },
+      });
+      if (
+        agenda === null ||
+        agenda.workspaceId !== workspaceId ||
+        (context.sessionId && agenda.sessionId !== null && agenda.sessionId !== context.sessionId)
+      )
+        throw new NotFoundException({
+          error: {
+            code: 'RESOURCE_CONTEXT_NOT_FOUND',
+            message: 'Resource context is unavailable in this workspace.',
+          },
+        });
+    }
   }
 
   private async requireWorkspace(workspaceId: string): Promise<{ organisationId: string }> {
