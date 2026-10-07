@@ -53,6 +53,10 @@ export * from './commercial.js';
 export * from './invoice.js';
 export * from './agreement.js';
 export * from './billing-snapshot.js';
+export * from './tenant.js';
+export * from './deployment-isolation.js';
+export * from './support-level.js';
+export * from './effective-commercial-configuration.js';
 
 // Evidence knowledge graph (ADR-0011, ADR-0012, ADR-0026).
 export * from './relationship-vocabulary.js';

@@ -3301,3 +3301,64 @@ export interface KnowledgeProvenanceChainView {
   confirmedByName: string;
   confirmedAt: string;
 }
+
+// ─── Effective commercial configuration (ADR-0034's sibling commercial-entitlement work) ───
+
+export interface ResourceProfileView {
+  code: string;
+  name: string;
+  description: string;
+  computeClass: string;
+  memoryClass: string;
+  storageQuotaBytes: string;
+  concurrencyLimit: number;
+  workerAllocation: number;
+  jobLimit: number;
+  backupProfile: string;
+  retentionProfile: string;
+}
+
+export interface ResolvedEntitlementView {
+  key: string;
+  value: boolean | number | string;
+  source: 'PLAN' | 'SUBSCRIPTION_OVERRIDE';
+}
+
+/**
+ * Every field here is already resolved server-side through the one
+ * authoritative resolution path (Organisation + Subscription + Plan +
+ * Overrides -> evaluateEntitlements() -> resolveEffectiveCommercialConfiguration()).
+ * Deliberately omits each override's `reason` text -- that is commercial
+ * negotiation detail for platform administration, not an ordinary
+ * organisation member's self-service view.
+ */
+export interface EffectiveCommercialConfigurationView {
+  organisationId: string;
+  subscriptionStatus: string;
+  planCode: string;
+  deploymentIsolation: 'SHARED' | 'ISOLATED_DATA' | 'DEDICATED' | 'SOVEREIGN';
+  supportLevel: string;
+  resourceProfile: ResourceProfileView | null;
+  entitlements: ResolvedEntitlementView[];
+}
+
+/** The platform-administration view additionally carries each override's reason. */
+export interface SubscriptionEntitlementOverrideView {
+  id: string;
+  entitlementKey: string;
+  value: boolean | number | string;
+  reason: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const createSubscriptionEntitlementOverrideRequestSchema = z
+  .object({
+    entitlementKey: z.string().min(1),
+    value: z.union([z.boolean(), z.number(), z.string()]),
+    reason: z.string().trim().min(1, 'A reason is required for every commercial override.'),
+  })
+  .strict();
+export type CreateSubscriptionEntitlementOverrideRequest = z.infer<
+  typeof createSubscriptionEntitlementOverrideRequestSchema
+>;
