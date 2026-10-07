@@ -49,9 +49,12 @@ one-time deployment control; it must never grant a customer platform administrat
    fixed quota may need an authorised operator correction to follow the profile.
 10. **Provisioning:** Compare desired isolation/profile with verified observed allocation.
     DEDICATED, ISOLATED_DATA or SOVEREIGN commitments must not be approved from a plan enum alone.
-    Missing provider evidence or incomplete provisioning is a blocker. Obtain infrastructure proof
-    using the approved deployment runbook; no customer evidence upload is authorised until the
-    contracted boundary holds.
+    For supported SHARED profiles, use **Verify allocation and record evidence**. Require observed
+    READY, matching desired profile/fingerprint, a current `shared-runtime` evidence reference and
+    an `organisation.provisioning_verified` audit event. The adapter checks the serving database,
+    tenant mapping and both storage namespaces. This attests shared-pool access; it does not promise
+    dedicated compute or additional workers. Unsupported higher isolation remains NOT_PROVISIONED.
+    Missing provider evidence or incomplete provisioning blocks client onboarding.
 11. **First admin:** Ensure the named administrator can authenticate at the configured identity
     provider with the verified email. The organisation-created invited user activates through
     verified sign-in; operator creation does not prove an IdP account or delivered invitation
@@ -64,18 +67,24 @@ one-time deployment control; it must never grant a customer platform administrat
     by its bytes, reserved usage returns to zero, available storage decreases and the upload is
     readable only in its authorised program. Perform quota rejection tests in the synthetic
     organisation.
-14. **Support:** Give the client the approved support contact and contracted SupportLevel. Confirm
+14. **Usage visibility:** Sign in as the organisation administrator and verify usage is visible
+    for this organisation only, with used/reserved/available values matching the operator view.
+15. **Support:** Give the client the approved support contact and contracted SupportLevel. Confirm
     the public contact route reaches the monitored support destination. Record the operator owner
     and escalation path; do not invent response-time guarantees.
-15. **Final check:** Reopen operator allocation/usage and billing: organisation, subscription,
+16. **Audit trail:** Verify organisation creation, commercial changes, settlement, provisioning
+    verification and upload events belong to the correct organisation and acting operator/member.
+17. **Final check:** Reopen operator allocation/usage and billing: organisation, subscription,
     invoice, payment, receipt, entitlements, tenant, provisioning evidence and audit chain must
     agree. Confirm backup/recovery coverage, invite delivery and member access. Record deployed SHA
     and onboarding evidence. Archive synthetic work according to governance; retain immutable
     financial/audit history.
 
-## Current blockers
+## Release condition
 
-The candidate adds catalogue-priced origination controls and reuses manual settlement. Negotiated
-quote-priced origination and verified provisioning remain incomplete. Production SSH access, current
-backup/object recovery, email transport and complete real-session browser acceptance are not proven.
-This document does not accept any of those risks or authorise a first paying customer yet.
+Use the latest [release reconciliation](../release/PRODUCTION_RECONCILIATION_2026-10-06.md)
+for candidate identity and gate evidence. The earlier isolated restore, object recovery, migration
+and rollback proofs remain recorded there. New runtime code must pass its own exact-candidate
+validation; production acceptance and controlled external invitation/recovery delivery are required
+before first-client onboarding. Catalogue-priced origination is supported; negotiated quote-priced
+origination is not offered by this flow. Do not promise unsupported provisioning modes.

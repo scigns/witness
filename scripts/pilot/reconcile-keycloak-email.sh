@@ -140,9 +140,15 @@ CURRENT_REALM_JSON="$({
     sh -lc "/opt/keycloak/bin/kcadm.sh get realms/$REALM"
 })"
 
-MERGED_REALM_JSON="$(printf '%s' "$CURRENT_REALM_JSON" | python3 -c '
+# Feed secrets through stdin rather than exposing them in process arguments.
+MERGED_REALM_JSON="$(printf '%s\0' "$CURRENT_REALM_JSON" \
+  "$SMTP_HOST" "$SMTP_PORT" "$SMTP_FROM" "$SMTP_FROM_NAME" \
+  "$SMTP_REPLY_TO" "$SMTP_USER" "$SMTP_PASSWORD" "$SMTP_STARTTLS" "$SMTP_SSL" | python3 -c '
 import json, sys
-host, port, sender, sender_name, reply_to, user, password, starttls, ssl = sys.argv[1:]
+values = sys.stdin.buffer.read().decode("utf-8").split("\0")
+if len(values) != 11 or values[-1] != "":
+    raise SystemExit("Invalid realm reconciliation input")
+realm_json, host, port, sender, sender_name, reply_to, user, password, starttls, ssl = values[:-1]
 smtp = {
     "host": host,
     "port": port,
@@ -157,11 +163,10 @@ if sender_name:
     smtp["fromDisplayName"] = sender_name
 if reply_to:
     smtp["replyTo"] = reply_to
-realm = json.load(sys.stdin)
+realm = json.loads(realm_json)
 realm["smtpServer"] = smtp
 json.dump(realm, sys.stdout)
-' "$SMTP_HOST" "$SMTP_PORT" "$SMTP_FROM" "$SMTP_FROM_NAME" \
-  "$SMTP_REPLY_TO" "$SMTP_USER" "$SMTP_PASSWORD" "$SMTP_STARTTLS" "$SMTP_SSL")"
+')"
 
 printf '%s' "$MERGED_REALM_JSON" | docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T keycloak \
   sh -lc 'set -eu; f="$(mktemp)"; trap "rm -f \"$f\"" EXIT; cat >"$f"; /opt/keycloak/bin/kcadm.sh update realms/'"$REALM"' -f "$f" >/dev/null'
