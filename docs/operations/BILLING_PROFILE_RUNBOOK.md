@@ -10,7 +10,9 @@ required: `BILLING_LEGAL_NAME`, optional `BILLING_BUSINESS_IDENTIFIER`, `BILLING
 `BILLING_EMAIL`, `BILLING_BANK_ACCOUNT_NAME`, `BILLING_BANK_BSB`, and
 `BILLING_BANK_ACCOUNT_NUMBER`. `BILLING_PAYMENT_INSTRUCTIONS` is optional.
 
-Values are deployment secrets/configuration and must never be committed. Use placeholders only in documentation and synthetic tests; production must use reviewed facts. Review supplier entity and remittance instructions with legal/tax/procurement
+Values are deployment secrets/configuration and must never be committed. Use placeholders only in
+documentation and synthetic tests; production must use reviewed facts.
+Review supplier entity and remittance instructions with legal/tax/procurement
 professionals, and do not infer tax jurisdiction or bank ownership from format validation.
 
 ## Classification and prohibition

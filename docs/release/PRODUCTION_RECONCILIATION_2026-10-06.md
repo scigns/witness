@@ -350,8 +350,8 @@ with zero restarts. No production migration or application deployment has occurr
 
 ## Current release decision — 7 October 2026
 
-#264 landed first, then #266 as `8029e388ec2eb1b27ce78ff8ae20383794e6a850`.
-#269 repaired exact-SHA scheduled security evidence handling and landed as
+PR #264 landed first, then #266 as `8029e388ec2eb1b27ce78ff8ae20383794e6a850`.
+PR #269 repaired exact-SHA scheduled security evidence handling and landed as
 `ec77a1cdcb4355904976c74fa7ea678ec42b0604`. No merge protection was bypassed.
 CodeRabbit remains manually requested and non-blocking. PR Security/CodeQL concurrency cancels
 superseded runs; required production security and artifact gates remain intact.
