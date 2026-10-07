@@ -131,7 +131,16 @@ export type Action =
   | 'knowledge_candidate:validate_community'
   | 'knowledge_entity:steward'
   | 'knowledge_entity:publish'
-  | 'knowledge_governance:configure';
+  | 'knowledge_governance:configure'
+  // Commercial entitlements (ADR-0034's sibling work). Reading an
+  // organisation's own effective configuration reuses 'organisation:read'
+  // (already broad) -- no new action for that. Creating or changing a
+  // negotiated SubscriptionEntitlementOverride is a distinct, more
+  // consequential capability and gets its own action, routed through
+  // PLATFORM_ONLY_ACTIONS (policy-enforcement.service.ts) the same way
+  // 'operator:read' already is: an organisation-scoped admin never reaches
+  // it, only a genuine platform-scope RoleAssignment does.
+  | 'commercial_override:manage';
 
 export interface AuthorizationDecision {
   readonly allowed: boolean;

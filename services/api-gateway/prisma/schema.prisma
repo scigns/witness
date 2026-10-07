@@ -135,6 +135,13 @@ model Organisation {
   /// configures starting defaults only (see organisations.service.ts), never
   /// a different code path.
   profile           String   @default("general") @db.VarChar(20)
+  /// The technical isolation boundary this organisation is explicitly
+  /// assigned to, if any (ADR-0034). NULL ("no explicit assignment") is the
+  /// default and today's universal case — `effectiveTenantId` in
+  /// packages/domain/src/tenant.ts falls back to this organisation's own id,
+  /// so nothing downstream needs to special-case the null.
+  tenantId          String?  @map("tenant_id") @db.Uuid
+  tenant            Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   workspaces                   Workspace[]
@@ -182,7 +189,23 @@ model Organisation {
   // Governed QR/link session joining (Phase 5, Workstream 1.6).
   sessionJoinLinks SessionJoinLink[]
 
+  @@index([tenantId])
   @@map("organisation")
+}
+
+/// The technical isolation boundary (ADR-0034) — distinct from Organisation,
+/// the commercial/governance identity. Deliberately minimal: identity and a
+/// label only. This table existing at all is the point — it is the seam a
+/// future negotiated dedicated environment is recorded against, without a
+/// schema migration at the moment that need first arrives.
+model Tenant {
+  id        String   @id @db.Uuid
+  label     String   @db.VarChar(200)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organisations Organisation[]
+
+  @@map("tenant")
 }
 
 /// A commercial offer owned by Witness. Provider product/price identifiers do
@@ -241,6 +264,32 @@ model PlanEntitlement {
   @@unique([planId, entitlementDefinitionId])
   @@index([entitlementDefinitionId])
   @@map("plan_entitlement")
+}
+
+/// Declarative capacity catalogue (ADR-0034's sibling commercial-entitlement
+/// work). A row here is desired capacity, never a provisioning instruction —
+/// nothing on this model names a cloud provider, a host, or an orchestrator.
+/// An organisation's effective profile is resolved the same way every other
+/// entitlement is: through the `resource.profile` EntitlementDefinition key
+/// (its STRING value is this table's `code`), so Plan defaults and
+/// subscription overrides both reuse `evaluateEntitlements()` rather than a
+/// parallel resolution path.
+model ResourceProfile {
+  id                String  @id @db.Uuid
+  code              String  @unique @db.VarChar(32)
+  name              String  @db.VarChar(100)
+  description       String  @db.VarChar(500)
+  computeClass      String  @map("compute_class") @db.VarChar(32)
+  memoryClass       String  @map("memory_class") @db.VarChar(32)
+  storageQuotaBytes BigInt  @map("storage_quota_bytes")
+  concurrencyLimit  Int     @map("concurrency_limit")
+  workerAllocation  Int     @map("worker_allocation")
+  jobLimit          Int     @map("job_limit")
+  backupProfile     String  @map("backup_profile") @db.VarChar(32)
+  retentionProfile  String  @map("retention_profile") @db.VarChar(32)
+  active            Boolean @default(true)
+
+  @@map("resource_profile")
 }
 
 model BillingAccount {

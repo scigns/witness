@@ -103,6 +103,45 @@ function adminPrisma(): PrismaService {
 }
 
 /**
+ * A user holding a *platform-scoped* `admin` `RoleAssignment` — the shape
+ * `commercial_override:manage` (ADR-0034's sibling commercial-entitlement
+ * work) requires. It is also one of `PolicyEnforcementService`'s
+ * `PLATFORM_ONLY_ACTIONS`, same mechanism and same reasoning as
+ * `payment:settle` below: a negotiated institutional override is Witness's
+ * own platform administration acting, never a customer's own
+ * organisation-scoped admin, however senior within their own organisation.
+ */
+function platformAdminPrisma(): PrismaService {
+  return {
+    roleAssignment: {
+      findMany: async ({
+        where,
+      }: {
+        where: {
+          userId: string;
+          scopeType?: string;
+          organisationId?: string | null;
+          workspaceId?: string | null;
+        };
+      }) => {
+        if (
+          where.userId === ADMIN_USER &&
+          where.scopeType === 'platform' &&
+          where.organisationId === null &&
+          where.workspaceId === null
+        ) {
+          return [{ role: 'admin' }];
+        }
+        return [];
+      },
+    },
+    organisationMembership: { findUnique: async () => null, findMany: async () => [] },
+    workspaceMembership: { findUnique: async () => null, findMany: async () => [] },
+    workspace: { findUnique: async () => null },
+  } as unknown as PrismaService;
+}
+
+/**
  * A user holding a *platform-scoped* `billing_manager` `RoleAssignment`
  * (`scopeType: 'platform'`, both ids null) — the only shape
  * `RoleResolutionService.platformGrantTiers` recognises. `payment:settle` is
@@ -263,6 +302,45 @@ describe('regression — organisation admin retains full billing authority along
     const decision = await service.decide(ADMIN_PRINCIPAL, action as never, {
       type: 'organisation',
       organisationId: ORGANISATION_A,
+    });
+    expect(decision.allowed).toBe(true);
+  });
+});
+
+describe('commercial_override:manage — platform-only by design (ADR-0034)', () => {
+  it('denies an organisation-scoped admin in their own organisation, however senior', async () => {
+    const service = await realService(adminPrisma());
+    const decision = await service.decide(ADMIN_PRINCIPAL, 'commercial_override:manage' as never, {
+      type: 'organisation',
+      organisationId: ORGANISATION_A,
+    });
+    expect(decision.allowed).toBe(false);
+  });
+
+  it('denies billing_manager even from an organisation-scoped assignment', async () => {
+    const service = await realService(billingManagerPrisma());
+    const decision = await service.decide(
+      BILLING_MANAGER_PRINCIPAL,
+      'commercial_override:manage' as never,
+      { type: 'organisation', organisationId: ORGANISATION_A },
+    );
+    expect(decision.allowed).toBe(false);
+  });
+
+  it('grants admin only once granted a genuine platform-scoped assignment', async () => {
+    const service = await realService(platformAdminPrisma());
+    const decision = await service.decide(ADMIN_PRINCIPAL, 'commercial_override:manage' as never, {
+      type: 'organisation',
+      organisationId: ORGANISATION_A,
+    });
+    expect(decision.allowed).toBe(true);
+  });
+
+  it('a platform-scoped grant is not scope-limited -- the same principal reaches it for any organisationId', async () => {
+    const service = await realService(platformAdminPrisma());
+    const decision = await service.decide(ADMIN_PRINCIPAL, 'commercial_override:manage' as never, {
+      type: 'organisation',
+      organisationId: ORGANISATION_B,
     });
     expect(decision.allowed).toBe(true);
   });
