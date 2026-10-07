@@ -2,7 +2,11 @@
 
 **Owner:** Engineering and release manager
 
-**Status:** NOT CLIENT READY — release held; no candidate approved, merged or deployed
+**Status:** NOT CLIENT READY — stack merged; deployment held for external email and supplier configuration
+
+The current decision below supersedes the historical checkpoint sections. Production application
+images and migration ledger remain unchanged; a controlled Keycloak recovery-test identity was
+created, so this does not claim all production data is untouched.
 
 ## Independently verified state
 
@@ -343,3 +347,68 @@ Keycloak email configuration is present, STARTTLS enabled and password recovery 
 A fresh readable Witness/Keycloak checkpoint was taken before the recovery test attempt.
 No real customer records were changed. Production API/web identities remain unchanged, healthy,
 with zero restarts. No production migration or application deployment has occurred.
+
+## Current release decision — 7 October 2026
+
+#264 landed first, then #266 as `8029e388ec2eb1b27ce78ff8ae20383794e6a850`.
+#269 repaired exact-SHA scheduled security evidence handling and landed as
+`ec77a1cdcb4355904976c74fa7ea678ec42b0604`. No merge protection was bypassed.
+CodeRabbit remains manually requested and non-blocking. PR Security/CodeQL concurrency cancels
+superseded runs; required production security and artifact gates remain intact.
+
+Last fully validated candidate: `ec77a1cdcb4355904976c74fa7ea678ec42b0604`.
+Hosted CI `37617417804`, Security `37617417836`, CodeQL `37617417833`: PASS.
+Immutable publication `37619002470`: PASS, created `2026-10-07T12:00:15.172347+00:00`;
+published `2026-10-07T12:11:16.529580+00:00` without rebuilding validated bytes.
+
+- API: `ghcr.io/scigns/witness-api@sha256:a3e61a4daf1c962fcd52e6e5dfba0470a7a8d7a4dac7ad0e166f05b53c079c9a`
+- Web: `ghcr.io/scigns/witness-web@sha256:a663cdf190f77558c915a698d72e2af97ca1baf6ca03f60780034514d06d5987`
+
+The retained isolated remote recovery environment started these exact images, verified readiness,
+45 migration entries, actual SHARED database/storage attestation, audited idempotent observation,
+customer/foreign-organisation denials and operator browser rendering. Unsupported higher isolation
+modes remained NOT_PROVISIONED. Remote browser acceptance passed at 375/768/1440 widths.
+Compatible immutable recovery images at `313d185174062ba4084cdb6973f943b473f57c53` passed
+real OIDC, retained object/accounting reads and new workspace/upload usability in 12.761 seconds.
+Legacy production-image recovery remains DATABASE RESTORE REQUIRED (83.302-second prior proof).
+The isolated services are stopped; volumes and protected evidence are retained. No Mac Docker used.
+Sanitized exact-candidate evidence: [release proof](../handoffs/evidence/PRODUCTION_RELEASE_EC77A1C_2026-10-07.json).
+
+| Critical gate                                        | IMPLEMENTED                                | TESTED                          | REHEARSED                                        | DEPLOYED                                   | PRODUCTION VERIFIED                 |
+| ---------------------------------------------------- | ------------------------------------------ | ------------------------------- | ------------------------------------------------ | ------------------------------------------ | ----------------------------------- |
+| Build, tests, security, tenant/auth/quota invariants | PASS                                       | PASS: exact SHA hosted CI       | PASS                                             | FAIL: candidate not deployed               | FAIL: pending deployment            |
+| Immutable image validation/publication/identity      | PASS                                       | PASS                            | PASS                                             | FAIL: candidate not deployed               | FAIL: pending deployment            |
+| Backup, DB/Keycloak/object restore, 12 migrations    | PASS                                       | PASS                            | PASS: retained recovery proof; ledger 33 to 45   | FAIL: candidate migrations not applied     | FAIL: pending deployment            |
+| Rollback                                             | PASS                                       | PASS                            | PASS: compatible images; legacy requires restore | FAIL: release not deployed                 | FAIL: pending deployment            |
+| SHARED provisioning and denied isolation escalation  | PASS                                       | PASS                            | PASS: exact candidate/provider evidence          | FAIL: candidate not deployed               | FAIL: pending deployment            |
+| Commercial lifecycle/frontend acceptance             | PASS                                       | PASS                            | PASS: synthetic supplier profile                 | FAIL: candidate not deployed               | FAIL: real supplier profile missing |
+| External invitation and recovery email               | PASS: transport exists                     | PASS: SMTP TLS/auth/acceptance  | FAIL: no external inbox/link proof               | FAIL: candidate not deployed               | FAIL: external delivery unverified  |
+| Supplier invoice configuration                       | PASS: forwarding/preflight repair prepared | PASS: targeted safety checks    | FAIL: real configuration absent                  | FAIL: repair not deployed                  | FAIL: six required values absent    |
+| Exact-artifact deployment approval                   | PASS: protected manual workflow            | PASS: safety checks             | PASS: retained rollback controls                 | FAIL: workflow disabled; no approved tuple | FAIL: pending approved deployment   |
+| Synthetic client acceptance in production            | PASS: procedure exists                     | PASS: isolated application path | PASS: isolated candidate                         | FAIL: not deployed                         | FAIL: not run live                  |
+
+No deferred critical risk has been accepted. Existing successful restore/migration proofs are retained;
+configuration-control changes do not justify repeating the entire recovery exercise. A new source
+checkpoint must obtain its own hosted CI and immutable artifacts; the PASS values above belong only
+to ec77a1c. The deployment preflight repair validates complete supplier fields and invokes the exact
+image's installed runtime validator offline before backup/migration/Compose mutation, without
+printing credentials or remittance. This repair is not yet production verified.
+
+NOT READY FOR PRODUCTION. Exact blockers:
+
+1. The controlled external invitation and Keycloak recovery messages were SMTP accepted, but
+   repeated inbox/spam/trash searches found no delivery. Provider delivery-log access is required
+   at `https://app.brevo.com/transactional/email/logs`; inspect the controlled recipient
+   `vunilagibookclub+witness-release-20261007@gmail.com`. Do not resend blindly or claim delivery.
+2. Protected production configuration lacks BILLING_LEGAL_NAME, BILLING_ADDRESS, BILLING_EMAIL,
+   BILLING_BANK_ACCOUNT_NAME, BILLING_BANK_BSB and BILLING_BANK_ACCOUNT_NUMBER. An authorised
+   operator must populate reviewed supplier/remittance facts in `/home/witness/witness/.env`;
+   no invented values, secrets in Git/chat, or real-client invoices before this is resolved.
+3. The necessary configuration-control repair requires final combined-SHA CI/publication and
+   configuration verification. Only after critical gates pass may the approved tuple be set,
+   the authoritative manual workflow enabled/dispatched, and the owner approve its pilot
+   environment review. No automatic main deployment or agent approval is permitted.
+
+Immediately before production mutation, the workflow must take fresh DB/Keycloak backups and
+checksums and record live image IDs, ledger, Compose and routing state. The earlier recovery/email
+checkpoints do not substitute for that fresh checkpoint. Live acceptance and CLIENT READY remain FAIL.

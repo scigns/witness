@@ -101,6 +101,40 @@ def validate_recovery(manifest):
         require(ref == os.environ.get('WITNESS_APPROVED_ROLLBACK_' + kind.upper() + '_REF'), 'recovery digest approval mismatch')
 
 
+def validate_deployment_config(config, inputs):
+    env = config['services']['web']['environment']
+    for suffix in ('API_URL', 'PROFILE', 'BASE_PATH'):
+        require(env.get('WITNESS_IMAGE_' + suffix) == inputs['NEXT_PUBLIC_WITNESS_' + suffix],
+                'deployment public build input mismatch: ' + suffix)
+    api_env = config['services']['api']['environment']
+    require(api_env['WITNESS_DEPLOYMENT_PROFILE'] == inputs['NEXT_PUBLIC_WITNESS_PROFILE'],
+            'deployment API/web profile mismatch')
+    # This controlled release is for commercial clients. The application may run
+    # free-only without a profile, but must not deploy as invoice-ready that way.
+    for key in ('BILLING_LEGAL_NAME', 'BILLING_ADDRESS', 'BILLING_EMAIL',
+                'BILLING_BANK_ACCOUNT_NAME', 'BILLING_BANK_BSB', 'BILLING_BANK_ACCOUNT_NUMBER'):
+        value = api_env.get(key)
+        require(isinstance(value, str) and bool(value.strip()),
+                'commercial supplier profile missing: ' + key)
+    # Never emit supplier/remittance values. Human review of ownership is separate.
+
+
+def validate_runtime_config(env, api_ref):
+    # Run the exact artifact's installed validator offline. JSON stdin avoids
+    # environment-file escaping and keeps credentials out of process arguments.
+    js = ('import {loadConfig} from "@witness/config";let input="";'
+          'for await(const chunk of process.stdin)input+=chunk;'
+          'try{const c=loadConfig({...process.env,...JSON.parse(input)});'
+          'if(c.billingProfile===null)throw new Error();}'
+          'catch{process.exitCode=1;}')
+    result = subprocess.run(['docker', 'run', '--rm', '--network', 'none',
+                             '--memory', '128m', '--cpus', '0.25', '-i',
+                             '--entrypoint', 'node', api_ref, '--input-type=module', '-e', js],
+                            input=json.dumps(env), text=True, capture_output=True)
+    require(result.returncode == 0,
+            'candidate runtime configuration rejected; review protected production settings')
+
+
 def main():
     command, path = sys.argv[1:3]
     if command == 'create':
@@ -138,11 +172,10 @@ def main():
     elif command == 'deployment-config':
         validate(manifest)
         config = json.load(sys.stdin)
-        env = config['services']['web']['environment']
-        inputs = manifest['build_inputs']['web']
-        for suffix in ('API_URL', 'PROFILE', 'BASE_PATH'):
-            require(env.get('WITNESS_IMAGE_' + suffix) == inputs['NEXT_PUBLIC_WITNESS_' + suffix], 'deployment public build input mismatch: ' + suffix)
-        require(config['services']['api']['environment']['WITNESS_DEPLOYMENT_PROFILE'] == inputs['NEXT_PUBLIC_WITNESS_PROFILE'], 'deployment API/web profile mismatch')
+        validate_deployment_config(config, manifest['build_inputs']['web'])
+        item = manifest['images']['api']
+        validate_runtime_config(config['services']['api']['environment'],
+                                item['repository'] + '@' + item['digest'])
     else:
         raise ValueError('unknown artifact operation')
 

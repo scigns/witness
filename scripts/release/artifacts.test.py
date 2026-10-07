@@ -60,5 +60,68 @@ class RecoveryApproval(unittest.TestCase):
                 self.validate(manifest)
 
 
+
+class CommercialDeploymentConfig(unittest.TestCase):
+    def setUp(self):
+        self.inputs = {'NEXT_PUBLIC_WITNESS_API_URL': 'https://api.example.invalid',
+                       'NEXT_PUBLIC_WITNESS_PROFILE': 'hybrid', 'NEXT_PUBLIC_WITNESS_BASE_PATH': ''}
+        self.fields = ('BILLING_LEGAL_NAME', 'BILLING_ADDRESS', 'BILLING_EMAIL',
+                       'BILLING_BANK_ACCOUNT_NAME', 'BILLING_BANK_BSB', 'BILLING_BANK_ACCOUNT_NUMBER')
+        self.config = {'services': {
+            'web': {'environment': {'WITNESS_IMAGE_' + key.removeprefix('NEXT_PUBLIC_WITNESS_'): value
+                                    for key, value in self.inputs.items()}},
+            'api': {'environment': {'WITNESS_DEPLOYMENT_PROFILE': 'hybrid',
+                                    **{key: 'synthetic fixture' for key in self.fields}}}}}
+
+    def test_complete_supplier_profile_and_matching_build_inputs_pass(self):
+        artifacts.validate_deployment_config(self.config, self.inputs)
+
+    def test_missing_blank_or_nonstring_supplier_fields_refuse_without_values_in_error(self):
+        for key in self.fields:
+            for missing in (None, '', '   ', 123):
+                config = copy.deepcopy(self.config)
+                config['services']['api']['environment'][key] = missing
+                with self.subTest(key=key, value=missing), self.assertRaisesRegex(
+                        ValueError, '^commercial supplier profile missing: ' + key + '$'):
+                    artifacts.validate_deployment_config(config, self.inputs)
+
+    def test_build_drift_still_refuses(self):
+        config = copy.deepcopy(self.config)
+        config['services']['web']['environment']['WITNESS_IMAGE_API_URL'] = 'https://other.example.invalid'
+        with self.assertRaises(ValueError):
+            artifacts.validate_deployment_config(config, self.inputs)
+
+    def test_production_compose_forwards_reviewed_supplier_fields(self):
+        compose = Path('deployments/cloud-managed/docker-compose.pilot.yml').read_text()
+        for key in self.fields:
+            self.assertIn(key + ': ${' + key + ':-}', compose)
+
+
+
+class OfflineRuntimeConfig(unittest.TestCase):
+    def test_installed_validator_is_offline_and_secret_values_use_stdin_only(self):
+        from types import SimpleNamespace
+        env = {'KEYCLOAK_SMTP_PASSWORD': 'private-synthetic-secret',
+               'BILLING_BANK_ACCOUNT_NUMBER': 'private-synthetic-remittance'}
+        ref = 'ghcr.io/scigns/witness-api@sha256:' + '1' * 64
+        with patch.object(artifacts.subprocess, 'run', return_value=SimpleNamespace(returncode=0)) as run:
+            artifacts.validate_runtime_config(env, ref)
+        args, kwargs = run.call_args
+        self.assertIn('none', args[0])
+        self.assertIn(ref, args[0])
+        self.assertIn('-i', args[0])
+        self.assertTrue(kwargs['capture_output'])
+        self.assertEqual(json.loads(kwargs['input']), env)
+        self.assertNotIn(env['KEYCLOAK_SMTP_PASSWORD'], str(args))
+        self.assertNotIn(env['BILLING_BANK_ACCOUNT_NUMBER'], str(args))
+
+    def test_invalid_runtime_refuses_without_emitting_validator_output(self):
+        from types import SimpleNamespace
+        result = SimpleNamespace(returncode=1, stderr='private-synthetic-secret', stdout='private-remittance')
+        with patch.object(artifacts.subprocess, 'run', return_value=result), self.assertRaisesRegex(
+                ValueError, '^candidate runtime configuration rejected; review protected production settings$'):
+            artifacts.validate_runtime_config({}, 'ghcr.io/scigns/witness-api@sha256:' + '1' * 64)
+
+
 if __name__ == '__main__':
     unittest.main()

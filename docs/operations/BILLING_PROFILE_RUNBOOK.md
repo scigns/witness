@@ -10,8 +10,7 @@ required: `BILLING_LEGAL_NAME`, optional `BILLING_BUSINESS_IDENTIFIER`, `BILLING
 `BILLING_EMAIL`, `BILLING_BANK_ACCOUNT_NAME`, `BILLING_BANK_BSB`, and
 `BILLING_BANK_ACCOUNT_NUMBER`. `BILLING_PAYMENT_INSTRUCTIONS` is optional.
 
-Values are deployment secrets/configuration and must never be committed. Use placeholders in
-operator systems, review supplier entity and remittance instructions with legal/tax/procurement
+Values are deployment secrets/configuration and must never be committed. Use placeholders only in documentation and synthetic tests; production must use reviewed facts. Review supplier entity and remittance instructions with legal/tax/procurement
 professionals, and do not infer tax jurisdiction or bank ownership from format validation.
 
 ## Classification and prohibition
@@ -41,3 +40,15 @@ Invoice issuance and authenticated remittance presentation are #114 scope. Rende
 snapshots, not current configuration. An invoice and its payment instructions are not evidence that
 payment occurred; this milestone does not process payments, reconcile settlement or activate
 entitlements.
+
+## Controlled commercial production release
+
+The production Compose definition forwards the reviewed profile from the protected environment.
+Before production mutation, the release preflight requires all six mandatory fields and runs the
+exact immutable API image's installed configuration validator offline. It rejects missing or
+malformed configuration without printing values. This does not verify bank ownership.
+
+An authorised operator must populate the protected `/home/witness/witness/.env` through the
+existing secret-management process. Do not paste remittance into chat, PRs or evidence files.
+Record only review completion and validation results. Invoice issuance and settlement must then
+pass synthetic client acceptance against the deployed application before first-client onboarding.

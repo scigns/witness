@@ -8,6 +8,9 @@ Use this procedure only after
 manager approves the deployed SHA. Never onboard real confidential information to a candidate
 environment. Test first with a clearly labelled synthetic organisation.
 
+Before issuing an invoice, verify the reviewed supplier profile using the
+[billing profile runbook](BILLING_PROFILE_RUNBOOK.md). Missing supplier configuration blocks onboarding.
+
 No SQL or source edits are part of client origination. Initial platform bootstrap is a separate,
 one-time deployment control; it must never grant a customer platform administrator authority.
 
