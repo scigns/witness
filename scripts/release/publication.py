@@ -30,7 +30,10 @@ def gates():
         run = runs[0]
         require(run['head_sha'] == sha and run['conclusion'] == 'success', f'latest {workflow} has not passed')
         require(run['head_repository']['full_name'] == 'scigns/witness', 'fork artifacts are not publishable')
-        require(run['event'] in ('push', 'pull_request'), 'invalid validation context')
+        # Scheduled security scans of this exact SHA can supersede its push scan.
+        # CI still requires a code event because scheduled jobs do not produce image bytes.
+        contexts = ('push', 'pull_request') if workflow == 'ci.yml' else ('push', 'pull_request', 'schedule')
+        require(run['event'] in contexts, 'invalid validation context')
         selected[workflow] = run
     # CI uploads immutable archives for its own run attempt. Expired/missing => fail, never rebuild.
     run = selected['ci.yml']
