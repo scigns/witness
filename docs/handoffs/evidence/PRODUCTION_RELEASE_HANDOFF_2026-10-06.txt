@@ -1,3 +1,12 @@
+LATEST CONTINUATION — 2026-10-08
+PR #270 merged; final candidate a5976e2d9a4bb116bfc716d3f5749ba569569ef9.
+CI 37695488119, Security 37695487904, CodeQL 37695487925, publication 37697961604 PASS.
+Exact images started healthy; actual provisioning passed; compatible rollback 10.992 seconds.
+See final decision and PRODUCTION_RELEASE_A5976E2_2026-10-08.json for immutable digests.
+External email and real supplier profile remain FAIL. Deployment disabled; production ledger 33.
+Rehearsal services stopped; fresh pre-deployment backups and human review still required.
+Evidence-only documentation commits do not replace the selected exact artifact SHA.
+
 CURRENT CONTINUATION — 2026-10-07
 #264, #266 and narrow publication repair #269 are merged.
 Last fully validated/published/rehearsed SHA: ec77a1cdcb4355904976c74fa7ea678ec42b0604.

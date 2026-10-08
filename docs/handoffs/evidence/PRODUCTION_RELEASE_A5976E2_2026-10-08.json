@@ -1,0 +1,519 @@
+{
+  "candidate_sha": "a5976e2d9a4bb116bfc716d3f5749ba569569ef9",
+  "publication_run_id": "37697961604",
+  "manifest": {
+    "build": {
+      "run_attempt": "1",
+      "run_id": "37695488119",
+      "workflow": ".github/workflows/ci.yml"
+    },
+    "build_inputs": {
+      "platform": "linux/amd64",
+      "web": {
+        "NEXT_PUBLIC_WITNESS_API_URL": "https://api.buildwithwitness.com",
+        "NEXT_PUBLIC_WITNESS_BASE_PATH": "",
+        "NEXT_PUBLIC_WITNESS_PROFILE": "hybrid"
+      }
+    },
+    "created_at": "2026-10-07T22:24:59.706760+00:00",
+    "git_sha": "a5976e2d9a4bb116bfc716d3f5749ba569569ef9",
+    "images": {
+      "api": {
+        "digest": "sha256:145c879f66aebf388199a3249468554820f6e7fd97bbf975f4635bb8bbab522e",
+        "local_id": "sha256:d8aec556bb3a07b86e24534f183aedf68b89fca6e452cf2212c445e6089d80cd",
+        "oci_revision": "a5976e2d9a4bb116bfc716d3f5749ba569569ef9",
+        "repository": "ghcr.io/scigns/witness-api"
+      },
+      "web": {
+        "digest": "sha256:141a3baef0116c159d42086cabbccdda945ce7656d27d607ddcc5b3925bfb5ab",
+        "local_id": "sha256:58c7fc617a860e5fd60863f503ec95215f264b6df386093deb7c760e9963c7a6",
+        "oci_revision": "a5976e2d9a4bb116bfc716d3f5749ba569569ef9",
+        "repository": "ghcr.io/scigns/witness-web"
+      }
+    },
+    "migrations": [
+      {
+        "path": "schema.prisma",
+        "sha256": "489c7a81af4dedf0957ae102ec47f91e5f1677b1ffa4c9a293aa96b898dba316"
+      },
+      {
+        "path": "migrations/20260801071330_initial_developer_preview/migration.sql",
+        "sha256": "4c3050ba110a5383c6b84410cc74f2eb0c2126cfa430b81f7fa574f156294783"
+      },
+      {
+        "path": "migrations/20260803120000_organisations/migration.sql",
+        "sha256": "ed14048593f25fbe842437fe7f0985ec89f72893b6dd79b9cff770afa3c8e3f5"
+      },
+      {
+        "path": "migrations/20260803140000_workspaces/migration.sql",
+        "sha256": "41142bd1953b85a6ff9e021d0c5822b2667f5007190f453ebd30e46b7595b7e8"
+      },
+      {
+        "path": "migrations/20260803160000_users_and_memberships/migration.sql",
+        "sha256": "4cbda21f48ad365aed6d657e4c642cfcfac29d48d652469ba01ef6cfb5bcb41d"
+      },
+      {
+        "path": "migrations/20260803180000_role_assignments/migration.sql",
+        "sha256": "e0d851871d40d1828fc9ea4dfa1bfffd1095db032c64fed50d5c5dc6357592be"
+      },
+      {
+        "path": "migrations/20260803200000_authentication/migration.sql",
+        "sha256": "82f873621e6c3c7e934531436940c6a2a6b0a0b6a29759e5cad103400ad1d371"
+      },
+      {
+        "path": "migrations/20260804050000_co_design_sessions/migration.sql",
+        "sha256": "224a3a1310a422cfa77f0dbd8b6c91946578ba5baaf8a53c38638074d51ecf9b"
+      },
+      {
+        "path": "migrations/20260804070000_session_participants/migration.sql",
+        "sha256": "fa9dd6e8c7ff48017577a426889ea1f8f4658447f921ebc1a316edb64bca51f3"
+      },
+      {
+        "path": "migrations/20260804080000_consent_management/migration.sql",
+        "sha256": "9f20225e90eedfea1fa54fbd8de8b4559f3e3063b0b6753ec1969a0b4c4b3701"
+      },
+      {
+        "path": "migrations/20260804090000_evidence_capture/migration.sql",
+        "sha256": "16b287120190db7b56c8c118292e97526293c32b1497f472f8f44ae90fcf0d9a"
+      },
+      {
+        "path": "migrations/20260806100000_evidence_review_validation/migration.sql",
+        "sha256": "03d46292c94cf465b560601c8668cea06af5d82c1d58a40823d8be3b3316de58"
+      },
+      {
+        "path": "migrations/20260808100000_outcomes_decisions_commitments_actions/migration.sql",
+        "sha256": "8a32eb6f141e09b35e77f793aa36d650e6f32e3a591e2fce9b4e0d4720d7128f"
+      },
+      {
+        "path": "migrations/20260809100000_session_reporting_and_export/migration.sql",
+        "sha256": "fd91550bc941afa72769cdc9902538bb1d8d10da45a39e4f81023406bb293eb9"
+      },
+      {
+        "path": "migrations/20260809120000_widen_audit_subject_type/migration.sql",
+        "sha256": "a1e4beb26f8b3e620a3927a887662397b373fbfb9690e1fc5879bc653a6dff58"
+      },
+      {
+        "path": "migrations/20260811022859_add_evidence_attachment/migration.sql",
+        "sha256": "5008fc1c06d8a23c27d2877c226f8aee7a34343bf57e08337db42a4d8f338004"
+      },
+      {
+        "path": "migrations/20260811050015_add_transcript/migration.sql",
+        "sha256": "3361c3ee6fc2f44300332e72393e412f44760d65f48dc8ce1262b36614ec870b"
+      },
+      {
+        "path": "migrations/20260811061009_add_session_summary/migration.sql",
+        "sha256": "d83f99b9ded6ec2e0aa8fc2b58326458c91d9e442359cc03fcad7641c539ee98"
+      },
+      {
+        "path": "migrations/20260811123639_widen_report_source_type/migration.sql",
+        "sha256": "cd60af0cc20d8c0abb3767974d182a4c0f76d134fe0d2f9316dc316d8fbb8cf9"
+      },
+      {
+        "path": "migrations/20260812020222_add_workspace_description_and_user_bio/migration.sql",
+        "sha256": "ae0483a16462769cbd301391f8111082a93eac0bbd0b290fc108d863a6c6acdb"
+      },
+      {
+        "path": "migrations/20260812064123_add_agenda_and_resources/migration.sql",
+        "sha256": "dbb165c776662b6c6193cc59aa836829cc18455d8a381f8d0482d958f35b31d5"
+      },
+      {
+        "path": "migrations/20260812111529_add_audit_event_sequence/migration.sql",
+        "sha256": "49042b80b2c35ea244b54d3c1118484a2b84e1fee8085540b0769fb4a8c0bc73"
+      },
+      {
+        "path": "migrations/20260813120000_add_evidence_client_request_id/migration.sql",
+        "sha256": "ae929824635d5e91981e43511236ac5ef32b90b1fbcd9ebd6073de78425c6184"
+      },
+      {
+        "path": "migrations/20260814020000_platform_role_scope/migration.sql",
+        "sha256": "8ed291abcd40a370cc96b837c3100ac6145f15ffcc01ec6c37037a8a05ebfcf2"
+      },
+      {
+        "path": "migrations/20260814050000_add_storage_key/migration.sql",
+        "sha256": "ec453f766946b0b2bd7646e9d7527181b0d62a5fbe6230f0b906ac6a41a3ad4b"
+      },
+      {
+        "path": "migrations/20260814080000_add_organisation_storage_quota/migration.sql",
+        "sha256": "3f23d2253882483400bb1801e537a695d11e149d53340daca7b512aff806e88f"
+      },
+      {
+        "path": "migrations/20260815150000_add_organisation_profile_and_name_unique/migration.sql",
+        "sha256": "a806214a4e024e9e42f17cef81e52b7b26dfe75895568922f1830ea74306170a"
+      },
+      {
+        "path": "migrations/20260825090000_commercial_domain_foundation/migration.sql",
+        "sha256": "5cec5df7b46ff33c50558988ad9fc808b77782063c4afb8c80e602ed6829e535"
+      },
+      {
+        "path": "migrations/20260826090000_commercial_self_service_intent/migration.sql",
+        "sha256": "28f191566a77f14968bd1354c3efe48477e880580d92788c618d89e9230337e8"
+      },
+      {
+        "path": "migrations/20260826100000_commercial_persistence/migration.sql",
+        "sha256": "521ac03e63d31412cba0191c6a387882d803fc8042964f979bc73fa2426af10a"
+      },
+      {
+        "path": "migrations/20260827100000_billing_invoice_snapshots/migration.sql",
+        "sha256": "51d077b202054e1f8eb6fa6d217be2d3e82aefe880476bcdb19713e7d46684f6"
+      },
+      {
+        "path": "migrations/20260828100000_invoice_issuance_idempotency/migration.sql",
+        "sha256": "8b2250a0e572d2478dd770e2c050bc0d595a60edcb6eee9bdf60917a37a02e48"
+      },
+      {
+        "path": "migrations/20260901090000_manual_settlement_activation/migration.sql",
+        "sha256": "0a83d16850b01a457d483e19e5255ff0f74b0617676c72d419980236b5788383"
+      },
+      {
+        "path": "migrations/20260902110000_invitation_notifications/migration.sql",
+        "sha256": "a8e1fa1fb323689cb028e322443f96d37c97bbd3138bb43a350788618843f09f"
+      },
+      {
+        "path": "migrations/20260919090741_evidence_knowledge_graph/migration.sql",
+        "sha256": "4329c6b1633fee8f00e579857fe0847aed56ca3a097a550ec5b905dd91223a63"
+      },
+      {
+        "path": "migrations/20260921003323_widen_candidate_status/migration.sql",
+        "sha256": "5a11de5982d316c186d7eacfe6372c0cb4139bcef29f29efb7cd78d8050d94d0"
+      },
+      {
+        "path": "migrations/20260922105103_workspace_invitation_and_affiliation/migration.sql",
+        "sha256": "e326806376d4544039850d07090f0b7a3b25454c1fdd25f1611e6e498977b559"
+      },
+      {
+        "path": "migrations/20260922122842_workspace_lifecycle_status/migration.sql",
+        "sha256": "d5e9848b198a1acbbc5aa1a99da0aa1f8338a534578e68371468ccc16030e946"
+      },
+      {
+        "path": "migrations/20260923073459_session_join_link/migration.sql",
+        "sha256": "a8cbc8f7fdea1d58fa17b9663198dfb419bce7aeddd6d5b22681616bc1c2ffdd"
+      },
+      {
+        "path": "migrations/20260923080428_participant_capture_token/migration.sql",
+        "sha256": "b3026028a858cca775a7fbdffa723e9556cd60dafc331dbb7a42e625b9d53d51"
+      },
+      {
+        "path": "migrations/20260924044439_receipt/migration.sql",
+        "sha256": "dd774fa2c9a77462eb563913341d348c225b9268a8f2acfefb82590cd7a7af72"
+      },
+      {
+        "path": "migrations/20260925005140_agreement/migration.sql",
+        "sha256": "c8cd0bfb1f5367f381d13bf4c578de0a694d437d2b98546c8327d31cab72f7f5"
+      },
+      {
+        "path": "migrations/20261004072548_commercial_entitlements_resource_profile/migration.sql",
+        "sha256": "5cdd9ac35786562bdbb738b2ddfc3812c4b5c919564bc24f897b18d2eac5b42e"
+      },
+      {
+        "path": "migrations/20261004115917_resource_profile_quota_and_tenant_status/migration.sql",
+        "sha256": "724139c0315af27dd4e5bbcae6a7a42dd3f07fe6f81942d82ef015b960da74ec"
+      },
+      {
+        "path": "migrations/20261005010000_durable_storage_reservations/migration.sql",
+        "sha256": "61620e9b99cd3a3ce3be7007760c206f11f60fc10f442c7c1444884c94d3412c"
+      },
+      {
+        "path": "migrations/20261005020000_login_return_path/migration.sql",
+        "sha256": "9a22dfbf05b6cfda67493e7f6943f785b02c54c45ff6d7451f32911fe1c7320e"
+      }
+    ],
+    "platform": "linux/amd64",
+    "publication": {
+      "created_at": "2026-10-07T22:44:42.150375+00:00",
+      "run_attempt": "1",
+      "run_id": "37697961604",
+      "workflow": ".github/workflows/release-artifacts.yml"
+    },
+    "published": true,
+    "schema_version": 1,
+    "version": "0.4.0"
+  },
+  "hosted_checks": {
+    "CI": "37695488119",
+    "Security": "37695487904",
+    "CodeQL": "37695487925",
+    "result": "PASS"
+  },
+  "runtime": {
+    "sha": "a5976e2d9a4bb116bfc716d3f5749ba569569ef9",
+    "artifacts": {
+      "api": "ghcr.io/scigns/witness-api@sha256:145c879f66aebf388199a3249468554820f6e7fd97bbf975f4635bb8bbab522e",
+      "web": "ghcr.io/scigns/witness-web@sha256:141a3baef0116c159d42086cabbccdda945ce7656d27d607ddcc5b3925bfb5ab"
+    },
+    "health": {
+      "api": "healthy",
+      "web": "healthy"
+    },
+    "migrations": 45,
+    "migration_inventory": "UNCHANGED AND VERIFIED",
+    "production": "UNCHANGED"
+  },
+  "provisioning": {
+    "result": "PASS",
+    "candidate_sha": "a5976e2d9a4bb116bfc716d3f5749ba569569ef9",
+    "results": [
+      {
+        "name": "OIDC login release-operator",
+        "result": "PASS",
+        "one_time_callback": true,
+        "landing": "/workspaces"
+      },
+      {
+        "name": "OIDC login release-admin",
+        "result": "PASS",
+        "one_time_callback": true,
+        "landing": "/workspaces"
+      },
+      {
+        "name": "actual shared runtime and storage provider attest exact candidate",
+        "result": "PASS"
+      },
+      {
+        "name": "operator attestation audited and duplicate observation does not append duplicate event",
+        "result": "PASS"
+      },
+      {
+        "name": "customer cannot attest or escalate, cross-org provisioning denied, provider reference hidden",
+        "result": "PASS"
+      },
+      {
+        "name": "unsupported higher isolation fails closed with packaged production adapter",
+        "result": "PASS"
+      }
+    ]
+  },
+  "observability": {
+    "result": "PASS",
+    "candidate": {
+      "api": {
+        "image": "sha256:145c879f66aebf388199a3249468554820f6e7fd97bbf975f4635bb8bbab522e",
+        "revision": "a5976e2d9a4bb116bfc716d3f5749ba569569ef9",
+        "health": "healthy",
+        "restarts": 0,
+        "critical_startup_errors": []
+      },
+      "web": {
+        "image": "sha256:141a3baef0116c159d42086cabbccdda945ce7656d27d607ddcc5b3925bfb5ab",
+        "revision": "a5976e2d9a4bb116bfc716d3f5749ba569569ef9",
+        "health": "healthy",
+        "restarts": 0,
+        "critical_startup_errors": []
+      }
+    },
+    "production": {
+      "api": {
+        "image": "sha256:994f78c2266c52cd57d11fca42f8ff28643583605026e2ba29f2b6628989426b",
+        "health": "healthy",
+        "restarts": 0
+      },
+      "web": {
+        "image": "sha256:a7bd28eb30fb553b27266b92c25efd42f9f85cdf857cdddde86493b380f10d3c",
+        "health": "healthy",
+        "restarts": 0
+      },
+      "postgres": {
+        "image": "sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b",
+        "health": "healthy",
+        "restarts": 0
+      },
+      "keycloak": {
+        "image": "sha256:09a381c715ab0b111835b70f2905955274843a219c6f27efb348e4d9f4086858",
+        "health": "healthy",
+        "restarts": 0
+      }
+    },
+    "production_ledger": 33
+  },
+  "rollback": {
+    "result": "PASS",
+    "classification": "COMPATIBLE RECOVERY ARTIFACT; NO DATABASE RESTORE",
+    "candidate_sha": "a5976e2d9a4bb116bfc716d3f5749ba569569ef9",
+    "recovery_sha": "313d185174062ba4084cdb6973f943b473f57c53",
+    "recovery_refs": {
+      "api": "ghcr.io/scigns/witness-api@sha256:a79035d2fd0173fe268b1458d60fc555410b809566ef749ac2badf52fc6a86c3",
+      "web": "ghcr.io/scigns/witness-web@sha256:6f7da70b05aeb872a43b9534021d1e7e14e56beae06dd27e9b2de8bd4f023da3"
+    },
+    "before_after_counts": "45|8|5|4|2|2|6|258",
+    "duration_seconds": 10.992,
+    "commands": [
+      ["hostname", "-s"],
+      [
+        "docker",
+        "exec",
+        "witness-release-cdfe7fb-postgres",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "witness",
+        "-Atc",
+        "SELECT (SELECT count(*) FROM _prisma_migrations),(SELECT count(*) FROM organisation),(SELECT count(*) FROM workspace),(SELECT count(*) FROM resource),(SELECT count(*) FROM payment),(SELECT count(*) FROM receipt),(SELECT count(*) FROM storage_reservation),(SELECT count(*) FROM audit_event)"
+      ],
+      ["docker", "inspect", "witness-release-cdfe7fb-api"],
+      [
+        "docker",
+        "image",
+        "inspect",
+        "ghcr.io/scigns/witness-api@sha256:a79035d2fd0173fe268b1458d60fc555410b809566ef749ac2badf52fc6a86c3"
+      ],
+      ["docker", "stop", "witness-release-cdfe7fb-api"],
+      ["docker", "rm", "witness-release-cdfe7fb-api"],
+      [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "witness-release-cdfe7fb-api",
+        "--network",
+        "witness-release-cdfe7fb-private",
+        "--network-alias",
+        "api",
+        "--memory",
+        "768m",
+        "--cpus",
+        "0.75",
+        "--env-file",
+        "/home/witness/witness-backups/release-cdfe7fb-20261006/api.env",
+        "--mount",
+        "type=bind,source=/home/witness/witness-backups/release-cdfe7fb-20261006/tls.crt,target=/rehearsal/tls.crt,readonly",
+        "ghcr.io/scigns/witness-api@sha256:a79035d2fd0173fe268b1458d60fc555410b809566ef749ac2badf52fc6a86c3"
+      ],
+      ["docker", "inspect", "witness-release-cdfe7fb-web"],
+      [
+        "docker",
+        "image",
+        "inspect",
+        "ghcr.io/scigns/witness-web@sha256:6f7da70b05aeb872a43b9534021d1e7e14e56beae06dd27e9b2de8bd4f023da3"
+      ],
+      ["docker", "stop", "witness-release-cdfe7fb-web"],
+      ["docker", "rm", "witness-release-cdfe7fb-web"],
+      [
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        "witness-release-cdfe7fb-web",
+        "--network",
+        "witness-release-cdfe7fb-private",
+        "--network-alias",
+        "web",
+        "--memory",
+        "384m",
+        "--cpus",
+        "0.5",
+        "ghcr.io/scigns/witness-web@sha256:6f7da70b05aeb872a43b9534021d1e7e14e56beae06dd27e9b2de8bd4f023da3"
+      ],
+      [
+        "docker",
+        "exec",
+        "witness-release-cdfe7fb-api",
+        "node",
+        "-e",
+        "Promise.all([fetch('http://127.0.0.1:3001/ready').then(r=>r.json()),fetch('http://web:3000/api/build-identity').then(r=>r.json())]).then(x=>console.log(JSON.stringify(x)))"
+      ],
+      [
+        "docker",
+        "exec",
+        "witness-release-cdfe7fb-api",
+        "node",
+        "-e",
+        "Promise.all([fetch('http://127.0.0.1:3001/ready').then(r=>r.json()),fetch('http://web:3000/api/build-identity').then(r=>r.json())]).then(x=>console.log(JSON.stringify(x)))"
+      ],
+      [
+        "docker",
+        "exec",
+        "witness-release-cdfe7fb-api",
+        "node",
+        "-e",
+        "Promise.all([fetch('http://127.0.0.1:3001/ready').then(r=>r.json()),fetch('http://web:3000/api/build-identity').then(r=>r.json())]).then(x=>console.log(JSON.stringify(x)))"
+      ],
+      [
+        "docker",
+        "exec",
+        "witness-release-cdfe7fb-postgres",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "witness",
+        "-Atc",
+        "SELECT (SELECT count(*) FROM _prisma_migrations),(SELECT count(*) FROM organisation),(SELECT count(*) FROM workspace),(SELECT count(*) FROM resource),(SELECT count(*) FROM payment),(SELECT count(*) FROM receipt),(SELECT count(*) FROM storage_reservation),(SELECT count(*) FROM audit_event)"
+      ],
+      [
+        "docker",
+        "cp",
+        "/home/witness/witness-backups/release-cdfe7fb-20261006/final-rollback-usability.mjs",
+        "witness-release-cdfe7fb-api:/repo/services/api-gateway/compatible-rollback-usability.mjs"
+      ],
+      [
+        "docker",
+        "cp",
+        "/home/witness/witness-backups/release-cdfe7fb-20261006/synthetic-credentials.json",
+        "witness-release-cdfe7fb-api:/tmp/synthetic-credentials.json"
+      ],
+      [
+        "docker",
+        "cp",
+        "/home/witness/witness-backups/release-cdfe7fb-20261006/acceptance-private.json",
+        "witness-release-cdfe7fb-api:/tmp/acceptance-private.json"
+      ],
+      [
+        "docker",
+        "exec",
+        "witness-release-cdfe7fb-api",
+        "node",
+        "compatible-rollback-usability.mjs"
+      ],
+      [
+        "docker",
+        "cp",
+        "witness-release-cdfe7fb-api:/tmp/compatible-rollback-usability.json",
+        "/home/witness/witness-backups/release-cdfe7fb-20261006/compatible-rollback-usability.json"
+      ]
+    ]
+  },
+  "rollback_usability": {
+    "result": "PASS",
+    "results": [
+      {
+        "name": "OIDC login release-operator",
+        "result": "PASS",
+        "one_time_callback": true,
+        "landing": "/workspaces"
+      },
+      {
+        "name": "OIDC login release-admin",
+        "result": "PASS",
+        "one_time_callback": true,
+        "landing": "/workspaces"
+      },
+      {
+        "name": "OIDC login release-member",
+        "result": "PASS",
+        "one_time_callback": true,
+        "landing": "/workspaces"
+      },
+      {
+        "name": "compatible artifact preserves candidate object/accounting/reservations and supports real OIDC plus new writes",
+        "result": "PASS"
+      }
+    ]
+  },
+  "production_supplier_profile": {
+    "result": "FAIL",
+    "billingProfileConfigured": false,
+    "values_recorded": false
+  },
+  "external_email": {
+    "result": "FAIL",
+    "smtp_accepted": true,
+    "external_inbox_observed": false,
+    "provider_log_access": "REQUIRED"
+  },
+  "production_deployment": "NOT PERFORMED",
+  "client_ready": false,
+  "browser_evidence": {
+    "source_candidate": "ec77a1cdcb4355904976c74fa7ea678ec42b0604",
+    "reason_retained": "No application/frontend/auth/schema changes between ec77a1c and this candidate; only deployment configuration, release safety harness and evidence changes. Exact new artifacts separately passed hosted image validation, runtime, OIDC and provisioning/rollback."
+  }
+}

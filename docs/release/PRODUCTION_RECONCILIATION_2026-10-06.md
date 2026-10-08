@@ -412,3 +412,95 @@ NOT READY FOR PRODUCTION. Exact blockers:
 Immediately before production mutation, the workflow must take fresh DB/Keycloak backups and
 checksums and record live image IDs, ledger, Compose and routing state. The earlier recovery/email
 checkpoints do not substitute for that fresh checkpoint. Live acceptance and CLIENT READY remain FAIL.
+
+## Final merged artifact decision — 8 October 2026
+
+This decision supersedes the ec77a1c decision above. PR #270 merged through normal protection as
+`a5976e2d9a4bb116bfc716d3f5749ba569569ef9`. The repair forwards the supplier profile and rejects
+missing or invalid runtime configuration before production mutation. Its fake-infrastructure
+harness covers refusal before backup, migration and recreation; no Mac Docker was used.
+
+Exact main CI `37695488119`, Security `37695487904`, CodeQL `37695487925`: PASS.
+Release image validation is PASS in that CI run. Immutable publication `37697961604`: PASS.
+Images were created `2026-10-07T22:24:59.706760+00:00` and published
+`2026-10-07T22:44:42.150375+00:00` from the validated bytes without rebuilding.
+
+The exact published API/web artifacts started healthy in the retained isolated runtime.
+Migration checksums still match all 45 entries; no new migration or restore was performed.
+Real OIDC, actual SHARED provider attestation, audit idempotency, customer/cross-org denials and
+higher-isolation refusal passed at this SHA. Candidate restart counts were zero and no critical
+startup errors were found. Compatible rollback to 313d185 passed retained reads and new writes
+in 10.992 seconds, preserving `45|8|5|4|2|2|6|258` migration/data/audit counts across the swap.
+The temporary services are stopped. Production images remain the original recorded IDs and its
+migration ledger remains 33. The real production supplier profile remains absent in the exact-image
+offline config probe; auth URLs, storage/SMTP presence and API/web profile checks pass.
+
+Application, frontend, auth and schema source did not change from ec77a1c. Its browser acceptance
+and original DB/Keycloak/object restore proofs are retained with that explicit scope; they are
+not relabelled as new-SHA test executions. New-SHA hosted tests, image/runtime/OIDC/provisioning
+and compatible rollback proof are recorded separately in
+[final artifact evidence](../handoffs/evidence/PRODUCTION_RELEASE_A5976E2_2026-10-08.json).
+This evidence-only documentation checkpoint does not replace the selected artifact SHA.
+
+| Critical gate                                  | IMPLEMENTED     | TESTED                             | REHEARSED                                                                      | DEPLOYED                                   | PRODUCTION VERIFIED                     |
+| ---------------------------------------------- | --------------- | ---------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------ | --------------------------------------- |
+| Core code/security/isolation/auth/quota safety | PASS            | PASS: a5976e2 hosted checks        | PASS: exact-artifact auth/provisioning plus retained unchanged-code acceptance | FAIL: candidate not deployed               | FAIL: pending deployment                |
+| Migration, DB/Keycloak/object recovery         | PASS            | PASS: unchanged inventory verified | PASS: retained restore; exact 45-entry ledger checked                          | FAIL: production ledger still 33           | FAIL: pending deployment                |
+| Immutable images and identity                  | PASS            | PASS: a5976e2 CI/publication       | PASS: exact artifacts                                                          | FAIL: candidate not deployed               | FAIL: pending deployment                |
+| Compatible rollback; legacy DB restore         | PASS            | PASS                               | PASS: 10.992 seconds; legacy restore proof retained                            | FAIL: candidate not deployed               | FAIL: pending deployment                |
+| Truthful SHARED provisioning                   | PASS            | PASS                               | PASS: a5976e2 provider/audit/denial proof                                      | FAIL: candidate not deployed               | FAIL: pending deployment                |
+| Commercial lifecycle/frontend                  | PASS            | PASS                               | PASS: unchanged synthetic application path                                     | FAIL: candidate not deployed               | FAIL: real supplier profile absent      |
+| Supplier forwarding and fail-closed preflight  | PASS            | PASS: local harness and hosted CI  | PASS: absence detected in offline probe                                        | FAIL: production profile missing           | FAIL: authorised configuration required |
+| External email                                 | PASS: transport | PASS: SMTP TLS/auth/acceptance     | FAIL: no inbox/link proof                                                      | FAIL: candidate not deployed               | FAIL: provider verification required    |
+| Protected exact-artifact deployment            | PASS            | PASS                               | PASS: rollback controls                                                        | FAIL: disabled and no approved final tuple | FAIL: pending approved deployment       |
+| Live synthetic client acceptance               | PASS: runbook   | PASS: isolated path                | PASS: scoped evidence above                                                    | FAIL: candidate not deployed               | FAIL: not run live                      |
+
+RELEASE CANDIDATE SHA: a5976e2d9a4bb116bfc716d3f5749ba569569ef9
+
+API IMAGE DIGEST: sha256:145c879f66aebf388199a3249468554820f6e7fd97bbf975f4635bb8bbab522e
+
+WEB IMAGE DIGEST: sha256:141a3baef0116c159d42086cabbccdda945ce7656d27d607ddcc5b3925bfb5ab
+
+MIGRATION SET: retained 12 migrations; production 33 to candidate 45; checksums unchanged.
+The exact complete inventory is in the immutable manifest in the linked evidence.
+
+BACKUP VERIFIED: PASS — retained proof; fresh pre-mutation backups still mandatory.
+
+RESTORE REHEARSED: PASS — Witness, Keycloak and 13 objects; unchanged restore mechanics.
+
+ROLLBACK REHEARSED: PASS — exact candidate to compatible 313d185 in 10.992 seconds;
+legacy production images require DATABASE RESTORE.
+
+SECURITY: PASS — exact main Security and CodeQL.
+
+TENANT ISOLATION: PASS — hosted tests and isolated customer/cross-org denial proof.
+
+AUTH: PASS — exact-artifact OIDC; live candidate verification remains pending deployment.
+
+QUOTA/RESERVATION: PASS — exact hosted tests and retained accounting/read/write rollback proof.
+
+COMMERCIAL ACTIVATION: FAIL for production — synthetic lifecycle passes, real supplier absent.
+
+FRONTEND ACCEPTANCE: PASS — retained unchanged-code browser proof and exact-artifact validation;
+live production candidate acceptance remains pending.
+
+RELEASE IMAGE VALIDATION: PASS — exact main CI 37695488119; publication 37697961604 PASS.
+
+DEPLOYMENT CONTROL: PASS implemented/tested; execution held, workflow disabled, no final approval.
+
+CLIENT ACCEPTANCE: FAIL — live synthetic production-client acceptance not performed.
+
+FINAL_RELEASE_SHA: a5976e2d9a4bb116bfc716d3f5749ba569569ef9
+
+PREVIOUS_API_IMAGE_DIGEST: sha256:994f78c2266c52cd57d11fca42f8ff28643583605026e2ba29f2b6628989426b
+
+PREVIOUS_WEB_IMAGE_DIGEST: sha256:a7bd28eb30fb553b27266b92c25efd42f9f85cdf857cdddde86493b380f10d3c
+
+ROLLBACK_SHA: 313d185174062ba4084cdb6973f943b473f57c53 for compatible recovery;
+old production API 0a273631087550f898a85c1e917a772fb8a22d20 requires DB restore.
+
+NOT READY FOR PRODUCTION. Remaining prerequisites are controlled external email inbox/link
+verification and the authorised real supplier profile. No critical deferred risk is accepted.
+After these pass, set only this exact approved publication/recovery tuple, obtain the pilot
+human approval, take the fresh authoritative workflow checkpoint, deploy and complete live
+synthetic client acceptance. Do not substitute later main commits or mutable tags.
