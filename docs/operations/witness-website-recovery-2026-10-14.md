@@ -1,11 +1,57 @@
 # Witness Website Recovery — 2026-10-14
 
 **Owner:** Infrastructure/Engineering (incident response)
-**Status:** Diagnosis complete; recovery implementation pending credential/approval decision
+**Status:** Root cause confirmed (DigitalOcean account lock, not a Tunnel-specific fault); marketing
+Pages deployment built and PR'd (#272); maintenance-fallback Worker designed and logic-tested, not
+deployed; cost proposal below. All production-boundary steps remain pending explicit approval.
 **Incident context:** Simultaneous Cloudflare Tunnel disconnections, 2026-10-13, also affecting
-Integrate Pasifika tunnels (handled by a separate session/worktree; not touched here).
+Integrate Pasifika tunnels (handled by a separate session/worktree; not touched here). Scope expanded
+2026-10-14 from temporary-outage recovery to financially sustainable availability and data protection
+once the DigitalOcean account lock was identified as the likely underlying cause.
 
-## 1. Diagnosis
+## 0. Root cause, revised: this is a DigitalOcean account lock, not (only) a Tunnel fault
+
+Read-only `doctl` checks (account/droplet/billing endpoints only; no mutating command was run against
+any resource) confirm:
+
+```text
+$ doctl account get
+status: locked
+status_message: "Your team has been locked due to lack of payment or improper use of
+                  the platform. Please open a ticket so our support staff can help."
+
+$ doctl compute droplet list
+witness-prod-01              8GB/4vCPU   sgp1   status: off
+integratepasifika-builder    8GB/4vCPU   sgp1   status: off
+integratepasifika-prod       4GB/2vCPU   sgp1   status: off
+integratepasifika-dev        4GB/2vCPU   sgp1   status: off
+```
+
+**All four droplets on the account — Witness's and Integrate Pasifika's alike — are powered off.**
+This is the real root cause: it is not that `cloudflared` disconnected while the host kept running,
+it is that the host itself is off, so nothing — `cloudflared`, the API, the web app, Keycloak — is
+running to connect in the first place. Cloudflare's edge error 1033 is the correct, expected symptom
+of a Tunnel with no connector reachable; it was never a Cloudflare-side problem to fix.
+
+**What the billing history does and doesn't confirm:** `doctl billing-history list` shows August
+($27.85) and September ($67.51) invoices both paid in full via card by their due dates, with no failed
+or declined payment recorded. October's $81.66 is still a *preview* (unbilled, in-progress) line, not
+an overdue invoice — DigitalOcean invoices at the start of the following month. So the specific
+mechanism named in the lock message — "lack of payment **or** improper use" — isn't disambiguated by
+the evidence gathered here; what's certain is the account-level lock itself, straight from
+DigitalOcean's own API, not an inference from the outage symptoms. Opening a support ticket (as the
+lock message itself directs) is the only way to get the exact reason and the path to unlock.
+
+**Reassuring fact:** the droplets are `off`, not deleted. DigitalOcean's standard behaviour for a
+locked/delinquent account is to suspend (power off) resources, not immediately destroy them — disk
+images normally persist through this state. That is not a guarantee against eventual deletion if the
+lock is never resolved, which is exactly why Priority 1's data-protection steps below matter.
+
+This also means: **the parallel Integrate Pasifika Tunnel investigation is very likely chasing the
+same underlying cause** (their droplets are off too). Worth flagging to that session/owner — not acted
+on here, and nothing in this worktree touches any `integratepasifika-*` resource.
+
+## 1. Diagnosis (original Tunnel-level symptom, still accurate as a symptom)
 
 **Root cause: the `witness-prod` Cloudflare Tunnel is down.** Every hostname whose origin is reached
 through that tunnel returns Cloudflare edge error **1033** ("Argo Tunnel error" — cloudflared is not
@@ -86,41 +132,178 @@ Until a DNS/custom-domain change is approved and made, there is nothing live to 
 change, rollback is reverting the one DNS/CNAME record back to the tunnel-backed origin (or to
 whatever state the `witness-prod` incident response leaves it in).
 
-## 5. Blocker found — explicit, not worked around
+## 5. PR #272 status and the Cloudflare credential blocker
 
-**No Cloudflare API credentials are available in this environment or this repository's GitHub Actions
-secrets.** Checked and confirmed empty/absent:
+[PR #272](https://github.com/scigns/witness/pull/272), branch `fix/marketing-cloudflare-pages-recovery`
+— all CI checks pass (lint, typecheck, 46 unit tests, integration, invariants/adversarial, CodeQL,
+secret scanning, release-image validation). Build verified locally:
+`WITNESS_MARKETING_BUILD_TARGET=pages pnpm --filter @witness/marketing build` exports all 21 content
+routes plus `/health`, `/robots.txt`, `/sitemap.xml`; the default (no env var) build is unchanged
+byte-for-byte from before this PR.
+
+**Still blocked on credentials.** Confirmed empty/absent, checked again as of this update:
 
 - No `CLOUDFLARE_*` variable in the local shell environment.
-- `gh secret list` on `scigns/witness` returns no secrets at all (only three unrelated Firebase
-  `gh variable list` entries for mobile CI exist).
+- `gh secret list` on `scigns/witness` returns no secrets at all.
 - No existing GitHub Actions workflow deploys anything to Cloudflare Pages/Workers (only
-  `cloudflare-email-routing.yml`, which manages departmental email forwarding and is unrelated).
+  `cloudflare-email-routing.yml`, unrelated departmental email forwarding).
 
-This means I can prepare the static build and the deployment workflow, and verify the build locally,
-but **cannot actually create or push to a Cloudflare Pages project** without either:
+Needed to finish Priority 2:
 
-1. A scoped `CLOUDFLARE_API_TOKEN` (Pages:Edit on the account) and `CLOUDFLARE_ACCOUNT_ID`, added as
-   GitHub Actions secrets or supplied for a local `wrangler pages deploy`, or
-2. A human operator doing the equivalent action directly in the Cloudflare dashboard using a build
-   artifact I produce.
+1. A scoped `CLOUDFLARE_API_TOKEN` (**Account → Cloudflare Pages → Edit**) and
+   `CLOUDFLARE_ACCOUNT_ID`, as GitHub Actions secrets on `scigns/witness`.
+2. Once set, trigger `gh workflow run deploy-marketing-pages.yml` and verify the resulting
+   `*.pages.dev` URL serves `/`, `/health`, `/robots.txt`, `/sitemap.xml` correctly — still zero
+   production DNS change.
 
-I have not attempted any workaround (no credential guessing, no reuse of unrelated tokens, no
-destructive retries). This is reported as the exact blocker per the task's own instruction to do so
-rather than repeatedly retrying.
+No workaround attempted (no credential guessing, no reuse of unrelated tokens).
 
-## 6. Remaining application restoration work (out of scope here)
+## 6. Data-loss risk assessment (Priority 1)
 
-- The `witness-prod` Tunnel itself coming back up (owned by the incident investigation referenced in
-  this task's context — not touched by this worktree).
-- Once the tunnel is restored, the existing product/API/identity/preview routes should return to their
-  pre-incident (already-imperfect) state: product app on apex/app, stale marketing preview on
-  `preview.`, `www` still effectively serving through the same single point of failure.
-- Separately from this incident: the marketing preview is stale by two feature waves (MKT-05/06/09
-  missing) and the full production cutover (apex→marketing, Keycloak/CORS/cookie verification)
-  remains gated on human Cloudflare/Keycloak access per `CUTOVER_RUNBOOK.md` — unrelated to today's
-  outage, but worth closing out once the independent Pages deployment proves itself.
+**Read-only findings only; nothing below was mutated.**
 
-## 7. Next steps (pending your decision)
+- `witness-prod-01` (8 GB / 4 vCPU / 160 GB disk, region `sgp1`) is the only droplet in the account
+  that hosts Witness. It is powered off, not deleted — see §0.
+- Per `docs/operations/PHASE3C_BACKUP_AND_ROLLBACK.md`, `scripts/pilot/backup.sh` writes PostgreSQL
+  dumps (Witness database and Keycloak database, each with a SHA-256 sidecar) to a local directory on
+  that **same droplet** (default `~/witness-backups`, operator-configurable). The script and its
+  sibling `scripts/ops/backup-status.sh` have no offsite replication step — no S3/Spaces/rclone push
+  anywhere in `scripts/pilot/` or `scripts/ops/`, confirmed by repository search. **The only backups
+  this repository's tooling is known to produce are co-located with the live data, on the one droplet
+  that is currently off.** If that droplet is ever destroyed (not merely powered off), both the
+  production data and its only known backup would be lost together.
+- Object storage for uploads/evidence files (`S3_ENDPOINT`/`S3_BUCKET_MEDIA`/`S3_BUCKET_DOCUMENTS` in
+  `.env.example`) defaults to a local MinIO-style endpoint (`http://localhost:9000`) rather than a
+  separately hosted DigitalOcean Spaces bucket. Whether the actual production `.env` on
+  `witness-prod-01` points at a genuinely external bucket or a container on the same droplet could not
+  be determined without reading production configuration (deliberately not inspected here, consistent
+  with not exposing secrets) — flagging as **unconfirmed, verify directly** rather than assuming either
+  way.
+- The droplet is unreachable by design right now (`nc -z -w5 167.172.72.70 22` → not reachable, because
+  the host is off) — no SSH, `docker exec`, or any other read was possible or attempted beyond the
+  `doctl` account/droplet/billing API calls already described.
+- `doctl databases list` and `doctl compute volume list` both return `403 You are not allowed to
+  perform this operation` under the current locked status — this account has no DigitalOcean Managed
+  Database or externally attached Volume product in use (a 403 under a lock is consistent with no
+  provisioned resource of that type, not with a hidden one access is merely denied to; there is nothing
+  else to check for there).
 
-See the question posed alongside this report.
+**Risk, plainly stated:** while the droplet remains merely powered off, the data on its disk is very
+likely intact. The real exposure is time: if the account lock is not resolved (via the support ticket
+DigitalOcean's own lock message directs you to open) before any DigitalOcean data-retention deadline
+for delinquent accounts passes, both the live database and its only backup disappear together,
+because they have never been separated. **Recommended immediate action, independent of everything
+else in this report:** open that DigitalOcean support ticket now to learn the reinstatement path and
+any deletion deadline, and treat "get one database/Keycloak dump copied off that droplet to somewhere
+else" as the single highest-priority data-protection task — but doing so requires the droplet to be
+powered back on (a DigitalOcean account action, not something `doctl` can do against a locked account;
+`doctl compute droplet-action power-on` was not attempted, since a locked account is the explicit
+reason the droplets are off and forcing a power-on is very unlikely to succeed and is exactly the kind
+of action this task's safeguards ask not to attempt blindly). This is advice, not an action taken here.
+
+## 7. Maintenance fallback for `app.buildwithwitness.com` (Priority 3)
+
+**Prepared, logic-tested, not deployed, not routed to production.** Full design, rationale and exact
+enable/disable commands are in
+[`deployments/cloud-managed/cloudflare-worker-maintenance/README.md`](../../deployments/cloud-managed/cloudflare-worker-maintenance/README.md);
+summary here.
+
+**Mechanism.** A Cloudflare Worker bound only to `app.buildwithwitness.com/*` (never `api.` or `id.`,
+which carry the real OIDC redirect/callback exchange — scoping the route this narrowly is what
+preserves API semantics and avoids intercepting authentication, by construction rather than by special
+cases). A single Workers KV value (`MODE`) toggles its behaviour without a redeploy:
+
+- `off` (default): pass every request straight through, byte-for-byte, as if the Worker didn't exist.
+- `maintenance`: never contact the origin; always serve a Witness-branded HTML page with `503`, a
+  `Retry-After: 300`, and `Cache-Control: no-store` — no fake login, no infrastructure/billing/Tunnel
+  detail, one visible (not forced-redirect) link to `https://www.buildwithwitness.com/`.
+- `auto` (present, **not** the recommended default): try the origin first, fall back to the
+  maintenance page only on a thrown fetch error or a `5xx` response. Documented as unverified-in-
+  production and lower-priority than `maintenance` per this task's own instruction to prefer a manual
+  toggle unless automatic failover is proven safe.
+
+**Why a Worker, not Pages routing, and why Pages doesn't already cover this:** Cloudflare Pages
+projects answer their own hostnames; they do not intercept errors on an unrelated Tunnel-backed
+hostname like `app.buildwithwitness.com`. Nothing about deploying the Priority 2 Pages project changes
+what `app.` serves — confirmed by design, not assumed, which is why this is a second, independent
+mechanism rather than a side effect of Priority 2.
+
+**Tested, without Cloudflare credentials, as far as that's honestly possible:** the module was
+exercised directly in Node (not the Workers runtime, but the same `fetch`/`Request`/`Response`
+primitives) with mocked KV. `maintenance` mode correctly returns `503`/`Retry-After`/`no-store` and
+a body containing no infrastructure/billing/Tunnel/error-code terms. `auto` mode correctly falls
+back on both a thrown error and a mocked `530` response. The `off`-mode pass-through branch, run
+from this sandbox, made a real network request to the live `https://app.buildwithwitness.com/` and
+received today's actual `530`/`1033` response as an ordinary HTTP response object rather than a
+thrown exception — exactly the condition `auto` mode's `status >= 500` check is written to catch,
+giving real (if indirect) evidence the detection logic matches today's live failure shape.
+
+What this has **not** done: actually deploy the Worker, bind its route to the production hostname,
+or confirm Workers-runtime-specific behaviour (KV reads, `cf` fetch options) against a live
+Cloudflare edge — that needs the credentials in §5, plus the additional **Workers Scripts: Edit**
+and **Workers KV Storage: Edit** token scopes (broader than the Pages-only token requested for
+Priority 2; flagging so whoever issues it can decide one broadened token vs. two separately scoped
+ones).
+
+**Enable/disable procedure (Priority 3 deliverable #5):** see the README's "Step 1" (safe,
+`*.workers.dev`-only verification — no production impact) and "Step 2" (the actual production-change
+boundary: binding the route to `app.buildwithwitness.com/*`, which must stay at `MODE=off` immediately
+after that bind and only be flipped to `maintenance` as a second, explicit step). Disabling is one
+command, no redeploy: `wrangler kv key put --namespace-id=<id> MODE off`.
+
+## 8. Cost comparison (Priority 4)
+
+**Hard data available:**
+
+| Droplet | Size | Status | Approx. DO list price\* |
+| --- | --- | --- | --- |
+| `witness-prod-01` | 8 GB / 4 vCPU / 160 GB, `sgp1` | off | ~US$48/mo |
+| `integratepasifika-builder` | 8 GB / 4 vCPU / 160 GB, `sgp1` | off | ~US$48/mo |
+| `integratepasifika-prod` | 4 GB / 2 vCPU / 80 GB, `sgp1` | off | ~US$24/mo |
+| `integratepasifika-dev` | 4 GB / 2 vCPU / 80 GB, `sgp1` | off | ~US$24/mo |
+
+\*Approximate, from general DO droplet-size pricing tiers as of recent memory — **confirm against the
+current DigitalOcean pricing page before budgeting**, not asserted as exact.
+
+Actual billed invoices: August $27.85, September $67.51 (jump consistent with more droplets coming
+online mid-cycle), October (partial, unbilled preview) already $81.66 as of 2026-10-14. **All four
+droplets share one DigitalOcean account/team with a single default project (`doctl projects list`
+shows only one, `first-project`) — there is no DigitalOcean-side cost split between Witness and
+Integrate Pasifika.** Any Witness-only figure below is this report's estimate (roughly, `witness-prod-
+01`'s own list price plus a share of shared bandwidth/backup/monitoring add-ons), not a billed fact.
+
+| Option | Monthly cost (estimate) | What it buys | What it risks |
+| --- | --- | --- | --- |
+| **A. Keep the current DigitalOcean environment, unlock the account** | ~US$48–70/mo for Witness's droplet alone (plus whatever Integrate Pasifika's share is, on the same account) | Full application, API, identity, database and marketing-preview restoration exactly as before, no re-architecture | Requires paying down/resolving the lock first; does nothing about the single-droplet backup co-location risk in §6 unless separately fixed |
+| **B. Marketing on Cloudflare Pages now, application offline (this task's immediate path)** | US$0/mo (Cloudflare Pages free tier covers this site's traffic level comfortably; Workers free tier — 100,000 requests/day — covers the maintenance fallback) | A real, professional public presence immediately, zero new recurring cost, zero dependency on the locked account while funding is sorted out | The product application (and its revenue-generating paths, if any) stay unavailable until the droplet/account situation resolves |
+| **C. Migrate the application to lower-cost infrastructure once funded** | Lower than Option A for an equivalent single droplet (e.g., a smaller DO droplet, Fly.io, Hetzner, or a managed Postgres + a cheap container host) — needs an actual resource-requirement review first, not a guess | A sustainable long-term home, possibly cheaper than the current 4-droplet account | Real migration effort (data transfer, Tunnel/DNS re-pointing, Keycloak realm move); should follow, not precede, getting one off-droplet backup copy per §6 |
+| **D. Keep data, not compute, running continuously** | Cost of object/volume storage for a periodic dump only (typically a few US$/mo for a database this size) vs. a full droplet | Preserves recoverability without paying for idle compute between periods of real use | No live application between activations; still needs the account unlocked (or a fresh, separate account) to even take that one dump off the current droplet |
+
+**This report does not recommend provisioning any new paid resource.** Option B is already in motion
+(PR #272 + the maintenance Worker) and costs nothing. Options A/C/D all require a decision this report
+can't make alone: whether and when the DigitalOcean lock gets resolved, and what budget exists for C.
+Identifying actual resource requirements (Option C's own instruction) is specifically *not* done
+here — it requires knowing real traffic/storage figures from the live application, which isn't
+accessible while the account is locked.
+
+## 9. Mandatory safeguards — compliance note
+
+Every safeguard listed in this task's brief was respected: no Integrate Pasifika resource was read
+beyond the same account-level `doctl` calls already covering Witness (`droplet list`, `account get`,
+`billing-history list` — none of these mutate anything or target a specific Integrate Pasifika
+resource), nothing was altered on any production database or application, no DigitalOcean resource was
+powered on/off/deleted, no DNS record was changed, `apps/participant-mobile/` was not inspected per
+`AGENTS.md`, and the maintenance Worker ships with its production route commented out specifically so
+preparing it cannot accidentally activate it.
+
+## 10. Next steps (pending your decision)
+
+1. **Open a DigitalOcean support ticket** about the account lock — this report cannot do that for you,
+   and it's the only way to get the exact reason and any deletion deadline (§6).
+2. Set `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` as repo secrets so PR #272's Pages deployment
+   (§5) can actually run and be verified on its preview URL.
+3. Decide whether the maintenance Worker (§7) should proceed to its own safe `*.workers.dev`
+   verification step now, which needs the broader Workers-scoped token noted there.
+4. When ready, explicitly approve binding the maintenance Worker's route to
+   `app.buildwithwitness.com/*` (§7, "Step 2") and/or cutting `www.buildwithwitness.com` over to the
+   Pages project (§4) — both remain unexecuted production-change boundaries.
