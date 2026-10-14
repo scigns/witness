@@ -1,0 +1,130 @@
+# Production cutover for www.buildwithwitness.com: two separate,
+# manually-triggered workflows in this one file, run independently --
+# "preflight" (read-only) is always run and reviewed first; "apply" (the
+# only job that changes anything) is only run afterwards, deliberately, in
+# its own dispatch.
+#
+# Context: docs/operations/witness-website-recovery-2026-10-14.md, section 13.
+#
+# This uses Cloudflare's own Pages Custom Domains API
+# (POST .../pages/projects/{name}/domains), the supported mechanism behind
+# the dashboard's "Add Custom Domain" button -- not a hand-crafted DNS
+# record. Cloudflare provisions/updates the DNS record and certificate for
+# the hostname as part of this call.
+#
+# Scope: only ever touches www.buildwithwitness.com. Never app./api./id./
+# preview -- those hostnames do not appear anywhere in this file.
+
+name: Cutover www.buildwithwitness.com to Cloudflare Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "preflight (read-only, always safe to run) or apply (adds the custom domain -- only run after reviewing a preflight result)"
+        required: true
+        type: choice
+        options:
+          - preflight
+          - apply
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cutover-www-custom-domain
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Pre-flight checks (read-only)
+    if: inputs.action == 'preflight'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Confirm Pages project, production branch, and deployed commit
+        run: |
+          set -euo pipefail
+          RESPONSE=$(curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/witness-marketing")
+          SUCCESS=$(echo "$RESPONSE" | jq -r '.success')
+          if [ "$SUCCESS" != "true" ]; then
+            echo "::error::Could not read the witness-marketing Pages project."
+            echo "$RESPONSE" | jq '.errors'
+            exit 1
+          fi
+          SUMMARY=$(echo "$RESPONSE" | jq '{
+            name: .result.name,
+            production_branch: .result.production_branch,
+            existing_domains: .result.domains,
+            latest_deployment_url: .result.latest_deployment.url,
+            latest_deployment_branch: .result.latest_deployment.deployment_trigger.metadata.branch,
+            latest_deployment_commit: .result.latest_deployment.deployment_trigger.metadata.commit_hash,
+            latest_deployment_created_on: .result.latest_deployment.created_on,
+            latest_deployment_env: .result.latest_deployment.environment
+          }')
+          echo "$SUMMARY"
+          {
+            echo "## Pages project state"
+            echo '```json'
+            echo "$SUMMARY"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          BRANCH=$(echo "$RESPONSE" | jq -r '.result.production_branch')
+          if [ "$BRANCH" != "main" ]; then
+            echo "::warning::Production branch is '$BRANCH', not 'main'."
+          fi
+          DOMAIN_COUNT=$(echo "$RESPONSE" | jq '.result.domains | length')
+          if [ "$DOMAIN_COUNT" != "0" ]; then
+            echo "::warning::Project already has custom domain(s) attached: $(echo "$RESPONSE" | jq -c '.result.domains')"
+          fi
+
+      - name: Record current public state of www and apex (for the rollback record)
+        run: |
+          set -euo pipefail
+          {
+            echo "## Pre-cutover public state"
+            echo '```'
+            echo "apex (buildwithwitness.com):"
+            curl -sS -D - -o /dev/null --max-time 10 https://buildwithwitness.com/ | head -5 || true
+            echo
+            echo "www.buildwithwitness.com:"
+            curl -sS -D - -o /dev/null --max-time 10 https://www.buildwithwitness.com/ | head -5 || true
+            echo
+            echo "www public DNS answer:"
+            dig +short www.buildwithwitness.com || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    name: Attach www.buildwithwitness.com as a Pages Custom Domain
+    if: inputs.action == 'apply'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Add the custom domain
+        run: |
+          set -euo pipefail
+          RESPONSE=$(curl -sS -X POST \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"name":"www.buildwithwitness.com"}' \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/witness-marketing/domains")
+          echo "$RESPONSE" | jq '.'
+          SUCCESS=$(echo "$RESPONSE" | jq -r '.success')
+          if [ "$SUCCESS" != "true" ]; then
+            echo "::error::Adding the custom domain failed -- nothing else in this workflow attempts a fix or a retry."
+            exit 1
+          fi
+
+      - name: Confirm domain status
+        run: |
+          set -euo pipefail
+          sleep 5
+          RESPONSE=$(curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/witness-marketing/domains/www.buildwithwitness.com")
+          echo "$RESPONSE" | jq '.'
