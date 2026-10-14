@@ -2,8 +2,10 @@
 
 **Owner:** Infrastructure/Engineering (incident response)
 **Status:** Root cause confirmed (DigitalOcean account lock, not a Tunnel-specific fault); marketing
-Pages deployment built and PR'd (#272); maintenance-fallback Worker designed and logic-tested, not
-deployed; cost proposal below. All production-boundary steps remain pending explicit approval.
+Pages deployment built and PR'd ([#272](https://github.com/scigns/witness/pull/272), CI all green);
+maintenance-fallback Worker designed, logic-tested and split into its own PR
+([#273](https://github.com/scigns/witness/pull/273)) so it cannot block the marketing recovery; cost
+proposal below. All production-boundary steps remain pending explicit approval.
 **Incident context:** Simultaneous Cloudflare Tunnel disconnections, 2026-10-13, also affecting
 Integrate Pasifika tunnels (handled by a separate session/worktree; not touched here). Scope expanded
 2026-10-14 from temporary-outage recovery to financially sustainable availability and data protection
@@ -203,10 +205,13 @@ of action this task's safeguards ask not to attempt blindly). This is advice, no
 
 ## 7. Maintenance fallback for `app.buildwithwitness.com` (Priority 3)
 
-**Prepared, logic-tested, not deployed, not routed to production.** Full design, rationale and exact
-enable/disable commands are in
-[`deployments/cloud-managed/cloudflare-worker-maintenance/README.md`](../../deployments/cloud-managed/cloudflare-worker-maintenance/README.md);
-summary here.
+**Prepared, logic-tested, not deployed, not routed to production — and deliberately kept out of this
+PR.** This piece lives in its own branch and pull request,
+[`feat/app-maintenance-fallback-worker` / PR #273](https://github.com/scigns/witness/pull/273), whose
+`deployments/cloud-managed/cloudflare-worker-maintenance/README.md` has the full design, rationale and
+exact enable/disable commands; summary here. It is split out so that reviewing and, per instruction,
+independently and separately approving/testing the routing, security and rollback procedure for a
+production app-host fallback never blocks or delays the marketing-site recovery in this PR.
 
 **Mechanism.** A Cloudflare Worker bound only to `app.buildwithwitness.com/*` (never `api.` or `id.`,
 which carry the real OIDC redirect/callback exchange — scoping the route this narrowly is what
