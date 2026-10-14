@@ -21,12 +21,13 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "preflight (read-only, always safe to run) or apply (adds the custom domain -- only run after reviewing a preflight result)"
+        description: "preflight (read-only) / apply (adds the custom domain) / diagnose (read-only, GET-only -- investigates a 522/timeout after cutover)"
         required: true
         type: choice
         options:
           - preflight
           - apply
+          - diagnose
 
 permissions:
   contents: read
@@ -128,3 +129,68 @@ jobs:
           RESPONSE=$(curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/witness-marketing/domains/www.buildwithwitness.com")
           echo "$RESPONSE" | jq '.'
+
+  diagnose:
+    name: Diagnose www routing (read-only, GET only)
+    if: inputs.action == 'diagnose'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Non-secret: Cloudflare zone ID for buildwithwitness.com, surfaced in
+      # the apply job's own domain-creation response (zone_tag field).
+      ZONE_ID: "3d70bf17f3dc9541ba8ca2de25e87d2a"
+    steps:
+      - name: Pages custom-domain validation and certificate status
+        run: |
+          set -uo pipefail
+          RESPONSE=$(curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/witness-marketing/domains/www.buildwithwitness.com")
+          echo "$RESPONSE" | jq '.'
+
+      - name: Zone DNS record for www (requires Zone:DNS:Read -- may be out of this token's scope)
+        run: |
+          set -uo pipefail
+          RESPONSE=$(curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records?name=www.buildwithwitness.com")
+          echo "$RESPONSE" | jq '.'
+
+      - name: Zone Worker routes (requires Zone:Workers Routes:Read -- may be out of scope)
+        run: |
+          set -uo pipefail
+          RESPONSE=$(curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/workers/routes")
+          echo "$RESPONSE" | jq '.'
+
+      - name: Zone rulesets -- redirect rules and origin rules phases (requires Zone:Rulesets:Read -- may be out of scope)
+        run: |
+          set -uo pipefail
+          echo "--- entrypoint: http_request_dynamic_redirect ---"
+          curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/rulesets/phases/http_request_dynamic_redirect/entrypoint" | jq '.'
+          echo "--- entrypoint: http_request_origin ---"
+          curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/rulesets/phases/http_request_origin/entrypoint" | jq '.'
+
+      - name: Account Cloudflare Tunnels and witness-prod ingress (requires Account:Cloudflare Tunnel:Read -- may be out of scope)
+        run: |
+          set -uo pipefail
+          TUNNELS=$(curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/cfd_tunnel?is_deleted=false")
+          echo "$TUNNELS" | jq '.'
+          TUNNEL_ID=$(echo "$TUNNELS" | jq -r '.result[]? | select(.name | test("witness-prod"; "i")) | .id' | head -1)
+          if [ -n "${TUNNEL_ID:-}" ]; then
+            echo "--- witness-prod tunnel ($TUNNEL_ID) ingress configuration ---"
+            curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/cfd_tunnel/${TUNNEL_ID}/configurations" | jq '.'
+          fi
+
+      - name: Live public state of www, apex, and the Pages preview
+        run: |
+          set -uo pipefail
+          echo "--- www.buildwithwitness.com ---"
+          curl -sS -D - -o /dev/null --max-time 10 https://www.buildwithwitness.com/ | head -8
+          echo "--- buildwithwitness.com (apex) ---"
+          curl -sS -D - -o /dev/null --max-time 10 https://buildwithwitness.com/ | head -6
+          echo "--- witness-marketing-7un.pages.dev ---"
+          curl -sS -D - -o /dev/null --max-time 10 https://witness-marketing-7un.pages.dev/ | head -6
