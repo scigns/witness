@@ -175,12 +175,15 @@ No workaround attempted (no credential guessing, no reuse of unrelated tokens).
   that is currently off.** If that droplet is ever destroyed (not merely powered off), both the
   production data and its only known backup would be lost together.
 - Object storage for uploads/evidence files (`S3_ENDPOINT`/`S3_BUCKET_MEDIA`/`S3_BUCKET_DOCUMENTS` in
-  `.env.example`) defaults to a local MinIO-style endpoint (`http://localhost:9000`) rather than a
-  separately hosted DigitalOcean Spaces bucket. Whether the actual production `.env` on
-  `witness-prod-01` points at a genuinely external bucket or a container on the same droplet could not
-  be determined without reading production configuration (deliberately not inspected here, consistent
-  with not exposing secrets) — flagging as **unconfirmed, verify directly** rather than assuming either
-  way.
+  `.env.example`) defaults to a local MinIO-style endpoint, and `.env.example` documents leaving
+  `S3_ENDPOINT` empty to use "Postgres-inline storage instead." Reading
+  `deployments/cloud-managed/docker-compose.pilot.yml`'s full service list (`postgres`, `keycloak`,
+  `ollama`, `neo4j`, `graph-projector`, `api`, `web`, `proxy`, `cloudflared` — no `minio` or other
+  object-storage service anywhere in it) makes it fairly likely this deployment uses the documented
+  Postgres-inline fallback rather than a separate bucket — which would mean uploads/evidence are
+  already covered by the same Postgres dump, not a second at-risk store. Still **not fully confirmed**
+  without reading the production `.env` directly (deliberately not done here); treat as likely, verify
+  before relying on it.
 - The droplet is unreachable by design right now (`nc -z -w5 167.172.72.70 22` → not reachable, because
   the host is off) — no SSH, `docker exec`, or any other read was possible or attempted beyond the
   `doctl` account/droplet/billing API calls already described.
@@ -203,7 +206,64 @@ powered back on (a DigitalOcean account action, not something `doctl` can do aga
 reason the droplets are off and forcing a power-on is very unlikely to succeed and is exactly the kind
 of action this task's safeguards ask not to attempt blindly). This is advice, not an action taken here.
 
-## 7. Maintenance fallback for `app.buildwithwitness.com` (Priority 3)
+## 7. Data and secrets inventory, and the offsite export procedure (Decision 3)
+
+**Everything in this section is a plan, prepared for when the droplet is next reachable. Nothing here
+was executed.** The droplet is off and unreachable (see §6), so none of it can be run yet.
+
+### What exists only on `witness-prod-01`, from reading `docker-compose.pilot.yml` directly
+
+| Volume / file | Contents | Backed up today? |
+| --- | --- | --- |
+| `postgres-data` | Witness database (system of record) **and** the Keycloak database (same Postgres instance, separate role/DB — see `postgres-init/01-keycloak-role.sh`). Per the compose file's own comment, this is explicitly "the system of record," and per `.env.example`, uploads/evidence likely live here too (§6). | Yes, by `scripts/pilot/backup.sh` — but only to a local directory on this same droplet (§6). |
+| `neo4j-data` | Knowledge-graph projection. | No — and the compose file's own comment says this is intentional: "rebuildable from postgres-data by design" (ADR-0011, Neo4j is a projection, not a second system of record). Not a data-loss risk by design. |
+| `ollama-data` | Downloaded local LLM model weights. | No — not needed; re-downloadable, not unique data. |
+| `caddy-data` | TLS certificates/keys for the (currently unused behind the Tunnel) Caddy proxy. | No — not unique data; Caddy/Let's Encrypt can reissue. |
+| The operator `.env` file | Every credential in the stack: `POSTGRES_PASSWORD`, `KEYCLOAK_DB_PASSWORD`, Keycloak bootstrap admin credentials, OIDC/session secrets, `CLOUDFLARE_TUNNEL_ID` and its credentials file, and (if configured) S3 keys. | A local, timestamped snapshot exists via `scripts/pilot/snapshot-env.sh` — again, only on the same droplet (same exposure as the database dumps). |
+| Keycloak realm/client configuration | Realm settings, the `witness-api` client's redirect/web-origin/logout configuration. | A reviewed, secrets-excluded export exists via `scripts/pilot/export-keycloak-config.sh` — same local-only caveat. |
+
+**Net picture:** the single real system of record is Postgres. Neo4j, Ollama and Caddy's data are all
+either rebuildable or non-unique by design — this is a materially smaller recovery surface than "four
+services' worth of data," which is good news. The actual exposure is narrow and specific: one Postgres
+dump, one env snapshot, and one Keycloak config export, none of which have ever left the one droplet
+that's currently off.
+
+### Export procedure, for the moment the droplet is reachable again
+
+Read-only/non-destructive at every step; nothing here deletes, resizes, or restarts anything beyond
+what `backup.sh` already does today (a direct `pg_dump`, no write to the live tables).
+
+1. Confirm the droplet is genuinely back (`doctl compute droplet get 592338594` shows `status: active`,
+   and the account itself is unlocked — both outside this worktree's control).
+2. SSH in and run the existing tools exactly as documented, nothing new:
+
+   ```sh
+   cd /home/witness/witness
+   scripts/pilot/backup.sh ~/witness-backups          # fresh Postgres + Keycloak dumps
+   scripts/ops/backup-status.sh ~/witness-backups     # confirms checksum validity before trusting it
+   scripts/pilot/snapshot-env.sh ~/witness-backups/config
+   scripts/pilot/export-keycloak-config.sh ~/witness-backups/keycloak-config
+   ```
+
+3. Copy the fresh artifacts off the droplet — the step that's been missing — to anywhere that is not
+   the same DigitalOcean account. Plain `scp` to an operator's own machine is sufficient and requires
+   no new infrastructure:
+
+   ```sh
+   scp witness@167.172.72.70:~/witness-backups/witness-*.dump{,.sha256} ./offsite-backup/
+   scp witness@167.172.72.70:~/witness-backups/keycloak-*.dump{,.sha256} ./offsite-backup/
+   ```
+
+4. Verify the copy independently before trusting it: `sha256sum -c *.sha256` against the copied files,
+   not just the originals.
+5. **Optional, consistent with this task's "without depending on DigitalOcean" objective, not
+   acted on here:** a recurring offsite copy could target Cloudflare R2 (generous free tier, same
+   ecosystem as the Pages/Workers work in this report, and explicitly not DigitalOcean) via `rclone`
+   instead of a one-off `scp`. That's a follow-on improvement to `scripts/pilot/backup.sh`, not
+   something to build
+   speculatively before the current lock is even resolved and the existing gap closed once.
+
+## 8. Maintenance fallback for `app.buildwithwitness.com` (Priority 3)
 
 **Prepared, logic-tested, not deployed, not routed to production — and deliberately kept out of this
 PR.** This piece lives in its own branch and pull request,
@@ -256,7 +316,7 @@ boundary: binding the route to `app.buildwithwitness.com/*`, which must stay at 
 after that bind and only be flipped to `maintenance` as a second, explicit step). Disabling is one
 command, no redeploy: `wrangler kv key put --namespace-id=<id> MODE off`.
 
-## 8. Cost comparison (Priority 4)
+## 9. Cost comparison (Priority 4)
 
 **Hard data available:**
 
@@ -291,7 +351,7 @@ Identifying actual resource requirements (Option C's own instruction) is specifi
 here — it requires knowing real traffic/storage figures from the live application, which isn't
 accessible while the account is locked.
 
-## 9. Mandatory safeguards — compliance note
+## 10. Mandatory safeguards — compliance note
 
 Every safeguard listed in this task's brief was respected: no Integrate Pasifika resource was read
 beyond the same account-level `doctl` calls already covering Witness (`droplet list`, `account get`,
@@ -301,14 +361,37 @@ powered on/off/deleted, no DNS record was changed, `apps/participant-mobile/` wa
 `AGENTS.md`, and the maintenance Worker ships with its production route commented out specifically so
 preparing it cannot accidentally activate it.
 
-## 10. Next steps (pending your decision)
+## 11. Draft notification for the Integrate Pasifika investigation (Decision 4)
 
-1. **Open a DigitalOcean support ticket** about the account lock — this report cannot do that for you,
-   and it's the only way to get the exact reason and any deletion deadline (§6).
-2. Set `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` as repo secrets so PR #272's Pages deployment
-   (§5) can actually run and be verified on its preview URL.
-3. Decide whether the maintenance Worker (§7) should proceed to its own safe `*.workers.dev`
-   verification step now, which needs the broader Workers-scoped token noted there.
-4. When ready, explicitly approve binding the maintenance Worker's route to
-   `app.buildwithwitness.com/*` (§7, "Step 2") and/or cutting `www.buildwithwitness.com` over to the
-   Pages project (§4) — both remain unexecuted production-change boundaries.
+**Prepared only — not sent.** Drafted for you to relay, since that's a separate investigation/session
+and this worktree was told not to modify its repository or deployment, which sending it directly to
+that session's owner also stays clear of:
+
+> **Subject: Shared root cause found — DigitalOcean account lock, not a Tunnel-specific fault**
+>
+> Confirmed via read-only `doctl account get` / `doctl compute droplet list` from the Witness
+> investigation: the DigitalOcean account backing both projects (team `My Team`,
+> `dreamercoat@gmail.com`) is `status: locked`, with the message *"Your team has been locked due to
+> lack of payment or improper use of the platform. Please open a ticket so our support staff can
+> help."* All four droplets on the account are powered off — `witness-prod-01`,
+> `integratepasifika-builder`, `integratepasifika-prod`, and `integratepasifika-dev` alike. This is
+> very likely the real cause of the 13 October Tunnel disconnections on both sides: the hosts
+> themselves are off, not individually faulty tunnels. Droplets are off, not deleted, as of this
+> check. No Integrate Pasifika resource was touched — this was an account-level read only. Opening
+> the DigitalOcean support ticket the lock message references is probably the fastest path to a
+> resolution for both projects at once.
+
+## 12. Next steps (pending your decision)
+
+1. **Open a DigitalOcean support ticket** about the account lock — this report cannot do that for
+   you, and it's the only way to get the exact reason and any deletion deadline (§6).
+2. Merge PR #272 to `main` — required before `deploy-marketing-pages.yml` can be dispatched at all
+   (§5's `workflow_dispatch`/default-branch finding), and contains only the marketing Pages change,
+   not the maintenance Worker.
+3. Set `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` as repo secrets, then run
+   `gh workflow run deploy-marketing-pages.yml --repo scigns/witness --ref main` (§5) and verify the
+   resulting `*.pages.dev` preview — the stop-gate for this phase (Decision 5). No DNS change happens
+   automatically; cutting `www.buildwithwitness.com` over to it is a separate, later approval.
+4. Separately and independently, review PR #273 (the maintenance Worker) on its own timeline — it
+   does not block 1-3 and nothing in it is requested to be activated yet.
+5. Decide whether to relay §11's draft to the Integrate Pasifika investigation.
