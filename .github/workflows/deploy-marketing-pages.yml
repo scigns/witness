@@ -1,0 +1,75 @@
+# Independent Cloudflare Pages deployment for apps/marketing.
+#
+# Context: docs/operations/witness-website-recovery-2026-10-14.md. The
+# `witness-prod` Cloudflare Tunnel outage on 2026-10-13 took down every
+# public hostname that depends on it — including the only place the real
+# marketing site has ever run (preview.buildwithwitness.com). apps/marketing
+# has no API/database/auth dependency and builds to a fully static export, so
+# it can be served directly from Cloudflare's edge, independent of the
+# downed tunnel and the DigitalOcean host entirely.
+#
+# Manual trigger only. This workflow never touches production DNS, the
+# `witness-prod` tunnel, or any custom domain — it only pushes a static build
+# to a Cloudflare Pages project and reports the resulting *.pages.dev
+# preview URL. Pointing a real hostname at that project is a separate,
+# explicitly approved change (see the recovery doc, "production change
+# boundary").
+
+name: Deploy marketing to Cloudflare Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_url:
+        description: "WITNESS_MARKETING_SITE_URL for this build (defaults to the Pages project's own *.pages.dev URL once known; safe to leave as the placeholder below for a first deploy)"
+        required: false
+        default: "https://witness-marketing.pages.dev"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-marketing-pages
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  build-and-deploy:
+    name: Build static export and deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint, typecheck, test
+        run: |
+          pnpm --filter @witness/marketing lint
+          pnpm --filter @witness/marketing typecheck
+          pnpm --filter @witness/marketing test
+
+      - name: Build static export
+        env:
+          WITNESS_MARKETING_BUILD_TARGET: pages
+          WITNESS_MARKETING_SITE_URL: ${{ inputs.site_url }}
+          # Always preview/non-indexable from this workflow. Production
+          # indexing is a separate, explicitly human-approved action per
+          # docs/commercial-website/DEPLOYMENT.md.
+          WITNESS_MARKETING_ENV: preview
+          WITNESS_MARKETING_INDEXABLE: "false"
+        run: pnpm --filter @witness/marketing build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/marketing/out --project-name=witness-marketing --branch=${{ github.ref_name }}

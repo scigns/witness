@@ -34,6 +34,10 @@ const CONTENT_ROUTES = [
   '/stories',
 ] as const;
 
+// Resolved entirely from build-time env (marketingSiteConfig's process.env
+// default) — safe to statically export alongside the Cloudflare Pages build.
+export const dynamic = 'force-static';
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const config = marketingSiteConfig();
   return CONTENT_ROUTES.map((path) => ({

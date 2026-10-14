@@ -1,0 +1,11 @@
+/*
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), geolocation=(), microphone=(), payment=()
+
+# The exported route handler has no file extension for Pages to infer a
+# content type from; it is fixed JSON regardless of request.
+/health
+  Content-Type: application/json
+  Cache-Control: no-store
