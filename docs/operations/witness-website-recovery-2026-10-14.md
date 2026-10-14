@@ -381,17 +381,85 @@ that session's owner also stays clear of:
 > the DigitalOcean support ticket the lock message references is probably the fastest path to a
 > resolution for both projects at once.
 
-## 12. Next steps (pending your decision)
+## 12. Status as of 2026-10-14 10:21 UTC
 
-1. **Open a DigitalOcean support ticket** about the account lock — this report cannot do that for
-   you, and it's the only way to get the exact reason and any deletion deadline (§6).
-2. Merge PR #272 to `main` — required before `deploy-marketing-pages.yml` can be dispatched at all
-   (§5's `workflow_dispatch`/default-branch finding), and contains only the marketing Pages change,
-   not the maintenance Worker.
-3. Set `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` as repo secrets, then run
-   `gh workflow run deploy-marketing-pages.yml --repo scigns/witness --ref main` (§5) and verify the
-   resulting `*.pages.dev` preview — the stop-gate for this phase (Decision 5). No DNS change happens
-   automatically; cutting `www.buildwithwitness.com` over to it is a separate, later approval.
-4. Separately and independently, review PR #273 (the maintenance Worker) on its own timeline — it
-   does not block 1-3 and nothing in it is requested to be activated yet.
-5. Decide whether to relay §11's draft to the Integrate Pasifika investigation.
+1. ~~Merge PR #272 to `main`~~ — done (`62a19b0`).
+2. ~~Set `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` as repo secrets~~ — done.
+3. ~~Run the deployment workflow and verify the `*.pages.dev` preview~~ — done; see §13. Two
+   follow-on CI-tooling bugs surfaced and were fixed along the way (PR #274, PR #275), both scoped
+   to `.github/workflows/deploy-marketing-pages.yml` only — no application or infrastructure change.
+4. PR #273 (the maintenance Worker) was merged to `main` separately, outside this worktree, by a
+   human via the GitHub web UI — not by anything in this report. Its production route remains
+   commented out; nothing is bound or activated. Not acted on further here per instruction.
+5. **Open a DigitalOcean support ticket** about the account lock remains outstanding — this report
+   still cannot do that for you.
+6. §11's draft notification to the Integrate Pasifika investigation remains undelivered, pending
+   your decision to relay it.
+
+## 13. Deployment verification and production cutover plan (pending approval)
+
+### Verified live, externally, 2026-10-14 10:21 UTC
+
+- Live URL: `https://witness-marketing-7un.pages.dev` (Cloudflare auto-suffixed the requested
+  `witness-marketing` project name). `HTTP/2 200`, TLS valid, `server: cloudflare`.
+- All 21 content routes return `200`: `/`, `/get-started`, `/platform` (+ its 6 children),
+  `/solutions` (+ its 4 children), `/demo`, `/trust` (+ its 3 children), `/stories`,
+  `/how-it-works`, `/why-witness`.
+- `/health` → `{"service":"witness-marketing","status":"ok"}`, `Content-Type: application/json`,
+  `Cache-Control: no-store` (the `public/_headers` rule took effect).
+- `/robots.txt` → `Disallow: /` (correctly non-indexable — this preview must never be crawled).
+- `/sitemap.xml` → well-formed, lists the real canonical `www.buildwithwitness.com` URLs (canonical
+  metadata is independent of deployment URL by design — see `site-config.ts`).
+- Page title confirmed as real, previously-approved copy: *"Witness — Build better decisions with
+  the people affected by them"* — not placeholder or invented content.
+- Static assets verified individually: a `/_next/static/.../webpack-*.js` chunk
+  (`Content-Type: application/javascript`) and `/brand/witness-logo-transparent.png`
+  (`Content-Type: image/png`, 13,530 bytes) both return `200`.
+- Mobile viewport meta tag present (`width=device-width, initial-scale=1`).
+- Security headers present on every response: `Referrer-Policy`, `X-Content-Type-Options`,
+  `X-Frame-Options`, `Permissions-Policy` — exactly the set `public/_headers` defines.
+- One soft spot, not blocking: the commit-specific deployment alias
+  (`https://8acdf068.witness-marketing-7un.pages.dev`) returned a TLS handshake error on direct
+  `curl` from this environment immediately after deploy, while the stable project alias above
+  worked cleanly. Likely edge-certificate propagation lag for the newer, more specific hostname;
+  the stable alias is the one that matters for everything in this report and for any future cutover.
+- Independent of DigitalOcean, confirmed by construction: this deployment never touched
+  `witness-prod-01`, any Tunnel, or any DigitalOcean API — it built from the GitHub-hosted runner and
+  pushed straight to Cloudflare's edge.
+
+### Production cutover plan (do not execute without separate, explicit approval)
+
+This section is the proposal requested by Decision 5/Step 2 — nothing below has been done.
+
+1. **Preserve the existing apex redirect.** `buildwithwitness.com` → `https://www.buildwithwitness.com/`
+   is a Cloudflare Redirect Rule, not a DNS/origin change for this project — confirmed still live and
+   unaffected throughout this work (§0). Nothing in this plan touches that rule.
+2. **Add a custom domain to the Pages project**, following Cloudflare's own Pages custom-domain
+   flow (Cloudflare Dashboard → Workers & Pages → `witness-marketing` → Custom domains → Add
+   `www.buildwithwitness.com`), rather than hand-editing a CNAME record. Cloudflare provisions the
+   DNS record and certificate coverage for `www` as part of that flow automatically.
+3. Confirm `www.buildwithwitness.com`'s existing DNS state first (§6/STATUS.md record no DNS
+   answer for `www` as of the last live audit, and current checks this session show it 530/1033 —
+   i.e., behind the dead Tunnel) so the exact prior state is on record before any change.
+4. Rebuild and redeploy with `WITNESS_MARKETING_SITE_URL=https://www.buildwithwitness.com`,
+   `WITNESS_MARKETING_ENV=production`, so canonical metadata/sitemap/robots agree with the live
+   host (the `indexable` check in `site-config.ts` fails closed if they don't match exactly).
+   **Indexing (`WITNESS_MARKETING_INDEXABLE`) stays `false`** until a later, separately approved,
+   explicit launch decision — this cutover is about availability, not search visibility.
+5. Smoke-test `www.buildwithwitness.com` against the same checklist as §13's verification above,
+   plus confirm the apex redirect still resolves to the now-live `www`.
+6. Confirm `app.`/`api.`/`id.buildwithwitness.com` are completely unaffected — this project's
+   custom domain only ever touches `www`.
+
+### Rollback
+
+- **Before step 2 (custom domain not yet added):** nothing to roll back — the Pages project is
+  fully independent and has never been attached to any real hostname.
+- **After step 2:** remove the custom domain from the Pages project (Cloudflare Dashboard →
+  `witness-marketing` → Custom domains → remove `www.buildwithwitness.com`). This is a Cloudflare
+  dashboard action, reversible in seconds, and does not touch the `witness-prod` Tunnel, any DNS
+  record for `app.`/`api.`/`id.`, or any DigitalOcean resource. `www` returns to whatever state it
+  was in immediately before step 2 (currently: 530/1033, behind the dead Tunnel) — recorded here so
+  the prior state is known before any change is made.
+- No database, application, or DigitalOcean rollback is ever required for this plan — it never
+  touches any of them.
