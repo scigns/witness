@@ -18,15 +18,14 @@ name = "witness-maintenance"
 main = "src/index.js"
 compatibility_date = "2026-08-01"
 
-# Bind a KV namespace named MAINTENANCE_KV, created with:
-#   wrangler kv namespace create witness-maintenance-mode
-# then paste the resulting id below. The single key "MODE" in this
-# namespace ("off" | "maintenance" | "auto") is the manual toggle — see
-# README.md. Left blank here deliberately: a missing/invalid id is a wrangler
-# deploy-time error, not a silent production misconfiguration.
+# KV namespace "witness-maintenance-mode", created 2026-10-15 via
+# deploy-maintenance-worker.yml's create-kv action. The single key "MODE" in
+# this namespace ("off" | "maintenance" | "auto") is the manual toggle — see
+# README.md. This id is not a secret -- it's an opaque account-scoped
+# resource identifier, not a credential.
 [[kv_namespaces]]
 binding = "MAINTENANCE_KV"
-id = ""
+id = "92c270465033494e8c167e2e281bc473"
 
 # Step 2 above. Commented out until explicitly approved — see this
 # directory's README, "Enabling the fallback on the production host".
