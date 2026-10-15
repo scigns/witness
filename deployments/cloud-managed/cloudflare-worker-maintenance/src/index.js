@@ -85,11 +85,13 @@ const MAINTENANCE_HTML = `<!doctype html>
 <main>
   <h1>Witness is temporarily unavailable</h1>
   <p>
-    We're working on restoring access. Nothing about your account, your
-    organisation's records, or any evidence held in Witness has been lost.
-    Please check back shortly.
+    Our application services are currently offline. We are working to
+    restore access when our infrastructure is available.
   </p>
-  <a href="https://www.buildwithwitness.com/">Visit the Witness website</a>
+  <p>
+    You can continue exploring Witness and learning about our work through
+    our <a href="https://www.buildwithwitness.com/">main website</a>.
+  </p>
 </main>
 </body>
 </html>`;
