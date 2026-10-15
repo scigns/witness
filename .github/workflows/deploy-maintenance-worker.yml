@@ -33,13 +33,14 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "create-kv / deploy / set-mode / diagnose-subdomain (read-only, GET only)"
+        description: "create-kv / deploy / set-mode / get-mode (read-only) / diagnose-subdomain (read-only, GET only)"
         required: true
         type: choice
         options:
           - create-kv
           - deploy
           - set-mode
+          - get-mode
           - diagnose-subdomain
       mode:
         description: "set-mode only: off / maintenance / auto"
@@ -118,6 +119,24 @@ jobs:
           npx --yes "wrangler@${WRANGLER_VERSION}" kv key put MODE "${{ inputs.mode }}" \
             --namespace-id=92c270465033494e8c167e2e281bc473 --remote
           echo "::notice::MODE set to '${{ inputs.mode }}'. No route is bound to app.buildwithwitness.com, so this only affects the Worker's own *.workers.dev URL."
+
+  get-mode:
+    name: Read current MODE from KV (read-only)
+    if: inputs.action == 'get-mode'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: wrangler kv key get MODE
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@${WRANGLER_VERSION}" kv key get MODE \
+            --namespace-id=92c270465033494e8c167e2e281bc473 --remote
 
   diagnose-subdomain:
     name: Diagnose why the workers.dev route 404s (read-only, GET only)
