@@ -7,7 +7,7 @@
 # app.buildwithwitness.com serves. Binding the route is a separate,
 # explicitly approved edit to wrangler.toml, done before re-running this.
 #
-# Two independently-dispatched actions, same pattern as
+# Three independently-dispatched actions, same pattern as
 # cutover-www-custom-domain.yml, never auto-chained:
 #   create-kv  Creates the Workers KV namespace this Worker's MODE toggle
 #              lives in. Safe to run once; re-running after the namespace
@@ -16,6 +16,10 @@
 #   deploy     Publishes the Worker to its own *.workers.dev URL only --
 #              wrangler.toml's route stays commented out regardless of this
 #              action, so app.buildwithwitness.com is never touched by it.
+#   set-mode   Writes the single MODE key (off/maintenance/auto) in the KV
+#              namespace. Takes effect immediately, no redeploy -- and since
+#              no route is bound yet, this only ever affects the Worker's own
+#              *.workers.dev URL, never app.buildwithwitness.com.
 #
 # Uses a pinned wrangler version invoked directly via npx rather than
 # cloudflare/wrangler-action, which auto-detects this repo as a pnpm
@@ -29,12 +33,22 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "create-kv (one-time namespace setup) or deploy (publishes to *.workers.dev only, per the committed wrangler.toml)"
+        description: "create-kv / deploy (*.workers.dev only) / set-mode (writes MODE in KV -- see mode input below)"
         required: true
         type: choice
         options:
           - create-kv
           - deploy
+          - set-mode
+      mode:
+        description: "set-mode only: off / maintenance / auto"
+        required: false
+        type: choice
+        options:
+          - off
+          - maintenance
+          - auto
+        default: off
 
 permissions:
   contents: read
@@ -84,3 +98,22 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes "wrangler@${WRANGLER_VERSION}" deploy
+
+  set-mode:
+    name: Write MODE to KV (workers.dev scope only -- no route bound)
+    if: inputs.action == 'set-mode'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: wrangler kv key put MODE
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@${WRANGLER_VERSION}" kv key put MODE "${{ inputs.mode }}" \
+            --namespace-id=92c270465033494e8c167e2e281bc473 --remote
+          echo "::notice::MODE set to '${{ inputs.mode }}'. No route is bound to app.buildwithwitness.com, so this only affects the Worker's own *.workers.dev URL."
