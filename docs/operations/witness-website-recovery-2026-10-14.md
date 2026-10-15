@@ -560,3 +560,85 @@ yourself through a registrar of your choice (Cloudflare Registrar is the natural
 me — pointing `www.buildwithwitness.org` at the same `witness-marketing` Pages project (or a plain
 redirect to `www.buildwithwitness.com`) is then a small, low-risk follow-on, same pattern as §13/§14.
 Nothing about `buildwithwitness.com`'s cutover depends on this either way.
+
+## 16. Maintenance Worker isolated testing — results (2026-10-15, workers.dev only)
+
+**Not bound to production. Nothing on `app.`/`api.`/`id.buildwithwitness.com` was touched at any
+point in this testing.** All of it ran against the Worker's own
+`https://witness-maintenance.dreamercoat.workers.dev` URL, via PRs #280-286 (workflow fixes, KV
+namespace creation, the `deploy`/`set-mode`/`get-mode`/`diagnose-subdomain` actions).
+
+### Worker test URL
+
+`https://witness-maintenance.dreamercoat.workers.dev`
+
+### Test results
+
+| Mode | Result |
+| --- | --- |
+| **ON** (`maintenance`) | `503`, `Retry-After: 300`, `Cache-Control: no-store, must-revalidate`, `x-witness-maintenance: true`. Body contains the exact required copy ("Our application services are currently offline...", "...through our main website" linking to `https://www.buildwithwitness.com/`) and no infrastructure/billing/Tunnel/error-code terms (explicitly scanned for). |
+| **OFF** (`off`) | Pure pass-through — no custom headers, no modification, byte-for-byte whatever the wrapped `fetch(request)` returns. |
+| **AUTO** (`auto`) | Live-verified: a non-5xx response (the only kind obtainable against a target with no real origin) is passed through unchanged — confirms legitimate traffic is never incorrectly replaced. The 5xx/thrown-error → maintenance-fallback branch is verified by the local mocked-`fetch` test (`global.fetch` forced to throw, and to return `530`) against this exact deployed source — a live 5xx isn't practical to construct safely against an isolated test target, so this is the honest limit of what "isolated" testing can prove; the code path itself is simple and directly inspectable. |
+| Authentication-traffic safety | Not a live test (nothing is bound to `app.`, so there is no live auth flow to test against) — a **design-level** guarantee instead: the Worker's route pattern (`app.buildwithwitness.com/*`, still commented out in `wrangler.toml`) cannot syntactically match `api.`/`id.buildwithwitness.com`, which carry the real OIDC flow. |
+
+### Two real bugs found and fixed during this testing (both merged, both workflow-only)
+
+- `cloudflare/wrangler-action` tried to self-install `wrangler` via `pnpm add` at this pnpm
+  workspace's root, which pnpm refuses — fixed by invoking a pinned `wrangler@4.151.0` via `npx`
+  (PR #280, same shape as the earlier marketing-deploy fix in PR #274).
+- The workflow's own `mode` choice input had a bare `- off` in YAML, which parses as the boolean
+  `false`, not the string `"off"` — the literal string `"off"` submitted via the dispatch API could
+  never match. Fixed by quoting it (PR #285).
+
+### One content gap found and fixed
+
+- The first deployed build used this Worker's own earlier draft copy for the maintenance page, not
+  the exact wording specified for the notice. Corrected verbatim and redeployed (PR #284) before any
+  further testing or sign-off.
+
+### Confirmation that KV mode is OFF
+
+Read directly from Cloudflare, not inferred from behaviour:
+
+```text
+$ wrangler kv key get MODE --namespace-id=92c270465033494e8c167e2e281bc473 --remote
+off
+```
+
+### Exact production route changes required (not made — pending separate approval)
+
+1. Uncomment the `[[routes]]` block in
+   `deployments/cloud-managed/cloudflare-worker-maintenance/wrangler.toml`:
+
+   ```toml
+   [[routes]]
+   pattern = "app.buildwithwitness.com/*"
+   zone_name = "buildwithwitness.com"
+   ```
+
+2. Confirm `MODE` is `off` (already true) *before* deploying that change, via `get-mode`.
+3. Run `deploy` with the route uncommitted — this binds the Worker to `app.buildwithwitness.com` for
+   the first time. Because `MODE` is `off`, every request passes straight through; the bind itself
+   should be a no-op.
+4. Verify `https://app.buildwithwitness.com/` still returns exactly `530`/`1033` as it does today —
+   confirming the bind changed nothing observable.
+5. Only then, a separate, explicit step: `set-mode maintenance` — this is the moment the notice
+   actually appears to visitors. No redeploy needed.
+
+### Rollback procedure
+
+- **Disable the notice** (reversible in seconds, no redeploy): `set-mode off`.
+- **Unbind entirely**: comment the `[[routes]]` block back out in `wrangler.toml` and run `deploy`
+  again. `app.buildwithwitness.com` returns to being served solely by whatever the
+  `witness-prod` Tunnel situation resolves to (today: `530`/`1033`).
+- No database, application, or DigitalOcean rollback is ever required — this Worker has never
+  touched any of them.
+
+### GO/NO-GO recommendation
+
+**GO**, for the specific, narrow step of binding the route with `MODE=off` (step 3 above) — logic is
+tested, the content bug and both workflow bugs are already fixed, and that step is designed to be a
+no-op the moment it happens, independently verifiable before anything is shown to a real visitor.
+
+Flipping to `maintenance` (step 5) is a separate decision with a real user-facing effect and should
+get its own explicit go-ahead at that time, not be bundled into this recommendation.
