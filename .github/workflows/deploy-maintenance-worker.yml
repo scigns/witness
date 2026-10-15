@@ -46,10 +46,10 @@ on:
         required: false
         type: choice
         options:
-          - off
+          - "off"
           - maintenance
           - auto
-        default: off
+        default: "off"
 
 permissions:
   contents: read
