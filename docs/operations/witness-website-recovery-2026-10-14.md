@@ -1,11 +1,11 @@
 # Witness Website Recovery — 2026-10-14
 
 **Owner:** Infrastructure/Engineering (incident response)
-**Status:** Root cause confirmed (DigitalOcean account lock, not a Tunnel-specific fault); marketing
-Pages deployment built and PR'd ([#272](https://github.com/scigns/witness/pull/272), CI all green);
-maintenance-fallback Worker designed, logic-tested and split into its own PR
-([#273](https://github.com/scigns/witness/pull/273)) so it cannot block the marketing recovery; cost
-proposal below. All production-boundary steps remain pending explicit approval.
+**Status:** **`www.buildwithwitness.com` is live in production**, serving the Witness marketing site
+from Cloudflare Pages, independent of DigitalOcean — see §14 for the final verification. Root cause
+confirmed (DigitalOcean account lock, not a Tunnel-specific fault). The maintenance-fallback Worker
+(PR [#273](https://github.com/scigns/witness/pull/273)) remains merged but unbound/inactive, pending
+separate approval.
 **Incident context:** Simultaneous Cloudflare Tunnel disconnections, 2026-10-13, also affecting
 Integrate Pasifika tunnels (handled by a separate session/worktree; not touched here). Scope expanded
 2026-10-14 from temporary-outage recovery to financially sustainable availability and data protection
@@ -68,7 +68,7 @@ connected). Confirmed by direct HTTPS checks at the time of writing (2026-10-14 
 | `id.buildwithwitness.com` | `buildwithwitness.com` | `530` / `1033` |
 | `preview.buildwithwitness.com` (the only place the real marketing build has ever been live) | `buildwithwitness.com` | `530` / `1033` |
 | `witness-prod-web/api/id.pacificdigitalconsultancy.org` | `pacificdigitalconsultancy.org` | `530` / `1033` |
-| `buildwithwitness.org` | — | Registered (`whois` status `ACTIVE`) but has **no nameservers configured** — not pointed at Cloudflare or anywhere. Not live, not a viable immediate substitute. |
+| `buildwithwitness.org` | — | **Correction, 2026-10-14 ~23:00 UTC (see §15): not registered at all.** The morning check's `whois` read the `.org` TLD registry's own "ACTIVE" status, not the domain's; querying the authoritative registry directly (`whois -h whois.publicinterestregistry.org buildwithwitness.org`) returns "Domain not found." Not live, not a viable immediate substitute, and not something to configure — it would need to be registered first, which is outside what this worktree can or should do (see §15). |
 
 Identical `1033` across both zones and every subdomain confirms a single shared tunnel backs all of
 them — this is exactly the incident already in progress for `witness-prod`, not a separate website
@@ -463,3 +463,100 @@ This section is the proposal requested by Decision 5/Step 2 — nothing below ha
   the prior state is known before any change is made.
 - No database, application, or DigitalOcean rollback is ever required for this plan — it never
   touches any of them.
+
+## 14. Production cutover executed — final status (2026-10-14 23:48 UTC)
+
+**`www.buildwithwitness.com` is live.** The custom domain was attached to the `witness-marketing`
+Pages project via PR [#277](https://github.com/scigns/witness/pull/277)'s
+`cutover-www-custom-domain.yml` workflow (`apply` action). The DNS CNAME itself was changed manually
+(outside this worktree's token scope — see "Known gap" below), which is how the custom domain's
+validation was able to complete.
+
+### Transient 522 during cutover — diagnosed and resolved
+
+A Cloudflare error 522 was observed briefly at 10:52:47 UTC, in the window between the DNS change and
+Cloudflare completing the custom domain's HTTP validation and certificate issuance (certificate
+authority: Google). By 10:54:00 UTC, and confirmed repeatedly since, it had fully resolved. Diagnosed
+read-only via PR [#278](https://github.com/scigns/witness/pull/278)'s `diagnose` action, querying the
+Cloudflare API directly rather than relying on public DNS alone:
+
+- Pages custom-domain status: `"status": "active"`, `verification_data.status: "active"`,
+  `validation_data.status: "active"`.
+- Zone DNS record for `www`, zone Worker routes, and redirect/origin rulesets: all returned
+  `"Authentication error"` — out of this token's scope (`Account → Pages:Edit` only), so a
+  conflicting route at those layers could not be directly ruled in or out.
+- Account Cloudflare Tunnel list: returned `success: true` with `0` results — almost certainly a
+  scope artifact (the `witness-prod` tunnel is known to exist from the rest of this investigation),
+  not evidence that no tunnel exists. Reported as inconclusive, not as a clean result.
+- No further action was needed — the 522 resolved on its own as validation completed, which is the
+  expected behaviour for this specific error signature in this specific window, not a sign of a
+  conflicting route.
+
+### Final verification (all re-checked directly, not assumed)
+
+- All 21 content routes: `200`.
+- `/health` → `{"service":"witness-marketing","status":"ok"}`.
+- `/robots.txt` → `Disallow: /` — **indexing remains off**, as required.
+- Canonical `<link>` tag now correctly reads `https://www.buildwithwitness.com` (matches the live
+  host exactly, since this is the same build verified pre-cutover — no rebuild was needed).
+- Brand logo asset: `200`.
+- Apex (`buildwithwitness.com`) still `301 → https://www.buildwithwitness.com/`.
+- `app.`, `api.`, `id.`, `preview.buildwithwitness.com`: all unchanged (`530`/`1033`, same as before
+  this work started) — nothing of theirs was touched at any point.
+- The Pages project's own `*.pages.dev` URL continues to serve independently alongside the custom
+  domain.
+
+### Known gap, for whoever handles a future rollback
+
+The DNS CNAME change was made directly in the Cloudflare dashboard, outside the token's scope
+available to this worktree, so the exact prior record (target, TTL, proxy status) was never captured
+via API before the change — only the pre-change public HTTP signature (530/1033, Cloudflare anycast
+IPs) was recorded. A future rollback to the Tunnel-backed origin will need whoever has DNS access to
+either recall or look up that prior CNAME target directly in the Cloudflare dashboard's audit log,
+not from this document.
+
+### What remains
+
+- PR #273 (maintenance Worker) stays merged but unbound and inactive — no change requested or made
+  here.
+- Indexing (`WITNESS_MARKETING_INDEXABLE`) remains off; enabling it is a separate, later,
+  explicitly-approved decision, same as always.
+- The DigitalOcean account lock (§0, §6) remains unresolved and is unaffected by any of this —
+  `www.buildwithwitness.com` now being independent of it was the entire point.
+
+## 15. `buildwithwitness.org` — correction and why this is not a "fix," it's a registration decision
+
+**Requested:** "www.buildwithwitness.org is offline, fix immediately." Investigated read-only; nothing
+was changed.
+
+**Finding: the domain is not currently registered at all**, not merely unconfigured:
+
+```text
+$ whois -h whois.publicinterestregistry.org buildwithwitness.org
+Domain not found.
+```
+
+This corrects §1's table, which carried forward a misread from this morning's investigation: a
+generic `whois` client surfaced the `.org` **registry's** own `status: ACTIVE` (true of the `.org` TLD
+itself, always) rather than following through to the domain-specific registry
+(`whois.publicinterestregistry.org`), which has no record of this name. `dig NS`/`dig A` for both the
+apex and `www` return nothing because there is nothing to return — no registration means no
+delegation, no zone, no record, nothing a DNS fix could act on.
+
+**Why "fix immediately" isn't the right frame here:** there is no outage to resolve — the domain has
+presumably never been live, under this account or any other. The only way to make
+`buildwithwitness.org` serve anything is to **register** it first, which is a purchase (a financial
+transaction with a registrar, using a payment method) and therefore not an action this worktree
+performs under any circumstance, regardless of urgency. This is a deliberate limit, not a missing
+permission to request.
+
+**Worth flagging, independent of urgency:** an unregistered domain closely matching the Witness brand
+is available for anyone — not just Witness — to register. That's a trademark/phishing-surface
+consideration worth a conscious decision, not an emergency this document can resolve.
+
+**Recommendation, pending your decision:** if you want `buildwithwitness.org` secured, register it
+yourself through a registrar of your choice (Cloudflare Registrar is the natural fit, matching the
+`.com` zone already in Cloudflare). Once registered, delegate its nameservers to Cloudflare and tell
+me — pointing `www.buildwithwitness.org` at the same `witness-marketing` Pages project (or a plain
+redirect to `www.buildwithwitness.com`) is then a small, low-risk follow-on, same pattern as §13/§14.
+Nothing about `buildwithwitness.com`'s cutover depends on this either way.
